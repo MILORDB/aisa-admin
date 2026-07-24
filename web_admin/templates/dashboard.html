@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - AIsa Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+        .header h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .header .user a {
+            color: #fff; text-decoration: none; opacity: 0.7;
+            padding: 4px 12px; border-radius: 12px; background: rgba(255,255,255,0.1);
+        }
+        .header .user a:hover { opacity: 1; background: rgba(255,255,255,0.2); }
+        
+        .container { display: flex; gap: 24px; padding: 24px; max-width: 1400px; margin: 0 auto; flex-wrap: wrap; }
+        .card {
+            background: #1a1a2e; border-radius: 12px; padding: 20px;
+            flex: 1; min-width: 280px; border: 1px solid #2a2a3e;
+        }
+        .card h2 { font-size: 16px; color: #888; margin-bottom: 16px; border-bottom: 1px solid #2a2a3e; padding-bottom: 10px; }
+        .card h3 { font-size: 14px; color: #aaa; margin: 12px 0 8px; }
+        
+        .modulo-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 0; border-bottom: 1px solid #1a1a2e;
+        }
+        .modulo-item .info { flex: 1; }
+        .modulo-item .info .nombre { font-weight: 600; font-size: 14px; }
+        .modulo-item .info .desc { font-size: 11px; color: #888; }
+        
+        .switch {
+            position: relative; width: 44px; height: 24px; cursor: pointer;
+            background: #333; border-radius: 12px; transition: background 0.3s;
+            flex-shrink: 0; margin-left: 12px;
+        }
+        .switch.active { background: #6c3ce0; }
+        .switch .slider {
+            position: absolute; top: 2px; left: 2px;
+            width: 20px; height: 20px; background: #fff; border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        .switch.active .slider { transform: translateX(20px); }
+        
+        .badge {
+            padding: 2px 10px; border-radius: 12px; font-size: 10px; font-weight: 600;
+        }
+        .badge.admin { background: #6c3ce0; color: #fff; }
+        .badge.usuario { background: #2a2a3e; color: #aaa; }
+        .badge.trabajador { background: #ff9800; color: #000; }
+        .badge.activo { background: #224422; color: #6bff6b; }
+        .badge.inactivo { background: #442222; color: #ff6b6b; }
+        .badge.permiso { background: #224422; color: #6bff6b; font-size: 9px; }
+        .badge.sin_permiso { background: #442222; color: #ff6b6b; font-size: 9px; }
+        
+        .btn-sm {
+            padding: 4px 12px; border: none; border-radius: 12px;
+            cursor: pointer; font-size: 11px; transition: opacity 0.3s;
+        }
+        .btn-sm:hover { opacity: 0.8; }
+        .btn-sm.activar { background: #224422; color: #6bff6b; }
+        .btn-sm.desactivar { background: #442222; color: #ff6b6b; }
+        .btn-sm.promover { background: #6c3ce0; color: #fff; }
+        .btn-sm.eliminar { background: #442222; color: #ff6b6b; }
+        .btn-sm.eliminar:hover { background: #661111; }
+        
+        .tabla {
+            width: 100%; border-collapse: collapse; font-size: 13px;
+        }
+        .tabla th {
+            text-align: left; padding: 6px 8px; color: #888;
+            border-bottom: 1px solid #2a2a3e; font-weight: 600;
+        }
+        .tabla td {
+            padding: 6px 8px; border-bottom: 1px solid #1a1a2e; vertical-align: middle;
+        }
+        .tabla .permisos-modulos { display: flex; flex-wrap: wrap; gap: 4px; }
+        .tabla .permisos-modulos .badge { font-size: 9px; }
+        
+        .scrollable { max-height: 400px; overflow-y: auto; }
+        .scrollable::-webkit-scrollbar { width: 4px; }
+        .scrollable::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        
+        .btn {
+            padding: 8px 18px; border: none; border-radius: 8px;
+            cursor: pointer; font-size: 13px; transition: all 0.3s;
+            text-decoration: none; display: inline-block;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-warning { background: #ff9800; color: #000; }
+        .btn-warning:hover { background: #e68900; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-success:hover { background: #3d8b40; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-danger:hover { background: #c62828; }
+        .btn-sm { padding: 4px 12px; font-size: 11px; }
+        
+        .admin-actions {
+            display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;
+        }
+        .admin-actions .btn { font-size: 12px; padding: 6px 14px; }
+        
+        .acciones-cell {
+            display: flex; gap: 4px; flex-wrap: wrap;
+        }
+        
+        .stats-mini {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px; margin-bottom: 12px;
+        }
+        .stats-mini .stat {
+            background: #0f0f1a; border: 1px solid #2a2a3e; border-radius: 8px;
+            padding: 12px; text-align: center;
+        }
+        .stats-mini .stat .num { font-size: 22px; font-weight: 700; color: #6c3ce0; }
+        .stats-mini .stat .label { font-size: 10px; color: #888; }
+        
+        @media (max-width: 768px) {
+            .container { padding: 16px; }
+            .card { min-width: 100%; }
+            .tabla { font-size: 11px; }
+            .acciones-cell { flex-direction: column; gap: 2px; }
+            .acciones-cell .btn-sm { width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1>🤖 AIsa <span style="font-size:14px;font-weight:normal;opacity:0.7;">Panel de Administración</span></h1>
+        <div class="user">
+            <span>👤 {{ usuario.nombre or usuario.username }} ({{ usuario.rol }})</span>
+            <a href="/logout">Cerrar sesión</a>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <!-- Acciones rápidas -->
+        <div class="card" style="width:100%;">
+            <h2>⚡ Acciones Rápidas</h2>
+            <div class="admin-actions">
+                <a href="/admin/db" class="btn btn-primary">🗄️ Gestor de Base de Datos</a>
+                <a href="/admin/perfil" class="btn btn-warning">👤 Mi Perfil</a>
+                <a href="/admin/trabajadores/pendientes" class="btn btn-success">📋 Trabajadores Pendientes</a>
+            </div>
+
+            <div style="margin-top:16px; padding-top:16px; border-top:1px solid #2a2a3e;">
+                <div class="stats-mini" id="statsMini">
+                    <div class="stat"><span class="num" id="statTotalUsuarios">0</span><span class="label">👥 Usuarios</span></div>
+                    <div class="stat"><span class="num" id="statTotalProductos">0</span><span class="label">📦 Productos</span></div>
+                    <div class="stat"><span class="num" id="statTotalVentas">0</span><span class="label">💰 Ventas</span></div>
+                    <div class="stat"><span class="num" id="statTotalServicios">0</span><span class="label">📋 Servicios</span></div>
+                    <div class="stat"><span class="num" id="statTotalContratos">0</span><span class="label">📄 Contratos</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- USUARIOS -->
+        <div class="card" style="flex:2;">
+            <h2>👥 Usuarios y Permisos</h2>
+            <div class="scrollable">
+                <table class="tabla" id="tablaUsuarios">
+                    <thead>
+                        <tr>
+                            <th>Usuario</th>
+                            <th>Rol</th>
+                            <th>Estado</th>
+                            <th>Módulos</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usuariosBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- MÓDULOS GLOBALES -->
+        <div class="card" style="flex:1;">
+            <h2>🧩 Módulos Globales</h2>
+            <div id="modulosGlobales"></div>
+        </div>
+    </div>
+
+    <script>
+        let modulosGlobales = [];
+
+        // ============================================
+        // CARGAR DATOS
+        // ============================================
+
+        async function cargarDatos() {
+            try {
+                const modRes = await fetch('/api/modulos');
+                modulosGlobales = await modRes.json();
+                renderModulosGlobales();
+
+                const usersRes = await fetch('/api/usuarios');
+                const usuarios = await usersRes.json();
+                renderUsuarios(usuarios);
+
+                // Estadísticas
+                const statsRes = await fetch('/api/estadisticas');
+                const stats = await statsRes.json();
+                document.getElementById('statTotalUsuarios').textContent = stats.total_usuarios || 0;
+                document.getElementById('statTotalProductos').textContent = stats.total_productos || 0;
+                document.getElementById('statTotalVentas').textContent = stats.total_ventas || 0;
+                document.getElementById('statTotalServicios').textContent = stats.total_servicios || 0;
+                document.getElementById('statTotalContratos').textContent = stats.total_contratos || 0;
+
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // ============================================
+        // RENDER MÓDULOS GLOBALES
+        // ============================================
+
+        function renderModulosGlobales() {
+            const container = document.getElementById('modulosGlobales');
+            container.innerHTML = '';
+            
+            modulosGlobales.forEach(mod => {
+                const div = document.createElement('div');
+                div.className = 'modulo-item';
+                div.innerHTML = `
+                    <div class="info">
+                        <div class="nombre">${mod.nombre}</div>
+                        <div class="desc">${mod.descripcion || ''}</div>
+                    </div>
+                    <div class="switch ${mod.activo_global ? 'active' : ''}" 
+                         onclick="toggleModuloGlobal(${mod.id}, ${mod.activo_global ? 0 : 1})">
+                        <div class="slider"></div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // ============================================
+        // RENDER USUARIOS
+        // ============================================
+
+        async function renderUsuarios(usuarios) {
+            const tbody = document.getElementById('usuariosBody');
+            tbody.innerHTML = '';
+
+            // Obtener el ID del admin actual desde el contexto
+            const adminId = {{ usuario.id }};
+
+            for (const user of usuarios) {
+                const permRes = await fetch(`/api/usuario/${user.id}/permisos`);
+                const permisos = await permRes.json();
+                
+                const tr = document.createElement('tr');
+                const esAdminActual = user.id === adminId;
+                
+                tr.innerHTML = `
+                    <td>
+                        <strong>${user.username}</strong>
+                        <br><small style="color:#888;">${user.email}</small>
+                    </td>
+                    <td>
+                        <select onchange="cambiarRol(${user.id}, this.value)" style="background:#1a1a2e;color:#fff;border:1px solid #2a2a3e;border-radius:6px;padding:4px 8px;">
+                            <option value="usuario" ${user.rol === 'usuario' ? 'selected' : ''}>Usuario</option>
+                            <option value="admin" ${user.rol === 'admin' ? 'selected' : ''}>Admin</option>
+                            <option value="trabajador" ${user.rol === 'trabajador' ? 'selected' : ''}>Trabajador</option>
+                        </select>
+                    </td>
+                    <td>
+                        <span class="badge ${user.activo ? 'activo' : 'inactivo'}">${user.activo ? '🟢 Activo' : '🔴 Inactivo'}</span>
+                        <button class="btn-sm ${user.activo ? 'desactivar' : 'activar'}" 
+                                onclick="toggleUsuario(${user.id}, ${user.activo ? 0 : 1})">
+                            ${user.activo ? 'Desactivar' : 'Activar'}
+                        </button>
+                    </td>
+                    <td>
+                        <div class="permisos-modulos">
+                            ${permisos.map(p => `
+                                <span class="badge ${p.permiso_activo ? 'permiso' : 'sin_permiso'}" 
+                                      style="cursor:pointer;" 
+                                      onclick="togglePermiso(${user.id}, ${p.id}, ${p.permiso_activo ? 0 : 1})">
+                                    ${p.nombre}
+                                </span>
+                            `).join('')}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="acciones-cell">
+                            <button class="btn-sm promover" onclick="promoverAdmin(${user.id})">⭐ Admin</button>
+                            ${!esAdminActual ? `<button class="btn-sm eliminar" onclick="eliminarUsuario(${user.id}, '${user.username}')">🗑️ Eliminar</button>` : 
+                                              `<span style="color:#666;font-size:10px;">(Tu usuario)</span>`}
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+        }
+
+        // ============================================
+        // ELIMINAR USUARIO
+        // ============================================
+
+        async function eliminarUsuario(userId, username) {
+            if (!confirm(`⚠️ ¿Estás seguro de que quieres eliminar al usuario "${username}"?\n\nEsta acción eliminará TODOS sus datos:\n• Perfil y configuración\n• Productos, ventas y servicios\n• Contratos\n• Permisos y sesiones\n\n¡No se puede deshacer!`)) {
+                return;
+            }
+            
+            if (!confirm(`⚠️ Confirmación final: ¿Eliminar "${username}" definitivamente?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/usuario/${userId}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✅ Usuario "${username}" eliminado correctamente`);
+                    cargarDatos();
+                } else {
+                    alert(`❌ Error al eliminar: ${data.error || 'Error desconocido'}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('❌ Error de conexión con el servidor');
+            }
+        }
+
+        // ============================================
+        // ACCIONES
+        // ============================================
+
+        async function toggleModuloGlobal(moduloId, activo) {
+            try {
+                await fetch(`/api/modulo/${moduloId}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ activo })
+                });
+                cargarDatos();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function toggleUsuario(userId, activo) {
+            try {
+                await fetch(`/api/usuario/${userId}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ activo })
+                });
+                cargarDatos();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function togglePermiso(userId, moduloId, activo) {
+            try {
+                await fetch(`/api/usuario/${userId}/permiso/${moduloId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ activo })
+                });
+                cargarDatos();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function cambiarRol(userId, rol) {
+            try {
+                await fetch(`/api/usuario/${userId}/rol`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rol })
+                });
+                cargarDatos();
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function promoverAdmin(userId) {
+            if (confirm('¿Dar permisos de administrador a este usuario?')) {
+                await cambiarRol(userId, 'admin');
+            }
+        }
+
+        // ============================================
+        // INICIO
+        // ============================================
+
+        cargarDatos();
+        setInterval(cargarDatos, 15000);
+    </script>
+</body>
+</html>

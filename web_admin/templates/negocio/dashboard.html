@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIsa - Negocio</title>
+    <style>
+        /* ============================================
+           RESET Y VARIABLES
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-card: #1a1a2e;
+            --bg-hover: #2a2a3e;
+            --border-color: #2a2a3e;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b8;
+            --text-muted: #666680;
+            --text-gray: #8888a0;
+            --accent: #6c3ce0;
+            --accent-hover: #5a2ec0;
+            --success: #4caf50;
+            --danger: #f44336;
+            --warning: #ff9800;
+            --radius: 12px;
+            --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ============================================
+           HEADER
+           ============================================ */
+        .header {
+            background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+            z-index: 10;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-left .logo {
+            font-size: 22px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-left .logo span {
+            font-size: 26px;
+        }
+
+        .header-left .subtitle {
+            font-size: 13px;
+            opacity: 0.7;
+            font-weight: 400;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            position: relative;
+        }
+
+        .header-right .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 30px;
+            transition: background 0.3s;
+            position: relative;
+        }
+
+        .header-right .user-info:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .header-right .user-info .avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+            transition: transform 0.3s;
+        }
+
+        .header-right .user-info:hover .avatar {
+            transform: scale(1.05);
+        }
+
+        .header-right .user-info .role-badge {
+            font-size: 10px;
+            padding: 2px 10px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.15);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .header-right .user-info .arrow {
+            font-size: 12px;
+            opacity: 0.5;
+            transition: transform 0.3s;
+        }
+
+        .header-right .user-info:hover .arrow {
+            opacity: 1;
+        }
+
+        /* ============================================
+           MENÚ DESPLEGABLE DEL USUARIO
+           ============================================ */
+        .user-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            min-width: 200px;
+            padding: 8px 0;
+            box-shadow: var(--shadow);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.25s ease;
+            z-index: 100;
+        }
+
+        .user-menu.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .user-menu .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 18px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 13px;
+            transition: background 0.2s, color 0.2s;
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+
+        .user-menu .menu-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .user-menu .menu-item .menu-icon {
+            font-size: 16px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .user-menu .menu-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 4px 12px;
+        }
+
+        .user-menu .menu-item.danger {
+            color: var(--danger);
+        }
+
+        .user-menu .menu-item.danger:hover {
+            background: rgba(244, 67, 54, 0.1);
+            color: var(--danger);
+        }
+
+        /* ============================================
+           MODAL PARA CAMBIAR CONTRASEÑA
+           ============================================ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            padding: 30px;
+            border-radius: var(--radius);
+            max-width: 420px;
+            width: 90%;
+            border: 1px solid var(--border-color);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content h3 {
+            font-size: 20px;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .modal-content .subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .modal-content .form-group {
+            margin-bottom: 16px;
+        }
+
+        .modal-content .form-group label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .modal-content .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .modal-content .form-group input:focus {
+            border-color: var(--accent);
+        }
+
+        .modal-content .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-content .form-actions .btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .modal-content .form-actions .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .modal-content .form-actions .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .modal-content .form-actions .btn-secondary {
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+        }
+
+        .modal-content .form-actions .btn-secondary:hover {
+            background: var(--border-color);
+        }
+
+        .modal-content .mensaje {
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: none;
+        }
+
+        .modal-content .mensaje.exito {
+            background: rgba(76, 175, 80, 0.15);
+            color: var(--success);
+            display: block;
+        }
+
+        .modal-content .mensaje.error {
+            background: rgba(244, 67, 54, 0.15);
+            color: var(--danger);
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ============================================
+           MAIN CONTAINER - 3 COLUMNAS
+           ============================================ */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            gap: 0;
+        }
+
+        /* ============================================
+           PANEL IZQUIERDO - MÓDULOS
+           ============================================ */
+        .panel-left {
+            width: 200px;
+            min-width: 200px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+            padding: 12px 0;
+        }
+
+        .panel-left .panel-title {
+            padding: 0 16px 12px 16px;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+
+        .panel-left .panel-title .count {
+            background: var(--bg-hover);
+            padding: 0 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            margin-left: 6px;
+        }
+
+        .panel-left .modulos-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+
+        .panel-left .modulos-container::-webkit-scrollbar {
+            width: 3px;
+        }
+
+        .panel-left .modulos-container::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 2px;
+        }
+
+        .panel-left .modulo-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            margin: 2px 8px;
+            border-radius: 8px;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+            cursor: default;
+        }
+
+        .panel-left .modulo-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .panel-left .modulo-item.active {
+            border-left-color: var(--success);
+            background: rgba(76, 175, 80, 0.08);
+            cursor: pointer;
+        }
+
+        .panel-left .modulo-item.active:hover {
+            background: rgba(76, 175, 80, 0.15);
+        }
+
+        .panel-left .modulo-item.inactive {
+            border-left-color: transparent;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .panel-left .modulo-item .modulo-icon {
+            font-size: 16px;
+            width: 28px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .panel-left .modulo-item .modulo-name {
+            font-size: 13px;
+            flex: 1;
+        }
+
+        .panel-left .modulo-item .modulo-name.active-text {
+            color: var(--text-primary);
+        }
+
+        .panel-left .modulo-item .modulo-name.inactive-text {
+            color: var(--text-gray);
+        }
+
+        .panel-left .modulo-item .modulo-status {
+            font-size: 9px;
+            padding: 1px 8px;
+            border-radius: 10px;
+            text-transform: uppercase;
+        }
+
+        .panel-left .modulo-item .modulo-status.active {
+            background: rgba(76, 175, 80, 0.15);
+            color: var(--success);
+        }
+
+        .panel-left .modulo-item .modulo-status.inactive {
+            background: rgba(244, 67, 54, 0.1);
+            color: var(--text-gray);
+        }
+
+        .panel-left .empty-message {
+            padding: 20px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        /* ============================================
+           PANEL CENTRAL - CONTENEDOR DE MÓDULOS
+           ============================================ */
+        .panel-center {
+            flex: 1;
+            background: var(--bg-primary);
+            padding: 0;
+            overflow: hidden;
+            min-width: 300px;
+            position: relative;
+        }
+
+        .panel-center .dashboard-content {
+            padding: 20px 24px;
+            overflow-y: auto;
+            height: 100%;
+        }
+
+        .panel-center .dashboard-content::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .panel-center .dashboard-content::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 2px;
+        }
+
+        .panel-center .dashboard-content.hidden {
+            display: none;
+        }
+
+        .panel-center .module-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: var(--bg-primary);
+            display: none;
+        }
+
+        .panel-center .module-frame.visible {
+            display: block;
+        }
+
+        .panel-center .loader {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            font-size: 16px;
+            flex-direction: column;
+            gap: 12px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-primary);
+        }
+
+        .panel-center .loader .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ============================================
+           ESTILOS DEL DASHBOARD (dentro del panel central)
+           ============================================ */
+        .page-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .page-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            border: 1px solid var(--border-color);
+            transition: border-color 0.3s;
+        }
+
+        .stat-card:hover {
+            border-color: var(--accent);
+        }
+
+        .stat-card .stat-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--accent);
+            display: block;
+        }
+
+        .stat-card .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            display: block;
+            margin-top: 4px;
+        }
+
+        .stat-card .stat-icon {
+            font-size: 18px;
+            margin-right: 6px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title .badge-count {
+            font-size: 11px;
+            background: var(--bg-hover);
+            padding: 0 10px;
+            border-radius: 12px;
+            color: var(--text-muted);
+        }
+
+        .trabajadores-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .trabajador-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: border-color 0.3s;
+        }
+
+        .trabajador-card:hover {
+            border-color: var(--accent);
+        }
+
+        .trabajador-card .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .trabajador-card .info {
+            flex: 1;
+        }
+
+        .trabajador-card .info .nombre {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .trabajador-card .info .cargo {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .trabajador-card .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .trabajador-card .status-dot.online {
+            background: var(--success);
+            box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
+        }
+
+        .trabajador-card .status-dot.offline {
+            background: var(--text-muted);
+        }
+
+        .trabajador-card .status-dot.ocupado {
+            background: var(--warning);
+            box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
+        }
+
+        .trabajador-empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 20px;
+            font-size: 13px;
+        }
+
+        .alertas-container {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            border: 1px solid var(--border-color);
+            margin-top: 8px;
+        }
+
+        .alertas-container .alerta-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .alertas-container .alerta-item:last-child {
+            border-bottom: none;
+        }
+
+        .alertas-container .alerta-item .alerta-icon {
+            font-size: 20px;
+        }
+
+        .alertas-container .alerta-item .alerta-info {
+            flex: 1;
+        }
+
+        .alertas-container .alerta-item .alerta-info .producto {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .alertas-container .alerta-item .alerta-info .detalle {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .alertas-container .alerta-item .alerta-accion {
+            font-size: 11px;
+            padding: 4px 12px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            background: rgba(255, 152, 0, 0.15);
+            color: var(--warning);
+            transition: background 0.3s;
+        }
+
+        .alertas-container .alerta-item .alerta-accion:hover {
+            background: rgba(255, 152, 0, 0.3);
+        }
+
+        .alertas-empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 16px;
+            font-size: 13px;
+        }
+
+        /* ============================================
+           PANEL DERECHO - ESTADÍSTICAS
+           ============================================ */
+        .panel-right {
+            width: 220px;
+            min-width: 220px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+            padding: 14px 16px;
+        }
+
+        .panel-right .stats-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .panel-right .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .panel-right .stat-item {
+            background: var(--bg-primary);
+            border-radius: var(--radius);
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .panel-right .stat-item .number {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+            display: block;
+        }
+
+        .panel-right .stat-item .label {
+            font-size: 10px;
+            color: var(--text-muted);
+            display: block;
+            margin-top: 2px;
+        }
+
+        .panel-right .reports-section {
+            flex: 1;
+            padding-top: 12px;
+            overflow-y: auto;
+        }
+
+        .panel-right .reports-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .panel-right .report-item {
+            background: var(--bg-primary);
+            border-radius: var(--radius);
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: border-color 0.3s;
+            cursor: pointer;
+        }
+
+        .panel-right .report-item:hover {
+            border-color: var(--accent);
+        }
+
+        .panel-right .report-item .report-name {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .panel-right .report-item .report-date {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .panel-right .report-item .report-download {
+            font-size: 11px;
+            padding: 2px 10px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            background: rgba(108, 60, 224, 0.15);
+            color: var(--accent);
+            transition: background 0.3s;
+        }
+
+        .panel-right .report-item .report-download:hover {
+            background: rgba(108, 60, 224, 0.3);
+        }
+
+        .panel-right .reports-empty {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+            padding: 20px 0;
+        }
+
+        .panel-right .hoy-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .panel-right .hoy-label strong {
+            color: var(--text-primary);
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        @media (max-width: 1024px) {
+            .panel-left { width: 160px; min-width: 160px; }
+            .panel-right { width: 180px; min-width: 180px; }
+            .stats-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+            .trabajadores-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+        }
+
+        @media (max-width: 768px) {
+            .panel-left { display: none; }
+            .panel-right {
+                width: 100%;
+                min-width: unset;
+                border-left: none;
+                border-top: 1px solid var(--border-color);
+                max-height: 250px;
+                flex-direction: row;
+                flex-wrap: wrap;
+                padding: 12px 16px;
+                overflow-y: auto;
+            }
+            .panel-right .stats-title { width: 100%; }
+            .panel-right .stats-grid { width: 100%; }
+            .panel-right .reports-section { display: none; }
+            .main-container { flex-direction: column; }
+            .panel-center { min-height: 400px; }
+            .header-left .subtitle { display: none; }
+            .header-right .user-info .role-badge { display: none; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .trabajadores-grid { grid-template-columns: 1fr 1fr; }
+            .user-menu {
+                right: -10px;
+                min-width: 180px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header { padding: 10px 16px; flex-wrap: wrap; gap: 8px; }
+            .panel-right .stats-grid { grid-template-columns: 1fr 1fr 1fr; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .trabajadores-grid { grid-template-columns: 1fr; }
+            .user-menu {
+                right: -20px;
+                min-width: 160px;
+            }
+            .user-menu .menu-item { font-size: 12px; padding: 8px 14px; }
+            .modal-content { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ============================================
+    HEADER - CON MENÚ DESPLEGABLE
+    ============================================ -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <span>🏢</span>
+                AIsa
+                <span class="subtitle">Panel de Negocio</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="user-info" id="userMenuToggle">
+                <div class="avatar">👤</div>
+                <span>{{ usuario.nombre or usuario.username }}</span>
+                <span class="role-badge">{{ usuario.rol }}</span>
+                <span class="arrow">▼</span>
+            </div>
+
+            <!-- Menú desplegable -->
+            <div class="user-menu" id="userMenu">
+                <button class="menu-item" onclick="abrirModalPassword()">
+                    <span class="menu-icon">🔑</span>
+                    Cambiar contraseña
+                </button>
+                <div class="menu-divider"></div>
+                <a href="/logout" class="menu-item danger">
+                    <span class="menu-icon">🚪</span>
+                    Cerrar sesión
+                </a>
+            </div>
+
+            <a href="/logout" class="logout-btn" style="display:none;">Cerrar sesión</a>
+        </div>
+    </header>
+
+    <!-- ============================================
+    MODAL PARA CAMBIAR CONTRASEÑA
+    ============================================ -->
+    <div class="modal-overlay" id="modalPassword">
+        <div class="modal-content">
+            <h3>🔑 Cambiar Contraseña</h3>
+            <div class="subtitle">Actualiza tu contraseña de acceso</div>
+
+            <div class="mensaje" id="mensajePassword"></div>
+
+            <div class="form-group">
+                <label>Contraseña actual</label>
+                <input type="password" id="currentPassword" placeholder="Ingresa tu contraseña actual">
+            </div>
+            <div class="form-group">
+                <label>Nueva contraseña</label>
+                <input type="password" id="newPassword" placeholder="Nueva contraseña (mínimo 6 caracteres)">
+            </div>
+            <div class="form-group">
+                <label>Confirmar nueva contraseña</label>
+                <input type="password" id="confirmPassword" placeholder="Confirma tu nueva contraseña">
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="cambiarPassword()">Actualizar</button>
+                <button class="btn btn-secondary" onclick="cerrarModalPassword()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================
+    MAIN CONTAINER - 3 COLUMNAS
+    ============================================ -->
+    <div class="main-container">
+
+        <!-- ============================================
+        PANEL IZQUIERDO - MÓDULOS
+        ============================================ -->
+        <div class="panel-left">
+            <div class="panel-title">
+                🧩 Módulos
+                <span class="count" id="totalModulos">0</span>
+            </div>
+            <div class="modulos-container" id="modulosContainer">
+                <div class="empty-message">Cargando módulos...</div>
+            </div>
+        </div>
+
+        <!-- ============================================
+        PANEL CENTRAL - CONTENEDOR DE MÓDULOS
+        ============================================ -->
+        <div class="panel-center" id="panelCenter">
+
+            <!-- Dashboard (vista por defecto) -->
+            <div class="dashboard-content" id="dashboardContent">
+                <div class="page-title">📊 Resumen del Negocio</div>
+                <div class="page-subtitle" id="fechaActual">Cargando fecha...</div>
+
+                <!-- Estadísticas generales -->
+                <div class="stats-grid" id="statsGrid">
+                    <div class="stat-card">
+                        <span class="stat-number" id="statTotalVentas">0</span>
+                        <span class="stat-label"><span class="stat-icon">💰</span> Ventas totales</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="statIngresosTotales">$0</span>
+                        <span class="stat-label"><span class="stat-icon">💵</span> Ingresos totales</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="statProductosTotales">0</span>
+                        <span class="stat-label"><span class="stat-icon">📦</span> Productos</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="statServiciosTotales">0</span>
+                        <span class="stat-label"><span class="stat-icon">📋</span> Servicios</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number" id="statContratosTotales">0</span>
+                        <span class="stat-label"><span class="stat-icon">📄</span> Contratos</span>
+                    </div>
+                </div>
+
+                <!-- Trabajadores activos -->
+                <div class="section-title">
+                    👷 Trabajadores en turno
+                    <span class="badge-count" id="trabajadoresCount">0</span>
+                </div>
+                <div class="trabajadores-grid" id="trabajadoresGrid">
+                    <div class="trabajador-empty">Cargando trabajadores...</div>
+                </div>
+
+                <!-- Alertas de stock -->
+                <div class="section-title">
+                    ⚠️ Alertas de stock bajo
+                    <span class="badge-count" id="alertasCount">0</span>
+                </div>
+                <div class="alertas-container" id="alertasContainer">
+                    <div class="alertas-empty">Cargando alertas...</div>
+                </div>
+            </div>
+
+            <!-- Contenedor del iframe para módulos -->
+            <iframe id="moduleFrame" class="module-frame"></iframe>
+
+            <!-- Loader -->
+            <div class="loader" id="moduleLoader">
+                <div class="spinner"></div>
+                <span>Cargando módulo...</span>
+            </div>
+
+        </div>
+
+        <!-- ============================================
+        PANEL DERECHO - ESTADÍSTICAS RÁPIDAS
+        ============================================ -->
+        <div class="panel-right">
+
+            <div class="stats-title">📊 Estadísticas de hoy</div>
+            <div class="hoy-label" id="fechaHoy">📅 Cargando fecha...</div>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="number" id="statVentasHoy">0</span>
+                    <span class="label">💰 Ventas</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="statClientesHoy">0</span>
+                    <span class="label">👥 Clientes</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="statIngresosHoy">$0</span>
+                    <span class="label">💵 Ingresos</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="statModulosActivos">0</span>
+                    <span class="label">🧩 Módulos activos</span>
+                </div>
+            </div>
+
+            <div class="reports-section">
+                <div class="reports-title">📄 Reportes</div>
+                <div id="reportesContainer">
+                    <div class="reports-empty">No hay reportes generados</div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ============================================
+    SCRIPTS
+    ============================================ -->
+    <script>
+        let usuarioId = {{ usuario.id }};
+        let modulos = [];
+        let intervaloActualizacion = null;
+        let moduloCargado = false;
+
+        // ============================================
+        // MENÚ DESPLEGABLE
+        // ============================================
+
+        document.getElementById('userMenuToggle').addEventListener('click', function(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('userMenu');
+            menu.classList.toggle('open');
+        });
+
+        document.addEventListener('click', function() {
+            const menu = document.getElementById('userMenu');
+            menu.classList.remove('open');
+        });
+
+        // ============================================
+        // MODAL DE CONTRASEÑA
+        // ============================================
+
+        function abrirModalPassword() {
+            document.getElementById('modalPassword').classList.add('show');
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            document.getElementById('mensajePassword').className = 'mensaje';
+            document.getElementById('mensajePassword').textContent = '';
+            document.getElementById('userMenu').classList.remove('open');
+        }
+
+        function cerrarModalPassword() {
+            document.getElementById('modalPassword').classList.remove('show');
+        }
+
+        document.getElementById('modalPassword').addEventListener('click', function(e) {
+            if (e.target === this) {
+                cerrarModalPassword();
+            }
+        });
+
+        document.getElementById('currentPassword').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') document.getElementById('newPassword').focus();
+        });
+
+        document.getElementById('newPassword').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') document.getElementById('confirmPassword').focus();
+        });
+
+        document.getElementById('confirmPassword').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') cambiarPassword();
+        });
+
+        // ============================================
+        // CAMBIAR CONTRASEÑA
+        // ============================================
+
+        async function cambiarPassword() {
+            const current = document.getElementById('currentPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confirm = document.getElementById('confirmPassword').value;
+            const mensajeEl = document.getElementById('mensajePassword');
+
+            mensajeEl.className = 'mensaje';
+            mensajeEl.textContent = '';
+
+            if (!current || !newPass || !confirm) {
+                mensajeEl.className = 'mensaje error';
+                mensajeEl.textContent = '❌ Completa todos los campos';
+                return;
+            }
+
+            if (newPass.length < 6) {
+                mensajeEl.className = 'mensaje error';
+                mensajeEl.textContent = '❌ La nueva contraseña debe tener al menos 6 caracteres';
+                return;
+            }
+
+            if (newPass !== confirm) {
+                mensajeEl.className = 'mensaje error';
+                mensajeEl.textContent = '❌ Las contraseñas no coinciden';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/perfil/password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        current_password: current,
+                        new_password: newPass
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    mensajeEl.className = 'mensaje exito';
+                    mensajeEl.textContent = '✅ Contraseña actualizada correctamente';
+                    document.getElementById('currentPassword').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('confirmPassword').value = '';
+                    setTimeout(() => {
+                        cerrarModalPassword();
+                    }, 1500);
+                } else {
+                    mensajeEl.className = 'mensaje error';
+                    mensajeEl.textContent = `❌ ${data.error || 'Error al cambiar contraseña'}`;
+                }
+            } catch (error) {
+                mensajeEl.className = 'mensaje error';
+                mensajeEl.textContent = '❌ Error de conexión con el servidor';
+                console.error(error);
+            }
+        }
+
+        // ============================================
+        // OBTENER FECHA ACTUAL
+        // ============================================
+
+        function obtenerFechaHoy() {
+            const hoy = new Date();
+            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            return hoy.toLocaleDateString('es-ES', opciones);
+        }
+
+        // ============================================
+        // CARGAR DATOS PRINCIPALES
+        // ============================================
+
+        async function cargarDatos() {
+            try {
+                const modRes = await fetch('/api/modulos');
+                const modulosData = await modRes.json();
+                modulos = Array.isArray(modulosData) ? modulosData : (modulosData.modulos || Object.values(modulosData));
+
+                const permRes = await fetch(`/api/usuario/${usuarioId}/permisos`);
+                const permisos = await permRes.json();
+
+                renderModulos(permisos);
+
+                if (!moduloCargado) {
+                    await cargarEstadisticasNegocio();
+                    await cargarTrabajadores();
+                    await cargarAlertasStock();
+                }
+
+                document.getElementById('fechaActual').textContent = `📅 ${obtenerFechaHoy()}`;
+                document.getElementById('fechaHoy').innerHTML = `📅 ${obtenerFechaHoy()}`;
+
+                if (intervaloActualizacion) clearInterval(intervaloActualizacion);
+                intervaloActualizacion = setInterval(cargarDatos, 30000);
+
+            } catch (error) {
+                console.error('Error al cargar datos:', error);
+            }
+        }
+
+        // ============================================
+        // RENDER MÓDULOS (Panel Izquierdo)
+        // ============================================
+
+        function renderModulos(permisos) {
+            const container = document.getElementById('modulosContainer');
+            container.innerHTML = '';
+
+            // Nombres de módulos de negocio (incluyendo CONTRATOS)
+            const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos'];
+            
+            const modulosNegocio = modulos.filter(m => 
+                m && m.nombre && nombresNegocio.includes(m.nombre.toLowerCase())
+            );
+
+            if (modulosNegocio.length === 0) {
+                container.innerHTML = '<div class="empty-message">No hay módulos disponibles</div>';
+                return;
+            }
+
+            document.getElementById('totalModulos').textContent = modulosNegocio.length;
+            let activos = 0;
+
+            // Iconos para cada módulo
+            const iconos = {
+                'inventario': '📦', 
+                'tienda': '🛍️',
+                'trabajadores': '👥', 
+                'servicios': '📋', 
+                'ventas': '💰',
+                'contratos': '📄'
+            };
+
+            modulosNegocio.forEach(mod => {
+                const permiso = Array.isArray(permisos) ? permisos.find(p => p.id === mod.id) : null;
+                const activo = permiso && permiso.permiso_activo === 1;
+
+                let clase = 'inactive';
+                let textoClase = 'inactive-text';
+                let statusText = '🔒 Inactivo';
+                let statusClase = 'inactive';
+
+                if (activo) {
+                    clase = 'active';
+                    textoClase = 'active-text';
+                    statusText = '✅ Activo';
+                    statusClase = 'active';
+                    activos++;
+                }
+
+                const icono = iconos[mod.nombre] || '📦';
+
+                const div = document.createElement('div');
+                div.className = `modulo-item ${clase}`;
+                div.dataset.modulo = mod.nombre;
+                div.innerHTML = `
+                    <span class="modulo-icon">${icono}</span>
+                    <span class="modulo-name ${textoClase}">${mod.nombre.charAt(0).toUpperCase() + mod.nombre.slice(1)}</span>
+                    <span class="modulo-status ${statusClase}">${statusText}</span>
+                `;
+
+                if (activo) {
+                    div.style.cursor = 'pointer';
+                    div.addEventListener('click', () => cargarModulo(mod.nombre));
+                } else {
+                    div.style.cursor = 'not-allowed';
+                    div.title = 'Módulo inactivo. Solicita activación al administrador.';
+                }
+
+                container.appendChild(div);
+            });
+
+            document.getElementById('statModulosActivos').textContent = activos;
+        }
+
+        // ============================================
+        // CARGAR MÓDULO EN EL PANEL CENTRAL (IFRAME)
+        // ============================================
+
+        function cargarModulo(nombre) {
+            const dashboardContent = document.getElementById('dashboardContent');
+            const moduleFrame = document.getElementById('moduleFrame');
+            const loader = document.getElementById('moduleLoader');
+
+            dashboardContent.classList.add('hidden');
+            moduleFrame.classList.remove('visible');
+            loader.style.display = 'flex';
+
+            moduloCargado = true;
+
+            moduleFrame.src = `/negocio/${nombre}`;
+
+            moduleFrame.onload = function() {
+                loader.style.display = 'none';
+                moduleFrame.classList.add('visible');
+            };
+
+            document.querySelectorAll('.modulo-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.modulo === nombre) {
+                    item.classList.add('active');
+                }
+            });
+        }
+
+        // ============================================
+        // VOLVER AL DASHBOARD
+        // ============================================
+
+        function volverDashboard() {
+            const dashboardContent = document.getElementById('dashboardContent');
+            const moduleFrame = document.getElementById('moduleFrame');
+            const loader = document.getElementById('moduleLoader');
+
+            dashboardContent.classList.remove('hidden');
+            moduleFrame.classList.remove('visible');
+            loader.style.display = 'none';
+            moduleFrame.src = '';
+
+            moduloCargado = false;
+
+            cargarEstadisticasNegocio();
+            cargarTrabajadores();
+            cargarAlertasStock();
+
+            document.querySelectorAll('.modulo-item').forEach(item => {
+                item.classList.remove('active');
+            });
+        }
+
+        // ============================================
+        // CARGAR ESTADÍSTICAS DEL NEGOCIO
+        // ============================================
+
+        async function cargarEstadisticasNegocio() {
+            try {
+                const ventasRes = await fetch('/api/ventas');
+                const ventas = await ventasRes.json();
+                const totalVentas = ventas.length;
+                const totalIngresos = ventas.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+
+                document.getElementById('statTotalVentas').textContent = totalVentas;
+                document.getElementById('statIngresosTotales').textContent = `$${totalIngresos.toFixed(2)}`;
+
+                const prodRes = await fetch('/api/productos');
+                const productos = await prodRes.json();
+                document.getElementById('statProductosTotales').textContent = productos.length;
+
+                const servRes = await fetch('/api/servicios');
+                const servicios = await servRes.json();
+                document.getElementById('statServiciosTotales').textContent = servicios.length;
+
+                // Contratos
+                const contrRes = await fetch('/api/contratos');
+                const contratos = await contrRes.json();
+                document.getElementById('statContratosTotales').textContent = contratos.length;
+
+                const hoy = new Date().toISOString().split('T')[0];
+                const ventasHoy = ventas.filter(v => v.fecha === hoy);
+                const clientesHoy = new Set(ventasHoy.map(v => v.cliente));
+
+                document.getElementById('statVentasHoy').textContent = ventasHoy.length;
+                document.getElementById('statClientesHoy').textContent = clientesHoy.size || 0;
+                const ingresosHoy = ventasHoy.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+                document.getElementById('statIngresosHoy').textContent = `$${ingresosHoy.toFixed(2)}`;
+
+            } catch (error) {
+                console.error('Error al cargar estadísticas:', error);
+            }
+        }
+
+        // ============================================
+        // CARGAR TRABAJADORES
+        // ============================================
+
+        async function cargarTrabajadores() {
+            const grid = document.getElementById('trabajadoresGrid');
+
+            try {
+                const response = await fetch('/api/negocio/trabajadores');
+                const trabajadores = await response.json();
+
+                const activos = trabajadores.filter(t => t.activo === 1);
+
+                document.getElementById('trabajadoresCount').textContent = activos.length;
+
+                if (activos.length === 0) {
+                    grid.innerHTML = '<div class="trabajador-empty">No hay trabajadores activos en este momento</div>';
+                    return;
+                }
+
+                grid.innerHTML = '';
+                activos.forEach(t => {
+                    const estados = ['online', 'online', 'ocupado', 'online'];
+                    const estado = estados[Math.floor(Math.random() * estados.length)];
+                    const statusText = { online: '🟢 Conectado', ocupado: '🟡 Ocupado', offline: '⚪ Desconectado' }[estado] || '🟢 Conectado';
+
+                    const div = document.createElement('div');
+                    div.className = 'trabajador-card';
+                    div.innerHTML = `
+                        <div class="avatar">👤</div>
+                        <div class="info">
+                            <div class="nombre">${t.nombre}</div>
+                            <div class="cargo">${t.cargo || 'Trabajador'}</div>
+                        </div>
+                        <span class="status-dot ${estado}" title="${statusText}"></span>
+                    `;
+                    grid.appendChild(div);
+                });
+
+            } catch (error) {
+                console.error('Error al cargar trabajadores:', error);
+                grid.innerHTML = '<div class="trabajador-empty">❌ Error al cargar trabajadores</div>';
+            }
+        }
+
+        // ============================================
+        // CARGAR ALERTAS DE STOCK
+        // ============================================
+
+        async function cargarAlertasStock() {
+            const container = document.getElementById('alertasContainer');
+
+            try {
+                const response = await fetch('/api/productos');
+                const productos = await response.json();
+
+                const alertas = productos.filter(p => p.stock <= (p.stock_minimo || 3));
+
+                document.getElementById('alertasCount').textContent = alertas.length;
+
+                if (alertas.length === 0) {
+                    container.innerHTML = `
+                        <div class="alertas-empty">
+                            ✅ No hay alertas de stock bajo. ¡Todo en orden!
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = '';
+                alertas.forEach(p => {
+                    const nivel = p.stock === 0 ? 'crítico' : 'bajo';
+                    const icono = p.stock === 0 ? '🚫' : '⚠️';
+                    const color = p.stock === 0 ? 'var(--danger)' : 'var(--warning)';
+
+                    const div = document.createElement('div');
+                    div.className = 'alerta-item';
+                    div.innerHTML = `
+                        <span class="alerta-icon">${icono}</span>
+                        <div class="alerta-info">
+                            <div class="producto">${p.nombre}</div>
+                            <div class="detalle">Stock: ${p.stock} unidades (mínimo: ${p.stock_minimo || 3}) - <strong style="color:${color};">${nivel === 'crítico' ? '¡CRÍTICO!' : 'Bajo'}</strong></div>
+                        </div>
+                        <button class="alerta-accion" onclick="cargarModulo('inventario')">📦 Ver</button>
+                    `;
+                    container.appendChild(div);
+                });
+
+            } catch (error) {
+                console.error('Error al cargar alertas:', error);
+                container.innerHTML = '<div class="alertas-empty">❌ Error al cargar alertas</div>';
+            }
+        }
+
+        // ============================================
+        // REPORTES
+        // ============================================
+
+        function renderReportes() {
+            const container = document.getElementById('reportesContainer');
+            const reportes = [
+                { nombre: 'Ventas mensuales', fecha: new Date().toISOString().split('T')[0], icono: '📊' },
+                { nombre: 'Clientes nuevos', fecha: new Date().toISOString().split('T')[0], icono: '👥' },
+                { nombre: 'Inventario', fecha: new Date().toISOString().split('T')[0], icono: '📦' },
+                { nombre: 'Financiero', fecha: new Date().toISOString().split('T')[0], icono: '💰' },
+                { nombre: 'Contratos', fecha: new Date().toISOString().split('T')[0], icono: '📄' },
+            ];
+
+            container.innerHTML = '';
+            reportes.forEach(report => {
+                const div = document.createElement('div');
+                div.className = 'report-item';
+                div.innerHTML = `
+                    <div class="report-info">
+                        <span class="report-name">${report.icono} ${report.nombre}</span>
+                        <span class="report-date">📅 ${report.fecha}</span>
+                    </div>
+                    <button class="report-download" onclick="alert('📥 Descargando ${report.nombre}...')">📥</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        // ============================================
+        // INICIO
+        // ============================================
+
+        renderReportes();
+        cargarDatos();
+    </script>
+</body>
+</html>

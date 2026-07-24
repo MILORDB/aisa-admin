@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trabajadores - AIsa Negocio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2a2a3e;
+            margin-bottom: 20px;
+        }
+        .card h2 { font-size: 18px; color: #6c3ce0; margin-bottom: 16px; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stat-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+        .stat-item .number { font-size: 24px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-warning { background: #ff9800; color: #fff; }
+        .btn-sm { padding: 4px 12px; font-size: 11px; }
+        .tabla {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .tabla th {
+            text-align: left;
+            padding: 8px 12px;
+            color: #888;
+            border-bottom: 1px solid #2a2a3e;
+        }
+        .tabla td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .tabla .badge {
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+        }
+        .tabla .badge.activo { background: #224422; color: #6bff6b; }
+        .tabla .badge.inactivo { background: #442222; color: #ff6b6b; }
+        .form-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .form-row input, .form-row select {
+            padding: 8px 14px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 13px;
+            flex: 1;
+            min-width: 120px;
+        }
+        .form-row input:focus { border-color: #6c3ce0; outline: none; }
+        .form-row select[multiple] {
+            min-height: 120px;
+            background: #0f0f1a;
+            color: #fff;
+            padding: 8px;
+        }
+        .form-row select[multiple] option {
+            padding: 6px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .form-row select[multiple] option:checked {
+            background: #6c3ce0;
+            color: #fff;
+        }
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .search-bar input {
+            flex: 1;
+            padding: 8px 14px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+        }
+        .search-bar input:focus { border-color: #6c3ce0; outline: none; }
+        .empty { text-align: center; color: #888; padding: 40px; }
+        .loading { text-align: center; color: #888; padding: 20px; }
+        .help-text {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .mensaje-exito {
+            background: #224422;
+            color: #6bff6b;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .mensaje-exito.show { display: block; }
+        .mensaje-error {
+            background: #442222;
+            color: #ff6b6b;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .mensaje-error.show { display: block; }
+        .modulo-tag {
+            display: inline-block;
+            background: rgba(108, 60, 224, 0.2);
+            color: #6c3ce0;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin: 2px 4px 2px 0;
+        }
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .form-row { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h1 style="font-size:22px;display:flex;align-items:center;gap:10px;">👥 Trabajadores <span style="font-size:14px;font-weight:normal;opacity:0.7;">Gestión de empleados</span></h1>
+    </div>
+
+    <div class="mensaje-error" id="mensajeError"></div>
+    <div class="mensaje-exito" id="mensajeExito"></div>
+
+    <div class="card">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="number" id="totalTrabajadores">0</span>
+                <span class="label">👥 Total empleados</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="trabajadoresActivos">0</span>
+                <span class="label">🟢 Activos</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="trabajadoresInactivos">0</span>
+                <span class="label">🔴 Inactivos</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="nominaTotal">$0</span>
+                <span class="label">💰 Nómina total</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar trabajador..." oninput="filtrarTrabajadores()">
+            <button class="btn btn-primary" onclick="mostrarFormulario()">+ Nuevo trabajador</button>
+        </div>
+
+        <div id="formTrabajador" style="display:none;border-top:1px solid #2a2a3e;padding-top:16px;margin-top:12px;">
+            <h3 style="margin-bottom:12px;">Nuevo Trabajador</h3>
+            <div class="form-row">
+                <input type="text" id="traNombre" placeholder="Nombre completo" required>
+                <input type="text" id="traCargo" placeholder="Cargo" required>
+            </div>
+            <div class="form-row">
+                <input type="email" id="traEmail" placeholder="Email" required>
+                <input type="text" id="traTelefono" placeholder="Teléfono">
+                <input type="number" id="traSalario" placeholder="Salario" step="0.01">
+            </div>
+            <div class="form-row">
+                <input type="text" id="traUsuario" placeholder="Usuario para login" required>
+                <input type="password" id="traPassword" placeholder="Contraseña" required>
+            </div>
+            <div class="form-row">
+                <select id="traModulos" multiple>
+                    <option value="inventario">📦 Inventario</option>
+                    <option value="tienda">🛍️ Tienda</option>
+                    <option value="servicios">📋 Servicios</option>
+                    <option value="ventas">💰 Ventas</option>
+                </select>
+            </div>
+            <div class="help-text">Mantén presionado Ctrl para seleccionar múltiples módulos</div>
+            <div style="display:flex;gap:10px;margin-top:12px;">
+                <button class="btn btn-success" onclick="guardarTrabajador()">💾 Guardar</button>
+                <button class="btn btn-danger" onclick="cancelarFormulario()">✕ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div id="trabajadoresContainer">
+            <div class="loading">Cargando trabajadores...</div>
+        </div>
+    </div>
+
+    <script>
+        let trabajadores = [];
+        let editandoId = null;
+
+        function mostrarMensaje(texto, tipo) {
+            const errorEl = document.getElementById('mensajeError');
+            const exitoEl = document.getElementById('mensajeExito');
+            errorEl.classList.remove('show');
+            exitoEl.classList.remove('show');
+            if (tipo === 'error') {
+                errorEl.textContent = '❌ ' + texto;
+                errorEl.classList.add('show');
+            } else {
+                exitoEl.textContent = '✅ ' + texto;
+                exitoEl.classList.add('show');
+            }
+            setTimeout(() => {
+                errorEl.classList.remove('show');
+                exitoEl.classList.remove('show');
+            }, 5000);
+        }
+
+        // ============================================
+        // CARGAR TRABAJADORES DESDE EL SERVIDOR
+        // ============================================
+
+        async function cargarTrabajadores() {
+            const container = document.getElementById('trabajadoresContainer');
+            container.innerHTML = '<div class="loading">Cargando trabajadores...</div>';
+
+            try {
+                const response = await fetch('/api/negocio/trabajadores');
+                if (!response.ok) {
+                    throw new Error('Error al cargar trabajadores');
+                }
+                trabajadores = await response.json();
+                renderTrabajadores();
+                actualizarEstadisticas();
+            } catch (error) {
+                console.error('Error:', error);
+                container.innerHTML = `<div class="empty">❌ Error al cargar trabajadores</div>`;
+            }
+        }
+
+        // ============================================
+        // RENDER TRABAJADORES
+        // ============================================
+
+        function renderTrabajadores(filtro = '') {
+            const container = document.getElementById('trabajadoresContainer');
+            const filtroLower = filtro.toLowerCase();
+            
+            const filtrados = trabajadores.filter(t => 
+                t.nombre.toLowerCase().includes(filtroLower) ||
+                (t.cargo && t.cargo.toLowerCase().includes(filtroLower)) ||
+                t.username.toLowerCase().includes(filtroLower)
+            );
+
+            if (filtrados.length === 0) {
+                container.innerHTML = `<div class="empty">No hay trabajadores registrados</div>`;
+                return;
+            }
+
+            let html = `
+                <div style="overflow-x:auto;">
+                    <table class="tabla">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Cargo</th>
+                                <th>Email</th>
+                                <th>Teléfono</th>
+                                <th>Salario</th>
+                                <th>Usuario</th>
+                                <th>Módulos</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            filtrados.forEach(t => {
+                const modulosStr = t.modulos && t.modulos.length > 0 
+                    ? t.modulos.map(m => `<span class="modulo-tag">${m}</span>`).join('')
+                    : '<span style="color:#666;">Sin módulos</span>';
+                
+                html += `
+                    <tr>
+                        <td><strong>${t.nombre}</strong></td>
+                        <td>${t.cargo || '-'}</td>
+                        <td>${t.email}</td>
+                        <td>${t.telefono || '-'}</td>
+                        <td>$${t.salario ? parseFloat(t.salario).toFixed(2) : '0.00'}</td>
+                        <td>${t.username}</td>
+                        <td>${modulosStr}</td>
+                        <td><span class="badge ${t.activo ? 'activo' : 'inactivo'}">${t.activo ? '🟢 Activo' : '🔴 Inactivo'}</span></td>
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="editarTrabajador(${t.id})">✏️</button>
+                            <button class="btn ${t.activo ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleTrabajador(${t.id}, ${t.activo ? 0 : 1})">${t.activo ? '🔴' : '🟢'}</button>
+                            <button class="btn btn-danger btn-sm" onclick="eliminarTrabajador(${t.id})">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // ============================================
+        // ESTADÍSTICAS
+        // ============================================
+
+        function actualizarEstadisticas() {
+            const total = trabajadores.length;
+            const activos = trabajadores.filter(t => t.activo).length;
+            const inactivos = total - activos;
+            const nomina = trabajadores.reduce((sum, t) => sum + (parseFloat(t.salario) || 0), 0);
+            
+            document.getElementById('totalTrabajadores').textContent = total;
+            document.getElementById('trabajadoresActivos').textContent = activos;
+            document.getElementById('trabajadoresInactivos').textContent = inactivos;
+            document.getElementById('nominaTotal').textContent = `$${nomina.toFixed(2)}`;
+        }
+
+        // ============================================
+        // FILTRAR
+        // ============================================
+
+        function filtrarTrabajadores() {
+            const filtro = document.getElementById('searchInput').value;
+            renderTrabajadores(filtro);
+        }
+
+        // ============================================
+        // FORMULARIO
+        // ============================================
+
+        function mostrarFormulario() {
+            document.getElementById('formTrabajador').style.display = 'block';
+            document.getElementById('traNombre').focus();
+            editandoId = null;
+            document.querySelector('#formTrabajador h3').textContent = '👤 Nuevo Trabajador';
+            document.querySelector('#formTrabajador .btn-success').textContent = '💾 Guardar';
+        }
+
+        function cancelarFormulario() {
+            document.getElementById('formTrabajador').style.display = 'none';
+            document.getElementById('traNombre').value = '';
+            document.getElementById('traCargo').value = '';
+            document.getElementById('traEmail').value = '';
+            document.getElementById('traTelefono').value = '';
+            document.getElementById('traSalario').value = '';
+            document.getElementById('traUsuario').value = '';
+            document.getElementById('traPassword').value = '';
+            editandoId = null;
+        }
+
+        // ============================================
+        // GUARDAR TRABAJADOR
+        // ============================================
+
+        function guardarTrabajador() {
+            const nombre = document.getElementById('traNombre').value.trim();
+            const cargo = document.getElementById('traCargo').value.trim();
+            const email = document.getElementById('traEmail').value.trim();
+            const telefono = document.getElementById('traTelefono').value.trim();
+            const salario = parseFloat(document.getElementById('traSalario').value);
+            const usuario = document.getElementById('traUsuario').value.trim();
+            const password = document.getElementById('traPassword').value.trim();
+
+            if (!nombre || !cargo || !email || !usuario || !password) {
+                mostrarMensaje('Completa todos los campos obligatorios', 'error');
+                return;
+            }
+
+            if (isNaN(salario)) {
+                mostrarMensaje('El salario debe ser un número válido', 'error');
+                return;
+            }
+
+            const selectModulos = document.getElementById('traModulos');
+            const modulosSeleccionados = Array.from(selectModulos.selectedOptions).map(opt => opt.value);
+
+            const data = {
+                nombre,
+                cargo,
+                email,
+                telefono,
+                salario,
+                usuario,
+                password,
+                modulos: modulosSeleccionados
+            };
+
+            fetch('/api/negocio/trabajador/crear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mostrarMensaje(`✅ Trabajador "${nombre}" creado correctamente. Usuario: ${usuario}`, 'exito');
+                    cancelarFormulario();
+                    cargarTrabajadores();
+                } else {
+                    mostrarMensaje(data.error || 'Error al crear el trabajador', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión con el servidor', 'error');
+            });
+        }
+
+        // ============================================
+        // ACCIONES
+        // ============================================
+
+        function editarTrabajador(id) {
+            const t = trabajadores.find(t => t.id === id);
+            if (!t) return;
+            mostrarFormulario();
+            document.getElementById('traNombre').value = t.nombre;
+            document.getElementById('traCargo').value = t.cargo || '';
+            document.getElementById('traEmail').value = t.email;
+            document.getElementById('traTelefono').value = t.telefono || '';
+            document.getElementById('traSalario').value = t.salario;
+            document.getElementById('traUsuario').value = t.username;
+            editandoId = id;
+            document.querySelector('#formTrabajador h3').textContent = '✏️ Editar Trabajador';
+            document.querySelector('#formTrabajador .btn-success').textContent = '💾 Actualizar';
+        }
+
+        async function toggleTrabajador(id, activo) {
+            try {
+                const response = await fetch(`/api/usuario/${id}/toggle`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ activo })
+                });
+                if (response.ok) {
+                    mostrarMensaje(`Trabajador ${activo ? 'activado' : 'desactivado'} correctamente`, 'exito');
+                    cargarTrabajadores();
+                } else {
+                    mostrarMensaje('Error al cambiar estado', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión', 'error');
+            }
+        }
+
+        function eliminarTrabajador(id) {
+            const t = trabajadores.find(t => t.id === id);
+            if (!t) return;
+            if (confirm(`¿Eliminar a "${t.nombre}"?`)) {
+                trabajadores = trabajadores.filter(t => t.id !== id);
+                renderTrabajadores();
+                actualizarEstadisticas();
+                mostrarMensaje(`Trabajador "${t.nombre}" eliminado`, 'exito');
+            }
+        }
+
+        // ============================================
+        // INICIO
+        // ============================================
+
+        cargarTrabajadores();
+        setInterval(cargarTrabajadores, 30000);
+    </script>
+</body>
+</html>

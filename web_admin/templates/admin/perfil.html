@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil - AIsa Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .header h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .header .nav a {
+            color: #fff;
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+            font-size: 13px;
+            transition: background 0.3s;
+            margin-left: 8px;
+        }
+        .header .nav a:hover { background: rgba(255,255,255,0.2); }
+        .container { padding: 24px; max-width: 600px; margin: 0 auto; flex: 1; display: flex; align-items: center; justify-content: center; }
+        .card {
+            background: #1a1a2e;
+            border-radius: 16px;
+            padding: 40px;
+            border: 1px solid #2a2a3e;
+            width: 100%;
+        }
+        .card h2 { font-size: 24px; color: #6c3ce0; margin-bottom: 8px; text-align: center; }
+        .card .subtitle { font-size: 14px; color: #888; text-align: center; margin-bottom: 30px; }
+        .avatar {
+            width: 80px; height: 80px; border-radius: 50%; background: #6c3ce0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 32px; margin: 0 auto 20px;
+        }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 6px; font-size: 14px; color: #aaa; }
+        .form-group input {
+            width: 100%; padding: 10px 16px; border: 1px solid #2a2a3e; border-radius: 8px;
+            background: #0f0f1a; color: #fff; font-size: 15px; outline: none; transition: border-color 0.3s;
+        }
+        .form-group input:focus { border-color: #6c3ce0; }
+        .form-group input:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn {
+            width: 100%; padding: 12px; border: none; border-radius: 8px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+            transition: all 0.3s; margin-top: 8px;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-success:hover { background: #3d8b40; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-danger:hover { background: #c62828; }
+        .mensaje {
+            padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: none;
+        }
+        .mensaje.exito { background: #224422; color: #6bff6b; display: block; }
+        .mensaje.error { background: #442222; color: #ff6b6b; display: block; }
+        .info-row {
+            display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1a1a2e;
+        }
+        .info-row .label { color: #888; }
+        .info-row .value { color: #fff; }
+        @media (max-width: 600px) {
+            .container { padding: 16px; }
+            .card { padding: 24px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1>👤 Mi Perfil</h1>
+        <div class="nav">
+            <a href="/dashboard">← Volver al Panel</a>
+            <a href="/admin/db">🗄️ Gestor BD</a>
+            <a href="/logout">Cerrar sesión</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <div class="avatar">👑</div>
+            <h2>Administrador</h2>
+            <div class="subtitle" id="userInfo">Cargando información...</div>
+
+            <div id="mensaje" class="mensaje"></div>
+
+            <div style="margin-bottom: 24px; padding: 12px; background: #0f0f1a; border-radius: 8px; border: 1px solid #2a2a3e;">
+                <div class="info-row">
+                    <span class="label">👤 Usuario</span>
+                    <span class="value" id="perfilUsername">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">📧 Email</span>
+                    <span class="value" id="perfilEmail">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">👤 Nombre</span>
+                    <span class="value" id="perfilNombre">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="label">📅 Registro</span>
+                    <span class="value" id="perfilRegistro">-</span>
+                </div>
+            </div>
+
+            <h3 style="color:#aaa;font-size:16px;margin-bottom:16px;">🔑 Cambiar Contraseña</h3>
+
+            <div class="form-group">
+                <label>Contraseña actual</label>
+                <input type="password" id="currentPassword" placeholder="Ingresa tu contraseña actual">
+            </div>
+            <div class="form-group">
+                <label>Nueva contraseña</label>
+                <input type="password" id="newPassword" placeholder="Nueva contraseña (mínimo 6 caracteres)">
+            </div>
+            <div class="form-group">
+                <label>Confirmar nueva contraseña</label>
+                <input type="password" id="confirmPassword" placeholder="Confirma tu nueva contraseña">
+            </div>
+
+            <button class="btn btn-success" onclick="cambiarPassword()">🔑 Cambiar Contraseña</button>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // CARGAR PERFIL
+        // ============================================
+
+        async function cargarPerfil() {
+            try {
+                const res = await fetch('/api/perfil');
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('perfilUsername').textContent = data.usuario.username;
+                    document.getElementById('perfilEmail').textContent = data.usuario.email;
+                    document.getElementById('perfilNombre').textContent = data.usuario.nombre || '-';
+                    document.getElementById('perfilRegistro').textContent = data.usuario.fecha_registro ? new Date(data.usuario.fecha_registro).toLocaleDateString() : '-';
+                    document.getElementById('userInfo').textContent = `👑 ${data.usuario.username} (${data.usuario.rol})`;
+                }
+            } catch (e) {
+                console.error('Error al cargar perfil:', e);
+                document.getElementById('userInfo').textContent = '❌ Error al cargar perfil';
+            }
+        }
+
+        // ============================================
+        // CAMBIAR CONTRASEÑA
+        // ============================================
+
+        function mostrarMensaje(texto, tipo) {
+            const el = document.getElementById('mensaje');
+            el.textContent = texto;
+            el.className = `mensaje ${tipo}`;
+            setTimeout(() => {
+                el.className = 'mensaje';
+            }, 5000);
+        }
+
+        async function cambiarPassword() {
+            const current = document.getElementById('currentPassword').value;
+            const newPass = document.getElementById('newPassword').value;
+            const confirm = document.getElementById('confirmPassword').value;
+
+            if (!current || !newPass || !confirm) {
+                mostrarMensaje('❌ Completa todos los campos', 'error');
+                return;
+            }
+
+            if (newPass.length < 6) {
+                mostrarMensaje('❌ La nueva contraseña debe tener al menos 6 caracteres', 'error');
+                return;
+            }
+
+            if (newPass !== confirm) {
+                mostrarMensaje('❌ Las contraseñas no coinciden', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/perfil/password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        current_password: current,
+                        new_password: newPass
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    mostrarMensaje('✅ Contraseña actualizada correctamente', 'exito');
+                    document.getElementById('currentPassword').value = '';
+                    document.getElementById('newPassword').value = '';
+                    document.getElementById('confirmPassword').value = '';
+                } else {
+                    mostrarMensaje(`❌ ${data.error || 'Error al cambiar contraseña'}`, 'error');
+                }
+            } catch (e) {
+                mostrarMensaje('❌ Error de conexión', 'error');
+                console.error(e);
+            }
+        }
+
+        cargarPerfil();
+    </script>
+</body>
+</html>

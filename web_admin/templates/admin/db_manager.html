@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor BD - AIsa Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .header h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .header .nav a {
+            color: #fff;
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+            font-size: 13px;
+            transition: background 0.3s;
+            margin-left: 8px;
+        }
+        .header .nav a:hover { background: rgba(255,255,255,0.2); }
+        .container { padding: 24px; max-width: 1400px; margin: 0 auto; flex: 1; }
+        .card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2a2a3e;
+            margin-bottom: 20px;
+        }
+        .card h2 { font-size: 18px; color: #6c3ce0; margin-bottom: 16px; }
+        .card .subtitle { font-size: 13px; color: #888; margin-bottom: 16px; }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .tabs button {
+            padding: 8px 20px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 13px;
+        }
+        .tabs button:hover { background: #2a2a3e; color: #fff; }
+        .tabs button.active { background: #6c3ce0; color: #fff; border-color: #6c3ce0; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .tabla {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .tabla th {
+            text-align: left;
+            padding: 8px 12px;
+            color: #888;
+            border-bottom: 1px solid #2a2a3e;
+        }
+        .tabla td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #1a1a2e;
+            vertical-align: middle;
+        }
+        .tabla .badge {
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+        }
+        .tabla .badge.activo { background: #224422; color: #6bff6b; }
+        .tabla .badge.inactivo { background: #442222; color: #ff6b6b; }
+        .tabla .badge.admin { background: #6c3ce0; color: #fff; }
+        .tabla .badge.usuario { background: #2a2a3e; color: #aaa; }
+        .tabla .badge.trabajador { background: #ff9800; color: #000; }
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-success:hover { background: #3d8b40; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-danger:hover { background: #c62828; }
+        .btn-warning { background: #ff9800; color: #000; }
+        .btn-warning:hover { background: #e68900; }
+        .btn-sm { padding: 4px 10px; font-size: 11px; }
+        .loading { text-align: center; color: #888; padding: 20px; }
+        .empty { text-align: center; color: #888; padding: 40px; }
+        .search-bar {
+            display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+        }
+        .search-bar input {
+            flex: 1; padding: 8px 14px; border: 1px solid #2a2a3e; border-radius: 8px;
+            background: #0f0f1a; color: #fff; font-size: 13px; min-width: 200px;
+        }
+        .search-bar input:focus { border-color: #6c3ce0; outline: none; }
+        .search-bar select {
+            padding: 8px 14px; border: 1px solid #2a2a3e; border-radius: 8px;
+            background: #0f0f1a; color: #fff; font-size: 13px;
+        }
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-content {
+            background: #1a1a2e; padding: 30px; border-radius: 12px; max-width: 500px; width: 90%;
+            border: 1px solid #2a2a3e;
+        }
+        .modal-content h3 { margin-bottom: 16px; color: #6c3ce0; }
+        .modal-content .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+        .modal-content .form-row input, .modal-content .form-row select {
+            flex: 1; padding: 8px 14px; border: 1px solid #2a2a3e; border-radius: 8px;
+            background: #0f0f1a; color: #fff; font-size: 13px; min-width: 120px;
+        }
+        .modal-content .form-row input:focus { border-color: #6c3ce0; outline: none; }
+        .modal-content .form-actions { display: flex; gap: 10px; margin-top: 16px; }
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px;
+        }
+        .stat-item {
+            background: #0f0f1a; border: 1px solid #2a2a3e; border-radius: 8px; padding: 16px; text-align: center;
+        }
+        .stat-item .number { font-size: 24px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
+        .log-item {
+            padding: 6px 0; border-bottom: 1px solid #1a1a2e; font-size: 12px; color: #aaa;
+        }
+        .log-item .time { color: #666; }
+        @media (max-width: 600px) {
+            .container { padding: 16px; }
+            .tabla { font-size: 11px; }
+            .tabla th, .tabla td { padding: 6px 8px; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1>🗄️ Gestor de Base de Datos</h1>
+        <div class="nav">
+            <a href="/dashboard">← Volver al Panel</a>
+            <a href="/admin/perfil">👤 Perfil</a>
+            <a href="/logout">Cerrar sesión</a>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <!-- Estadísticas -->
+        <div class="card">
+            <h2>📊 Resumen de la Base de Datos</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="number" id="statUsuarios">0</span>
+                    <span class="label">👥 Usuarios</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="statProductos">0</span>
+                    <span class="label">📦 Productos</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="statVentas">0</span>
+                    <span class="label">💰 Ventas</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="statServicios">0</span>
+                    <span class="label">📋 Servicios</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="statLogs">0</span>
+                    <span class="label">📝 Logs</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="statTrabajadores">0</span>
+                    <span class="label">👷 Trabajadores</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="active" data-tab="usuarios">👥 Usuarios</button>
+            <button data-tab="productos">📦 Productos</button>
+            <button data-tab="ventas">💰 Ventas</button>
+            <button data-tab="servicios">📋 Servicios</button>
+            <button data-tab="logs">📝 Logs</button>
+            <button data-tab="sql">⚡ SQL Query</button>
+        </div>
+
+        <!-- TAB: Usuarios -->
+        <div class="tab-content active" id="tab-usuarios">
+            <div class="card">
+                <h2>👥 Usuarios</h2>
+                <div class="subtitle">Gestión de usuarios del sistema</div>
+                <div class="search-bar">
+                    <input type="text" id="searchUsuarios" placeholder="🔍 Buscar usuario..." oninput="filtrarTabla('usuarios')">
+                    <button class="btn btn-primary" onclick="mostrarModal('usuario')">+ Nuevo Usuario</button>
+                </div>
+                <div id="usuariosContainer"><div class="loading">Cargando...</div></div>
+            </div>
+        </div>
+
+        <!-- TAB: Productos -->
+        <div class="tab-content" id="tab-productos">
+            <div class="card">
+                <h2>📦 Productos</h2>
+                <div class="subtitle">Inventario de todos los negocios</div>
+                <div class="search-bar">
+                    <input type="text" id="searchProductos" placeholder="🔍 Buscar producto..." oninput="filtrarTabla('productos')">
+                </div>
+                <div id="productosContainer"><div class="loading">Cargando...</div></div>
+            </div>
+        </div>
+
+        <!-- TAB: Ventas -->
+        <div class="tab-content" id="tab-ventas">
+            <div class="card">
+                <h2>💰 Ventas</h2>
+                <div class="subtitle">Todas las ventas del sistema</div>
+                <div class="search-bar">
+                    <input type="text" id="searchVentas" placeholder="🔍 Buscar venta..." oninput="filtrarTabla('ventas')">
+                </div>
+                <div id="ventasContainer"><div class="loading">Cargando...</div></div>
+            </div>
+        </div>
+
+        <!-- TAB: Servicios -->
+        <div class="tab-content" id="tab-servicios">
+            <div class="card">
+                <h2>📋 Servicios</h2>
+                <div class="subtitle">Servicios ofrecidos por los negocios</div>
+                <div class="search-bar">
+                    <input type="text" id="searchServicios" placeholder="🔍 Buscar servicio..." oninput="filtrarTabla('servicios')">
+                </div>
+                <div id="serviciosContainer"><div class="loading">Cargando...</div></div>
+            </div>
+        </div>
+
+        <!-- TAB: Logs -->
+        <div class="tab-content" id="tab-logs">
+            <div class="card">
+                <h2>📝 Logs del Sistema</h2>
+                <div class="subtitle">Registro de actividades</div>
+                <div id="logsContainer"><div class="loading">Cargando...</div></div>
+            </div>
+        </div>
+
+        <!-- TAB: SQL Query -->
+        <div class="tab-content" id="tab-sql">
+            <div class="card">
+                <h2>⚡ Ejecutar SQL</h2>
+                <div class="subtitle" style="color:#ff6b6b;">⚠️ Solo para administradores avanzados</div>
+                <div style="margin-bottom:12px;">
+                    <textarea id="sqlQuery" rows="4" style="width:100%;padding:12px;border:1px solid #2a2a3e;border-radius:8px;background:#0f0f1a;color:#fff;font-family:monospace;font-size:13px;" placeholder="SELECT * FROM usuarios LIMIT 10"></textarea>
+                </div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="ejecutarSQL()">▶️ Ejecutar</button>
+                    <button class="btn btn-warning" onclick="document.getElementById('sqlQuery').value='SELECT * FROM usuarios LIMIT 10'">📋 SELECT usuarios</button>
+                    <button class="btn btn-warning" onclick="document.getElementById('sqlQuery').value='SELECT * FROM productos LIMIT 10'">📋 SELECT productos</button>
+                    <button class="btn btn-warning" onclick="document.getElementById('sqlQuery').value='SELECT * FROM ventas LIMIT 10'">📋 SELECT ventas</button>
+                </div>
+                <div id="sqlResult" style="margin-top:16px;background:#0f0f1a;border-radius:8px;padding:12px;border:1px solid #2a2a3e;overflow-x:auto;font-family:monospace;font-size:12px;max-height:400px;overflow-y:auto;"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Modal para Nuevo/Editar Usuario -->
+    <div class="modal-overlay" id="modalUsuario">
+        <div class="modal-content">
+            <h3 id="modalUsuarioTitle">👤 Nuevo Usuario</h3>
+            <input type="hidden" id="modalUsuarioId">
+            <div class="form-row">
+                <input type="text" id="modalUsername" placeholder="Usuario" required>
+                <input type="email" id="modalEmail" placeholder="Email" required>
+            </div>
+            <div class="form-row">
+                <input type="text" id="modalNombre" placeholder="Nombre completo">
+                <select id="modalRol">
+                    <option value="usuario">Usuario</option>
+                    <option value="admin">Admin</option>
+                    <option value="trabajador">Trabajador</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <input type="password" id="modalPassword" placeholder="Contraseña (dejar vacío para no cambiar)">
+                <select id="modalTipo">
+                    <option value="cliente">Cliente</option>
+                    <option value="negocio">Negocio</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label style="color:#888;font-size:13px;display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" id="modalActivo" checked> Activo
+                </label>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-success" onclick="guardarUsuario()">💾 Guardar</button>
+                <button class="btn btn-danger" onclick="cerrarModal('modalUsuario')">✕ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let datosCache = {};
+        let tabActual = 'usuarios';
+
+        // ============================================
+        // TABS
+        // ============================================
+
+        document.querySelectorAll('.tabs button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                const tab = this.dataset.tab;
+                tabActual = tab;
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.getElementById(`tab-${tab}`).classList.add('active');
+                cargarTab(tab);
+            });
+        });
+
+        // ============================================
+        // CARGAR TAB
+        // ============================================
+
+        function cargarTab(tab) {
+            const map = {
+                'usuarios': { url: '/api/usuarios', container: 'usuariosContainer', render: renderUsuarios },
+                'productos': { url: '/api/productos', container: 'productosContainer', render: renderProductos },
+                'ventas': { url: '/api/ventas', container: 'ventasContainer', render: renderVentas },
+                'servicios': { url: '/api/servicios', container: 'serviciosContainer', render: renderServicios },
+                'logs': { url: '/api/logs', container: 'logsContainer', render: renderLogs }
+            };
+
+            if (!map[tab]) return;
+            const config = map[tab];
+            const container = document.getElementById(config.container);
+            container.innerHTML = '<div class="loading">Cargando...</div>';
+
+            fetch(config.url)
+                .then(res => res.json())
+                .then(data => {
+                    datosCache[tab] = data;
+                    config.render(data);
+                    actualizarEstadisticas();
+                })
+                .catch(err => {
+                    container.innerHTML = `<div class="empty">❌ Error al cargar</div>`;
+                    console.error(err);
+                });
+        }
+
+        // ============================================
+        // RENDER: USUARIOS
+        // ============================================
+
+        function renderUsuarios(data) {
+            const container = document.getElementById('usuariosContainer');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="empty">No hay usuarios registrados</div>';
+                return;
+            }
+            let html = `
+                <div style="overflow-x:auto;">
+                    <table class="tabla" id="tablaUsuarios">
+                        <thead><tr>
+                            <th>ID</th><th>Usuario</th><th>Email</th><th>Nombre</th><th>Rol</th><th>Tipo</th><th>Estado</th><th>Acciones</th>
+                        </tr></thead>
+                        <tbody>
+            `;
+            data.forEach(u => {
+                const rolBadge = { admin: 'admin', usuario: 'usuario', trabajador: 'trabajador' }[u.rol] || 'usuario';
+                html += `
+                    <tr>
+                        <td>${u.id}</td>
+                        <td><strong>${u.username}</strong></td>
+                        <td>${u.email}</td>
+                        <td>${u.nombre || '-'}</td>
+                        <td><span class="badge ${rolBadge}">${u.rol}</span></td>
+                        <td>${u.tipo || 'cliente'}</td>
+                        <td><span class="badge ${u.activo ? 'activo' : 'inactivo'}">${u.activo ? '🟢 Activo' : '🔴 Inactivo'}</span></td>
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="editarUsuario(${u.id})">✏️</button>
+                            <button class="btn btn-danger btn-sm" onclick="toggleUsuario(${u.id}, ${u.activo ? 0 : 1})">${u.activo ? '🔴' : '🟢'}</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        // ============================================
+        // RENDER: PRODUCTOS
+        // ============================================
+
+        function renderProductos(data) {
+            const container = document.getElementById('productosContainer');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="empty">No hay productos registrados</div>';
+                return;
+            }
+            let html = `
+                <div style="overflow-x:auto;">
+                    <table class="tabla" id="tablaProductos">
+                        <thead><tr>
+                            <th>ID</th><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Negocio</th><th>Acciones</th>
+                        </tr></thead>
+                        <tbody>
+            `;
+            data.forEach(p => {
+                html += `
+                    <tr>
+                        <td>${p.id}</td>
+                        <td><strong>${p.nombre}</strong></td>
+                        <td>${p.categoria || '-'}</td>
+                        <td>$${parseFloat(p.precio).toFixed(2)}</td>
+                        <td>${p.stock}</td>
+                        <td>${p.negocio_id || '-'}</td>
+                        <td>
+                            <button class="btn btn-danger btn-sm" onclick="eliminarRegistro('productos', ${p.id})">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        // ============================================
+        // RENDER: VENTAS
+        // ============================================
+
+        function renderVentas(data) {
+            const container = document.getElementById('ventasContainer');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="empty">No hay ventas registradas</div>';
+                return;
+            }
+            let html = `
+                <div style="overflow-x:auto;">
+                    <table class="tabla" id="tablaVentas">
+                        <thead><tr>
+                            <th>ID</th><th>Cliente</th><th>Producto</th><th>Cantidad</th><th>Total</th><th>Fecha</th><th>Estado</th><th>Vendedor</th>
+                        </tr></thead>
+                        <tbody>
+            `;
+            data.forEach(v => {
+                const estado = v.estado || 'pagado';
+                const badge = { pagado: 'activo', pendiente: 'inactivo', cancelado: 'inactivo' }[estado] || 'activo';
+                html += `
+                    <tr>
+                        <td>#${v.id}</td>
+                        <td>${v.cliente}</td>
+                        <td>${v.producto}</td>
+                        <td>${v.cantidad}</td>
+                        <td>$${parseFloat(v.total).toFixed(2)}</td>
+                        <td>${v.fecha}</td>
+                        <td><span class="badge ${badge}">${estado}</span></td>
+                        <td>${v.trabajador_id ? '👤 Trabajador' : 'Admin'}</td>
+                    </tr>
+                `;
+            });
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        // ============================================
+        // RENDER: SERVICIOS
+        // ============================================
+
+        function renderServicios(data) {
+            const container = document.getElementById('serviciosContainer');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="empty">No hay servicios registrados</div>';
+                return;
+            }
+            let html = `
+                <div style="overflow-x:auto;">
+                    <table class="tabla" id="tablaServicios">
+                        <thead><tr>
+                            <th>ID</th><th>Servicio</th><th>Categoría</th><th>Precio</th><th>Duración</th><th>Estado</th><th>Creado por</th>
+                        </tr></thead>
+                        <tbody>
+            `;
+            data.forEach(s => {
+                html += `
+                    <tr>
+                        <td>${s.id}</td>
+                        <td><strong>${s.nombre}</strong></td>
+                        <td>${s.categoria || '-'}</td>
+                        <td>$${parseFloat(s.precio).toFixed(2)}</td>
+                        <td>${s.duracion} min</td>
+                        <td><span class="badge ${s.activo ? 'activo' : 'inactivo'}">${s.activo ? '🟢 Activo' : '🔴 Inactivo'}</span></td>
+                        <td>${s.trabajador_id ? '👤 Trabajador' : 'Admin'}</td>
+                    </tr>
+                `;
+            });
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        // ============================================
+        // RENDER: LOGS
+        // ============================================
+
+        function renderLogs(data) {
+            const container = document.getElementById('logsContainer');
+            if (!data || data.length === 0) {
+                container.innerHTML = '<div class="empty">No hay logs registrados</div>';
+                return;
+            }
+            let html = '';
+            data.forEach(l => {
+                const fecha = new Date(l.fecha);
+                html += `
+                    <div class="log-item">
+                        <span class="time">[${fecha.toLocaleString()}]</span>
+                        <strong>${l.username || 'Sistema'}</strong>:
+                        ${l.accion} ${l.detalle || ''}
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // ============================================
+        // ESTADÍSTICAS
+        // ============================================
+
+        async function actualizarEstadisticas() {
+            try {
+                const res = await fetch('/api/estadisticas');
+                const stats = await res.json();
+                document.getElementById('statUsuarios').textContent = stats.total_usuarios || 0;
+                document.getElementById('statProductos').textContent = stats.total_productos || 0;
+                document.getElementById('statVentas').textContent = stats.total_ventas || 0;
+                document.getElementById('statServicios').textContent = stats.total_servicios || 0;
+                document.getElementById('statLogs').textContent = stats.total_logs || 0;
+                document.getElementById('statTrabajadores').textContent = stats.total_trabajadores || 0;
+            } catch (e) {
+                console.error('Error al actualizar estadísticas:', e);
+            }
+        }
+
+        // ============================================
+        // FILTROS
+        // ============================================
+
+        function filtrarTabla(tab) {
+            const input = document.getElementById(`search${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+            if (!input) return;
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById(`tabla${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+            if (!table) return;
+            const rows = table.getElementsByTagName('tr');
+            for (let i = 1; i < rows.length; i++) {
+                const cells = rows[i].getElementsByTagName('td');
+                let found = false;
+                for (let j = 0; j < cells.length; j++) {
+                    if (cells[j].textContent.toLowerCase().includes(filter)) {
+                        found = true; break;
+                    }
+                }
+                rows[i].style.display = found ? '' : 'none';
+            }
+        }
+
+        // ============================================
+        // MODAL USUARIO
+        // ============================================
+
+        function mostrarModal(tipo) {
+            document.getElementById('modalUsuario').classList.add('show');
+            document.getElementById('modalUsuarioTitle').textContent = '👤 Nuevo Usuario';
+            document.getElementById('modalUsuarioId').value = '';
+            document.getElementById('modalUsername').value = '';
+            document.getElementById('modalEmail').value = '';
+            document.getElementById('modalNombre').value = '';
+            document.getElementById('modalRol').value = 'usuario';
+            document.getElementById('modalTipo').value = 'cliente';
+            document.getElementById('modalPassword').value = '';
+            document.getElementById('modalActivo').checked = true;
+        }
+
+        function editarUsuario(id) {
+            const user = datosCache.usuarios?.find(u => u.id === id);
+            if (!user) return;
+            document.getElementById('modalUsuario').classList.add('show');
+            document.getElementById('modalUsuarioTitle').textContent = '✏️ Editar Usuario';
+            document.getElementById('modalUsuarioId').value = id;
+            document.getElementById('modalUsername').value = user.username;
+            document.getElementById('modalEmail').value = user.email;
+            document.getElementById('modalNombre').value = user.nombre || '';
+            document.getElementById('modalRol').value = user.rol || 'usuario';
+            document.getElementById('modalTipo').value = user.tipo || 'cliente';
+            document.getElementById('modalPassword').value = '';
+            document.getElementById('modalActivo').checked = user.activo === 1;
+        }
+
+        function cerrarModal(id) {
+            document.getElementById(id).classList.remove('show');
+        }
+
+        function guardarUsuario() {
+            const id = document.getElementById('modalUsuarioId').value;
+            const data = {
+                username: document.getElementById('modalUsername').value.trim(),
+                email: document.getElementById('modalEmail').value.trim(),
+                nombre: document.getElementById('modalNombre').value.trim(),
+                rol: document.getElementById('modalRol').value,
+                tipo: document.getElementById('modalTipo').value,
+                password: document.getElementById('modalPassword').value,
+                activo: document.getElementById('modalActivo').checked ? 1 : 0
+            };
+
+            if (!data.username || !data.email) {
+                alert('❌ Usuario y email son obligatorios');
+                return;
+            }
+
+            const url = id ? `/api/usuario/${id}` : '/api/usuarios';
+            const method = id ? 'PUT' : 'POST';
+
+            fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Usuario guardado correctamente');
+                    cerrarModal('modalUsuario');
+                    cargarTab('usuarios');
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Error al guardar'));
+                }
+            })
+            .catch(err => {
+                alert('❌ Error de conexión');
+                console.error(err);
+            });
+        }
+
+        // ============================================
+        // TOGGLE USUARIO
+        // ============================================
+
+        function toggleUsuario(id, activo) {
+            if (!confirm(`¿${activo ? 'Activar' : 'Desactivar'} este usuario?`)) return;
+            fetch(`/api/usuario/${id}/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activo })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    cargarTab('usuarios');
+                } else {
+                    alert('❌ Error al cambiar estado');
+                }
+            })
+            .catch(err => console.error(err));
+        }
+
+        // ============================================
+        // ELIMINAR REGISTRO
+        // ============================================
+
+        function eliminarRegistro(tabla, id) {
+            if (!confirm(`¿Eliminar este registro de ${tabla}?`)) return;
+            alert(`🗑️ Eliminar registro ${tabla} ID:${id} (Próximamente disponible)`);
+            // Aquí se implementaría la llamada a la API de eliminación
+        }
+
+        // ============================================
+        // SQL QUERY
+        // ============================================
+
+        function ejecutarSQL() {
+            const query = document.getElementById('sqlQuery').value.trim();
+            if (!query) {
+                document.getElementById('sqlResult').innerHTML = '<div style="color:#ff6b6b;">❌ Escribe una consulta SQL</div>';
+                return;
+            }
+            document.getElementById('sqlResult').innerHTML = '<div class="loading">Ejecutando...</div>';
+            fetch('/api/sql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('sqlResult').innerHTML = `<div style="color:#ff6b6b;">❌ ${data.error}</div>`;
+                } else if (data.result) {
+                    let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+                    if (data.result.length > 0) {
+                        const headers = Object.keys(data.result[0]);
+                        html += '<thead><tr style="border-bottom:1px solid #2a2a3e;">';
+                        headers.forEach(h => html += `<th style="padding:4px 8px;text-align:left;color:#888;">${h}</th>`);
+                        html += '</tr></thead><tbody>';
+                        data.result.forEach(row => {
+                            html += '<tr>';
+                            headers.forEach(h => html += `<td style="padding:4px 8px;border-bottom:1px solid #1a1a2e;">${row[h] !== null ? row[h] : ''}</td>`);
+                            html += '</tr>';
+                        });
+                        html += '</tbody>';
+                    } else {
+                        html += '<tr><td style="padding:12px;color:#888;text-align:center;">✅ Consulta ejecutada. 0 filas afectadas.</td></tr>';
+                    }
+                    html += '</table>';
+                    document.getElementById('sqlResult').innerHTML = html;
+                } else {
+                    document.getElementById('sqlResult').innerHTML = '<div style="color:#888;">⚠️ No se recibieron datos</div>';
+                }
+            })
+            .catch(err => {
+                document.getElementById('sqlResult').innerHTML = `<div style="color:#ff6b6b;">❌ Error: ${err.message}</div>`;
+            });
+        }
+
+        // ============================================
+        // INICIO
+        // ============================================
+
+        // Cargar primera tab
+        cargarTab('usuarios');
+
+        // Tecla Enter para SQL
+        document.getElementById('sqlQuery').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                e.preventDefault();
+                ejecutarSQL();
+            }
+        });
+    </script>
+</body>
+</html>
