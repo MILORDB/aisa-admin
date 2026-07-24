@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trabajadores - AIsa Negocio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2a2a3e;
+            margin-bottom: 20px;
+        }
+        .card h2 { font-size: 18px; color: #6c3ce0; margin-bottom: 16px; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stat-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+        .stat-item .number { font-size: 24px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-warning { background: #ff9800; color: #fff; }
+        .btn-sm { padding: 4px 12px; font-size: 11px; }
+        .tabla {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .tabla th {
+            text-align: left;
+            padding: 8px 12px;
+            color: #888;
+            border-bottom: 1px solid #2a2a3e;
+        }
+        .tabla td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .tabla .badge {
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+        }
+        .tabla .badge.activo { background: #224422; color: #6bff6b; }
+        .tabla .badge.inactivo { background: #442222; color: #ff6b6b; }
+        .form-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .form-row input, .form-row select {
+            padding: 8px 14px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 13px;
+            flex: 1;
+            min-width: 120px;
+        }
+        .form-row input:focus { border-color: #6c3ce0; outline: none; }
+        .form-row select[multiple] {
+            min-height: 80px;
+            background: #0f0f1a;
+            color: #fff;
+        }
+        .form-row select[multiple] option {
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+        .form-row select[multiple] option:checked {
+            background: #6c3ce0;
+            color: #fff;
+        }
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .search-bar input {
+            flex: 1;
+            padding: 8px 14px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+        }
+        .search-bar input:focus { border-color: #6c3ce0; outline: none; }
+        .empty { text-align: center; color: #888; padding: 40px; }
+        .help-text {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .mensaje-exito {
+            background: #224422;
+            color: #6bff6b;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .mensaje-exito.show { display: block; }
+        .mensaje-error {
+            background: #442222;
+            color: #ff6b6b;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .mensaje-error.show { display: block; }
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .form-row { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h1 style="font-size:22px;display:flex;align-items:center;gap:10px;">👥 Trabajadores <span style="font-size:14px;font-weight:normal;opacity:0.7;">Gestión de empleados</span></h1>
+    </div>
+
+    <div class="mensaje-error" id="mensajeError"></div>
+    <div class="mensaje-exito" id="mensajeExito"></div>
+
+    <div class="card">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="number" id="totalTrabajadores">0</span>
+                <span class="label">👥 Total empleados</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="trabajadoresActivos">0</span>
+                <span class="label">🟢 Activos</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="trabajadoresInactivos">0</span>
+                <span class="label">🔴 Inactivos</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="nominaTotal">$0</span>
+                <span class="label">💰 Nómina total</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar trabajador..." oninput="filtrarTrabajadores()">
+            <button class="btn btn-primary" onclick="mostrarFormulario()">+ Nuevo trabajador</button>
+        </div>
+
+        <div id="formTrabajador" style="display:none;border-top:1px solid #2a2a3e;padding-top:16px;margin-top:12px;">
+            <h3 style="margin-bottom:12px;">Nuevo Trabajador</h3>
+            <div class="form-row">
+                <input type="text" id="traNombre" placeholder="Nombre completo" required>
+                <input type="text" id="traCargo" placeholder="Cargo" required>
+            </div>
+            <div class="form-row">
+                <input type="email" id="traEmail" placeholder="Email" required>
+                <input type="text" id="traTelefono" placeholder="Teléfono">
+                <input type="number" id="traSalario" placeholder="Salario">
+            </div>
+            <div class="form-row">
+                <input type="text" id="traUsuario" placeholder="Usuario para login" required>
+                <input type="password" id="traPassword" placeholder="Contraseña" required>
+            </div>
+            <div class="form-row">
+                <select id="traModulos" multiple>
+                    <option value="inventario">📦 Inventario</option>
+                    <option value="tienda">🛍️ Tienda</option>
+                    <option value="servicios">📋 Servicios</option>
+                    <option value="ventas">💰 Ventas</option>
+                </select>
+            </div>
+            <div class="help-text">Mantén presionado Ctrl para seleccionar múltiples módulos</div>
+            <div style="display:flex;gap:10px;margin-top:12px;">
+                <button class="btn btn-success" onclick="guardarTrabajador()">💾 Guardar</button>
+                <button class="btn btn-danger" onclick="cancelarFormulario()">✕ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <table class="tabla" id="tablaTrabajadores">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Cargo</th>
+                    <th>Email</th>
+                    <th>Teléfono</th>
+                    <th>Salario</th>
+                    <th>Usuario</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="trabajadoresBody">
+                <tr><td colspan="8" class="empty">Cargando trabajadores...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let trabajadores = [];
+
+        // ============================================
+        // CARGAR TRABAJADORES
+        // ============================================
+
+        function cargarTrabajadores() {
+            trabajadores = [
+                { id: 1, nombre: 'Ana García', cargo: 'Gerente', email: 'ana@empresa.com', telefono: '555-0001', salario: 2500, activo: true, usuario: 'ana' },
+                { id: 2, nombre: 'Luis Pérez', cargo: 'Vendedor', email: 'luis@empresa.com', telefono: '555-0002', salario: 1500, activo: true, usuario: 'luis' },
+                { id: 3, nombre: 'María López', cargo: 'Contadora', email: 'maria@empresa.com', telefono: '555-0003', salario: 2000, activo: true, usuario: 'maria' },
+                { id: 4, nombre: 'Carlos Ruiz', cargo: 'Repartidor', email: 'carlos@empresa.com', telefono: '555-0004', salario: 1200, activo: false, usuario: 'carlos' },
+            ];
+            renderTrabajadores();
+            actualizarEstadisticas();
+        }
+
+        // ============================================
+        // RENDER TRABAJADORES
+        // ============================================
+
+        function renderTrabajadores(filtro = '') {
+            const tbody = document.getElementById('trabajadoresBody');
+            const filtroLower = filtro.toLowerCase();
+            const filtrados = trabajadores.filter(t => 
+                t.nombre.toLowerCase().includes(filtroLower) ||
+                t.cargo.toLowerCase().includes(filtroLower)
+            );
+            if (filtrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="empty">No hay trabajadores</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = '';
+            filtrados.forEach(t => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${t.nombre}</strong></td>
+                    <td>${t.cargo}</td>
+                    <td>${t.email}</td>
+                    <td>${t.telefono}</td>
+                    <td>$${t.salario.toFixed(2)}</td>
+                    <td>${t.usuario}</td>
+                    <td><span class="badge ${t.activo ? 'activo' : 'inactivo'}">${t.activo ? '🟢 Activo' : '🔴 Inactivo'}</span></td>
+                    <td>
+                        <button class="btn btn-warning btn-sm" onclick="editarTrabajador(${t.id})">✏️</button>
+                        <button class="btn ${t.activo ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleTrabajador(${t.id})">${t.activo ? '🔴' : '🟢'}</button>
+                        <button class="btn btn-danger btn-sm" onclick="eliminarTrabajador(${t.id})">🗑️</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ============================================
+        // ESTADÍSTICAS
+        // ============================================
+
+        function actualizarEstadisticas() {
+            const total = trabajadores.length;
+            const activos = trabajadores.filter(t => t.activo).length;
+            const inactivos = total - activos;
+            const nomina = trabajadores.reduce((sum, t) => sum + t.salario, 0);
+            document.getElementById('totalTrabajadores').textContent = total;
+            document.getElementById('trabajadoresActivos').textContent = activos;
+            document.getElementById('trabajadoresInactivos').textContent = inactivos;
+            document.getElementById('nominaTotal').textContent = `$${nomina.toFixed(2)}`;
+        }
+
+        // ============================================
+        // FILTRAR
+        // ============================================
+
+        function filtrarTrabajadores() {
+            const filtro = document.getElementById('searchInput').value;
+            renderTrabajadores(filtro);
+        }
+
+        // ============================================
+        // FORMULARIO
+        // ============================================
+
+        function mostrarFormulario() {
+            document.getElementById('formTrabajador').style.display = 'block';
+            document.getElementById('traNombre').focus();
+        }
+
+        function cancelarFormulario() {
+            document.getElementById('formTrabajador').style.display = 'none';
+            document.getElementById('traNombre').value = '';
+            document.getElementById('traCargo').value = '';
+            document.getElementById('traEmail').value = '';
+            document.getElementById('traTelefono').value = '';
+            document.getElementById('traSalario').value = '';
+            document.getElementById('traUsuario').value = '';
+            document.getElementById('traPassword').value = '';
+        }
+
+        function mostrarMensaje(texto, tipo) {
+            const errorEl = document.getElementById('mensajeError');
+            const exitoEl = document.getElementById('mensajeExito');
+            errorEl.classList.remove('show');
+            exitoEl.classList.remove('show');
+            if (tipo === 'error') {
+                errorEl.textContent = texto;
+                errorEl.classList.add('show');
+            } else {
+                exitoEl.textContent = texto;
+                exitoEl.classList.add('show');
+            }
+            setTimeout(() => {
+                errorEl.classList.remove('show');
+                exitoEl.classList.remove('show');
+            }, 5000);
+        }
+
+        // ============================================
+        // GUARDAR TRABAJADOR
+        // ============================================
+
+        function guardarTrabajador() {
+            const nombre = document.getElementById('traNombre').value.trim();
+            const cargo = document.getElementById('traCargo').value.trim();
+            const email = document.getElementById('traEmail').value.trim();
+            const telefono = document.getElementById('traTelefono').value.trim();
+            const salario = parseFloat(document.getElementById('traSalario').value);
+            const usuario = document.getElementById('traUsuario').value.trim();
+            const password = document.getElementById('traPassword').value.trim();
+
+            if (!nombre || !cargo || !email || !usuario || !password) {
+                mostrarMensaje('❌ Completa todos los campos obligatorios', 'error');
+                return;
+            }
+
+            if (isNaN(salario)) {
+                mostrarMensaje('❌ El salario debe ser un número válido', 'error');
+                return;
+            }
+
+            const selectModulos = document.getElementById('traModulos');
+            const modulosSeleccionados = Array.from(selectModulos.selectedOptions).map(opt => opt.value);
+
+            fetch('/api/negocio/trabajador/crear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nombre,
+                    cargo,
+                    email,
+                    telefono,
+                    salario,
+                    usuario,
+                    password,
+                    modulos: modulosSeleccionados
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const nuevo = {
+                        id: trabajadores.length + 1,
+                        nombre,
+                        cargo,
+                        email,
+                        telefono,
+                        salario,
+                        activo: true,
+                        usuario
+                    };
+                    trabajadores.push(nuevo);
+                    renderTrabajadores();
+                    actualizarEstadisticas();
+                    cancelarFormulario();
+                    mostrarMensaje(`✅ Trabajador "${nombre}" creado correctamente. Usuario: ${usuario}`, 'exito');
+                } else {
+                    mostrarMensaje('❌ ' + (data.error || 'Error al crear el trabajador'), 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                mostrarMensaje('❌ Error de conexión con el servidor', 'error');
+            });
+        }
+
+        // ============================================
+        // ACCIONES
+        // ============================================
+
+        function editarTrabajador(id) {
+            const t = trabajadores.find(t => t.id === id);
+            if (!t) return;
+            alert(`✏️ Editar trabajador: ${t.nombre}\n\n(Próximamente disponible)`);
+        }
+
+        function toggleTrabajador(id) {
+            const t = trabajadores.find(t => t.id === id);
+            if (!t) return;
+            t.activo = !t.activo;
+            renderTrabajadores();
+            actualizarEstadisticas();
+            alert(`${t.activo ? '🟢 Activado' : '🔴 Desactivado'}`);
+        }
+
+        function eliminarTrabajador(id) {
+            const t = trabajadores.find(t => t.id === id);
+            if (!t) return;
+            if (confirm(`¿Eliminar a "${t.nombre}"?`)) {
+                trabajadores = trabajadores.filter(t => t.id !== id);
+                renderTrabajadores();
+                actualizarEstadisticas();
+                alert(`🗑️ Trabajador "${t.nombre}" eliminado`);
+            }
+        }
+
+        // ============================================
+        // INICIO
+        // ============================================
+
+        cargarTrabajadores();
+    </script>
+</body>
+</html>

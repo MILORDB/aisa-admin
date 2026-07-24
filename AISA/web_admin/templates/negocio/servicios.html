@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Servicios - AIsa Negocio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2a2a3e;
+            margin-bottom: 20px;
+        }
+        .card h2 { font-size: 18px; color: #6c3ce0; margin-bottom: 16px; }
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-warning { background: #ff9800; color: #fff; }
+        .btn-sm { padding: 4px 12px; font-size: 11px; }
+        .tabla {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        .tabla th {
+            text-align: left;
+            padding: 8px 12px;
+            color: #888;
+            border-bottom: 1px solid #2a2a3e;
+        }
+        .tabla td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .tabla .badge {
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+        }
+        .tabla .badge.activo { background: #224422; color: #6bff6b; }
+        .tabla .badge.inactivo { background: #442222; color: #ff6b6b; }
+        .form-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .form-row input, .form-row select, .form-row textarea {
+            padding: 8px 14px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 13px;
+            flex: 1;
+            min-width: 120px;
+        }
+        .form-row input:focus, .form-row select:focus {
+            border-color: #6c3ce0;
+            outline: none;
+        }
+        .form-row select option { background: #1a1a2e; }
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .search-bar input {
+            flex: 1;
+            padding: 8px 14px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+        }
+        .search-bar input:focus { border-color: #6c3ce0; outline: none; }
+        .empty { text-align: center; color: #888; padding: 40px; }
+        .loading { text-align: center; color: #888; padding: 20px; }
+        .info-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .info-header .trabajador-info { font-size: 13px; color: #888; }
+        .mensaje-exito {
+            background: #224422;
+            color: #6bff6b;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .mensaje-exito.show { display: block; }
+        .mensaje-error {
+            background: #442222;
+            color: #ff6b6b;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        .mensaje-error.show { display: block; }
+        .categoria-tag {
+            display: inline-block;
+            background: rgba(108, 60, 224, 0.2);
+            color: #6c3ce0;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+        }
+        @media (max-width: 600px) {
+            .form-row { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="info-header">
+        <h1 style="font-size:22px;display:flex;align-items:center;gap:10px;">📋 Servicios <span style="font-size:14px;font-weight:normal;opacity:0.7;">Gestión de servicios ofrecidos</span></h1>
+        <div id="infoTrabajador" class="trabajador-info"></div>
+    </div>
+
+    <div class="mensaje-error" id="mensajeError"></div>
+    <div class="mensaje-exito" id="mensajeExito"></div>
+
+    <div class="card">
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar servicio..." oninput="filtrarServicios()">
+            <button class="btn btn-primary" onclick="mostrarFormulario()">+ Nuevo servicio</button>
+        </div>
+
+        <div id="formServicio" style="display:none;border-top:1px solid #2a2a3e;padding-top:16px;margin-top:12px;">
+            <h3 style="margin-bottom:12px;">Nuevo Servicio</h3>
+            <div class="form-row">
+                <input type="text" id="serNombre" placeholder="Nombre del servicio">
+                <select id="serCategoria" required>
+                    <option value="">-- Seleccionar categoría --</option>
+                    <optgroup label="👗 Moda y Ropa">
+                        <option value="ropa_mujer">Ropa de Mujer</option>
+                        <option value="ropa_hombre">Ropa de Hombre</option>
+                        <option value="ropa_niños">Ropa de Niños y Bebés</option>
+                    </optgroup>
+                    <optgroup label="👟 Calzado y Accesorios">
+                        <option value="calzado_mujer">Calzado de Mujer</option>
+                        <option value="calzado_hombre">Calzado de Hombre</option>
+                        <option value="calzado_niños">Calzado de Niños</option>
+                        <option value="joyas">Joyas y Accesorios</option>
+                    </optgroup>
+                    <optgroup label="💻 Electrónica y Tecnología">
+                        <option value="electronica">Electrónica de Consumo</option>
+                        <option value="videojuegos">Videojuegos</option>
+                        <option value="audio">Audio</option>
+                    </optgroup>
+                    <optgroup label="🏠 Hogar y Cocina">
+                        <option value="hogar">Muebles y Hogar</option>
+                        <option value="decoracion">Decoración del Hogar</option>
+                        <option value="cocina">Cocina y Utensilios</option>
+                        <option value="almacenamiento">Almacenamiento y Organización</option>
+                        <option value="mejoras_hogar">Mejoras para el Hogar</option>
+                    </optgroup>
+                    <optgroup label="🌿 Jardín y Bricolaje">
+                        <option value="jardin">Jardín y Bricolaje</option>
+                    </optgroup>
+                    <optgroup label="💄 Belleza y Salud">
+                        <option value="belleza">Belleza y Salud</option>
+                    </optgroup>
+                    <optgroup label="🏋️ Deporte y Aire Libre">
+                        <option value="deporte">Deporte y Aire Libre</option>
+                    </optgroup>
+                    <optgroup label="🧸 Juguetes y Entretenimiento">
+                        <option value="juguetes">Juguetes y Entretenimiento</option>
+                    </optgroup>
+                    <optgroup label="🐾 Mascotas">
+                        <option value="mascotas">Mascotas</option>
+                    </optgroup>
+                    <optgroup label="📚 Oficina y Escuela">
+                        <option value="oficina">Oficina y Escuela</option>
+                    </optgroup>
+                    <optgroup label="🚗 Automotriz">
+                        <option value="automotriz">Automotriz</option>
+                    </optgroup>
+                    <optgroup label="👶 Bebé y Maternidad">
+                        <option value="bebe">Bebé y Maternidad</option>
+                    </optgroup>
+                    <optgroup label="🎵 Música e Instrumentos">
+                        <option value="musica">Música e Instrumentos</option>
+                    </optgroup>
+                    <optgroup label="🛍️ Otras Categorías">
+                        <option value="bolsas">Bolsas y Equipaje</option>
+                        <option value="manualidades">Manualidades y Arte</option>
+                        <option value="industrial">Suministros Industriales</option>
+                        <option value="coleccionables">Coleccionables</option>
+                        <option value="musica_fisica">CDs y Discos de Vinilo</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div class="form-row">
+                <input type="number" id="serPrecio" placeholder="Precio" step="0.01">
+                <input type="number" id="serDuracion" placeholder="Duración (minutos)">
+                <select id="serEstado">
+                    <option value="1">Activo</option>
+                    <option value="0">Inactivo</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <textarea id="serDescripcion" placeholder="Descripción del servicio" rows="2"></textarea>
+            </div>
+            <input type="hidden" id="serTrabajador" value="">
+            <div style="display:flex;gap:10px;margin-top:12px;">
+                <button class="btn btn-success" onclick="guardarServicio()">💾 Guardar</button>
+                <button class="btn btn-danger" onclick="cancelarFormulario()">✕ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div id="serviciosContainer">
+            <div class="loading">Cargando servicios...</div>
+        </div>
+    </div>
+
+    <script>
+        let servicios = [];
+        let trabajadorId = null;
+
+        const categoriasMap = {
+            'ropa_mujer': '👗 Ropa de Mujer',
+            'ropa_hombre': '👔 Ropa de Hombre',
+            'ropa_niños': '👕 Ropa de Niños',
+            'calzado_mujer': '👠 Calzado de Mujer',
+            'calzado_hombre': '👞 Calzado de Hombre',
+            'calzado_niños': '👟 Calzado de Niños',
+            'joyas': '💍 Joyas y Accesorios',
+            'electronica': '💻 Electrónica',
+            'videojuegos': '🎮 Videojuegos',
+            'audio': '🎧 Audio',
+            'hogar': '🏠 Hogar',
+            'decoracion': '🖼️ Decoración',
+            'cocina': '🍳 Cocina',
+            'almacenamiento': '📦 Almacenamiento',
+            'mejoras_hogar': '🔧 Mejoras Hogar',
+            'jardin': '🌿 Jardín',
+            'belleza': '💄 Belleza',
+            'deporte': '🏋️ Deporte',
+            'juguetes': '🧸 Juguetes',
+            'mascotas': '🐾 Mascotas',
+            'oficina': '📚 Oficina',
+            'automotriz': '🚗 Automotriz',
+            'bebe': '👶 Bebé',
+            'musica': '🎵 Música',
+            'bolsas': '🛍️ Bolsas',
+            'manualidades': '🎨 Manualidades',
+            'industrial': '🏭 Industrial',
+            'coleccionables': '🌟 Coleccionables',
+            'musica_fisica': '💿 CDs/Vinilos'
+        };
+
+        function getTrabajadorId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('trabajador_id');
+        }
+
+        function mostrarInfoTrabajador() {
+            const id = getTrabajadorId();
+            if (id) {
+                trabajadorId = id;
+                document.getElementById('infoTrabajador').textContent = '👤 Trabajador ID: ' + id;
+                document.getElementById('serTrabajador').value = id;
+            }
+        }
+
+        function mostrarMensaje(texto, tipo) {
+            const errorEl = document.getElementById('mensajeError');
+            const exitoEl = document.getElementById('mensajeExito');
+            errorEl.classList.remove('show');
+            exitoEl.classList.remove('show');
+            if (tipo === 'error') {
+                errorEl.textContent = '❌ ' + texto;
+                errorEl.classList.add('show');
+            } else {
+                exitoEl.textContent = '✅ ' + texto;
+                exitoEl.classList.add('show');
+            }
+            setTimeout(() => {
+                errorEl.classList.remove('show');
+                exitoEl.classList.remove('show');
+            }, 5000);
+        }
+
+        async function cargarServicios() {
+            const container = document.getElementById('serviciosContainer');
+            container.innerHTML = '<div class="loading">Cargando servicios...</div>';
+
+            try {
+                const url = trabajadorId ? `/api/servicios?trabajador_id=${trabajadorId}` : '/api/servicios';
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Error al cargar servicios');
+                servicios = await response.json();
+                renderServicios();
+            } catch (error) {
+                console.error('Error:', error);
+                container.innerHTML = `<div class="empty">❌ Error al cargar servicios</div>`;
+            }
+        }
+
+        function renderServicios(filtro = '') {
+            const container = document.getElementById('serviciosContainer');
+            const filtroLower = filtro.toLowerCase();
+            
+            const filtrados = servicios.filter(s => 
+                s.nombre.toLowerCase().includes(filtroLower) ||
+                (s.categoria && s.categoria.toLowerCase().includes(filtroLower))
+            );
+
+            if (filtrados.length === 0) {
+                container.innerHTML = `<div class="empty">No hay servicios registrados</div>`;
+                return;
+            }
+
+            let html = `
+                <div style="overflow-x:auto;">
+                    <table class="tabla">
+                        <thead>
+                            <tr>
+                                <th>Servicio</th>
+                                <th>Categoría</th>
+                                <th>Precio</th>
+                                <th>Duración</th>
+                                <th>Estado</th>
+                                <th>Creado por</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            filtrados.forEach(s => {
+                const categoriaDisplay = categoriasMap[s.categoria] || s.categoria || '-';
+                html += `
+                    <tr>
+                        <td><strong>${s.nombre}</strong></td>
+                        <td><span class="categoria-tag">${categoriaDisplay}</span></td>
+                        <td>$${parseFloat(s.precio).toFixed(2)}</td>
+                        <td>${s.duracion} min</td>
+                        <td><span class="badge ${s.activo ? 'activo' : 'inactivo'}">${s.activo ? '🟢 Activo' : '🔴 Inactivo'}</span></td>
+                        <td>${s.trabajador_id ? '👤 Trabajador' : 'Admin'}</td>
+                        <td>
+                            <button class="btn btn-warning btn-sm" onclick="toggleServicio(${s.id}, ${s.activo ? 0 : 1})">${s.activo ? '🔴' : '🟢'}</button>
+                            <button class="btn btn-danger btn-sm" onclick="eliminarServicio(${s.id})">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function filtrarServicios() {
+            const filtro = document.getElementById('searchInput').value;
+            renderServicios(filtro);
+        }
+
+        function mostrarFormulario() {
+            document.getElementById('formServicio').style.display = 'block';
+            document.getElementById('serNombre').focus();
+        }
+
+        function cancelarFormulario() {
+            document.getElementById('formServicio').style.display = 'none';
+            document.getElementById('serNombre').value = '';
+            document.getElementById('serCategoria').value = '';
+            document.getElementById('serPrecio').value = '';
+            document.getElementById('serDuracion').value = '';
+            document.getElementById('serDescripcion').value = '';
+        }
+
+        function guardarServicio() {
+            const nombre = document.getElementById('serNombre').value.trim();
+            const categoria = document.getElementById('serCategoria').value;
+            const precio = parseFloat(document.getElementById('serPrecio').value);
+            const duracion = parseInt(document.getElementById('serDuracion').value) || 60;
+            const activo = parseInt(document.getElementById('serEstado').value) === 1;
+            const descripcion = document.getElementById('serDescripcion').value.trim();
+            const trabajador = document.getElementById('serTrabajador').value;
+
+            if (!nombre || !categoria || isNaN(precio)) {
+                mostrarMensaje('Nombre, categoría y precio son obligatorios', 'error');
+                return;
+            }
+
+            const data = {
+                nombre,
+                categoria,
+                precio,
+                duracion,
+                descripcion,
+                trabajador_id: trabajador || null
+            };
+
+            fetch('/api/servicios', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mostrarMensaje(`✅ Servicio "${nombre}" agregado correctamente`, 'exito');
+                    cancelarFormulario();
+                    cargarServicios();
+                } else {
+                    mostrarMensaje(data.error || 'Error al guardar el servicio', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión con el servidor', 'error');
+            });
+        }
+
+        function toggleServicio(id, activo) {
+            fetch(`/api/servicio/${id}/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activo })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mostrarMensaje(`Servicio ${activo ? 'activado' : 'desactivado'}`, 'exito');
+                    cargarServicios();
+                } else {
+                    mostrarMensaje(data.error || 'Error al cambiar estado', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión', 'error');
+            });
+        }
+
+        function eliminarServicio(id) {
+            if (!confirm('¿Eliminar este servicio?')) return;
+            
+            fetch(`/api/servicio/${id}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mostrarMensaje('Servicio eliminado correctamente', 'exito');
+                    cargarServicios();
+                } else {
+                    mostrarMensaje(data.error || 'Error al eliminar', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión', 'error');
+            });
+        }
+
+        mostrarInfoTrabajador();
+        cargarServicios();
+        setInterval(cargarServicios, 30000);
+    </script>
+</body>
+</html>

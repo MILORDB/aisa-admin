@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tienda - AIsa Negocio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2a2a3e;
+            margin-bottom: 20px;
+        }
+        .card h2 { font-size: 18px; color: #6c3ce0; margin-bottom: 16px; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stat-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+        .stat-item .number { font-size: 24px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-warning { background: #ff9800; color: #fff; }
+        .btn-sm { padding: 4px 12px; font-size: 11px; }
+        .productos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        .producto-card {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            transition: border-color 0.3s;
+        }
+        .producto-card:hover { border-color: #6c3ce0; }
+        .producto-card .icon { font-size: 40px; display: block; margin-bottom: 8px; }
+        .producto-card .nombre { font-size: 14px; font-weight: 600; }
+        .producto-card .precio { font-size: 16px; color: #6c3ce0; font-weight: 700; margin: 4px 0; }
+        .producto-card .stock { font-size: 11px; color: #888; }
+        .producto-card .stock.bajo { color: #ff6b6b; }
+        .producto-card .btn { margin-top: 8px; }
+        .empty { text-align: center; color: #888; padding: 40px; }
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .search-bar input {
+            flex: 1;
+            padding: 8px 14px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+        }
+        .search-bar input:focus { border-color: #6c3ce0; outline: none; }
+        @media (max-width: 600px) {
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .productos-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <h1 style="font-size:22px;display:flex;align-items:center;gap:10px;">🛍️ Tienda <span style="font-size:14px;font-weight:normal;opacity:0.7;">Gestión de productos en venta</span></h1>
+    </div>
+
+    <div class="card">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="number" id="totalProductos">0</span>
+                <span class="label">📦 Productos en tienda</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="productosDestacados">0</span>
+                <span class="label">⭐ Destacados</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="ventasHoy">0</span>
+                <span class="label">💰 Ventas hoy</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="clientesHoy">0</span>
+                <span class="label">👥 Clientes hoy</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar productos..." oninput="filtrarProductos()">
+            <button class="btn btn-primary" onclick="agregarProductoTienda()">+ Agregar producto</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🛒 Productos en tienda</h2>
+        <div class="productos-grid" id="productosGrid">
+            <div class="empty">No hay productos en la tienda</div>
+        </div>
+    </div>
+
+    <script>
+        let productosTienda = [];
+
+        function cargarProductos() {
+            // Inicializar con array vacío - sin datos de ejemplo
+            productosTienda = [];
+            renderProductos();
+            actualizarEstadisticas();
+        }
+
+        function renderProductos(filtro = '') {
+            const grid = document.getElementById('productosGrid');
+            const filtroLower = filtro.toLowerCase();
+            const filtrados = productosTienda.filter(p => p.nombre.toLowerCase().includes(filtroLower));
+            if (filtrados.length === 0) {
+                grid.innerHTML = `<div class="empty">No hay productos en la tienda</div>`;
+                return;
+            }
+            grid.innerHTML = '';
+            filtrados.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'producto-card';
+                div.innerHTML = `
+                    <span class="icon">${p.icono || '📦'}</span>
+                    <div class="nombre">${p.nombre}</div>
+                    <div class="precio">$${p.precio.toFixed(2)}</div>
+                    <div class="stock ${p.stock < 5 ? 'bajo' : ''}">${p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado'}</div>
+                    ${p.destacado ? '⭐ Destacado' : ''}
+                    <div style="display:flex;gap:6px;justify-content:center;margin-top:8px;">
+                        <button class="btn btn-warning btn-sm" onclick="editarProductoTienda(${p.id})">✏️</button>
+                        <button class="btn btn-danger btn-sm" onclick="eliminarProductoTienda(${p.id})">🗑️</button>
+                        <button class="btn btn-success btn-sm" onclick="destacarProducto(${p.id})">⭐</button>
+                    </div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        function actualizarEstadisticas() {
+            document.getElementById('totalProductos').textContent = productosTienda.length;
+            document.getElementById('productosDestacados').textContent = productosTienda.filter(p => p.destacado).length;
+            document.getElementById('ventasHoy').textContent = 0;
+            document.getElementById('clientesHoy').textContent = 0;
+        }
+
+        function filtrarProductos() {
+            const filtro = document.getElementById('searchInput').value;
+            renderProductos(filtro);
+        }
+
+        function agregarProductoTienda() {
+            alert('📦 Agregar producto a la tienda\n\n(Próximamente disponible)');
+        }
+
+        function editarProductoTienda(id) {
+            const p = productosTienda.find(p => p.id === id);
+            if (!p) return;
+            alert(`✏️ Editar producto: ${p.nombre}\n\n(Próximamente disponible)`);
+        }
+
+        function eliminarProductoTienda(id) {
+            const p = productosTienda.find(p => p.id === id);
+            if (!p) return;
+            if (confirm(`¿Eliminar "${p.nombre}" de la tienda?`)) {
+                productosTienda = productosTienda.filter(p => p.id !== id);
+                renderProductos();
+                actualizarEstadisticas();
+                alert(`🗑️ Producto "${p.nombre}" eliminado`);
+            }
+        }
+
+        function destacarProducto(id) {
+            const p = productosTienda.find(p => p.id === id);
+            if (!p) return;
+            p.destacado = !p.destacado;
+            renderProductos();
+            actualizarEstadisticas();
+            alert(p.destacado ? `⭐ "${p.nombre}" destacado` : `⭐ "${p.nombre}" ya no está destacado`);
+        }
+
+        cargarProductos();
+    </script>
+</body>
+</html>
