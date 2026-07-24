@@ -14,9 +14,44 @@ def get_db():
     return conn
 
 def init_db():
+    """Inicializa la base de datos con timport os
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from datetime import datetime
+import bcrypt
+import json
+import re
+
+# Obtener la URL de la base de datos desde las variables de entorno
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+def get_db():
+    """Obtiene una conexión a la base de datos PostgreSQL con SSL"""
+    if not DATABASE_URL:
+        raise Exception("DATABASE_URL no está configurada")
+    
+    # Asegurar que la URL tenga sslmode=require
+    if 'sslmode' not in DATABASE_URL:
+        if '?' in DATABASE_URL:
+            DATABASE_URL_CONN = DATABASE_URL + '&sslmode=require'
+        else:
+            DATABASE_URL_CONN = DATABASE_URL + '?sslmode=require'
+    else:
+        DATABASE_URL_CONN = DATABASE_URL
+    
+    conn = psycopg2.connect(DATABASE_URL_CONN)
+    return conn
+
+def init_db():
     """Inicializa la base de datos con todas las tablas"""
-    conn = get_db()
-    cursor = conn.cursor()
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL")
+    except Exception as e:
+        print(f"❌ Error de conexión: {e}")
+        print("⚠️ Asegúrate de que DATABASE_URL esté configurada correctamente")
+        return
     
     # Tabla de usuarios
     cursor.execute('''
@@ -221,6 +256,7 @@ def init_db():
             'INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido) VALUES (%s, %s, %s, %s)',
             modulos
         )
+        print("✅ Módulos insertados")
     
     # Crear usuario admin por defecto
     cursor.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'admin'")
@@ -241,6 +277,7 @@ def init_db():
             INSERT INTO permisos_usuario (usuario_id, modulo_id, activo)
             VALUES (%s, %s, 1)
             ''', (admin_id, mod[0]))
+        print("✅ Usuario admin creado (admin/admin123)")
     
     conn.commit()
     conn.close()
