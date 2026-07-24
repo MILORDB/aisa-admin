@@ -4,7 +4,7 @@ import os
 import sys
 import logging
 import json
-import sqlite3
+import psycopg2
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -48,18 +48,21 @@ except Exception as e:
     traceback.print_exc()
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 CORS(app)
 
-# Crear carpeta para archivos estáticos
+# Crear carpetas para archivos estáticos
 os.makedirs('static/uploads', exist_ok=True)
 os.makedirs('static/img', exist_ok=True)
 
+# Intentar inicializar la base de datos
 try:
     init_db()
-    print("✅ Base de datos inicializada")
+    print("✅ Base de datos inicializada correctamente")
 except Exception as e:
     print(f"❌ Error inicializando base de datos: {e}")
+    print("⚠️ Asegúrate de que DATABASE_URL esté configurada correctamente")
+    print("⚠️ La aplicación continuará, pero algunas funciones pueden no estar disponibles")
 
 # ============================================
 # DECORADORES
