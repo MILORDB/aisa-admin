@@ -8,44 +8,25 @@ import urllib.parse
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
-def parse_db_url(url):
-    """Parsea la URL de PostgreSQL y devuelve los parámetros de conexión"""
-    if not url:
-        return None
-    
-    url = url.strip()
-    if not url.startswith('postgresql://') and not url.startswith('postgres://'):
-        url = 'postgresql://' + url
-    
-    try:
-        parsed = urllib.parse.urlparse(url)
-        return {
-            'host': parsed.hostname or 'localhost',
-            'port': parsed.port or 5432,
-            'database': parsed.path.lstrip('/') if parsed.path else '',
-            'user': parsed.username or '',
-            'password': parsed.password or ''
-        }
-    except Exception as e:
-        print(f"❌ Error parseando URL: {e}")
-        return None
-
 def get_db():
-    """Obtiene una conexión a PostgreSQL con SSL"""
+    """Obtiene una conexión a PostgreSQL"""
     if not DATABASE_URL:
         raise Exception("DATABASE_URL no está configurada")
     
-    params = parse_db_url(DATABASE_URL)
-    if not params:
-        raise Exception("No se pudo parsear DATABASE_URL")
+    # Parsear URL manualmente
+    url = DATABASE_URL.strip()
+    if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+        url = 'postgresql://' + url
+    
+    parsed = urllib.parse.urlparse(url)
     
     try:
         conn = psycopg2.connect(
-            host=params['host'],
-            port=params['port'],
-            database=params['database'],
-            user=params['user'],
-            password=params['password'],
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
             sslmode='require'
         )
         return conn
@@ -53,12 +34,8 @@ def get_db():
         print(f"❌ Error de conexión: {e}")
         raise
 
-# ============================================
-# INICIALIZAR BASE DE DATOS
-# ============================================
-
 def init_db():
-    """Inicializa la base de datos con todas las tablas"""
+    """Inicializa la base de datos"""
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -67,7 +44,7 @@ def init_db():
         print(f"❌ Error de conexión: {e}")
         return
     
-    # Crear tablas
+    # Crear tablas básicas
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -146,18 +123,6 @@ def init_db():
         created_at TEXT NOT NULL,
         updated_at TEXT,
         FOREIGN KEY (negocio_id) REFERENCES usuarios(id)
-    )
-    ''')
-    
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS productos_tienda (
-        id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        producto_id INTEGER NOT NULL,
-        destacado INTEGER DEFAULT 0,
-        created_at TEXT NOT NULL,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id),
-        FOREIGN KEY (producto_id) REFERENCES productos(id)
     )
     ''')
     
@@ -259,7 +224,6 @@ def init_db():
             'INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido) VALUES (%s, %s, %s, %s)',
             modulos
         )
-        print("✅ Módulos insertados")
     
     # Crear usuario admin
     cursor.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'admin'")
@@ -279,15 +243,14 @@ def init_db():
             INSERT INTO permisos_usuario (usuario_id, modulo_id, activo)
             VALUES (%s, %s, 1)
             ''', (admin_id, mod[0]))
-        print("✅ Usuario admin creado (admin/admin123)")
+        print("✅ Usuario admin creado")
     
     conn.commit()
     conn.close()
     print("✅ Base de datos inicializada correctamente")
-    print("👤 Usuario admin: admin / Contraseña: admin123")
 
 # ============================================
-# FUNCIONES DE USUARIOS
+# FUNCIONES DE USUARIOS (SIMPLIFICADAS)
 # ============================================
 
 def hash_password(password):
@@ -313,23 +276,10 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         ''', (username, email, password_hash, nombre, rol, tipo, fecha, datos_negocio))
         
         user_id = cursor.lastrowid
-        
-        if rol != 'trabajador':
-            if tipo == 'negocio':
-                cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'negocio'))
-            else:
-                cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'cliente'))
-            
-            for mod in cursor.fetchall():
-                cursor.execute('''
-                INSERT INTO permisos_usuario (usuario_id, modulo_id, activo)
-                VALUES (%s, %s, 1)
-                ''', (user_id, mod[0]))
-        
         conn.commit()
         return user_id
     except Exception as e:
-        print(f"❌ Error al crear usuario: {e}")
+        print(f"❌ Error: {e}")
         return None
     finally:
         conn.close()
@@ -353,138 +303,10 @@ def obtener_usuario_por_id(user_id):
 def obtener_todos_usuarios():
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT id, username, email, nombre, rol, tipo, activo, aprobado, fecha_registro, ultimo_acceso, datos_negocio
-    FROM usuarios ORDER BY id
-    ''')
+    cursor.execute('SELECT * FROM usuarios ORDER BY id')
     usuarios = cursor.fetchall()
     conn.close()
     return usuarios
-
-def obtener_negocios():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT id, username, email, nombre, activo, fecha_registro
-    FROM usuarios WHERE tipo = 'negocio' AND rol != 'admin' ORDER BY id
-    ''')
-    negocios = cursor.fetchall()
-    conn.close()
-    return negocios
-
-def eliminar_usuario(user_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM permisos_usuario WHERE usuario_id = %s', (user_id,))
-    cursor.execute('DELETE FROM sesiones WHERE usuario_id = %s', (user_id,))
-    cursor.execute('DELETE FROM trabajadores_negocio WHERE negocio_id = %s OR trabajador_id = %s', (user_id, user_id))
-    cursor.execute('DELETE FROM productos WHERE negocio_id = %s', (user_id,))
-    cursor.execute('DELETE FROM ventas WHERE negocio_id = %s OR trabajador_id = %s', (user_id, user_id))
-    cursor.execute('DELETE FROM servicios WHERE negocio_id = %s OR trabajador_id = %s', (user_id, user_id))
-    cursor.execute('DELETE FROM productos_tienda WHERE negocio_id = %s', (user_id,))
-    cursor.execute('DELETE FROM contratos WHERE negocio_id = %s OR trabajador_id = %s', (user_id, user_id))
-    cursor.execute('DELETE FROM logs WHERE usuario_id = %s', (user_id,))
-    cursor.execute('DELETE FROM usuarios WHERE id = %s', (user_id,))
-    conn.commit()
-    conn.close()
-    return True
-
-# ============================================
-# FUNCIONES PARA TRABAJADORES
-# ============================================
-
-def obtener_trabajadores_por_empresa(empresa_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT u.id, u.username, u.email, u.nombre, u.activo, 
-           u.datos_negocio, u.fecha_registro,
-           tn.cargo, tn.salario, tn.fecha_contratacion,
-           STRING_AGG(m.nombre, ',') as modulos
-    FROM trabajadores_negocio tn
-    JOIN usuarios u ON tn.trabajador_id = u.id
-    LEFT JOIN permisos_usuario p ON u.id = p.usuario_id
-    LEFT JOIN modulos m ON p.modulo_id = m.id AND p.activo = 1
-    WHERE tn.negocio_id = %s AND tn.activo = 1
-    GROUP BY u.id, tn.cargo, tn.salario, tn.fecha_contratacion
-    ORDER BY u.id DESC
-    ''', (empresa_id,))
-    trabajadores = cursor.fetchall()
-    conn.close()
-    return trabajadores
-
-def obtener_trabajador_por_id(user_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT u.id, u.username, u.email, u.nombre, u.activo, 
-           u.datos_negocio, u.fecha_registro,
-           STRING_AGG(m.nombre, ',') as modulos
-    FROM usuarios u
-    LEFT JOIN permisos_usuario p ON u.id = p.usuario_id
-    LEFT JOIN modulos m ON p.modulo_id = m.id AND p.activo = 1
-    WHERE u.id = %s AND u.rol = 'trabajador'
-    GROUP BY u.id
-    ''', (user_id,))
-    trabajador = cursor.fetchone()
-    conn.close()
-    return trabajador
-
-def crear_trabajador_negocio(negocio_id, trabajador_id, cargo, salario):
-    conn = get_db()
-    cursor = conn.cursor()
-    fecha = datetime.now().isoformat()
-    cursor.execute('''
-    INSERT INTO trabajadores_negocio (negocio_id, trabajador_id, cargo, salario, fecha_contratacion, activo)
-    VALUES (%s, %s, %s, %s, %s, 1)
-    ON CONFLICT (negocio_id, trabajador_id) DO UPDATE SET
-        cargo = EXCLUDED.cargo, salario = EXCLUDED.salario,
-        fecha_contratacion = EXCLUDED.fecha_contratacion, activo = 1
-    ''', (negocio_id, trabajador_id, cargo, salario, fecha))
-    conn.commit()
-    conn.close()
-
-def toggle_trabajador_negocio(negocio_id, trabajador_id, activo):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE trabajadores_negocio SET activo = %s WHERE negocio_id = %s AND trabajador_id = %s',
-                   (activo, negocio_id, trabajador_id))
-    conn.commit()
-    conn.close()
-
-def actualizar_trabajador_negocio(negocio_id, trabajador_id, cargo, salario):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE trabajadores_negocio SET cargo = %s, salario = %s WHERE negocio_id = %s AND trabajador_id = %s',
-                   (cargo, salario, negocio_id, trabajador_id))
-    conn.commit()
-    conn.close()
-
-def obtener_trabajadores_pendientes():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT id, username, email, nombre, fecha_registro
-    FROM usuarios WHERE rol = 'trabajador' AND aprobado = 0 AND activo = 1
-    ORDER BY fecha_registro DESC
-    ''')
-    trabajadores = cursor.fetchall()
-    conn.close()
-    return trabajadores
-
-def aprobar_trabajador(user_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET aprobado = 1 WHERE id = %s', (user_id,))
-    conn.commit()
-    conn.close()
-
-def rechazar_trabajador(user_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET activo = 0 WHERE id = %s', (user_id,))
-    conn.commit()
-    conn.close()
 
 def actualizar_ultimo_acceso(user_id):
     conn = get_db()
@@ -515,12 +337,21 @@ def actualizar_tipo_usuario(user_id, tipo):
     conn.commit()
     conn.close()
 
-def actualizar_datos_negocio(user_id, datos):
+def eliminar_usuario(user_id):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET datos_negocio = %s WHERE id = %s', (json.dumps(datos), user_id))
+    cursor.execute('DELETE FROM usuarios WHERE id = %s', (user_id,))
     conn.commit()
     conn.close()
+    return True
+
+def obtener_negocios():
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('SELECT id, username, email, nombre, activo, fecha_registro FROM usuarios WHERE tipo = %s', ('negocio',))
+    negocios = cursor.fetchall()
+    conn.close()
+    return negocios
 
 # ============================================
 # FUNCIONES DE MÓDULOS
@@ -530,8 +361,7 @@ def obtener_modulos(tipo_usuario=None):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     if tipo_usuario:
-        cursor.execute('SELECT * FROM modulos WHERE tipo_requerido IN (%s, %s) ORDER BY nombre',
-                       ('ambos', tipo_usuario))
+        cursor.execute('SELECT * FROM modulos WHERE tipo_requerido IN (%s, %s) ORDER BY nombre', ('ambos', tipo_usuario))
     else:
         cursor.execute('SELECT * FROM modulos ORDER BY nombre')
     modulos = cursor.fetchall()
@@ -657,10 +487,7 @@ def crear_producto(negocio_id, nombre, categoria, precio, stock, stock_minimo=3)
 def obtener_productos(negocio_id):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT id, nombre, categoria, precio, stock, stock_minimo, foto_url, created_at
-    FROM productos WHERE negocio_id = %s ORDER BY id DESC
-    ''', (negocio_id,))
+    cursor.execute('SELECT * FROM productos WHERE negocio_id = %s ORDER BY id DESC', (negocio_id,))
     productos = cursor.fetchall()
     conn.close()
     return productos
@@ -670,8 +497,7 @@ def obtener_todos_productos():
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
     SELECT p.*, u.username as negocio_username
-    FROM productos p JOIN usuarios u ON p.negocio_id = u.id
-    ORDER BY p.id DESC
+    FROM productos p JOIN usuarios u ON p.negocio_id = u.id ORDER BY p.id DESC
     ''')
     productos = cursor.fetchall()
     conn.close()
@@ -680,10 +506,8 @@ def obtener_todos_productos():
 def obtener_productos_con_stock(negocio_id):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT id, nombre, precio, stock
-    FROM productos WHERE negocio_id = %s AND stock > 0 ORDER BY nombre
-    ''', (negocio_id,))
+    cursor.execute('SELECT id, nombre, precio, stock FROM productos WHERE negocio_id = %s AND stock > 0 ORDER BY nombre',
+                   (negocio_id,))
     productos = cursor.fetchall()
     conn.close()
     return productos
@@ -693,10 +517,8 @@ def obtener_productos_tienda():
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
     SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url
-    FROM productos p
-    JOIN usuarios u ON p.negocio_id = u.id
-    WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0
-    ORDER BY p.id DESC
+    FROM productos p JOIN usuarios u ON p.negocio_id = u.id
+    WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0 ORDER BY p.id DESC
     ''')
     productos = cursor.fetchall()
     conn.close()
@@ -723,8 +545,7 @@ def actualizar_stock_producto(producto_id, cantidad):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
-    UPDATE productos SET stock = stock - %s, updated_at = %s
-    WHERE id = %s AND stock >= %s
+    UPDATE productos SET stock = stock - %s, updated_at = %s WHERE id = %s AND stock >= %s
     ''', (cantidad, datetime.now().isoformat(), producto_id, cantidad))
     filas = cursor.rowcount
     conn.commit()
@@ -734,59 +555,113 @@ def actualizar_stock_producto(producto_id, cantidad):
 def actualizar_foto_producto(producto_id, foto_url, foto_public_id=None):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-    UPDATE productos SET foto_url = %s, foto_public_id = %s, updated_at = %s WHERE id = %s
-    ''', (foto_url, foto_public_id, datetime.now().isoformat(), producto_id))
+    cursor.execute('UPDATE productos SET foto_url = %s, foto_public_id = %s, updated_at = %s WHERE id = %s',
+                   (foto_url, foto_public_id, datetime.now().isoformat(), producto_id))
     conn.commit()
     conn.close()
 
 def eliminar_foto_producto(producto_id):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-    UPDATE productos SET foto_url = NULL, foto_public_id = NULL, updated_at = %s WHERE id = %s
-    ''', (datetime.now().isoformat(), producto_id))
+    cursor.execute('UPDATE productos SET foto_url = NULL, foto_public_id = NULL, updated_at = %s WHERE id = %s',
+                   (datetime.now().isoformat(), producto_id))
     conn.commit()
     conn.close()
 
 # ============================================
-# FUNCIONES PARA PRODUCTOS EN TIENDA
+# FUNCIONES PARA TRABAJADORES
 # ============================================
 
-def agregar_producto_tienda(negocio_id, producto_id, destacado=0):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-    INSERT INTO productos_tienda (negocio_id, producto_id, destacado, created_at)
-    VALUES (%s, %s, %s, %s)
-    ''', (negocio_id, producto_id, destacado, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-
-def obtener_productos_tienda(negocio_id):
+def obtener_trabajadores_por_empresa(empresa_id):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
-    SELECT pt.id, p.nombre, p.precio, p.stock, p.foto_url, pt.destacado
-    FROM productos_tienda pt
-    JOIN productos p ON pt.producto_id = p.id
-    WHERE pt.negocio_id = %s ORDER BY pt.id DESC
-    ''', (negocio_id,))
-    productos = cursor.fetchall()
+    SELECT u.id, u.username, u.email, u.nombre, u.activo, 
+           u.datos_negocio, u.fecha_registro,
+           tn.cargo, tn.salario, tn.fecha_contratacion,
+           STRING_AGG(m.nombre, ',') as modulos
+    FROM trabajadores_negocio tn
+    JOIN usuarios u ON tn.trabajador_id = u.id
+    LEFT JOIN permisos_usuario p ON u.id = p.usuario_id
+    LEFT JOIN modulos m ON p.modulo_id = m.id AND p.activo = 1
+    WHERE tn.negocio_id = %s AND tn.activo = 1
+    GROUP BY u.id, tn.cargo, tn.salario, tn.fecha_contratacion
+    ORDER BY u.id DESC
+    ''', (empresa_id,))
+    trabajadores = cursor.fetchall()
     conn.close()
-    return productos
+    return trabajadores
 
-def toggle_destacado_tienda(producto_tienda_id, destacado):
+def obtener_trabajador_por_id(user_id):
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+    SELECT u.id, u.username, u.email, u.nombre, u.activo, 
+           u.datos_negocio, u.fecha_registro,
+           STRING_AGG(m.nombre, ',') as modulos
+    FROM usuarios u
+    LEFT JOIN permisos_usuario p ON u.id = p.usuario_id
+    LEFT JOIN modulos m ON p.modulo_id = m.id AND p.activo = 1
+    WHERE u.id = %s AND u.rol = 'trabajador'
+    GROUP BY u.id
+    ''', (user_id,))
+    trabajador = cursor.fetchone()
+    conn.close()
+    return trabajador
+
+def crear_trabajador_negocio(negocio_id, trabajador_id, cargo, salario):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('UPDATE productos_tienda SET destacado = %s WHERE id = %s', (destacado, producto_tienda_id))
+    fecha = datetime.now().isoformat()
+    cursor.execute('''
+    INSERT INTO trabajadores_negocio (negocio_id, trabajador_id, cargo, salario, fecha_contratacion, activo)
+    VALUES (%s, %s, %s, %s, %s, 1)
+    ON CONFLICT (negocio_id, trabajador_id) DO UPDATE SET
+        cargo = EXCLUDED.cargo, salario = EXCLUDED.salario,
+        fecha_contratacion = EXCLUDED.fecha_contratacion, activo = 1
+    ''', (negocio_id, trabajador_id, cargo, salario, fecha))
     conn.commit()
     conn.close()
 
-def eliminar_producto_tienda(producto_tienda_id):
+def toggle_trabajador_negocio(negocio_id, trabajador_id, activo):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM productos_tienda WHERE id = %s', (producto_tienda_id,))
+    cursor.execute('UPDATE trabajadores_negocio SET activo = %s WHERE negocio_id = %s AND trabajador_id = %s',
+                   (activo, negocio_id, trabajador_id))
+    conn.commit()
+    conn.close()
+
+def actualizar_trabajador_negocio(negocio_id, trabajador_id, cargo, salario):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE trabajadores_negocio SET cargo = %s, salario = %s WHERE negocio_id = %s AND trabajador_id = %s',
+                   (cargo, salario, negocio_id, trabajador_id))
+    conn.commit()
+    conn.close()
+
+def obtener_trabajadores_pendientes():
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+    SELECT id, username, email, nombre, fecha_registro
+    FROM usuarios WHERE rol = 'trabajador' AND aprobado = 0 AND activo = 1
+    ORDER BY fecha_registro DESC
+    ''')
+    trabajadores = cursor.fetchall()
+    conn.close()
+    return trabajadores
+
+def aprobar_trabajador(user_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE usuarios SET aprobado = 1 WHERE id = %s', (user_id,))
+    conn.commit()
+    conn.close()
+
+def rechazar_trabajador(user_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE usuarios SET activo = 0 WHERE id = %s', (user_id,))
     conn.commit()
     conn.close()
 
@@ -815,14 +690,10 @@ def obtener_ventas(negocio_id, trabajador_id=None):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     if trabajador_id:
         cursor.execute('''
-        SELECT id, cliente, producto, cantidad, total, fecha, estado, trabajador_id, producto_id, empresa, tipo, factura_url
-        FROM ventas WHERE negocio_id = %s AND trabajador_id = %s ORDER BY id DESC
+        SELECT * FROM ventas WHERE negocio_id = %s AND trabajador_id = %s ORDER BY id DESC
         ''', (negocio_id, trabajador_id))
     else:
-        cursor.execute('''
-        SELECT id, cliente, producto, cantidad, total, fecha, estado, trabajador_id, producto_id, empresa, tipo, factura_url
-        FROM ventas WHERE negocio_id = %s ORDER BY id DESC
-        ''', (negocio_id,))
+        cursor.execute('SELECT * FROM ventas WHERE negocio_id = %s ORDER BY id DESC', (negocio_id,))
     ventas = cursor.fetchall()
     conn.close()
     return ventas
@@ -900,14 +771,10 @@ def obtener_servicios(negocio_id, trabajador_id=None):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     if trabajador_id:
         cursor.execute('''
-        SELECT id, nombre, categoria, precio, duracion, activo, descripcion, created_at, trabajador_id
-        FROM servicios WHERE negocio_id = %s AND trabajador_id = %s ORDER BY id DESC
+        SELECT * FROM servicios WHERE negocio_id = %s AND trabajador_id = %s ORDER BY id DESC
         ''', (negocio_id, trabajador_id))
     else:
-        cursor.execute('''
-        SELECT id, nombre, categoria, precio, duracion, activo, descripcion, created_at, trabajador_id
-        FROM servicios WHERE negocio_id = %s ORDER BY id DESC
-        ''', (negocio_id,))
+        cursor.execute('SELECT * FROM servicios WHERE negocio_id = %s ORDER BY id DESC', (negocio_id,))
     servicios = cursor.fetchall()
     conn.close()
     return servicios
@@ -937,30 +804,6 @@ def eliminar_servicio(servicio_id):
     cursor.execute('DELETE FROM servicios WHERE id = %s', (servicio_id,))
     conn.commit()
     conn.close()
-
-# ============================================
-# FUNCIONES PARA ESTADÍSTICAS DE TRABAJADORES
-# ============================================
-
-def obtener_estadisticas_trabajador(trabajador_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    hoy = datetime.now().date().isoformat()
-    cursor.execute('SELECT COUNT(*) as ventas, COALESCE(SUM(total), 0) as ingresos FROM ventas WHERE trabajador_id = %s AND fecha = %s',
-                   (trabajador_id, hoy))
-    ventas = cursor.fetchone()
-    cursor.execute('SELECT COUNT(*) as servicios FROM servicios WHERE trabajador_id = %s AND activo = 1', (trabajador_id,))
-    servicios = cursor.fetchone()
-    cursor.execute('SELECT COUNT(DISTINCT cliente) as clientes FROM ventas WHERE trabajador_id = %s AND fecha = %s',
-                   (trabajador_id, hoy))
-    clientes = cursor.fetchone()
-    conn.close()
-    return {
-        'ventas': ventas[0] if ventas else 0,
-        'ingresos': ventas[1] if ventas else 0,
-        'servicios': servicios[0] if servicios else 0,
-        'clientes': clientes[0] if clientes else 0
-    }
 
 # ============================================
 # FUNCIONES PARA CONTRATOS
