@@ -34,7 +34,7 @@ def get_db():
         raise
 
 def init_db():
-    """Inicializa la base de datos con PostgreSQL (SIN AUTOINCREMENT)"""
+    """Inicializa la base de datos con PostgreSQL (SERIAL)"""
     try:
         conn = get_db()
         cursor = conn.cursor()
