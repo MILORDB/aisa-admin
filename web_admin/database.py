@@ -34,7 +34,7 @@ def get_db():
         raise
 
 def init_db():
-    """Inicializa la base de datos"""
+    """Inicializa la base de datos con PostgreSQL (SIN AUTOINCREMENT)"""
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -43,7 +43,7 @@ def init_db():
         print(f"❌ Error de conexión: {e}")
         return
     
-    # Crear tablas
+    # TABLAS CON SERIAL (PostgreSQL) - NO AUTOINCREMENT
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -235,6 +235,7 @@ def init_db():
             'INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido) VALUES (%s, %s, %s, %s)',
             modulos
         )
+        print("✅ Módulos insertados")
     
     # Crear usuario admin
     cursor.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'admin'")
@@ -254,14 +255,14 @@ def init_db():
             INSERT INTO permisos_usuario (usuario_id, modulo_id, activo)
             VALUES (%s, %s, 1)
             ''', (admin_id, mod[0]))
-        print("✅ Usuario admin creado")
+        print("✅ Usuario admin creado (admin/admin123)")
     
     conn.commit()
     conn.close()
     print("✅ Base de datos inicializada correctamente")
 
 # ============================================
-# FUNCIONES DE USUARIOS (TODAS)
+# FUNCIONES DE USUARIOS
 # ============================================
 
 def hash_password(password):
@@ -287,6 +288,19 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         ''', (username, email, password_hash, nombre, rol, tipo, fecha, datos_negocio))
         
         user_id = cursor.lastrowid
+        
+        if rol != 'trabajador':
+            if tipo == 'negocio':
+                cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'negocio'))
+            else:
+                cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'cliente'))
+            
+            for mod in cursor.fetchall():
+                cursor.execute('''
+                INSERT INTO permisos_usuario (usuario_id, modulo_id, activo)
+                VALUES (%s, %s, 1)
+                ''', (user_id, mod[0]))
+        
         conn.commit()
         return user_id
     except Exception as e:
