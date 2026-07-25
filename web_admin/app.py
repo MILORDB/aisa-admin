@@ -64,97 +64,15 @@ os.makedirs('static/uploads', exist_ok=True)
 os.makedirs('static/img', exist_ok=True)
 
 # ============================================
-# INICIALIZAR BASE DE DATOS AUTOMÁTICAMENTE
+# INICIALIZAR BASE DE DATOS
 # ============================================
 
-def init_database():
-    """Función para inicializar la base de datos si no existe"""
-    try:
-        from web_admin.database import init_db
-        init_db()
-        print("✅ Base de datos inicializada correctamente")
-        return True
-    except Exception as e:
-        print(f"⚠️ Error al inicializar BD automáticamente: {e}")
-        print("   Intentando inicialización manual...")
-        
-        try:
-            # Intentar inicialización manual
-            import psycopg2
-            import bcrypt
-            from datetime import datetime
-            
-            DATABASE_URL = os.environ.get('DATABASE_URL')
-            if not DATABASE_URL:
-                print("❌ DATABASE_URL no configurada")
-                return False
-            
-            # Forzar SSL
-            if 'sslmode' not in DATABASE_URL:
-                if '?' in DATABASE_URL:
-                    DATABASE_URL = DATABASE_URL + '&sslmode=require'
-                else:
-                    DATABASE_URL = DATABASE_URL + '?sslmode=require'
-            
-            conn = psycopg2.connect(DATABASE_URL)
-            cursor = conn.cursor()
-            
-            # Verificar si la tabla usuarios existe
-            cursor.execute("""
-                SELECT EXISTS (
-                    SELECT FROM information_schema.tables 
-                    WHERE table_name = 'usuarios'
-                )
-            """)
-            if cursor.fetchone()[0]:
-                print("✅ Las tablas ya existen")
-                conn.close()
-                return True
-            
-            # Crear tablas básicas
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id SERIAL PRIMARY KEY,
-                username TEXT UNIQUE NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                nombre TEXT,
-                rol TEXT DEFAULT 'usuario',
-                tipo TEXT DEFAULT 'cliente',
-                activo INTEGER DEFAULT 1,
-                aprobado INTEGER DEFAULT 1,
-                fecha_registro TEXT NOT NULL,
-                ultimo_acceso TEXT,
-                datos_negocio TEXT
-            )
-            ''')
-            
-            # Crear usuario admin
-            salt = bcrypt.gensalt()
-            password_hash = bcrypt.hashpw('admin123'.encode('utf-8'), salt).decode('utf-8')
-            fecha = datetime.now().isoformat()
-            cursor.execute('''
-            INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1)
-            ''', ('admin', 'admin@aisa.com', password_hash, 'Administrador', 'admin', 'admin', fecha))
-            
-            conn.commit()
-            conn.close()
-            print("✅ Base de datos inicializada manualmente")
-            print("👤 Usuario admin creado: admin / admin123")
-            return True
-            
-        except Exception as e2:
-            print(f"❌ Error en inicialización manual: {e2}")
-            return False
-
-# Ejecutar inicialización
-print("🔧 Verificando base de datos...")
-if init_database():
-    print("✅ Base de datos lista para usar")
-else:
-    print("⚠️ No se pudo inicializar la base de datos")
-    print("   Visita /init-db para intentar manualmente")
+try:
+    from web_admin.database import init_db
+    init_db()
+    print("✅ Base de datos inicializada correctamente")
+except Exception as e:
+    print(f"⚠️ Error al inicializar BD: {e}")
 
 # ============================================
 # ENDPOINT PARA INICIALIZAR BD MANUALMENTE
@@ -243,6 +161,10 @@ def login():
         return render_template('login.html')
     
     try:
+        # Verificar Content-Type
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type debe ser application/json'}), 415
+        
         data = request.get_json()
         if not data:
             return jsonify({'error': 'Datos inválidos'}), 400
@@ -254,27 +176,28 @@ def login():
             return jsonify({'error': 'Usuario y contraseña son requeridos'}), 400
         
         usuario = obtener_usuario_por_username(username)
+        
         if not usuario:
             return jsonify({'error': 'Usuario o contraseña incorrectos'}), 401
         
-        if usuario['activo'] != 1:
+        if usuario.get('activo') != 1:
             return jsonify({'error': 'Usuario desactivado'}), 401
         
-        if not verify_password(password, usuario['password_hash']):
+        if not verify_password(password, usuario.get('password_hash')):
             return jsonify({'error': 'Usuario o contraseña incorrectos'}), 401
         
-        token = crear_sesion(usuario['id'])
-        actualizar_ultimo_acceso(usuario['id'])
-        registrar_log(usuario['id'], 'login', 'Inicio de sesión')
+        token = crear_sesion(usuario.get('id'))
+        actualizar_ultimo_acceso(usuario.get('id'))
+        registrar_log(usuario.get('id'), 'login', 'Inicio de sesión')
         
         response = jsonify({
             'success': True,
             'usuario': {
-                'id': usuario['id'],
-                'username': usuario['username'],
-                'nombre': usuario['nombre'],
-                'rol': usuario['rol'],
-                'tipo': usuario['tipo']
+                'id': usuario.get('id'),
+                'username': usuario.get('username'),
+                'nombre': usuario.get('nombre'),
+                'rol': usuario.get('rol'),
+                'tipo': usuario.get('tipo')
             }
         })
         response.set_cookie('token', token, httponly=True, max_age=604800)
@@ -283,7 +206,7 @@ def login():
     except Exception as e:
         print(f"❌ Error en login: {e}")
         traceback.print_exc()
-        return jsonify({'error': 'Error interno del servidor'}), 500
+        return jsonify({'error': f'Error interno del servidor'}), 500
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -414,7 +337,7 @@ def api_perfil_password():
     return jsonify({'success': True, 'message': 'Contraseña actualizada correctamente'})
 
 # ============================================
-# API - SQL QUERY (MODIFICADO PARA POSTGRESQL)
+# API - SQL QUERY
 # ============================================
 
 @app.route('/api/sql', methods=['POST'])
