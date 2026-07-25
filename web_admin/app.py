@@ -64,15 +64,11 @@ os.makedirs('static/uploads', exist_ok=True)
 os.makedirs('static/img', exist_ok=True)
 
 # ============================================
-# INICIALIZAR BASE DE DATOS
+# INICIALIZAR BASE DE DATOS (DESACTIVADO)
 # ============================================
 
-try:
-    from web_admin.database import init_db
-    init_db()
-    print("✅ Base de datos inicializada correctamente")
-except Exception as e:
-    print(f"⚠️ Error al inicializar BD: {e}")
+print("⚠️ Inicialización automática desactivada")
+print("👉 Visita /init-db para inicializar manualmente")
 
 # ============================================
 # ENDPOINT PARA INICIALIZAR BD MANUALMENTE
@@ -97,7 +93,16 @@ def init_db_route():
         </html>
         """
     except Exception as e:
-        return f"<h1>❌ Error al inicializar la base de datos</h1><pre>{e}</pre>", 500
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al inicializar la base de datos</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/login" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Ir al Login</a>
+            </body>
+        </html>
+        """, 500
 
 # ============================================
 # DECORADORES
@@ -161,7 +166,6 @@ def login():
         return render_template('login.html')
     
     try:
-        # Verificar Content-Type
         if not request.is_json:
             return jsonify({'error': 'Content-Type debe ser application/json'}), 415
         
