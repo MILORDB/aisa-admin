@@ -5,26 +5,74 @@ from datetime import datetime
 import bcrypt
 import json
 import re
+import urllib.parse
 
 # Obtener la URL de la base de datos desde las variables de entorno
-DATABASE_URL = os.environ.get('DATABASE_URL')
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+
+def parse_db_url(url):
+    """Parsea la URL de PostgreSQL y devuelve los parámetros de conexión"""
+    if not url:
+        return None
+    
+    # Limpiar la URL
+    url = url.strip()
+    
+    # Si no tiene el prefijo, agregarlo
+    if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+        url = 'postgresql://' + url
+    
+    # Parsear la URL
+    try:
+        parsed = urllib.parse.urlparse(url)
+        
+        # Extraer parámetros
+        host = parsed.hostname or 'localhost'
+        port = parsed.port or 5432
+        database = parsed.path.lstrip('/') if parsed.path else ''
+        user = parsed.username or ''
+        password = parsed.password or ''
+        
+        return {
+            'host': host,
+            'port': port,
+            'database': database,
+            'user': user,
+            'password': password
+        }
+    except Exception as e:
+        print(f"❌ Error parseando URL: {e}")
+        return None
 
 def get_db():
     """Obtiene una conexión a la base de datos PostgreSQL con SSL"""
+    global DATABASE_URL
+    
     if not DATABASE_URL:
         raise Exception("DATABASE_URL no está configurada")
     
-    # Asegurar que la URL tenga sslmode=require
-    if 'sslmode' not in DATABASE_URL:
-        if '?' in DATABASE_URL:
-            DATABASE_URL_CONN = DATABASE_URL + '&sslmode=require'
-        else:
-            DATABASE_URL_CONN = DATABASE_URL + '?sslmode=require'
-    else:
-        DATABASE_URL_CONN = DATABASE_URL
+    # Parsear la URL manualmente
+    params = parse_db_url(DATABASE_URL)
+    if not params:
+        raise Exception("No se pudo parsear DATABASE_URL")
     
-    conn = psycopg2.connect(DATABASE_URL_CONN)
-    return conn
+    print(f"📡 Conectando a PostgreSQL: {params['host']}:{params['port']}/{params['database']}")
+    
+    # Construir conexión manualmente
+    try:
+        conn = psycopg2.connect(
+            host=params['host'],
+            port=params['port'],
+            database=params['database'],
+            user=params['user'],
+            password=params['password'],
+            sslmode='require'
+        )
+        print("✅ Conexión establecida")
+        return conn
+    except Exception as e:
+        print(f"❌ Error de conexión: {e}")
+        raise
 
 def init_db():
     """Inicializa la base de datos con todas las tablas"""
@@ -36,6 +84,10 @@ def init_db():
         print(f"❌ Error de conexión: {e}")
         print("⚠️ Asegúrate de que DATABASE_URL esté configurada correctamente")
         return
+    
+    # ============================================
+    # CREAR TABLAS
+    # ============================================
     
     # Tabla de usuarios
     cursor.execute('''
