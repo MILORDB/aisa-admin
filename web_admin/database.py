@@ -43,7 +43,7 @@ def init_db():
         print(f"❌ Error de conexión: {e}")
         return
     
-    # TABLAS CON SERIAL (PostgreSQL) - NO AUTOINCREMENT
+    # TABLAS CON SERIAL (PostgreSQL)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -281,13 +281,18 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         
         if datos_negocio and isinstance(datos_negocio, dict):
             datos_negocio = json.dumps(datos_negocio)
+        elif datos_negocio and isinstance(datos_negocio, str):
+            pass
+        else:
+            datos_negocio = None
         
         cursor.execute('''
         INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado, datos_negocio)
         VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1, %s)
+        RETURNING id
         ''', (username, email, password_hash, nombre, rol, tipo, fecha, datos_negocio))
         
-        user_id = cursor.lastrowid
+        user_id = cursor.fetchone()[0]
         
         if rol != 'trabajador':
             if tipo == 'negocio':
@@ -302,9 +307,14 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
                 ''', (user_id, mod[0]))
         
         conn.commit()
+        print(f"✅ Usuario creado: {username} (ID: {user_id})")
         return user_id
+        
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Error al crear usuario: {e}")
+        import traceback
+        traceback.print_exc()
+        conn.rollback()
         return None
     finally:
         conn.close()
