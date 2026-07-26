@@ -938,7 +938,7 @@ def api_producto(producto_id):
         return jsonify({'error': 'No autorizado'}), 403
     
     # ============================================
-    # DELETE - ELIMINAR PRODUCTO (CORREGIDO)
+    # DELETE - ELIMINAR PRODUCTO (VERSIÓN MEJORADA)
     # ============================================
     if request.method == 'DELETE':
         try:
@@ -947,7 +947,7 @@ def api_producto(producto_id):
             # Verificar que el producto pertenece al negocio
             conn = get_db()
             cursor = conn.cursor()
-            cursor.execute('SELECT negocio_id FROM productos WHERE id = %s', (producto_id,))
+            cursor.execute('SELECT negocio_id, nombre FROM productos WHERE id = %s', (producto_id,))
             producto = cursor.fetchone()
             conn.close()
             
@@ -959,17 +959,24 @@ def api_producto(producto_id):
                 print(f"❌ Producto {producto_id} no pertenece al usuario {usuario['id']}")
                 return jsonify({'error': 'No autorizado'}), 403
             
-            # Eliminar el producto
+            # Intentar eliminar el producto
             exito = eliminar_producto(producto_id)
             
-            if not exito:
+            if exito:
+                registrar_log(usuario['id'], 'producto_eliminado', 
+                            f'Producto: {producto[1]} (ID: {producto_id})')
+                print(f"✅ Producto {producto_id} eliminado correctamente")
+                return jsonify({
+                    'success': True,
+                    'message': f'Producto "{producto[1]}" eliminado correctamente',
+                    'producto_id': producto_id
+                })
+            else:
                 print(f"❌ Error al eliminar producto {producto_id}")
-                return jsonify({'error': 'Error al eliminar el producto'}), 500
-            
-            registrar_log(usuario['id'], 'producto_eliminado', f'ID: {producto_id}')
-            print(f"✅ Producto {producto_id} eliminado correctamente")
-            return jsonify({'success': True})
-            
+                return jsonify({
+                    'error': 'No se pudo eliminar el producto. Verifica que no tenga ventas asociadas.'
+                }), 500
+                
         except Exception as e:
             print(f"❌ Error eliminando producto: {e}")
             import traceback
@@ -981,11 +988,17 @@ def api_producto(producto_id):
     # ============================================
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Datos inválidos'}), 400
+            
         nombre = data.get('nombre')
         categoria = data.get('categoria')
         precio = data.get('precio')
         stock = data.get('stock', 0)
         stock_minimo = data.get('stock_minimo', 3)
+        
+        if not nombre or precio is None:
+            return jsonify({'error': 'Nombre y precio son requeridos'}), 400
         
         # Verificar que el producto pertenece al negocio
         conn = get_db()
