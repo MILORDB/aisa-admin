@@ -122,6 +122,112 @@ def init_db_route():
         """, 500
 
 # ============================================
+# ENDPOINT PARA REPARAR VENTAS (AGREGAR COLUMNAS)
+# ============================================
+
+@app.route('/fix-ventas', methods=['GET'])
+def fix_ventas():
+    """Endpoint para agregar columnas faltantes a la tabla ventas"""
+    try:
+        import urllib.parse
+        import psycopg2
+        
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL")
+        
+        # Verificar columnas actuales
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'ventas'
+        """)
+        columnas = cursor.fetchall()
+        columnas_existentes = [col[0] for col in columnas]
+        
+        print("📋 Columnas existentes:", columnas_existentes)
+        
+        # Columnas que deben existir
+        columnas_necesarias = [
+            ('factura', 'TEXT'),
+            ('transferencia_id', 'TEXT'),
+            ('transferencia_cedula', 'TEXT'),
+            ('transferencia_banco', 'TEXT'),
+            ('transferencia_fecha', 'TEXT')
+        ]
+        
+        columnas_agregadas = []
+        mensajes = []
+        
+        for col, tipo in columnas_necesarias:
+            if col not in columnas_existentes:
+                try:
+                    cursor.execute(f"ALTER TABLE ventas ADD COLUMN {col} {tipo}")
+                    columnas_agregadas.append(col)
+                    mensajes.append(f"✅ Columna '{col}' agregada correctamente")
+                    print(f"✅ Columna '{col}' agregada correctamente")
+                except psycopg2.Error as e:
+                    if "duplicate column" in str(e).lower():
+                        mensajes.append(f"⚠️ Columna '{col}' ya existe")
+                        print(f"⚠️ Columna '{col}' ya existe")
+                    else:
+                        mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
+                        print(f"⚠️ Error al agregar '{col}': {e}")
+            else:
+                mensajes.append(f"✅ Columna '{col}' ya existe")
+                print(f"✅ Columna '{col}' ya existe")
+        
+        conn.commit()
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head><title>Ventas Reparadas</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#6c3ce0;">✅ Ventas reparadas correctamente</h1>
+                <div style="background:#1a1a2e;border-radius:8px;padding:20px;margin:20px auto;max-width:600px;text-align:left;border:1px solid #2a2a3e;">
+                    {html_mensajes}
+                </div>
+                <p style="color:#888;">Columnas agregadas: factura, transferencia_id, transferencia_cedula, transferencia_banco, transferencia_fecha</p>
+                <br>
+                <a href="/negocio/ventas" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;display:inline-block;">Ir a Ventas</a>
+                <a href="/dashboard" style="color:#888;text-decoration:none;border:1px solid #2a2a3e;padding:10px 20px;border-radius:8px;display:inline-block;margin-left:10px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al reparar ventas</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
 # DECORADORES
 # ============================================
 
@@ -1147,6 +1253,8 @@ def api_ventas():
         return jsonify([dict(v) for v in ventas])
     
     data = request.get_json()
+    print("📥 Datos recibidos en POST:", data)
+    
     cliente = data.get('cliente')
     producto = data.get('producto')
     producto_id = data.get('producto_id')
@@ -1317,7 +1425,7 @@ def api_toggle_servicio(servicio_id):
     
     return jsonify({'success': True})
 
-@app.route('/api/servicio/<int:servicio_id>', methods=['DELETE'])
+@app.route('/api/servicio/<int:servicio_id>', methods(['DELETE'])
 @login_required
 def api_eliminar_servicio(servicio_id):
     token = request.cookies.get('token')
