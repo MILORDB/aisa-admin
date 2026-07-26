@@ -122,12 +122,12 @@ def init_db_route():
         """, 500
 
 # ============================================
-# ENDPOINT PARA REPARAR VENTAS EN RENDER
+# ENDPOINT PARA REPARAR VENTAS
 # ============================================
 
 @app.route('/fix-ventas', methods=['GET'])
 def fix_ventas():
-    """Endpoint para agregar columnas faltantes a la tabla ventas en Render"""
+    """Endpoint para agregar columnas faltantes a la tabla ventas"""
     try:
         import urllib.parse
         import psycopg2
@@ -135,25 +135,14 @@ def fix_ventas():
         DATABASE_URL = os.environ.get('DATABASE_URL', '')
         
         if not DATABASE_URL:
-            return """
-            <html>
-                <head><title>Error</title></head>
-                <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
-                    <h1 style="color:#ff6b6b;">❌ DATABASE_URL no está configurada</h1>
-                    <p style="color:#888;">Asegúrate de que la variable de entorno DATABASE_URL esté configurada en Render.</p>
-                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;display:inline-block;margin-top:20px;">Volver al Dashboard</a>
-                </body>
-            </html>
-            """, 500
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
         
-        # Parsear la URL de PostgreSQL
         url = DATABASE_URL.strip()
         if not url.startswith('postgresql://') and not url.startswith('postgres://'):
             url = 'postgresql://' + url
         
         parsed = urllib.parse.urlparse(url)
         
-        # Conectar a PostgreSQL
         conn = psycopg2.connect(
             host=parsed.hostname or 'localhost',
             port=parsed.port or 5432,
@@ -163,21 +152,18 @@ def fix_ventas():
             sslmode='require'
         )
         cursor = conn.cursor()
-        print("✅ Conectado a PostgreSQL en Render")
+        print("✅ Conectado a PostgreSQL")
         
-        # Verificar columnas actuales
         cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
             WHERE table_name = 'ventas'
-            ORDER BY ordinal_position
         """)
         columnas = cursor.fetchall()
         columnas_existentes = [col[0] for col in columnas]
         
         print("📋 Columnas existentes:", columnas_existentes)
         
-        # Columnas que deben existir
         columnas_necesarias = [
             ('factura', 'TEXT'),
             ('transferencia_id', 'TEXT'),
@@ -188,7 +174,6 @@ def fix_ventas():
         
         columnas_agregadas = []
         mensajes = []
-        errores = []
         
         for col, tipo in columnas_necesarias:
             if col not in columnas_existentes:
@@ -202,8 +187,7 @@ def fix_ventas():
                         mensajes.append(f"⚠️ Columna '{col}' ya existe")
                         print(f"⚠️ Columna '{col}' ya existe")
                     else:
-                        errores.append(f"❌ Error al agregar '{col}': {str(e)}")
-                        mensajes.append(f"❌ Error al agregar '{col}': {str(e)}")
+                        mensajes.append(f"❌ Error al agregar '{col}': {e}")
                         print(f"❌ Error al agregar '{col}': {e}")
             else:
                 mensajes.append(f"✅ Columna '{col}' ya existe")
@@ -213,32 +197,16 @@ def fix_ventas():
         conn.close()
         
         html_mensajes = "<br>".join(mensajes)
-        html_errores = "<br>".join(errores) if errores else ""
-        
-        if columnas_agregadas:
-            estado_titulo = "✅ Ventas reparadas correctamente"
-            estado_color = "#6c3ce0"
-            columnas_texto = f"Columnas agregadas: {', '.join(columnas_agregadas)}"
-        elif errores:
-            estado_titulo = "⚠️ Algunas columnas no se pudieron agregar"
-            estado_color = "#ffbb33"
-            columnas_texto = "Revisa los errores arriba"
-        else:
-            estado_titulo = "✅ Todas las columnas ya existen"
-            estado_color = "#6c3ce0"
-            columnas_texto = "No se necesitaron cambios"
         
         return f"""
         <html>
             <head><title>Ventas Reparadas</title></head>
             <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
-                <h1 style="color:{estado_color};">{estado_titulo}</h1>
+                <h1 style="color:#6c3ce0;">✅ Ventas reparadas correctamente</h1>
                 <div style="background:#1a1a2e;border-radius:8px;padding:20px;margin:20px auto;max-width:600px;text-align:left;border:1px solid #2a2a3e;">
                     {html_mensajes}
-                    {('<br>' + html_errores) if errores else ''}
                 </div>
-                <p style="color:#888;">{columnas_texto}</p>
-                <p style="color:#666;font-size:12px;">🔗 Base de datos: {parsed.hostname}</p>
+                <p style="color:#888;">Columnas agregadas: factura, transferencia_id, transferencia_cedula, transferencia_banco, transferencia_fecha</p>
                 <br>
                 <a href="/negocio/ventas" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;display:inline-block;">Ir a Ventas</a>
                 <a href="/dashboard" style="color:#888;text-decoration:none;border:1px solid #2a2a3e;padding:10px 20px;border-radius:8px;display:inline-block;margin-left:10px;">Volver al Dashboard</a>
@@ -246,20 +214,13 @@ def fix_ventas():
         </html>
         """
     except Exception as e:
-        import traceback
-        error_detalle = traceback.format_exc()
         return f"""
         <html>
             <head><title>Error</title></head>
             <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
                 <h1 style="color:#ff6b6b;">❌ Error al reparar ventas</h1>
-                <div style="background:#1a1a2e;border-radius:8px;padding:20px;margin:20px auto;max-width:800px;text-align:left;border:1px solid #2a2a3e;overflow-x:auto;">
-                    <pre style="color:#ff6b6b;font-size:12px;white-space:pre-wrap;word-break:break-all;">{str(e)}</pre>
-                    <hr style="border-color:#2a2a3e;">
-                    <pre style="color:#888;font-size:11px;white-space:pre-wrap;word-break:break-all;">{error_detalle}</pre>
-                </div>
-                <p style="color:#888;">Asegúrate de que la base de datos PostgreSQL esté funcionando correctamente.</p>
-                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;display:inline-block;margin-top:20px;">Volver al Dashboard</a>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
             </body>
         </html>
         """, 500
@@ -618,7 +579,7 @@ def verificar_usuario(username):
     return jsonify({'exists': False, 'message': 'Usuario no encontrado'})
 
 # ============================================
-# RUTAS DE MÓDULOS DE NEGOCIO (CON VERSIÓN PARA EVITAR CACHÉ)
+# RUTAS DE MÓDULOS DE NEGOCIO
 # ============================================
 
 @app.route('/negocio/inventario')
@@ -936,7 +897,7 @@ def api_toggle_trabajador_negocio(trabajador_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - PRODUCTOS
+# API - PRODUCTOS (CON DELETE CORREGIDO)
 # ============================================
 
 @app.route('/api/productos', methods=['GET', 'POST'])
@@ -976,22 +937,75 @@ def api_producto(producto_id):
     if not usuario or usuario['tipo'] != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
+    # ============================================
+    # DELETE - ELIMINAR PRODUCTO (CORREGIDO)
+    # ============================================
     if request.method == 'DELETE':
-        eliminar_producto(producto_id)
-        registrar_log(usuario['id'], 'producto_eliminado', f'ID: {producto_id}')
+        try:
+            print(f"🗑️ Intentando eliminar producto ID: {producto_id}")
+            
+            # Verificar que el producto pertenece al negocio
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute('SELECT negocio_id FROM productos WHERE id = %s', (producto_id,))
+            producto = cursor.fetchone()
+            conn.close()
+            
+            if not producto:
+                print(f"❌ Producto {producto_id} no encontrado")
+                return jsonify({'error': 'Producto no encontrado'}), 404
+            
+            if producto[0] != usuario['id']:
+                print(f"❌ Producto {producto_id} no pertenece al usuario {usuario['id']}")
+                return jsonify({'error': 'No autorizado'}), 403
+            
+            # Eliminar el producto
+            exito = eliminar_producto(producto_id)
+            
+            if not exito:
+                print(f"❌ Error al eliminar producto {producto_id}")
+                return jsonify({'error': 'Error al eliminar el producto'}), 500
+            
+            registrar_log(usuario['id'], 'producto_eliminado', f'ID: {producto_id}')
+            print(f"✅ Producto {producto_id} eliminado correctamente")
+            return jsonify({'success': True})
+            
+        except Exception as e:
+            print(f"❌ Error eliminando producto: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+    
+    # ============================================
+    # PUT - ACTUALIZAR PRODUCTO
+    # ============================================
+    try:
+        data = request.get_json()
+        nombre = data.get('nombre')
+        categoria = data.get('categoria')
+        precio = data.get('precio')
+        stock = data.get('stock', 0)
+        stock_minimo = data.get('stock_minimo', 3)
+        
+        # Verificar que el producto pertenece al negocio
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT negocio_id FROM productos WHERE id = %s', (producto_id,))
+        producto = cursor.fetchone()
+        conn.close()
+        
+        if not producto or producto[0] != usuario['id']:
+            return jsonify({'error': 'Producto no encontrado'}), 404
+        
+        actualizar_producto(producto_id, nombre, categoria, precio, stock, stock_minimo)
+        registrar_log(usuario['id'], 'producto_actualizado', f'ID: {producto_id}')
         return jsonify({'success': True})
-    
-    data = request.get_json()
-    nombre = data.get('nombre')
-    categoria = data.get('categoria')
-    precio = data.get('precio')
-    stock = data.get('stock', 0)
-    stock_minimo = data.get('stock_minimo', 3)
-    
-    actualizar_producto(producto_id, nombre, categoria, precio, stock, stock_minimo)
-    registrar_log(usuario['id'], 'producto_actualizado', f'ID: {producto_id}')
-    
-    return jsonify({'success': True})
+        
+    except Exception as e:
+        print(f"❌ Error actualizando producto: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/productos/stock')
 @login_required
@@ -1107,7 +1121,6 @@ def api_productos_tienda():
 @app.route('/api/tienda/productos', methods=['GET'])
 @login_required
 def api_tienda_productos():
-    """Obtiene los productos que el negocio tiene en su tienda"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1132,7 +1145,6 @@ def api_tienda_productos():
 @app.route('/api/tienda/producto/agregar', methods=['POST'])
 @login_required
 def api_tienda_agregar_producto():
-    """Agrega un producto a la tienda del negocio"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1176,7 +1188,6 @@ def api_tienda_agregar_producto():
 @app.route('/api/tienda/producto/<int:tienda_id>/destacar', methods=['POST'])
 @login_required
 def api_tienda_destacar_producto(tienda_id):
-    """Destaca o quita el destacado de un producto en la tienda"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1202,7 +1213,6 @@ def api_tienda_destacar_producto(tienda_id):
 @app.route('/api/tienda/producto/<int:tienda_id>', methods=['DELETE'])
 @login_required
 def api_tienda_eliminar_producto(tienda_id):
-    """Elimina un producto de la tienda"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1225,7 +1235,6 @@ def api_tienda_eliminar_producto(tienda_id):
 
 @app.route('/api/tienda/public', methods=['GET'])
 def api_tienda_public():
-    """Obtiene todos los productos disponibles en la tienda (público)"""
     try:
         conn = get_db()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -1240,16 +1249,13 @@ def api_tienda_public():
         ''')
         productos = cursor.fetchall()
         conn.close()
-        
         return jsonify([dict(p) for p in productos])
-        
     except Exception as e:
         print(f"❌ Error en tienda pública: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tienda/public/<int:negocio_id>', methods=['GET'])
 def api_tienda_public_negocio(negocio_id):
-    """Obtiene los productos de un negocio específico en la tienda"""
     try:
         conn = get_db()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -1264,15 +1270,13 @@ def api_tienda_public_negocio(negocio_id):
         ''', (negocio_id,))
         productos = cursor.fetchall()
         conn.close()
-        
         return jsonify([dict(p) for p in productos])
-        
     except Exception as e:
         print(f"❌ Error en tienda pública: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - VENTAS (ACTUALIZADO CON NUEVOS CAMPOS)
+# API - VENTAS
 # ============================================
 
 @app.route('/api/ventas', methods=['GET', 'POST'])
@@ -1364,7 +1368,6 @@ def api_ventas_estadisticas():
 @app.route('/api/venta/<int:venta_id>/estado', methods=['PUT'])
 @login_required
 def api_actualizar_estado_venta(venta_id):
-    """Actualiza el estado de una venta"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
