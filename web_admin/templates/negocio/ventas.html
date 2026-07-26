@@ -101,6 +101,7 @@
         .tabla .badge.pagado { background: #224422; color: #6bff6b; }
         .tabla .badge.pendiente { background: #443322; color: #ffbb33; }
         .tabla .badge.cancelado { background: #442222; color: #ff6b6b; }
+        .tabla .badge.transferencia { background: #1a237e; color: #fff; }
         .form-row {
             display: flex;
             gap: 12px;
@@ -108,7 +109,7 @@
             margin-bottom: 12px;
             align-items: center;
         }
-        .form-row input, .form-row select {
+        .form-row input, .form-row select, .form-row textarea {
             padding: 8px 14px;
             border: 1px solid #2a2a3e;
             border-radius: 8px;
@@ -118,22 +119,24 @@
             flex: 1;
             min-width: 120px;
         }
-        .form-row input:focus, .form-row select:focus {
+        .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
             border-color: #6c3ce0;
             outline: none;
         }
         .form-row select option { background: #1a1a2e; }
-        .form-row .campo-opcional label {
-            font-size: 11px;
-            color: #888;
-            display: block;
-            margin-bottom: 2px;
-        }
         .form-row label {
             font-size: 12px;
             color: #aaa;
             display: block;
             margin-bottom: 2px;
+        }
+        .form-row .campo-opcional label {
+            font-size: 11px;
+            color: #888;
+        }
+        .form-row .campo-obligatorio label::after {
+            content: " *";
+            color: #ff6b6b;
         }
         .search-bar {
             display: flex;
@@ -175,13 +178,13 @@
             background: #1a1a2e;
             padding: 30px;
             border-radius: 12px;
-            max-width: 650px;
+            max-width: 750px;
             width: 95%;
             border: 1px solid #2a2a3e;
-            max-height: 90vh;
+            max-height: 95vh;
             overflow-y: auto;
         }
-        .modal-content h3 { margin-bottom: 16px; }
+        .modal-content h3 { margin-bottom: 8px; }
         .modal-content .modal-subtitle {
             font-size: 12px;
             color: #888;
@@ -212,27 +215,6 @@
             display: none;
         }
         .mensaje-error.show { display: block; }
-        .stock-info {
-            font-size: 11px;
-            color: #888;
-            margin-top: 2px;
-        }
-        .resumen-venta {
-            background: #0f0f1a;
-            border-radius: 8px;
-            padding: 12px 16px;
-            border: 1px solid #2a2a3e;
-            margin-top: 8px;
-        }
-        .resumen-venta .fila {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            font-size: 13px;
-        }
-        .resumen-venta .fila .label { color: #888; }
-        .resumen-venta .fila .value { font-weight: 600; }
-        .resumen-venta .fila .value.total { color: #6c3ce0; font-size: 16px; }
         .seccion-items {
             border: 1px solid #2a2a3e;
             border-radius: 8px;
@@ -293,12 +275,86 @@
             font-weight: 600;
             min-width: 60px;
         }
+        .item-line .item-stock {
+            font-size: 11px;
+            color: #888;
+            min-width: 50px;
+            text-align: center;
+        }
+        .item-line .item-stock.bajo { color: #ff6b6b; }
         .item-line .item-subtotal {
             flex: 1;
             font-size: 13px;
             text-align: right;
             color: #fff;
             min-width: 60px;
+        }
+        .factura-preview {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 12px;
+            font-size: 12px;
+        }
+        .factura-preview .factura-titulo {
+            text-align: center;
+            font-size: 16px;
+            font-weight: 700;
+            color: #6c3ce0;
+            border-bottom: 1px solid #2a2a3e;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+        }
+        .factura-preview .factura-fila {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .factura-preview .factura-fila .label { color: #888; }
+        .factura-preview .factura-fila .value { color: #fff; }
+        .factura-preview .factura-total {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-top: 2px solid #6c3ce0;
+            margin-top: 4px;
+            font-size: 16px;
+            font-weight: 700;
+            color: #6c3ce0;
+        }
+        .factura-preview .factura-items {
+            margin: 6px 0;
+        }
+        .factura-preview .factura-items .item {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            font-size: 11px;
+            color: #aaa;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .campo-transferencia {
+            display: none;
+            border-left: 2px solid #ff9800;
+            padding-left: 12px;
+            margin-top: 8px;
+        }
+        .campo-transferencia.show {
+            display: block;
+        }
+        .campo-transferencia .form-row {
+            margin-bottom: 6px;
+        }
+        .campo-transferencia .form-row input {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .badge-numero {
+            font-size: 11px;
+            color: #6c3ce0;
+            font-weight: 600;
         }
         .acciones-cell {
             display: flex; gap: 4px; flex-wrap: wrap;
@@ -311,15 +367,13 @@
             padding: 2px 6px;
             font-size: 11px;
         }
-        .total-venta {
-            text-align: right;
-            padding: 12px;
-            border-top: 2px solid #6c3ce0;
-            margin-top: 8px;
-            font-size: 18px;
-            font-weight: 700;
+        .contrato-link {
             color: #6c3ce0;
+            text-decoration: none;
+            font-size: 12px;
+            cursor: pointer;
         }
+        .contrato-link:hover { text-decoration: underline; }
         @media (max-width: 600px) {
             .form-row { flex-direction: column; }
             .search-bar { flex-direction: column; }
@@ -328,6 +382,7 @@
             .modal-content { padding: 16px; }
             .item-line { flex-wrap: wrap; }
             .item-line select { flex: 1 1 100%; }
+            .factura-preview { font-size: 10px; }
         }
     </style>
 </head>
@@ -371,6 +426,7 @@
                 <option value="pagado">✅ Pagado</option>
                 <option value="pendiente">⏳ Pendiente</option>
                 <option value="cancelado">❌ Cancelado</option>
+                <option value="transferencia">💳 Transferencia</option>
             </select>
             <button class="btn btn-primary" onclick="nuevaVenta()">+ Nueva venta</button>
         </div>
@@ -380,64 +436,126 @@
     <div class="modal-overlay" id="modalVenta">
         <div class="modal-content">
             <h3>💰 Nueva Venta</h3>
-            <div class="modal-subtitle">Agrega productos y/o servicios a la venta</div>
+            <div class="modal-subtitle">Complete los datos de la venta</div>
 
-            <!-- Empresa (opcional) -->
+            <!-- 1. Empresa / TCP / MIPYME (NO OBLIGATORIO) + Contratos -->
             <div class="form-row campo-opcional">
-                <div style="flex:1;">
+                <div style="flex:2;">
                     <label>🏢 Empresa / TCP / MIPYME <span style="color:#666;">(opcional)</span></label>
-                    <input type="text" id="ventaEmpresa" placeholder="Nombre de la empresa o TCP">
+                    <input type="text" id="ventaEmpresa" placeholder="Nombre de la empresa o TCP" oninput="generarNumeroFactura()">
+                    <div style="font-size:11px;color:#888;margin-top:2px;">
+                        <span id="infoContrato">📄 </span>
+                        <a href="#" class="contrato-link" onclick="buscarContrato()">Buscar contrato</a>
+                    </div>
+                </div>
+                <div style="flex:1;">
+                    <label>📄 N° Factura <span style="color:#666;">(automático)</span></label>
+                    <input type="text" id="ventaFactura" placeholder="FAC-0001" readonly style="background:#0a0a14;color:#6c3ce0;font-weight:700;">
                 </div>
             </div>
 
-            <!-- Productos -->
+            <!-- 2. Productos -->
             <div class="seccion-items">
                 <div class="seccion-titulo">
                     <span>📦 Productos</span>
                     <span class="badge-count" id="countProductos">0</span>
                 </div>
                 <div id="productosContainer">
-                    <!-- Los productos se agregan aquí dinámicamente -->
+                    <!-- Productos se agregan dinámicamente -->
                 </div>
                 <div style="display:flex;justify-content:center;margin-top:8px;">
                     <button class="btn-add" onclick="agregarLineaProducto()" title="Agregar producto">➕</button>
                 </div>
             </div>
 
-            <!-- Servicios -->
+            <!-- 3. Servicios -->
             <div class="seccion-items">
                 <div class="seccion-titulo">
                     <span>📋 Servicios</span>
                     <span class="badge-count" id="countServicios">0</span>
                 </div>
                 <div id="serviciosContainer">
-                    <!-- Los servicios se agregan aquí dinámicamente -->
+                    <!-- Servicios se agregan dinámicamente -->
                 </div>
                 <div style="display:flex;justify-content:center;margin-top:8px;">
                     <button class="btn-add" onclick="agregarLineaServicio()" title="Agregar servicio">➕</button>
                 </div>
             </div>
 
-            <!-- Resumen de la venta -->
-            <div class="resumen-venta">
-                <div class="fila">
-                    <span class="label">📌 Estado:</span>
-                    <span class="value" id="resumenEstado">✅ Pagado</span>
-                </div>
-                <div class="fila" style="border-top:1px solid #2a2a3e;padding-top:8px;margin-top:4px;">
-                    <span class="label">💰 Total:</span>
-                    <span class="value total" id="resumenTotal">$0.00</span>
+            <!-- 4. Estado de pago -->
+            <div class="form-row">
+                <div style="flex:1;">
+                    <label>📌 Estado de pago</label>
+                    <select id="ventaEstado" onchange="mostrarCamposTransferencia()">
+                        <option value="pagado">✅ Pagado (Efectivo)</option>
+                        <option value="pendiente">⏳ Pendiente</option>
+                        <option value="cancelado">❌ Cancelado</option>
+                        <option value="transferencia">💳 Transferencia</option>
+                    </select>
                 </div>
             </div>
 
-            <div class="form-row" style="border-top:1px solid #2a2a3e;padding-top:12px;margin-top:8px;">
-                <div style="flex:1;min-width:150px;">
-                    <label>📌 Estado de pago</label>
-                    <select id="ventaEstado" onchange="actualizarResumen()">
-                        <option value="pagado" style="color:#6bff6b;">✅ Pagado</option>
-                        <option value="pendiente" style="color:#ffbb33;">⏳ Pendiente</option>
-                        <option value="cancelado" style="color:#ff6b6b;">❌ Cancelado</option>
-                    </select>
+            <!-- 5. Campos para Transferencia -->
+            <div class="campo-transferencia" id="camposTransferencia">
+                <div class="form-row">
+                    <div style="flex:1;">
+                        <label>📱 ID de Transferencia</label>
+                        <input type="text" id="transferenciaId" placeholder="ID de la transferencia">
+                    </div>
+                    <div style="flex:1;">
+                        <label>🪪 Carnet de Identidad</label>
+                        <input type="text" id="transferenciaCedula" placeholder="Carnet de identidad">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div style="flex:1;">
+                        <label>🏦 Banco</label>
+                        <input type="text" id="transferenciaBanco" placeholder="Banco de origen">
+                    </div>
+                    <div style="flex:1;">
+                        <label>📅 Fecha de transferencia</label>
+                        <input type="date" id="transferenciaFecha">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. Factura Preview -->
+            <div class="factura-preview" id="facturaPreview">
+                <div class="factura-titulo">🧾 FACTURA DE VENTA</div>
+                <div class="factura-fila">
+                    <span class="label">📄 N° Factura:</span>
+                    <span class="value" id="facturaNumero">FAC-0001</span>
+                </div>
+                <div class="factura-fila">
+                    <span class="label">🏢 Empresa:</span>
+                    <span class="value" id="facturaEmpresa">-</span>
+                </div>
+                <div class="factura-fila">
+                    <span class="label">📅 Fecha:</span>
+                    <span class="value" id="facturaFecha">-</span>
+                </div>
+                <div class="factura-items" id="facturaItems">
+                    <div style="color:#888;font-size:11px;text-align:center;padding:4px 0;">No hay items agregados</div>
+                </div>
+                <div class="factura-fila">
+                    <span class="label">📌 Estado:</span>
+                    <span class="value" id="facturaEstado">✅ Pagado</span>
+                </div>
+                <div class="factura-fila" id="facturaTransferencia" style="display:none;">
+                    <span class="label">💳 Transferencia ID:</span>
+                    <span class="value" id="facturaTransId">-</span>
+                </div>
+                <div class="factura-fila" id="facturaCedula" style="display:none;">
+                    <span class="label">🪪 Carnet:</span>
+                    <span class="value" id="facturaCedulaValor">-</span>
+                </div>
+                <div class="factura-total">
+                    <span>TOTAL</span>
+                    <span id="facturaTotal">$0.00</span>
+                </div>
+                <div class="factura-fila" style="border-top:1px solid #1a1a2e;padding-top:4px;font-size:11px;color:#666;">
+                    <span class="label">👤 Atendido por:</span>
+                    <span class="value" id="facturaAtendido">-</span>
                 </div>
             </div>
 
@@ -461,11 +579,12 @@
         let ventas = [];
         let productos = [];
         let servicios = [];
+        let contratos = [];
         let trabajadorId = null;
         let lineasProductos = [];
         let lineasServicios = [];
         let nextId = 1;
-        let datosCargados = false;
+        let ultimoNumeroFactura = 0;
 
         // ============================================
         // INICIALIZACIÓN
@@ -504,7 +623,90 @@
         }
 
         // ============================================
-        // CARGAR PRODUCTOS Y SERVICIOS (FUNCIONES GLOBALES)
+        // GENERAR NÚMERO DE FACTURA
+        // ============================================
+
+        function generarNumeroFactura() {
+            const empresa = document.getElementById('ventaEmpresa').value.trim();
+            const facturaInput = document.getElementById('ventaFactura');
+            
+            if (empresa) {
+                ultimoNumeroFactura++;
+                const año = new Date().getFullYear();
+                const numero = String(ultimoNumeroFactura).padStart(4, '0');
+                facturaInput.value = `FAC-${año}-${numero}`;
+                document.getElementById('facturaNumero').textContent = facturaInput.value;
+            } else {
+                facturaInput.value = '';
+                document.getElementById('facturaNumero').textContent = '-';
+            }
+        }
+
+        // ============================================
+        // MOSTRAR CAMPOS DE TRANSFERENCIA
+        // ============================================
+
+        function mostrarCamposTransferencia() {
+            const estado = document.getElementById('ventaEstado').value;
+            const campos = document.getElementById('camposTransferencia');
+            const transRow = document.getElementById('facturaTransferencia');
+            const cedulaRow = document.getElementById('facturaCedula');
+            
+            if (estado === 'transferencia') {
+                campos.classList.add('show');
+                transRow.style.display = 'flex';
+                cedulaRow.style.display = 'flex';
+            } else {
+                campos.classList.remove('show');
+                transRow.style.display = 'none';
+                cedulaRow.style.display = 'none';
+            }
+            actualizarFactura();
+        }
+
+        // ============================================
+        // BUSCAR CONTRATO
+        // ============================================
+
+        async function buscarContrato() {
+            const empresa = document.getElementById('ventaEmpresa').value.trim();
+            if (!empresa) {
+                mostrarMensaje('⚠️ Ingresa el nombre de la empresa para buscar contratos', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/contratos`);
+                if (!response.ok) throw new Error('Error al buscar contratos');
+                const todosContratos = await response.json();
+                
+                const contratosEncontrados = todosContratos.filter(c => 
+                    c.empresa && c.empresa.toLowerCase().includes(empresa.toLowerCase()) && 
+                    c.estado === 'activo'
+                );
+                
+                if (contratosEncontrados.length === 0) {
+                    mostrarMensaje('⚠️ No se encontraron contratos activos para esta empresa', 'error');
+                    document.getElementById('infoContrato').textContent = '📄 Sin contratos activos';
+                    return;
+                }
+                
+                let mensaje = '📄 Contratos encontrados: ';
+                contratosEncontrados.forEach((c, i) => {
+                    mensaje += `${c.numero_contrato} (${c.tipo})`;
+                    if (i < contratosEncontrados.length - 1) mensaje += ', ';
+                });
+                document.getElementById('infoContrato').textContent = mensaje;
+                mostrarMensaje(`✅ ${contratosEncontrados.length} contrato(s) encontrado(s)`, 'exito');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('Error al buscar contratos', 'error');
+            }
+        }
+
+        // ============================================
+        // CARGAR PRODUCTOS Y SERVICIOS
         // ============================================
 
         async function cargarProductos() {
@@ -535,7 +737,6 @@
         }
 
         function actualizarSelectoresProductos() {
-            console.log('🔄 Actualizando selectores de productos...');
             document.querySelectorAll('.select-producto').forEach(select => {
                 const valorActual = select.value;
                 while (select.options.length > 1) {
@@ -555,7 +756,7 @@
                 productosConStock.forEach(p => {
                     const opt = document.createElement('option');
                     opt.value = p.id;
-                    opt.textContent = `${p.nombre} (Stock: ${p.stock})`;
+                    opt.textContent = `${p.nombre}`;
                     opt.dataset.precio = p.precio;
                     opt.dataset.stock = p.stock;
                     select.appendChild(opt);
@@ -566,7 +767,6 @@
                 }
             });
             
-            // Actualizar precios de líneas existentes
             document.querySelectorAll('.select-producto').forEach(select => {
                 const id = select.dataset.lineaId;
                 if (id) {
@@ -576,7 +776,6 @@
         }
 
         function actualizarSelectoresServicios() {
-            console.log('🔄 Actualizando selectores de servicios...');
             document.querySelectorAll('.select-servicio').forEach(select => {
                 const valorActual = select.value;
                 while (select.options.length > 1) {
@@ -605,7 +804,6 @@
                 }
             });
             
-            // Actualizar precios de líneas existentes
             document.querySelectorAll('.select-servicio').forEach(select => {
                 const id = select.dataset.lineaId;
                 if (id) {
@@ -615,11 +813,10 @@
         }
 
         // ============================================
-        // AGREGAR LÍNEAS DE PRODUCTOS Y SERVICIOS
+        // AGREGAR LÍNEAS
         // ============================================
 
         function agregarLineaProducto() {
-            console.log('➕ Agregando línea de producto...');
             const container = document.getElementById('productosContainer');
             const id = nextId++;
             const html = `
@@ -629,6 +826,7 @@
                         <option value="">-- Seleccionar --</option>
                     </select>
                     <input type="number" class="input-cantidad" data-linea-id="${id}" value="1" min="1" onchange="actualizarLineaProducto(${id})" style="width:70px;flex:none;">
+                    <span class="item-stock" id="producto-stock-${id}">Stock: 0</span>
                     <span class="item-precio" id="producto-precio-${id}">$0.00</span>
                     <span class="item-subtotal" id="producto-subtotal-${id}">$0.00</span>
                     <button class="btn-remove-item" onclick="eliminarLinea('producto', ${id})">✕</button>
@@ -636,20 +834,16 @@
             `;
             container.insertAdjacentHTML('beforeend', html);
             
-            // Actualizar selectores con datos si ya están cargados
             if (productos.length > 0) {
                 actualizarSelectoresProductos();
-            } else {
-                console.log('⏳ Productos no cargados aún, se actualizarán cuando estén listos');
             }
             
             lineasProductos.push({ id, tipo: 'producto' });
             document.getElementById('countProductos').textContent = lineasProductos.length;
-            actualizarResumen();
+            actualizarFactura();
         }
 
         function agregarLineaServicio() {
-            console.log('➕ Agregando línea de servicio...');
             const container = document.getElementById('serviciosContainer');
             const id = nextId++;
             const html = `
@@ -667,13 +861,11 @@
             
             if (servicios.length > 0) {
                 actualizarSelectoresServicios();
-            } else {
-                console.log('⏳ Servicios no cargados aún, se actualizarán cuando estén listos');
             }
             
             lineasServicios.push({ id, tipo: 'servicio' });
             document.getElementById('countServicios').textContent = lineasServicios.length;
-            actualizarResumen();
+            actualizarFactura();
         }
 
         // ============================================
@@ -683,6 +875,7 @@
         function actualizarLineaProducto(id) {
             const select = document.querySelector(`.select-producto[data-linea-id="${id}"]`);
             const cantidadInput = document.querySelector(`.input-cantidad[data-linea-id="${id}"]`);
+            const stockSpan = document.getElementById(`producto-stock-${id}`);
             const precioSpan = document.getElementById(`producto-precio-${id}`);
             const subtotalSpan = document.getElementById(`producto-subtotal-${id}`);
             
@@ -696,6 +889,8 @@
                 const stock = parseInt(selected.dataset.stock) || 0;
                 const subtotal = precio * cantidad;
                 
+                stockSpan.textContent = `📦 ${stock}`;
+                stockSpan.className = stock < 5 ? 'item-stock bajo' : 'item-stock';
                 precioSpan.textContent = `$${precio.toFixed(2)}`;
                 subtotalSpan.textContent = `$${subtotal.toFixed(2)}`;
                 
@@ -703,11 +898,13 @@
                     mostrarMensaje(`⚠️ Stock insuficiente. Disponible: ${stock} unidades`, 'error');
                 }
             } else {
+                stockSpan.textContent = 'Stock: 0';
+                stockSpan.className = 'item-stock';
                 precioSpan.textContent = '$0.00';
                 subtotalSpan.textContent = '$0.00';
             }
             
-            actualizarResumen();
+            actualizarFactura();
         }
 
         function actualizarLineaServicio(id) {
@@ -728,7 +925,7 @@
                 subtotalSpan.textContent = '$0.00';
             }
             
-            actualizarResumen();
+            actualizarFactura();
         }
 
         // ============================================
@@ -749,47 +946,96 @@
                     document.getElementById('countServicios').textContent = lineasServicios.length;
                 }
             }
-            actualizarResumen();
+            actualizarFactura();
         }
 
         // ============================================
-        // ACTUALIZAR RESUMEN
+        // ACTUALIZAR FACTURA PREVIEW
         // ============================================
 
-        function actualizarResumen() {
+        function actualizarFactura() {
+            const empresa = document.getElementById('ventaEmpresa').value.trim() || '-';
+            const estado = document.getElementById('ventaEstado').value;
+            const facturaNum = document.getElementById('ventaFactura').value || 'FAC-0001';
+            const fecha = new Date().toLocaleDateString('es-ES');
+            
             let total = 0;
+            let itemsHtml = '';
+            let items = [];
             
             document.querySelectorAll('#productosContainer .item-line').forEach(line => {
-                const subtotalSpan = line.querySelector('.item-subtotal');
-                if (subtotalSpan) {
-                    const valor = parseFloat(subtotalSpan.textContent.replace('$', '')) || 0;
-                    total += valor;
+                const select = line.querySelector('.select-producto');
+                const cantidadInput = line.querySelector('.input-cantidad');
+                if (select && select.value) {
+                    const selected = select.options[select.selectedIndex];
+                    const cantidad = parseInt(cantidadInput ? cantidadInput.value : 1) || 1;
+                    const precio = parseFloat(selected.dataset.precio) || 0;
+                    const nombre = selected.text;
+                    const subtotal = precio * cantidad;
+                    total += subtotal;
+                    items.push({ nombre, cantidad, precio, subtotal, tipo: '📦' });
                 }
             });
             
             document.querySelectorAll('#serviciosContainer .item-line').forEach(line => {
-                const subtotalSpan = line.querySelector('.item-subtotal');
-                if (subtotalSpan) {
-                    const valor = parseFloat(subtotalSpan.textContent.replace('$', '')) || 0;
-                    total += valor;
+                const select = line.querySelector('.select-servicio');
+                if (select && select.value) {
+                    const selected = select.options[select.selectedIndex];
+                    const precio = parseFloat(selected.dataset.precio) || 0;
+                    const nombre = selected.text;
+                    total += precio;
+                    items.push({ nombre, cantidad: 1, precio, subtotal: precio, tipo: '📋' });
                 }
             });
             
-            document.getElementById('resumenTotal').textContent = `$${total.toFixed(2)}`;
+            if (items.length === 0) {
+                itemsHtml = '<div style="color:#888;font-size:11px;text-align:center;padding:4px 0;">No hay items agregados</div>';
+            } else {
+                itemsHtml = items.map(item => `
+                    <div class="item">
+                        <span>${item.tipo} ${item.nombre} ${item.cantidad > 1 ? `x${item.cantidad}` : ''}</span>
+                        <span>$${item.subtotal.toFixed(2)}</span>
+                    </div>
+                `).join('');
+            }
             
-            const estado = document.getElementById('ventaEstado').value;
+            document.getElementById('facturaItems').innerHTML = itemsHtml;
+            document.getElementById('facturaEmpresa').textContent = empresa;
+            document.getElementById('facturaFecha').textContent = fecha;
+            document.getElementById('facturaNumero').textContent = facturaNum;
+            document.getElementById('facturaTotal').textContent = `$${total.toFixed(2)}`;
+            
             const estados = {
-                'pagado': '✅ Pagado',
+                'pagado': '✅ Pagado (Efectivo)',
                 'pendiente': '⏳ Pendiente',
-                'cancelado': '❌ Cancelado'
+                'cancelado': '❌ Cancelado',
+                'transferencia': '💳 Transferencia'
             };
-            const colores = {
-                'pagado': '#6bff6b',
-                'pendiente': '#ffbb33',
-                'cancelado': '#ff6b6b'
-            };
-            document.getElementById('resumenEstado').innerHTML = `<span style="color:${colores[estado]}">${estados[estado]}</span>`;
+            document.getElementById('facturaEstado').textContent = estados[estado] || estado;
+            
+            // Transferencia
+            if (estado === 'transferencia') {
+                const transId = document.getElementById('transferenciaId').value || '-';
+                const cedula = document.getElementById('transferenciaCedula').value || '-';
+                document.getElementById('facturaTransId').textContent = transId;
+                document.getElementById('facturaCedulaValor').textContent = cedula;
+                document.getElementById('facturaTransferencia').style.display = 'flex';
+                document.getElementById('facturaCedula').style.display = 'flex';
+            } else {
+                document.getElementById('facturaTransferencia').style.display = 'none';
+                document.getElementById('facturaCedula').style.display = 'none';
+            }
+            
+            // Atendido por
+            const usuario = document.querySelector('.header-right .user-info span')?.textContent || 'Admin';
+            document.getElementById('facturaAtendido').textContent = usuario;
         }
+
+        // Eventos para actualizar factura
+        document.getElementById('ventaEmpresa').addEventListener('input', actualizarFactura);
+        document.getElementById('ventaEstado').addEventListener('change', actualizarFactura);
+        document.getElementById('transferenciaId').addEventListener('input', actualizarFactura);
+        document.getElementById('transferenciaCedula').addEventListener('input', actualizarFactura);
 
         // ============================================
         // CARGAR VENTAS
@@ -824,7 +1070,8 @@
                 v.cliente.toLowerCase().includes(filtroLower) ||
                 v.producto.toLowerCase().includes(filtroLower) ||
                 String(v.id).includes(filtroLower) ||
-                (v.empresa && v.empresa.toLowerCase().includes(filtroLower))
+                (v.empresa && v.empresa.toLowerCase().includes(filtroLower)) ||
+                (v.factura && v.factura.toLowerCase().includes(filtroLower))
             );
 
             if (estadoFiltro !== 'todos') {
@@ -842,6 +1089,7 @@
                         <thead>
                             <tr>
                                 <th># Venta</th>
+                                <th>Factura</th>
                                 <th>Cliente</th>
                                 <th>Empresa</th>
                                 <th>Productos/Servicios</th>
@@ -858,17 +1106,21 @@
                 const estados = { 
                     'pagado': '✅ Pagado', 
                     'pendiente': '⏳ Pendiente', 
-                    'cancelado': '❌ Cancelado' 
+                    'cancelado': '❌ Cancelado',
+                    'transferencia': '💳 Transferencia'
                 };
                 const clases = { 
                     'pagado': 'pagado', 
                     'pendiente': 'pendiente', 
-                    'cancelado': 'cancelado' 
+                    'cancelado': 'cancelado',
+                    'transferencia': 'transferencia'
                 };
+                const factura = v.factura || '-';
                 
                 html += `
                     <tr>
                         <td><strong>#${v.id}</strong></td>
+                        <td><span class="badge-numero">${factura}</span></td>
                         <td>${v.cliente}</td>
                         <td>${v.empresa || '-'}</td>
                         <td>${v.producto}</td>
@@ -881,6 +1133,7 @@
                                     <option value="pagado" ${v.estado === 'pagado' ? 'selected' : ''}>✅ Pagado</option>
                                     <option value="pendiente" ${v.estado === 'pendiente' ? 'selected' : ''}>⏳ Pendiente</option>
                                     <option value="cancelado" ${v.estado === 'cancelado' ? 'selected' : ''}>❌ Cancelado</option>
+                                    <option value="transferencia" ${v.estado === 'transferencia' ? 'selected' : ''}>💳 Transferencia</option>
                                 </select>
                                 <button class="btn btn-danger btn-sm" onclick="eliminarVenta(${v.id})">🗑️</button>
                             </div>
@@ -904,7 +1157,7 @@
 
         function actualizarResumenVentas() {
             const total = ventas.length;
-            const pagado = ventas.filter(v => v.estado === 'pagado').length;
+            const pagado = ventas.filter(v => v.estado === 'pagado' || v.estado === 'transferencia').length;
             const pendiente = ventas.filter(v => v.estado === 'pendiente').length;
             const cancelado = ventas.filter(v => v.estado === 'cancelado').length;
             
@@ -925,14 +1178,11 @@
         }
 
         // ============================================
-        // NUEVA VENTA - ABRIR MODAL (CORREGIDO)
+        // NUEVA VENTA
         // ============================================
 
         async function nuevaVenta() {
-            console.log('🔄 Abriendo modal de nueva venta...');
-            
-            // Mostrar loading en el botón
-            const btn = event ? event.target : document.querySelector('.btn-primary');
+            const btn = document.querySelector('.btn-primary');
             if (btn) {
                 btn.disabled = true;
                 btn.textContent = '⏳ Cargando...';
@@ -940,9 +1190,17 @@
             
             // Resetear
             document.getElementById('ventaEmpresa').value = '';
+            document.getElementById('ventaFactura').value = '';
             document.getElementById('ventaEstado').value = 'pagado';
+            document.getElementById('transferenciaId').value = '';
+            document.getElementById('transferenciaCedula').value = '';
+            document.getElementById('transferenciaBanco').value = '';
+            document.getElementById('transferenciaFecha').value = '';
+            document.getElementById('camposTransferencia').classList.remove('show');
+            document.getElementById('facturaTransferencia').style.display = 'none';
+            document.getElementById('facturaCedula').style.display = 'none';
+            document.getElementById('infoContrato').textContent = '📄 ';
             
-            // Limpiar contenedores
             document.getElementById('productosContainer').innerHTML = '';
             document.getElementById('serviciosContainer').innerHTML = '';
             lineasProductos = [];
@@ -951,37 +1209,20 @@
             document.getElementById('countServicios').textContent = '0';
             nextId = 1;
             
-            // Cargar productos y servicios ANTES de abrir el modal
-            console.log('📦 Cargando productos...');
             await cargarProductos();
-            console.log('📋 Cargando servicios...');
             await cargarServicios();
             
-            // Agregar una línea por defecto DESPUÉS de cargar los datos
-            console.log('➕ Agregando línea de producto por defecto...');
             agregarLineaProducto();
             
-            // Forzar actualización de selectores
-            if (productos.length > 0) {
-                actualizarSelectoresProductos();
-            }
-            if (servicios.length > 0) {
-                actualizarSelectoresServicios();
-            }
+            actualizarFactura();
             
-            actualizarResumen();
-            
-            // Abrir modal
             document.getElementById('modalVenta').classList.add('show');
             document.getElementById('ventaEmpresa').focus();
             
-            // Restaurar botón
             if (btn) {
                 btn.disabled = false;
                 btn.textContent = '+ Nueva venta';
             }
-            
-            console.log('✅ Modal abierto correctamente');
         }
 
         function cerrarModal() {
@@ -995,6 +1236,7 @@
         function guardarVenta() {
             const empresa = document.getElementById('ventaEmpresa').value.trim();
             const estado = document.getElementById('ventaEstado').value;
+            const factura = document.getElementById('ventaFactura').value.trim();
             
             let items = [];
             
@@ -1008,7 +1250,7 @@
                     items.push({
                         tipo: 'producto',
                         id: parseInt(select.value),
-                        nombre: selected.text.split('(')[0].trim(),
+                        nombre: selected.text,
                         cantidad: cantidad,
                         precio: precio,
                         subtotal: precio * cantidad
@@ -1042,6 +1284,19 @@
             const nombres = items.map(item => `${item.cantidad}x ${item.nombre}`).join(', ');
             const primerItem = items[0];
             
+            // Datos de transferencia
+            let transferenciaId = null;
+            let transferenciaCedula = null;
+            let transferenciaBanco = null;
+            let transferenciaFecha = null;
+            
+            if (estado === 'transferencia') {
+                transferenciaId = document.getElementById('transferenciaId').value.trim() || null;
+                transferenciaCedula = document.getElementById('transferenciaCedula').value.trim() || null;
+                transferenciaBanco = document.getElementById('transferenciaBanco').value.trim() || null;
+                transferenciaFecha = document.getElementById('transferenciaFecha').value || null;
+            }
+            
             const data = {
                 cliente: cliente,
                 producto: nombres,
@@ -1050,9 +1305,14 @@
                 precio: total,
                 total: total,
                 empresa: empresa || null,
+                factura: factura || null,
                 tipo: items.length === 1 && items[0].tipo === 'servicio' ? 'servicio' : 'producto',
                 trabajador_id: trabajadorId || null,
-                estado: estado
+                estado: estado,
+                transferencia_id: transferenciaId,
+                transferencia_cedula: transferenciaCedula,
+                transferencia_banco: transferenciaBanco,
+                transferencia_fecha: transferenciaFecha
             };
 
             fetch('/api/ventas', {
@@ -1090,7 +1350,8 @@
             const estados = {
                 'pagado': '✅ Pagado',
                 'pendiente': '⏳ Pendiente',
-                'cancelado': '❌ Cancelado'
+                'cancelado': '❌ Cancelado',
+                'transferencia': '💳 Transferencia'
             };
             
             if (!confirm(`¿Cambiar el estado de la venta #${id} de "${estados[venta.estado]}" a "${estados[estado]}"?`)) {
@@ -1131,7 +1392,8 @@
             const estados = {
                 'pagado': '✅ Pagado',
                 'pendiente': '⏳ Pendiente',
-                'cancelado': '❌ Cancelado'
+                'cancelado': '❌ Cancelado',
+                'transferencia': '💳 Transferencia'
             };
             
             if (!confirm(`⚠️ ¿Estás seguro de eliminar esta venta?\n\n📋 Cliente: ${venta.cliente}\n📦 Producto: ${venta.producto}\n💰 Total: $${parseFloat(venta.total).toFixed(2)}\n📌 Estado: ${estados[venta.estado]}`)) {
@@ -1164,8 +1426,6 @@
 
         mostrarInfoTrabajador();
         cargarVentas();
-        
-        // Cargar productos y servicios en segundo plano para tenerlos listos
         cargarProductos();
         cargarServicios();
         
