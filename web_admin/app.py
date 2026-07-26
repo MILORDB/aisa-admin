@@ -217,29 +217,47 @@ def register():
     if request.method == 'GET':
         return render_template('register.html')
     
-    data = request.get_json()
-    if not data:
-        return jsonify({'error': 'Datos inválidos'}), 400
-    
-    username = data.get('username')
-    email = data.get('email')
-    password = data.get('password')
-    nombre = data.get('nombre')
-    tipo = data.get('tipo', 'cliente')
-    datos_negocio = data.get('datos_negocio')
-    
-    if not username or not email or not password:
-        return jsonify({'error': 'Todos los campos son requeridos'}), 400
-    
-    if obtener_usuario_por_username(username):
-        return jsonify({'error': 'El nombre de usuario ya está en uso'}), 400
-    
-    user_id = crear_usuario(username, email, password, nombre, 'usuario', tipo, datos_negocio)
-    if not user_id:
-        return jsonify({'error': 'Error al crear el usuario'}), 500
-    
-    registrar_log(user_id, 'registro', f'Usuario registrado: {username} (tipo: {tipo})')
-    return jsonify({'success': True, 'message': 'Usuario registrado correctamente'})
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Datos inválidos'}), 400
+        
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+        nombre = data.get('nombre')
+        tipo = data.get('tipo', 'cliente')
+        datos_negocio = data.get('datos_negocio')
+        
+        # Validaciones
+        if not username or not email or not password:
+            return jsonify({'error': 'Todos los campos son requeridos'}), 400
+        
+        if len(password) < 6:
+            return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
+        
+        # Verificar si el usuario ya existe
+        if obtener_usuario_por_username(username):
+            return jsonify({'error': 'El nombre de usuario ya está en uso'}), 400
+        
+        # Crear usuario
+        user_id = crear_usuario(username, email, password, nombre, 'usuario', tipo, datos_negocio)
+        
+        if not user_id:
+            return jsonify({'error': 'Error al crear el usuario'}), 500
+        
+        registrar_log(user_id, 'registro', f'Usuario registrado: {username} (tipo: {tipo})')
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Usuario registrado correctamente',
+            'user_id': user_id
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en register: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Error interno del servidor: {str(e)}'}), 500
 
 @app.route('/dashboard')
 @login_required
@@ -419,6 +437,28 @@ def api_estadisticas():
         'total_servicios': total_servicios,
         'total_contratos': total_contratos
     })
+
+# ============================================
+# API - VERIFICAR USUARIO (DEBUG)
+# ============================================
+
+@app.route('/api/verificar-usuario/<username>', methods=['GET'])
+@admin_required
+def verificar_usuario(username):
+    """Endpoint para verificar si un usuario existe"""
+    usuario = obtener_usuario_por_username(username)
+    if usuario:
+        return jsonify({
+            'exists': True,
+            'usuario': {
+                'id': usuario.get('id'),
+                'username': usuario.get('username'),
+                'email': usuario.get('email'),
+                'tipo': usuario.get('tipo'),
+                'rol': usuario.get('rol')
+            }
+        })
+    return jsonify({'exists': False, 'message': 'Usuario no encontrado'})
 
 # ============================================
 # RUTAS DE MÓDULOS DE NEGOCIO
