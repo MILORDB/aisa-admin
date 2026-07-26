@@ -142,19 +142,9 @@
             border-radius: 12px;
             font-size: 11px;
         }
-        .foto-preview {
+        .foto-thumb {
             width: 60px;
             height: 60px;
-            object-fit: cover;
-            border-radius: 8px;
-            border: 2px solid #2a2a3e;
-        }
-        .foto-preview:hover {
-            border-color: #6c3ce0;
-        }
-        .foto-thumb {
-            width: 80px;
-            height: 80px;
             object-fit: cover;
             border-radius: 8px;
             border: 1px solid #2a2a3e;
@@ -207,7 +197,7 @@
         </div>
 
         <div id="formProducto" style="display:none;border-top:1px solid #2a2a3e;padding-top:16px;margin-top:12px;">
-            <h3 style="margin-bottom:12px;">📦 Nuevo Producto</h3>
+            <h3 style="margin-bottom:12px;" id="formTitle">📦 Nuevo Producto</h3>
             <div class="form-row">
                 <input type="text" id="prodNombre" placeholder="Nombre del producto">
                 <select id="prodCategoria" required>
@@ -276,7 +266,6 @@
                 <input type="number" id="prodStock" placeholder="Stock">
                 <input type="number" id="prodMinimo" placeholder="Stock mínimo">
             </div>
-            <!-- NUEVO: Campo para subir foto -->
             <div class="form-row">
                 <div style="flex:1;">
                     <label>📷 Foto del producto</label>
@@ -287,7 +276,7 @@
                 </div>
             </div>
             <div style="display:flex;gap:10px;">
-                <button class="btn btn-success" onclick="guardarProducto()">💾 Guardar</button>
+                <button class="btn btn-success" onclick="guardarProducto()" id="btnGuardar">💾 Guardar</button>
                 <button class="btn btn-danger" onclick="cancelarFormulario()">✕ Cancelar</button>
             </div>
         </div>
@@ -477,8 +466,9 @@
             archivoFoto = null;
             document.getElementById('previewImage').style.display = 'none';
             document.getElementById('prodFoto').value = '';
-            document.querySelector('#formProducto h3').textContent = '📦 Nuevo Producto';
-            document.querySelector('#formProducto .btn-success').textContent = '💾 Guardar';
+            document.getElementById('formTitle').textContent = '📦 Nuevo Producto';
+            document.getElementById('btnGuardar').textContent = '💾 Guardar';
+            document.getElementById('btnGuardar').className = 'btn btn-success';
         }
 
         function cancelarFormulario() {
@@ -492,6 +482,33 @@
             document.getElementById('previewImage').style.display = 'none';
             archivoFoto = null;
             editandoId = null;
+        }
+
+        function editarProducto(id) {
+            const p = productos.find(p => p.id === id);
+            if (!p) return;
+            
+            // Mostrar formulario
+            document.getElementById('formProducto').style.display = 'block';
+            document.getElementById('prodNombre').value = p.nombre;
+            document.getElementById('prodCategoria').value = p.categoria || '';
+            document.getElementById('prodPrecio').value = p.precio;
+            document.getElementById('prodStock').value = p.stock;
+            document.getElementById('prodMinimo').value = p.stock_minimo || 3;
+            
+            editandoId = id;
+            archivoFoto = null;
+            document.getElementById('formTitle').textContent = '✏️ Editar Producto';
+            document.getElementById('btnGuardar').textContent = '💾 Actualizar';
+            document.getElementById('btnGuardar').className = 'btn btn-warning';
+            
+            if (p.foto_url) {
+                document.getElementById('previewImage').src = p.foto_url;
+                document.getElementById('previewImage').style.display = 'block';
+            }
+            
+            // Scroll al formulario
+            document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
         async function guardarProducto() {
@@ -509,67 +526,68 @@
             const data = { nombre, categoria, precio, stock, stock_minimo };
 
             try {
-                // 1. Crear el producto
-                const response = await fetch('/api/productos', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const result = await response.json();
+                let response;
+                let result;
 
-                if (!result.success) {
-                    mostrarMensaje(result.error || 'Error al crear producto', 'error');
-                    return;
-                }
-
-                const producto_id = result.id;
-
-                // 2. Si hay foto, subirla
-                if (archivoFoto) {
-                    const formData = new FormData();
-                    formData.append('foto', archivoFoto);
-
-                    const fotoResponse = await fetch(`/api/producto/${producto_id}/foto`, {
-                        method: 'POST',
-                        body: formData
+                // Determinar si es edición o creación
+                if (editandoId) {
+                    // EDITAR - PUT
+                    response = await fetch(`/api/producto/${editandoId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
                     });
-
-                    const fotoResult = await fotoResponse.json();
-                    if (fotoResult.success) {
-                        mostrarMensaje('✅ Producto creado con foto', 'exito');
+                    result = await response.json();
+                    
+                    if (result.success) {
+                        mostrarMensaje(`✅ Producto "${nombre}" actualizado correctamente`, 'exito');
                     } else {
-                        mostrarMensaje('⚠️ Producto creado, pero error al subir foto', 'error');
+                        mostrarMensaje(result.error || 'Error al actualizar producto', 'error');
+                        return;
                     }
                 } else {
-                    mostrarMensaje('✅ Producto creado correctamente', 'exito');
+                    // CREAR - POST
+                    response = await fetch('/api/productos', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    result = await response.json();
+                    
+                    if (!result.success) {
+                        mostrarMensaje(result.error || 'Error al crear producto', 'error');
+                        return;
+                    }
+                    
+                    const producto_id = result.id;
+
+                    // Si hay foto, subirla (solo en creación)
+                    if (archivoFoto) {
+                        const formData = new FormData();
+                        formData.append('foto', archivoFoto);
+
+                        const fotoResponse = await fetch(`/api/producto/${producto_id}/foto`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const fotoResult = await fotoResponse.json();
+                        if (fotoResult.success) {
+                            mostrarMensaje('✅ Producto creado con foto', 'exito');
+                        } else {
+                            mostrarMensaje('⚠️ Producto creado, pero error al subir foto', 'error');
+                        }
+                    } else {
+                        mostrarMensaje(`✅ Producto "${nombre}" creado correctamente`, 'exito');
+                    }
                 }
 
                 cancelarFormulario();
                 await cargarProductos();
+                
             } catch (error) {
                 console.error('Error:', error);
                 mostrarMensaje('Error de conexión con el servidor', 'error');
-            }
-        }
-
-        function editarProducto(id) {
-            const p = productos.find(p => p.id === id);
-            if (!p) return;
-            
-            mostrarFormulario();
-            document.getElementById('prodNombre').value = p.nombre;
-            document.getElementById('prodCategoria').value = p.categoria || '';
-            document.getElementById('prodPrecio').value = p.precio;
-            document.getElementById('prodStock').value = p.stock;
-            document.getElementById('prodMinimo').value = p.stock_minimo || 3;
-            editandoId = id;
-            archivoFoto = null;
-            document.querySelector('#formProducto h3').textContent = '✏️ Editar Producto';
-            document.querySelector('#formProducto .btn-success').textContent = '💾 Actualizar';
-            
-            if (p.foto_url) {
-                document.getElementById('previewImage').src = p.foto_url;
-                document.getElementById('previewImage').style.display = 'block';
             }
         }
 
