@@ -43,7 +43,7 @@ def init_db():
         print(f"❌ Error de conexión: {e}")
         return
     
-    # TABLAS CON SERIAL (PostgreSQL)
+    # TABLAS CON SERIAL (PostgreSQL) - NO AUTOINCREMENT
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -749,7 +749,7 @@ def rechazar_trabajador(user_id):
     conn.close()
 
 # ============================================
-# FUNCIONES PARA VENTAS
+# FUNCIONES PARA VENTAS (ACTUALIZADO CON ESTADO)
 # ============================================
 
 def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, cantidad, precio, total,
@@ -809,7 +809,21 @@ def obtener_estadisticas_ventas(negocio_id, trabajador_id=None):
     conn.close()
     return stats
 
+def actualizar_estado_venta(venta_id, negocio_id, estado):
+    """Actualiza el estado de una venta"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+    UPDATE ventas SET estado = %s
+    WHERE id = %s AND negocio_id = %s
+    ''', (estado, venta_id, negocio_id))
+    filas = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return filas > 0
+
 def eliminar_venta_con_reintegro(venta_id, negocio_id):
+    """Elimina una venta y reintegra el stock del producto"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
