@@ -47,7 +47,7 @@ try:
         obtener_ultimo_numero_contrato
     )
     from web_admin.auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
-    from web_admin.storage import StorageManager
+    from web_admin.storage import get_storage_manager
     print("✅ Módulos importados correctamente")
 except Exception as e:
     print(f"❌ Error importando módulos: {e}")
@@ -897,7 +897,7 @@ def api_toggle_trabajador_negocio(trabajador_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - PRODUCTOS (CON DELETE CORREGIDO)
+# API - PRODUCTOS (CON DELETE Y FOTOS CORREGIDOS)
 # ============================================
 
 @app.route('/api/productos', methods=['GET', 'POST'])
@@ -1033,7 +1033,7 @@ def api_productos_stock():
     return jsonify([dict(p) for p in productos])
 
 # ============================================
-# API - FOTOS DE PRODUCTOS
+# API - FOTOS DE PRODUCTOS (VERSIÓN TERABOX)
 # ============================================
 
 @app.route('/api/producto/<int:producto_id>/foto', methods=['POST'])
@@ -1045,6 +1045,7 @@ def api_subir_foto_producto(producto_id):
     if not usuario or usuario['tipo'] != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Verificar que el producto pertenece al negocio
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT negocio_id FROM productos WHERE id = %s', (producto_id,))
@@ -1061,11 +1062,24 @@ def api_subir_foto_producto(producto_id):
     if archivo.filename == '':
         return jsonify({'error': 'Nombre de archivo vacío'}), 400
     
-    storage = StorageManager()
+    # Validar tipo de archivo
+    extension = archivo.filename.rsplit('.', 1)[1].lower() if '.' in archivo.filename else ''
+    if extension not in ['jpg', 'jpeg', 'png', 'gif', 'webp']:
+        return jsonify({'error': 'Formato de imagen no permitido. Use: JPG, PNG, GIF o WEBP'}), 400
+    
+    # Limitar tamaño del archivo (2MB)
+    archivo.seek(0, 2)
+    tamaño = archivo.tell()
+    archivo.seek(0)
+    if tamaño > 2 * 1024 * 1024:
+        return jsonify({'error': 'La imagen es demasiado grande. Máximo 2MB'}), 400
+    
+    storage = get_storage_manager()
     
     import uuid
-    extension = archivo.filename.rsplit('.', 1)[1].lower() if '.' in archivo.filename else 'jpg'
-    filename = f"foto_{uuid.uuid4().hex[:8]}.{extension}"
+    timestamp = int(time.time())
+    nombre_base = f"foto_{timestamp}_{uuid.uuid4().hex[:8]}"
+    filename = f"{nombre_base}.{extension}"
     
     exito = storage.subir_foto_producto(usuario['id'], producto_id, archivo, filename)
     
@@ -1075,7 +1089,14 @@ def api_subir_foto_producto(producto_id):
     url = storage.obtener_url_foto(usuario['id'], producto_id, filename)
     actualizar_foto_producto(producto_id, url, filename)
     
-    return jsonify({'success': True, 'url': url})
+    registrar_log(usuario['id'], 'foto_subida', f'Producto {producto_id} - {filename}')
+    
+    return jsonify({
+        'success': True, 
+        'url': url,
+        'filename': filename,
+        'message': 'Foto subida correctamente'
+    })
 
 @app.route('/api/producto/<int:producto_id>/foto', methods=['DELETE'])
 @login_required
@@ -1086,18 +1107,77 @@ def api_eliminar_foto_producto(producto_id):
     if not usuario or usuario['tipo'] != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Obtener información de la foto
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT negocio_id FROM productos WHERE id = %s', (producto_id,))
+    cursor.execute('SELECT negocio_id, foto_public_id FROM productos WHERE id = %s', (producto_id,))
     producto = cursor.fetchone()
     conn.close()
     
     if not producto or producto[0] != usuario['id']:
         return jsonify({'error': 'Producto no encontrado'}), 404
     
+    if not producto[1]:
+        return jsonify({'error': 'El producto no tiene foto'}), 400
+    
+    storage = get_storage_manager()
+    
+    # Eliminar de TeraBox (o local)
+    exito = storage.eliminar_foto_producto(usuario['id'], producto_id, producto[1])
+    
+    # Siempre eliminar la referencia en la BD
     eliminar_foto_producto(producto_id)
     
-    return jsonify({'success': True})
+    if exito:
+        registrar_log(usuario['id'], 'foto_eliminada', f'Producto {producto_id}')
+        return jsonify({'success': True, 'message': 'Foto eliminada correctamente'})
+    else:
+        return jsonify({'success': True, 'message': 'Foto eliminada de la base de datos (pero no de TeraBox)'})
+
+@app.route('/api/producto/<int:producto_id>/foto/url', methods=['GET'])
+@login_required
+def api_obtener_url_foto(producto_id):
+    """Obtiene la URL de la foto de un producto"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT foto_url, foto_public_id FROM productos WHERE id = %s AND negocio_id = %s', 
+                   (producto_id, usuario['id']))
+    producto = cursor.fetchone()
+    conn.close()
+    
+    if not producto:
+        return jsonify({'error': 'Producto no encontrado'}), 404
+    
+    if not producto[0]:
+        return jsonify({'url': None, 'message': 'Sin foto'})
+    
+    return jsonify({
+        'url': producto[0],
+        'filename': producto[1]
+    })
+
+@app.route('/api/tienda/producto/<int:producto_id>/foto', methods=['GET'])
+def api_tienda_obtener_foto(producto_id):
+    """Obtiene la URL de la foto de un producto para la tienda pública"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT foto_url FROM productos WHERE id = %s', (producto_id,))
+        producto = cursor.fetchone()
+        conn.close()
+        
+        if producto and producto[0]:
+            return jsonify({'url': producto[0]})
+        else:
+            return jsonify({'url': '/static/img/default_product.png'})
+    except Exception as e:
+        return jsonify({'url': '/static/img/default_product.png'})
 
 # ============================================
 # API - PRODUCTOS PARA TIENDA CLIENTE
