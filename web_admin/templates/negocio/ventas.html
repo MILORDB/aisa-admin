@@ -187,22 +187,36 @@
             font-weight: 600;
             margin-top: 2px;
         }
-        .campo-separador {
-            border-top: 1px solid #2a2a3e;
-            padding-top: 12px;
-            margin-top: 4px;
-        }
-        .tipo-venta-label {
-            font-size: 12px;
-            color: #888;
-            padding: 4px 12px;
-            border-radius: 12px;
-            background: rgba(108, 60, 224, 0.15);
-            display: inline-block;
-        }
         .acciones-cell {
             display: flex; gap: 4px; flex-wrap: wrap;
         }
+        .estado-select {
+            background: #1a1a2e;
+            color: #fff;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            padding: 2px 6px;
+            font-size: 11px;
+        }
+        .estado-select option.pagado { background: #224422; color: #6bff6b; }
+        .estado-select option.pendiente { background: #443322; color: #ffbb33; }
+        .estado-select option.cancelado { background: #442222; color: #ff6b6b; }
+        .resumen-venta {
+            background: #0f0f1a;
+            border-radius: 8px;
+            padding: 12px 16px;
+            border: 1px solid #2a2a3e;
+            margin-top: 8px;
+        }
+        .resumen-venta .fila {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+        .resumen-venta .fila .label { color: #888; }
+        .resumen-venta .fila .value { font-weight: 600; }
+        .resumen-venta .fila .value.total { color: #6c3ce0; font-size: 16px; }
         @media (max-width: 600px) {
             .form-row { flex-direction: column; }
             .search-bar { flex-direction: column; }
@@ -220,6 +234,28 @@
 
     <div class="mensaje-error" id="mensajeError"></div>
     <div class="mensaje-exito" id="mensajeExito"></div>
+
+    <!-- Resumen de ventas por estado -->
+    <div class="card">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;">
+            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#6c3ce0;" id="totalVentas">0</div>
+                <div style="font-size:12px;color:#888;">📊 Total ventas</div>
+            </div>
+            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#6bff6b;" id="totalPagado">0</div>
+                <div style="font-size:12px;color:#888;">✅ Pagadas</div>
+            </div>
+            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#ffbb33;" id="totalPendiente">0</div>
+                <div style="font-size:12px;color:#888;">⏳ Pendientes</div>
+            </div>
+            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:8px;padding:12px;text-align:center;">
+                <div style="font-size:24px;font-weight:700;color:#ff6b6b;" id="totalCancelado">0</div>
+                <div style="font-size:12px;color:#888;">❌ Canceladas</div>
+            </div>
+        </div>
+    </div>
 
     <div class="card">
         <div class="search-bar">
@@ -251,7 +287,6 @@
             </div>
 
             <div class="form-row" style="border-top:1px solid #2a2a3e;padding-top:12px;margin-top:4px;">
-                <!-- 2. Producto (selector) -->
                 <div style="flex:1;min-width:150px;">
                     <label>📦 Producto</label>
                     <select id="ventaProducto">
@@ -259,8 +294,6 @@
                     </select>
                     <div id="productoStockInfo" class="stock-info" style="display:none;"></div>
                 </div>
-
-                <!-- 3. Cantidad a comprar (solo si hay producto) -->
                 <div style="flex:1;min-width:100px;">
                     <label>🔢 Cantidad</label>
                     <input type="number" id="ventaCantidad" placeholder="1" value="1" min="1">
@@ -268,15 +301,12 @@
             </div>
 
             <div class="form-row" style="border-top:1px solid #2a2a3e;padding-top:12px;margin-top:4px;">
-                <!-- 4. Servicio (selector) -->
                 <div style="flex:1;min-width:150px;">
                     <label>📋 Servicio</label>
                     <select id="ventaServicio">
                         <option value="">-- Seleccionar --</option>
                     </select>
                 </div>
-
-                <!-- 5. Precio del servicio (se muestra automáticamente) -->
                 <div style="flex:1;min-width:120px;">
                     <label>💰 Precio del servicio</label>
                     <input type="text" id="ventaPrecioServicio" placeholder="$0.00" readonly style="background:#0a0a14;color:#6c3ce0;font-weight:600;">
@@ -284,13 +314,41 @@
             </div>
 
             <div class="form-row" style="border-top:1px solid #2a2a3e;padding-top:12px;margin-top:4px;">
-                <!-- 6. Precio unitario (se autocompleta) -->
                 <div style="flex:1;min-width:150px;">
                     <label>💵 Precio unitario</label>
                     <input type="number" id="ventaPrecio" placeholder="0.00" step="0.01">
                 </div>
-                <div style="flex:1;min-width:100px;display:flex;align-items:flex-end;">
-                    <button class="btn btn-success" onclick="guardarVenta()" style="width:100%;">💾 Guardar venta</button>
+                <div style="flex:1;min-width:120px;">
+                    <label>📌 Estado de pago</label>
+                    <select id="ventaEstado">
+                        <option value="pagado" style="color:#6bff6b;">✅ Pagado</option>
+                        <option value="pendiente" style="color:#ffbb33;">⏳ Pendiente</option>
+                        <option value="cancelado" style="color:#ff6b6b;">❌ Cancelado</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Resumen de la venta -->
+            <div class="resumen-venta" id="resumenVenta" style="display:none;">
+                <div class="fila">
+                    <span class="label">📦 Producto/Servicio:</span>
+                    <span class="value" id="resumenProducto">-</span>
+                </div>
+                <div class="fila">
+                    <span class="label">🔢 Cantidad:</span>
+                    <span class="value" id="resumenCantidad">-</span>
+                </div>
+                <div class="fila">
+                    <span class="label">💵 Precio unitario:</span>
+                    <span class="value" id="resumenPrecio">-</span>
+                </div>
+                <div class="fila">
+                    <span class="label">📌 Estado:</span>
+                    <span class="value" id="resumenEstado">-</span>
+                </div>
+                <div class="fila" style="border-top:1px solid #2a2a3e;padding-top:8px;margin-top:4px;">
+                    <span class="label">💰 Total:</span>
+                    <span class="value total" id="resumenTotal">$0.00</span>
                 </div>
             </div>
 
@@ -298,11 +356,13 @@
             <input type="hidden" id="ventaTipo" value="producto">
 
             <div style="display:flex;gap:10px;margin-top:12px;border-top:1px solid #2a2a3e;padding-top:12px;">
+                <button class="btn btn-success" onclick="guardarVenta()" style="flex:1;">💾 Guardar venta</button>
                 <button class="btn btn-danger" onclick="cerrarModal()" style="flex:1;">✕ Cancelar</button>
             </div>
         </div>
     </div>
 
+    <!-- Tabla de ventas -->
     <div class="card">
         <div id="ventasContainer">
             <div class="loading">Cargando ventas...</div>
@@ -371,7 +431,6 @@
                 const response = await fetch('/api/servicios');
                 if (!response.ok) throw new Error('Error al cargar servicios');
                 servicios = await response.json();
-                // Solo servicios activos
                 servicios = servicios.filter(s => s.activo === 1);
                 actualizarSelectorServicios();
             } catch (error) {
@@ -432,69 +491,111 @@
         }
 
         // ============================================
-        // EVENTOS DEL FORMULARIO - PRODUCTO
+        // ACTUALIZAR RESUMEN DE VENTA
         // ============================================
 
+        function actualizarResumen() {
+            const productoSelect = document.getElementById('ventaProducto');
+            const servicioSelect = document.getElementById('ventaServicio');
+            const cantidad = parseInt(document.getElementById('ventaCantidad').value) || 1;
+            const precio = parseFloat(document.getElementById('ventaPrecio').value) || 0;
+            const estado = document.getElementById('ventaEstado').value;
+            const resumen = document.getElementById('resumenVenta');
+
+            let nombreItem = '';
+            let precioUnitario = precio;
+
+            if (productoSelect.value) {
+                const selected = productoSelect.options[productoSelect.selectedIndex];
+                nombreItem = selected.text.split('(')[0].trim();
+                precioUnitario = parseFloat(selected.dataset.precio) || 0;
+                document.getElementById('ventaPrecio').value = precioUnitario.toFixed(2);
+            } else if (servicioSelect.value) {
+                const selected = servicioSelect.options[servicioSelect.selectedIndex];
+                nombreItem = selected.text;
+                precioUnitario = parseFloat(selected.dataset.precio) || 0;
+                document.getElementById('ventaPrecio').value = precioUnitario.toFixed(2);
+            }
+
+            if (nombreItem && precioUnitario > 0) {
+                resumen.style.display = 'block';
+                document.getElementById('resumenProducto').textContent = nombreItem;
+                document.getElementById('resumenCantidad').textContent = cantidad;
+                document.getElementById('resumenPrecio').textContent = `$${precioUnitario.toFixed(2)}`;
+                document.getElementById('resumenTotal').textContent = `$${(precioUnitario * cantidad).toFixed(2)}`;
+                
+                const estados = {
+                    'pagado': '✅ Pagado',
+                    'pendiente': '⏳ Pendiente',
+                    'cancelado': '❌ Cancelado'
+                };
+                const colores = {
+                    'pagado': '#6bff6b',
+                    'pendiente': '#ffbb33',
+                    'cancelado': '#ff6b6b'
+                };
+                document.getElementById('resumenEstado').innerHTML = `<span style="color:${colores[estado]}">${estados[estado]}</span>`;
+            } else {
+                resumen.style.display = 'none';
+            }
+        }
+
+        // Eventos para actualizar resumen
         document.getElementById('ventaProducto').addEventListener('change', function() {
-            const selected = this.options[this.selectedIndex];
-            const precioInput = document.getElementById('ventaPrecio');
             const servicioSelect = document.getElementById('ventaServicio');
             const stockInfo = document.getElementById('productoStockInfo');
 
-            if (selected.value) {
+            if (this.value) {
+                const selected = this.options[this.selectedIndex];
                 const precio = parseFloat(selected.dataset.precio) || 0;
                 const stock = parseInt(selected.dataset.stock) || 0;
-                precioInput.value = precio.toFixed(2);
+                document.getElementById('ventaPrecio').value = precio.toFixed(2);
                 document.getElementById('ventaTipo').value = 'producto';
                 
-                // Deshabilitar servicio
                 servicioSelect.disabled = true;
                 servicioSelect.classList.add('campo-deshabilitado');
+                servicioSelect.value = '';
                 
-                // Mostrar stock
                 stockInfo.style.display = 'block';
                 stockInfo.innerHTML = `📦 Stock disponible: ${stock} unidades ${stock < 5 ? '⚠️ Stock bajo' : '✅'}`;
                 stockInfo.className = stock < 5 ? 'stock-info bajo' : 'stock-info normal';
                 
-                // Limpiar precio servicio
                 document.getElementById('ventaPrecioServicio').value = '';
             } else {
-                precioInput.value = '';
+                document.getElementById('ventaPrecio').value = '';
                 stockInfo.style.display = 'none';
                 servicioSelect.disabled = false;
                 servicioSelect.classList.remove('campo-deshabilitado');
                 document.getElementById('ventaTipo').value = 'producto';
             }
+            actualizarResumen();
         });
 
-        // ============================================
-        // EVENTOS DEL FORMULARIO - SERVICIO
-        // ============================================
-
         document.getElementById('ventaServicio').addEventListener('change', function() {
-            const selected = this.options[this.selectedIndex];
-            const precioInput = document.getElementById('ventaPrecio');
-            const precioServicioInput = document.getElementById('ventaPrecioServicio');
             const productoSelect = document.getElementById('ventaProducto');
 
-            if (selected.value) {
+            if (this.value) {
+                const selected = this.options[this.selectedIndex];
                 const precio = parseFloat(selected.dataset.precio) || 0;
-                precioInput.value = precio.toFixed(2);
-                precioServicioInput.value = `$${precio.toFixed(2)}`;
+                document.getElementById('ventaPrecio').value = precio.toFixed(2);
+                document.getElementById('ventaPrecioServicio').value = `$${precio.toFixed(2)}`;
                 document.getElementById('ventaTipo').value = 'servicio';
                 
-                // Deshabilitar producto
                 productoSelect.disabled = true;
                 productoSelect.classList.add('campo-deshabilitado');
                 document.getElementById('productoStockInfo').style.display = 'none';
             } else {
-                precioInput.value = '';
-                precioServicioInput.value = '';
+                document.getElementById('ventaPrecio').value = '';
+                document.getElementById('ventaPrecioServicio').value = '';
                 productoSelect.disabled = false;
                 productoSelect.classList.remove('campo-deshabilitado');
                 document.getElementById('ventaTipo').value = 'producto';
             }
+            actualizarResumen();
         });
+
+        document.getElementById('ventaCantidad').addEventListener('input', actualizarResumen);
+        document.getElementById('ventaEstado').addEventListener('change', actualizarResumen);
 
         // ============================================
         // CARGAR VENTAS
@@ -510,11 +611,16 @@
                 if (!response.ok) throw new Error('Error al cargar ventas');
                 ventas = await response.json();
                 renderVentas();
+                actualizarResumenVentas();
             } catch (error) {
                 console.error('Error:', error);
                 container.innerHTML = `<div class="empty">❌ Error al cargar ventas</div>`;
             }
         }
+
+        // ============================================
+        // RENDER VENTAS
+        // ============================================
 
         function renderVentas(filtro = '', estadoFiltro = 'todos') {
             const container = document.getElementById('ventasContainer');
@@ -556,8 +662,16 @@
             `;
 
             filtrados.forEach(v => {
-                const estados = { 'pagado': '✅ Pagado', 'pendiente': '⏳ Pendiente', 'cancelado': '❌ Cancelado' };
-                const clases = { 'pagado': 'pagado', 'pendiente': 'pendiente', 'cancelado': 'cancelado' };
+                const estados = { 
+                    'pagado': '✅ Pagado', 
+                    'pendiente': '⏳ Pendiente', 
+                    'cancelado': '❌ Cancelado' 
+                };
+                const clases = { 
+                    'pagado': 'pagado', 
+                    'pendiente': 'pendiente', 
+                    'cancelado': 'cancelado' 
+                };
                 const tipoVenta = v.tipo || (v.producto_id ? 'producto' : 'servicio');
                 const iconoTipo = tipoVenta === 'producto' ? '📦' : '📋';
                 
@@ -573,8 +687,12 @@
                         <td><span class="badge ${clases[v.estado]}">${estados[v.estado]}</span></td>
                         <td>
                             <div class="acciones-cell">
+                                <select onchange="cambiarEstadoVenta(${v.id}, this.value)" class="estado-select">
+                                    <option value="pagado" ${v.estado === 'pagado' ? 'selected' : ''}>✅ Pagado</option>
+                                    <option value="pendiente" ${v.estado === 'pendiente' ? 'selected' : ''}>⏳ Pendiente</option>
+                                    <option value="cancelado" ${v.estado === 'cancelado' ? 'selected' : ''}>❌ Cancelado</option>
+                                </select>
                                 <button class="btn btn-danger btn-sm" onclick="eliminarVenta(${v.id})">🗑️</button>
-                                ${v.estado === 'pendiente' ? `<button class="btn btn-success btn-sm" onclick="marcarPagado(${v.id})">✅ Pagar</button>` : ''}
                             </div>
                         </td>
                     </tr>
@@ -589,6 +707,26 @@
 
             container.innerHTML = html;
         }
+
+        // ============================================
+        // ACTUALIZAR RESUMEN DE VENTAS (estadísticas)
+        // ============================================
+
+        function actualizarResumenVentas() {
+            const total = ventas.length;
+            const pagado = ventas.filter(v => v.estado === 'pagado').length;
+            const pendiente = ventas.filter(v => v.estado === 'pendiente').length;
+            const cancelado = ventas.filter(v => v.estado === 'cancelado').length;
+            
+            document.getElementById('totalVentas').textContent = total;
+            document.getElementById('totalPagado').textContent = pagado;
+            document.getElementById('totalPendiente').textContent = pendiente;
+            document.getElementById('totalCancelado').textContent = cancelado;
+        }
+
+        // ============================================
+        // FILTRAR
+        // ============================================
 
         function filtrarVentas() {
             const filtro = document.getElementById('searchInput').value;
@@ -607,6 +745,8 @@
             document.getElementById('ventaPrecio').value = '';
             document.getElementById('ventaPrecioServicio').value = '';
             document.getElementById('productoStockInfo').style.display = 'none';
+            document.getElementById('resumenVenta').style.display = 'none';
+            document.getElementById('ventaEstado').value = 'pagado';
             
             // Resetear selectores
             const productoSelect = document.getElementById('ventaProducto');
@@ -642,6 +782,7 @@
             const cantidad = parseInt(document.getElementById('ventaCantidad').value) || 1;
             const precio = parseFloat(document.getElementById('ventaPrecio').value);
             const tipo = document.getElementById('ventaTipo').value;
+            const estado = document.getElementById('ventaEstado').value;
 
             // Validar: al menos un producto o servicio seleccionado
             if (!productoId && !servicioId) {
@@ -681,7 +822,6 @@
                 idItem = servicioId;
             }
 
-            // Cliente por defecto (obligatorio para la venta)
             const cliente = empresa || 'Cliente sin empresa';
 
             const data = {
@@ -694,7 +834,7 @@
                 empresa: empresa || null,
                 tipo: tipo,
                 trabajador_id: trabajadorId || null,
-                estado: 'pagado'
+                estado: estado
             };
 
             fetch('/api/ventas', {
@@ -720,6 +860,35 @@
         }
 
         // ============================================
+        // CAMBIAR ESTADO DE VENTA
+        // ============================================
+
+        function cambiarEstadoVenta(id, estado) {
+            const venta = ventas.find(v => v.id === id);
+            if (!venta) return;
+            
+            if (venta.estado === estado) return;
+            
+            const estados = {
+                'pagado': '✅ Pagado',
+                'pendiente': '⏳ Pendiente',
+                'cancelado': '❌ Cancelado'
+            };
+            
+            if (!confirm(`¿Cambiar el estado de la venta #${id} de "${estados[venta.estado]}" a "${estados[estado]}"?`)) {
+                // Recargar para revertir el select
+                cargarVentas();
+                return;
+            }
+
+            // Actualizar localmente
+            venta.estado = estado;
+            renderVentas();
+            actualizarResumenVentas();
+            mostrarMensaje(`✅ Estado actualizado a "${estados[estado]}"`, 'exito');
+        }
+
+        // ============================================
         // ELIMINAR VENTA
         // ============================================
 
@@ -727,7 +896,13 @@
             const venta = ventas.find(v => v.id === id);
             if (!venta) return;
             
-            if (!confirm(`⚠️ ¿Estás seguro de eliminar esta venta?\n\n📋 Cliente: ${venta.cliente}\n📦 Producto: ${venta.producto}\n📦 Cantidad: ${venta.cantidad}\n💰 Total: $${parseFloat(venta.total).toFixed(2)}`)) {
+            const estados = {
+                'pagado': '✅ Pagado',
+                'pendiente': '⏳ Pendiente',
+                'cancelado': '❌ Cancelado'
+            };
+            
+            if (!confirm(`⚠️ ¿Estás seguro de eliminar esta venta?\n\n📋 Cliente: ${venta.cliente}\n📦 Producto: ${venta.producto}\n📦 Cantidad: ${venta.cantidad}\n💰 Total: $${parseFloat(venta.total).toFixed(2)}\n📌 Estado: ${estados[venta.estado]}`)) {
                 return;
             }
             
@@ -749,14 +924,6 @@
                 console.error('Error:', error);
                 mostrarMensaje('❌ Error de conexión', 'error');
             }
-        }
-
-        function marcarPagado(id) {
-            const v = ventas.find(v => v.id === id);
-            if (!v) return;
-            v.estado = 'pagado';
-            renderVentas();
-            mostrarMensaje('✅ Venta marcada como pagada', 'exito');
         }
 
         // ============================================
