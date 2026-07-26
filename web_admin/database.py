@@ -583,11 +583,21 @@ def actualizar_producto(producto_id, nombre, categoria, precio, stock, stock_min
     conn.close()
 
 def eliminar_producto(producto_id):
+    """Elimina un producto de la base de datos"""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
+    
+    # Primero verificar si existe
+    cursor.execute('SELECT id FROM productos WHERE id = ?', (producto_id,))
+    if not cursor.fetchone():
+        conn.close()
+        return False
+    
+    # Eliminar el producto
+    cursor.execute('DELETE FROM productos WHERE id = ?', (producto_id,))
     conn.commit()
     conn.close()
+    return True
 
 def actualizar_stock_producto(producto_id, cantidad):
     conn = get_db()
