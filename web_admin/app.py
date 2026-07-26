@@ -666,6 +666,179 @@ def api_asignar_permiso(user_id, modulo_id):
     return jsonify({'success': True})
 
 # ============================================
+# API - TIENDA (NEGOCIO)
+# ============================================
+
+@app.route('/api/tienda/productos', methods=['GET'])
+@login_required
+def api_tienda_productos():
+    """Obtiene los productos que el negocio tiene en su tienda"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+    SELECT pt.id, pt.destacado, pt.created_at,
+           p.id as producto_id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url
+    FROM productos_tienda pt
+    JOIN productos p ON pt.producto_id = p.id
+    WHERE pt.negocio_id = %s
+    ORDER BY pt.destacado DESC, pt.created_at DESC
+    ''', (usuario['id'],))
+    productos = cursor.fetchall()
+    conn.close()
+    
+    return jsonify([dict(p) for p in productos])
+
+@app.route('/api/tienda/producto/agregar', methods=['POST'])
+@login_required
+def api_tienda_agregar_producto():
+    """Agrega un producto a la tienda del negocio"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    data = request.get_json()
+    producto_id = data.get('producto_id')
+    destacado = data.get('destacado', 0)
+    
+    if not producto_id:
+        return jsonify({'error': 'ID de producto requerido'}), 400
+    
+    # Verificar que el producto pertenece al negocio
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT id FROM productos WHERE id = %s AND negocio_id = %s', (producto_id, usuario['id']))
+    producto = cursor.fetchone()
+    
+    if not producto:
+        conn.close()
+        return jsonify({'error': 'Producto no encontrado'}), 404
+    
+    # Verificar si ya está en la tienda
+    cursor.execute('SELECT id FROM productos_tienda WHERE producto_id = %s AND negocio_id = %s', (producto_id, usuario['id']))
+    if cursor.fetchone():
+        conn.close()
+        return jsonify({'error': 'El producto ya está en la tienda'}), 400
+    
+    # Agregar a la tienda
+    fecha = datetime.now().isoformat()
+    cursor.execute('''
+    INSERT INTO productos_tienda (negocio_id, producto_id, destacado, created_at)
+    VALUES (%s, %s, %s, %s)
+    ''', (usuario['id'], producto_id, destacado, fecha))
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'tienda_agregar', f'Producto {producto_id} agregado a la tienda')
+    
+    return jsonify({'success': True, 'message': 'Producto agregado a la tienda'})
+
+@app.route('/api/tienda/producto/<int:tienda_id>/destacar', methods=['POST'])
+@login_required
+def api_tienda_destacar_producto(tienda_id):
+    """Destaca o quita el destacado de un producto en la tienda"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    data = request.get_json()
+    destacado = data.get('destacado', 1)
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+    UPDATE productos_tienda SET destacado = %s
+    WHERE id = %s AND negocio_id = %s
+    ''', (destacado, tienda_id, usuario['id']))
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'tienda_destacar', f'Producto tienda {tienda_id} destacado={destacado}')
+    
+    return jsonify({'success': True})
+
+@app.route('/api/tienda/producto/<int:tienda_id>', methods=['DELETE'])
+@login_required
+def api_tienda_eliminar_producto(tienda_id):
+    """Elimina un producto de la tienda"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM productos_tienda WHERE id = %s AND negocio_id = %s', (tienda_id, usuario['id']))
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'tienda_eliminar', f'Producto tienda {tienda_id} eliminado')
+    
+    return jsonify({'success': True})
+
+# ============================================
+# API - TIENDA (CLIENTE)
+# ============================================
+
+@app.route('/api/tienda/public', methods=['GET'])
+def api_tienda_public():
+    """Obtiene todos los productos disponibles en la tienda (público)"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('''
+        SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
+               u.id as negocio_id, u.nombre as negocio_nombre, u.username as negocio_username
+        FROM productos_tienda pt
+        JOIN productos p ON pt.producto_id = p.id
+        JOIN usuarios u ON pt.negocio_id = u.id
+        WHERE p.stock > 0 AND u.activo = 1
+        ORDER BY pt.destacado DESC, pt.created_at DESC
+        ''')
+        productos = cursor.fetchall()
+        conn.close()
+        
+        return jsonify([dict(p) for p in productos])
+        
+    except Exception as e:
+        print(f"❌ Error en tienda pública: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tienda/public/<int:negocio_id>', methods=['GET'])
+def api_tienda_public_negocio(negocio_id):
+    """Obtiene los productos de un negocio específico en la tienda"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('''
+        SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
+               u.id as negocio_id, u.nombre as negocio_nombre
+        FROM productos_tienda pt
+        JOIN productos p ON pt.producto_id = p.id
+        JOIN usuarios u ON pt.negocio_id = u.id
+        WHERE pt.negocio_id = %s AND p.stock > 0 AND u.activo = 1
+        ORDER BY pt.destacado DESC, pt.created_at DESC
+        ''', (negocio_id,))
+        productos = cursor.fetchall()
+        conn.close()
+        
+        return jsonify([dict(p) for p in productos])
+        
+    except Exception as e:
+        print(f"❌ Error en tienda pública: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
 # API - NEGOCIO - TRABAJADORES
 # ============================================
 
