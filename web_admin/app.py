@@ -122,12 +122,12 @@ def init_db_route():
         """, 500
 
 # ============================================
-# ENDPOINT PARA REPARAR VENTAS (AGREGAR COLUMNAS)
+# ENDPOINT PARA REPARAR VENTAS EN RENDER
 # ============================================
 
 @app.route('/fix-ventas', methods=['GET'])
 def fix_ventas():
-    """Endpoint para agregar columnas faltantes a la tabla ventas"""
+    """Endpoint para agregar columnas faltantes a la tabla ventas en Render"""
     try:
         import urllib.parse
         import psycopg2
@@ -135,14 +135,25 @@ def fix_ventas():
         DATABASE_URL = os.environ.get('DATABASE_URL', '')
         
         if not DATABASE_URL:
-            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+            return """
+            <html>
+                <head><title>Error</title></head>
+                <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                    <h1 style="color:#ff6b6b;">❌ DATABASE_URL no está configurada</h1>
+                    <p style="color:#888;">Asegúrate de que la variable de entorno DATABASE_URL esté configurada en Render.</p>
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;display:inline-block;margin-top:20px;">Volver al Dashboard</a>
+                </body>
+            </html>
+            """, 500
         
+        # Parsear la URL de PostgreSQL
         url = DATABASE_URL.strip()
         if not url.startswith('postgresql://') and not url.startswith('postgres://'):
             url = 'postgresql://' + url
         
         parsed = urllib.parse.urlparse(url)
         
+        # Conectar a PostgreSQL
         conn = psycopg2.connect(
             host=parsed.hostname or 'localhost',
             port=parsed.port or 5432,
@@ -152,13 +163,14 @@ def fix_ventas():
             sslmode='require'
         )
         cursor = conn.cursor()
-        print("✅ Conectado a PostgreSQL")
+        print("✅ Conectado a PostgreSQL en Render")
         
         # Verificar columnas actuales
         cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
             WHERE table_name = 'ventas'
+            ORDER BY ordinal_position
         """)
         columnas = cursor.fetchall()
         columnas_existentes = [col[0] for col in columnas]
@@ -176,6 +188,7 @@ def fix_ventas():
         
         columnas_agregadas = []
         mensajes = []
+        errores = []
         
         for col, tipo in columnas_necesarias:
             if col not in columnas_existentes:
@@ -189,8 +202,9 @@ def fix_ventas():
                         mensajes.append(f"⚠️ Columna '{col}' ya existe")
                         print(f"⚠️ Columna '{col}' ya existe")
                     else:
-                        mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
-                        print(f"⚠️ Error al agregar '{col}': {e}")
+                        errores.append(f"❌ Error al agregar '{col}': {str(e)}")
+                        mensajes.append(f"❌ Error al agregar '{col}': {str(e)}")
+                        print(f"❌ Error al agregar '{col}': {e}")
             else:
                 mensajes.append(f"✅ Columna '{col}' ya existe")
                 print(f"✅ Columna '{col}' ya existe")
@@ -199,16 +213,32 @@ def fix_ventas():
         conn.close()
         
         html_mensajes = "<br>".join(mensajes)
+        html_errores = "<br>".join(errores) if errores else ""
+        
+        if columnas_agregadas:
+            estado_titulo = "✅ Ventas reparadas correctamente"
+            estado_color = "#6c3ce0"
+            columnas_texto = f"Columnas agregadas: {', '.join(columnas_agregadas)}"
+        elif errores:
+            estado_titulo = "⚠️ Algunas columnas no se pudieron agregar"
+            estado_color = "#ffbb33"
+            columnas_texto = "Revisa los errores arriba"
+        else:
+            estado_titulo = "✅ Todas las columnas ya existen"
+            estado_color = "#6c3ce0"
+            columnas_texto = "No se necesitaron cambios"
         
         return f"""
         <html>
             <head><title>Ventas Reparadas</title></head>
             <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
-                <h1 style="color:#6c3ce0;">✅ Ventas reparadas correctamente</h1>
+                <h1 style="color:{estado_color};">{estado_titulo}</h1>
                 <div style="background:#1a1a2e;border-radius:8px;padding:20px;margin:20px auto;max-width:600px;text-align:left;border:1px solid #2a2a3e;">
                     {html_mensajes}
+                    {('<br>' + html_errores) if errores else ''}
                 </div>
-                <p style="color:#888;">Columnas agregadas: factura, transferencia_id, transferencia_cedula, transferencia_banco, transferencia_fecha</p>
+                <p style="color:#888;">{columnas_texto}</p>
+                <p style="color:#666;font-size:12px;">🔗 Base de datos: {parsed.hostname}</p>
                 <br>
                 <a href="/negocio/ventas" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;display:inline-block;">Ir a Ventas</a>
                 <a href="/dashboard" style="color:#888;text-decoration:none;border:1px solid #2a2a3e;padding:10px 20px;border-radius:8px;display:inline-block;margin-left:10px;">Volver al Dashboard</a>
@@ -216,13 +246,20 @@ def fix_ventas():
         </html>
         """
     except Exception as e:
+        import traceback
+        error_detalle = traceback.format_exc()
         return f"""
         <html>
             <head><title>Error</title></head>
             <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
                 <h1 style="color:#ff6b6b;">❌ Error al reparar ventas</h1>
-                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
-                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                <div style="background:#1a1a2e;border-radius:8px;padding:20px;margin:20px auto;max-width:800px;text-align:left;border:1px solid #2a2a3e;overflow-x:auto;">
+                    <pre style="color:#ff6b6b;font-size:12px;white-space:pre-wrap;word-break:break-all;">{str(e)}</pre>
+                    <hr style="border-color:#2a2a3e;">
+                    <pre style="color:#888;font-size:11px;white-space:pre-wrap;word-break:break-all;">{error_detalle}</pre>
+                </div>
+                <p style="color:#888;">Asegúrate de que la base de datos PostgreSQL esté funcionando correctamente.</p>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;display:inline-block;margin-top:20px;">Volver al Dashboard</a>
             </body>
         </html>
         """, 500
@@ -1425,7 +1462,7 @@ def api_toggle_servicio(servicio_id):
     
     return jsonify({'success': True})
 
-@app.route('/api/servicio/<int:servicio_id>', methods(['DELETE'])
+@app.route('/api/servicio/<int:servicio_id>', methods=['DELETE'])
 @login_required
 def api_eliminar_servicio(servicio_id):
     token = request.cookies.get('token')
