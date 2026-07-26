@@ -479,7 +479,7 @@
         }
 
         /* ============================================
-           PANEL CENTRAL - CONTENEDOR DE MÓDULOS
+           PANEL CENTRAL - ESTILOS MEJORADOS
            ============================================ */
         .panel-center {
             flex: 1;
@@ -491,7 +491,7 @@
         }
 
         .panel-center .dashboard-content {
-            padding: 20px 24px;
+            padding: 16px 20px;
             overflow-y: auto;
             height: 100%;
         }
@@ -509,6 +509,232 @@
             display: none;
         }
 
+        .page-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .page-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        /* ============================================
+           ESTADÍSTICAS CENTRALES - CUADROS MEJORADOS
+           ============================================ */
+        .stats-grid-central {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card-central {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            padding: 14px 12px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card-central:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(108, 60, 224, 0.1);
+        }
+
+        .stat-card-central .stat-icon-box {
+            font-size: 24px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .stat-card-central .stat-number {
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--accent);
+            display: block;
+            line-height: 1.2;
+            margin-bottom: 2px;
+        }
+
+        .stat-card-central .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+
+        /* ============================================
+           TRABAJADORES
+           ============================================ */
+        .section-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title .badge-count {
+            font-size: 11px;
+            background: var(--bg-hover);
+            padding: 0 10px;
+            border-radius: 12px;
+            color: var(--text-muted);
+        }
+
+        .trabajadores-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .trabajador-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: border-color 0.3s;
+        }
+
+        .trabajador-card:hover {
+            border-color: var(--accent);
+        }
+
+        .trabajador-card .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .trabajador-card .info {
+            flex: 1;
+        }
+
+        .trabajador-card .info .nombre {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .trabajador-card .info .cargo {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .trabajador-card .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .trabajador-card .status-dot.online {
+            background: var(--success);
+            box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
+        }
+
+        .trabajador-card .status-dot.offline {
+            background: var(--text-muted);
+        }
+
+        .trabajador-card .status-dot.ocupado {
+            background: var(--warning);
+            box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
+        }
+
+        .trabajador-empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 16px;
+            font-size: 13px;
+        }
+
+        /* ============================================
+           ALERTAS DE STOCK
+           ============================================ */
+        .alertas-container {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
+            margin-top: 6px;
+        }
+
+        .alertas-container .alerta-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .alertas-container .alerta-item:last-child {
+            border-bottom: none;
+        }
+
+        .alertas-container .alerta-item .alerta-icon {
+            font-size: 18px;
+        }
+
+        .alertas-container .alerta-item .alerta-info {
+            flex: 1;
+        }
+
+        .alertas-container .alerta-item .alerta-info .producto {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .alertas-container .alerta-item .alerta-info .detalle {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .alertas-container .alerta-item .alerta-accion {
+            font-size: 10px;
+            padding: 3px 10px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            background: rgba(255, 152, 0, 0.15);
+            color: var(--warning);
+            transition: background 0.3s;
+        }
+
+        .alertas-container .alerta-item .alerta-accion:hover {
+            background: rgba(255, 152, 0, 0.3);
+        }
+
+        .alertas-empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 12px;
+            font-size: 13px;
+        }
+
+        /* ============================================
+           IFRAME Y LOADER
+           ============================================ */
         .panel-center .module-frame {
             width: 100%;
             height: 100%;
@@ -539,8 +765,8 @@
         }
 
         .panel-center .loader .spinner {
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             border: 3px solid var(--border-color);
             border-top-color: var(--accent);
             border-radius: 50%;
@@ -549,213 +775,6 @@
 
         @keyframes spin {
             to { transform: rotate(360deg); }
-        }
-
-        /* ============================================
-           ESTILOS DEL DASHBOARD (dentro del panel central)
-           ============================================ */
-        .page-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .page-subtitle {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-bottom: 20px;
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .stat-card {
-            background: var(--bg-secondary);
-            border-radius: var(--radius);
-            padding: 16px 20px;
-            border: 1px solid var(--border-color);
-            transition: border-color 0.3s;
-        }
-
-        .stat-card:hover {
-            border-color: var(--accent);
-        }
-
-        .stat-card .stat-number {
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--accent);
-            display: block;
-        }
-
-        .stat-card .stat-label {
-            font-size: 12px;
-            color: var(--text-muted);
-            display: block;
-            margin-top: 4px;
-        }
-
-        .stat-card .stat-icon {
-            font-size: 18px;
-            margin-right: 6px;
-        }
-
-        .section-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .section-title .badge-count {
-            font-size: 11px;
-            background: var(--bg-hover);
-            padding: 0 10px;
-            border-radius: 12px;
-            color: var(--text-muted);
-        }
-
-        .trabajadores-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-
-        .trabajador-card {
-            background: var(--bg-secondary);
-            border-radius: var(--radius);
-            padding: 14px 16px;
-            border: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transition: border-color 0.3s;
-        }
-
-        .trabajador-card:hover {
-            border-color: var(--accent);
-        }
-
-        .trabajador-card .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--accent);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
-        }
-
-        .trabajador-card .info {
-            flex: 1;
-        }
-
-        .trabajador-card .info .nombre {
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .trabajador-card .info .cargo {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        .trabajador-card .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-
-        .trabajador-card .status-dot.online {
-            background: var(--success);
-            box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
-        }
-
-        .trabajador-card .status-dot.offline {
-            background: var(--text-muted);
-        }
-
-        .trabajador-card .status-dot.ocupado {
-            background: var(--warning);
-            box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
-        }
-
-        .trabajador-empty {
-            text-align: center;
-            color: var(--text-muted);
-            padding: 20px;
-            font-size: 13px;
-        }
-
-        .alertas-container {
-            background: var(--bg-secondary);
-            border-radius: var(--radius);
-            padding: 16px 20px;
-            border: 1px solid var(--border-color);
-            margin-top: 8px;
-        }
-
-        .alertas-container .alerta-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .alertas-container .alerta-item:last-child {
-            border-bottom: none;
-        }
-
-        .alertas-container .alerta-item .alerta-icon {
-            font-size: 20px;
-        }
-
-        .alertas-container .alerta-item .alerta-info {
-            flex: 1;
-        }
-
-        .alertas-container .alerta-item .alerta-info .producto {
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .alertas-container .alerta-item .alerta-info .detalle {
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-
-        .alertas-container .alerta-item .alerta-accion {
-            font-size: 11px;
-            padding: 4px 12px;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            background: rgba(255, 152, 0, 0.15);
-            color: var(--warning);
-            transition: background 0.3s;
-        }
-
-        .alertas-container .alerta-item .alerta-accion:hover {
-            background: rgba(255, 152, 0, 0.3);
-        }
-
-        .alertas-empty {
-            text-align: center;
-            color: var(--text-muted);
-            padding: 16px;
-            font-size: 13px;
         }
 
         /* ============================================
@@ -912,7 +931,8 @@
             .panel-right { width: 170px; min-width: 170px; padding: 10px 10px; }
             .panel-right .stat-item-small .number { font-size: 16px; }
             .panel-right .stat-item-small .label { font-size: 8px; }
-            .stats-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+            .stats-grid-central { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+            .stat-card-central .stat-number { font-size: 22px; }
             .trabajadores-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
         }
 
@@ -938,14 +958,26 @@
             .panel-right .reports-section { display: none; }
             .main-container { flex-direction: column; }
             .panel-center { min-height: 350px; }
+            .panel-center .dashboard-content { padding: 12px 14px; }
+            .stats-grid-central { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+            .stat-card-central { padding: 10px 8px; }
+            .stat-card-central .stat-number { font-size: 20px; }
+            .stat-card-central .stat-label { font-size: 9px; }
+            .stat-card-central .stat-icon-box { font-size: 20px; }
+            .trabajadores-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+            .trabajador-card { padding: 10px 12px; }
+            .trabajador-card .avatar { width: 30px; height: 30px; font-size: 14px; }
+            .trabajador-card .info .nombre { font-size: 12px; }
+            .trabajador-card .info .cargo { font-size: 10px; }
             .header-left .subtitle { display: none; }
             .header-right .user-info .role-badge { display: none; }
-            .stats-grid { grid-template-columns: 1fr 1fr; }
-            .trabajadores-grid { grid-template-columns: 1fr 1fr; }
             .user-menu {
                 right: -10px;
                 min-width: 160px;
             }
+            .page-title { font-size: 18px; }
+            .page-subtitle { font-size: 12px; }
+            .section-title { font-size: 14px; }
         }
 
         @media (max-width: 480px) {
@@ -954,7 +986,11 @@
             .panel-right .stat-item-small { padding: 4px 2px; }
             .panel-right .stat-item-small .number { font-size: 13px; }
             .panel-right .stat-item-small .label { font-size: 7px; }
-            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .stats-grid-central { grid-template-columns: 1fr 1fr; gap: 6px; }
+            .stat-card-central { padding: 8px 6px; }
+            .stat-card-central .stat-number { font-size: 18px; }
+            .stat-card-central .stat-label { font-size: 8px; }
+            .stat-card-central .stat-icon-box { font-size: 18px; }
             .trabajadores-grid { grid-template-columns: 1fr; }
             .user-menu {
                 right: -20px;
@@ -1052,7 +1088,7 @@
         </div>
 
         <!-- ============================================
-        PANEL CENTRAL - CONTENEDOR DE MÓDULOS
+        PANEL CENTRAL - CONTENEDOR DE MÓDULOS (Mejorado)
         ============================================ -->
         <div class="panel-center" id="panelCenter">
 
@@ -1062,26 +1098,31 @@
                 <div class="page-subtitle" id="fechaActual">Cargando fecha...</div>
 
                 <!-- Estadísticas generales -->
-                <div class="stats-grid" id="statsGrid">
-                    <div class="stat-card">
-                        <span class="stat-number" id="statTotalVentas">0</span>
-                        <span class="stat-label"><span class="stat-icon">💰</span> Ventas totales</span>
+                <div class="stats-grid-central" id="statsGrid">
+                    <div class="stat-card-central">
+                        <div class="stat-icon-box">💰</div>
+                        <div class="stat-number" id="statTotalVentas">0</div>
+                        <div class="stat-label">Ventas totales</div>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-number" id="statIngresosTotales">$0</span>
-                        <span class="stat-label"><span class="stat-icon">💵</span> Ingresos totales</span>
+                    <div class="stat-card-central">
+                        <div class="stat-icon-box">💵</div>
+                        <div class="stat-number" id="statIngresosTotales">$0</div>
+                        <div class="stat-label">Ingresos totales</div>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-number" id="statProductosTotales">0</span>
-                        <span class="stat-label"><span class="stat-icon">📦</span> Productos</span>
+                    <div class="stat-card-central">
+                        <div class="stat-icon-box">📦</div>
+                        <div class="stat-number" id="statProductosTotales">0</div>
+                        <div class="stat-label">Productos</div>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-number" id="statServiciosTotales">0</span>
-                        <span class="stat-label"><span class="stat-icon">📋</span> Servicios</span>
+                    <div class="stat-card-central">
+                        <div class="stat-icon-box">📋</div>
+                        <div class="stat-number" id="statServiciosTotales">0</div>
+                        <div class="stat-label">Servicios</div>
                     </div>
-                    <div class="stat-card">
-                        <span class="stat-number" id="statContratosTotales">0</span>
-                        <span class="stat-label"><span class="stat-icon">📄</span> Contratos</span>
+                    <div class="stat-card-central">
+                        <div class="stat-icon-box">📄</div>
+                        <div class="stat-number" id="statContratosTotales">0</div>
+                        <div class="stat-label">Contratos</div>
                     </div>
                 </div>
 
@@ -1362,6 +1403,7 @@
                     await cargarEstadisticasMensuales();
                     await cargarTrabajadores();
                     await cargarAlertasStock();
+                    await cargarEstadisticasNegocio();
                 }
 
                 // Actualizar periodo del mes
@@ -1498,6 +1540,7 @@
             cargarEstadisticasMensuales();
             cargarTrabajadores();
             cargarAlertasStock();
+            cargarEstadisticasNegocio();
 
             document.querySelectorAll('.modulo-item').forEach(item => {
                 item.classList.remove('active');
@@ -1656,7 +1699,6 @@
 
         renderReportes();
         cargarDatos();
-        cargarEstadisticasNegocio();
     </script>
 </body>
 </html>
