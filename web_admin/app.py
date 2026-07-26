@@ -1063,6 +1063,31 @@ def api_tienda_eliminar_producto(tienda_id):
     
     return jsonify({'success': True})
 
+@app.route('/api/venta/<int:venta_id>/estado', methods=['PUT'])
+@login_required
+def api_actualizar_estado_venta(venta_id):
+    """Actualiza el estado de una venta"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    data = request.get_json()
+    estado = data.get('estado')
+    
+    if estado not in ['pagado', 'pendiente', 'cancelado']:
+        return jsonify({'error': 'Estado inválido'}), 400
+    
+    exito = actualizar_estado_venta(venta_id, usuario['id'], estado)
+    
+    if not exito:
+        return jsonify({'error': 'Venta no encontrada'}), 404
+    
+    registrar_log(usuario['id'], 'venta_estado', f'Venta {venta_id} estado={estado}')
+    
+    return jsonify({'success': True})
+
 # ============================================
 # API - TIENDA (CLIENTE)
 # ============================================
