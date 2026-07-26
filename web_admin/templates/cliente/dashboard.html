@@ -54,11 +54,23 @@
             padding: 16px;
             text-align: center;
             transition: all 0.3s;
+            position: relative;
         }
         .producto-card:hover {
             border-color: #6c3ce0;
             transform: translateY(-4px);
             box-shadow: 0 8px 25px rgba(108, 60, 224, 0.15);
+        }
+        .producto-card .destacado-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #ff9800;
+            color: #000;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
         }
         .producto-card .foto {
             width: 100%;
@@ -100,46 +112,17 @@
         .producto-card .btn-primary { background: #6c3ce0; color: #fff; }
         .producto-card .btn-primary:hover { background: #5a2ec0; }
         .producto-card .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        
-        .loading-productos {
-            text-align: center;
-            color: #888;
-            padding: 40px;
-        }
-        .empty-productos {
-            text-align: center;
-            color: #888;
-            padding: 40px;
+        .producto-card .negocio-nombre {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
         }
         
-        .modules-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 12px;
-            margin-top: 12px;
-        }
-        .module-card {
-            background: #0f0f1a;
-            border: 1px solid #2a2a3e;
-            border-radius: 8px;
-            padding: 16px;
-            text-align: center;
-        }
-        .module-card .icon { font-size: 28px; display: block; margin-bottom: 8px; }
-        .module-card .name { font-size: 14px; font-weight: 600; }
-        .module-card .desc { font-size: 12px; color: #888; margin-top: 4px; }
-        .module-card .status {
-            display: inline-block;
-            font-size: 10px;
-            padding: 2px 12px;
-            border-radius: 12px;
-            margin-top: 8px;
-        }
-        .module-card .status.active { background: #224422; color: #6bff6b; }
+        .loading-productos { text-align: center; color: #888; padding: 40px; }
+        .empty-productos { text-align: center; color: #888; padding: 40px; }
         
         @media (max-width: 600px) {
             .productos-grid { grid-template-columns: 1fr 1fr; }
-            .modules-grid { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -156,27 +139,21 @@
     <div class="container">
         <div class="card">
             <div class="welcome">👋 ¡Bienvenido, {{ usuario.nombre or usuario.username }}!</div>
-            <div class="subtitle">Modo Cliente - Explora productos y servicios disponibles</div>
+            <div class="subtitle">Explora productos disponibles en la tienda</div>
         </div>
 
-        <!-- Tienda con fotos -->
+        <!-- Tienda -->
         <div class="card">
             <h2>🛒 Tienda</h2>
             <div id="productosContainer">
                 <div class="loading-productos">Cargando productos...</div>
             </div>
         </div>
-
-        <!-- Módulos disponibles -->
-        <div class="card">
-            <h2>🧩 Módulos disponibles</h2>
-            <div class="modules-grid" id="modulosContainer"></div>
-        </div>
     </div>
 
     <script>
         // ============================================
-        // CARGAR PRODUCTOS DE LA TIENDA
+        // CARGAR PRODUCTOS DE LA TIENDA PÚBLICA
         // ============================================
         
         async function cargarProductosTienda() {
@@ -184,12 +161,12 @@
             container.innerHTML = '<div class="loading-productos">Cargando productos...</div>';
             
             try {
-                const response = await fetch('/api/productos/tienda');
+                const response = await fetch('/api/tienda/public');
                 if (!response.ok) throw new Error('Error al cargar productos');
                 const productos = await response.json();
                 
                 if (productos.length === 0) {
-                    container.innerHTML = '<div class="empty-productos">No hay productos disponibles en este momento</div>';
+                    container.innerHTML = '<div class="empty-productos">No hay productos disponibles en la tienda</div>';
                     return;
                 }
                 
@@ -199,15 +176,19 @@
                     const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
                     const disabled = p.stock <= 0 ? 'disabled' : '';
                     const fotoUrl = p.foto_url || '/static/img/default_product.png';
+                    const destacadoHtml = p.destacado ? '<span class="destacado-badge">⭐ Destacado</span>' : '';
+                    const negocioNombre = p.negocio_nombre || p.negocio_username || 'Negocio';
                     
                     html += `
                         <div class="producto-card">
+                            ${destacadoHtml}
                             <img src="${fotoUrl}" alt="${p.nombre}" class="foto" 
                                  onerror="this.src='/static/img/default_product.png'">
                             <div class="nombre">${p.nombre}</div>
                             <div class="categoria">${p.categoria || ''}</div>
                             <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
                             <div class="stock ${stockClass}">${stockText}</div>
+                            <div class="negocio-nombre">🏢 ${negocioNombre}</div>
                             <button class="btn btn-primary" ${disabled} onclick="agregarCarrito(${p.id}, '${p.nombre}', ${p.precio})">
                                 🛒 Agregar al carrito
                             </button>
@@ -225,41 +206,6 @@
         
         function agregarCarrito(id, nombre, precio) {
             alert(`🛒 Producto "${nombre}" agregado al carrito\n💰 Precio: $${precio.toFixed(2)}`);
-            // Aquí puedes implementar la lógica del carrito
-        }
-
-        // ============================================
-        // CARGAR MÓDULOS
-        // ============================================
-        
-        async function cargarModulos() {
-            try {
-                const res = await fetch('/api/modulos');
-                const modulos = await res.json();
-                const container = document.getElementById('modulosContainer');
-                container.innerHTML = '';
-
-                const modulosCliente = modulos.filter(m => m.tipo_requerido === 'ambos' || m.tipo_requerido === 'cliente');
-
-                if (modulosCliente.length === 0) {
-                    container.innerHTML = '<div style="text-align:center;color:#888;padding:20px;">No hay módulos disponibles</div>';
-                    return;
-                }
-
-                modulosCliente.forEach(mod => {
-                    const div = document.createElement('div');
-                    div.className = 'module-card';
-                    div.innerHTML = `
-                        <span class="icon">${mod.icon || '📦'}</span>
-                        <div class="name">${mod.nombre}</div>
-                        <div class="desc">${mod.descripcion || ''}</div>
-                        <span class="status active">✅ Activo</span>
-                    `;
-                    container.appendChild(div);
-                });
-            } catch (error) {
-                console.error('Error:', error);
-            }
         }
 
         // ============================================
@@ -267,9 +213,6 @@
         // ============================================
         
         cargarProductosTienda();
-        cargarModulos();
-        
-        // Actualizar cada 30 segundos
         setInterval(cargarProductosTienda, 30000);
     </script>
 </body>
