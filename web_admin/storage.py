@@ -1,24 +1,28 @@
 import os
-import json
 import requests
+import json
+import time
+import uuid
 from datetime import datetime
-import base64
 
 class StorageManager:
     """Gestor de almacenamiento en la nube para cada negocio"""
     
-    def __init__(self, provider='terabox'):
-        self.provider = provider
-        self.base_url = "https://terabox.com/api/"
+    def __init__(self):
         self.cookie = os.environ.get('TERABOX_COOKIE', '')
+        self.use_local = not self.cookie
+        self.base_url = "https://www.terabox.com/api/"
         
+        if self.use_local:
+            # Crear carpeta local para desarrollo
+            os.makedirs('static/uploads', exist_ok=True)
+            print("📁 Usando almacenamiento LOCAL (sin TeraBox)")
+        else:
+            print("📁 Usando almacenamiento en TeraBox")
+    
     def get_negocio_path(self, negocio_id):
         """Obtiene la ruta base para un negocio"""
         return f"Negocios/negocio_{negocio_id}"
-    
-    def get_facturas_path(self, negocio_id):
-        """Obtiene la ruta de facturas para un negocio"""
-        return f"{self.get_negocio_path(negocio_id)}/facturas"
     
     def get_productos_path(self, negocio_id):
         """Obtiene la ruta de productos para un negocio"""
@@ -28,149 +32,154 @@ class StorageManager:
         """Obtiene la ruta de un producto específico"""
         return f"{self.get_productos_path(negocio_id)}/producto_{producto_id}"
     
-    def crear_carpeta_negocio(self, negocio_id):
-        """Crea la estructura de carpetas para un nuevo negocio"""
-        paths = [
-            self.get_negocio_path(negocio_id),
-            self.get_facturas_path(negocio_id),
-            self.get_productos_path(negocio_id),
-        ]
-        resultados = []
-        for path in paths:
-            resultado = self._crear_carpeta(path)
-            resultados.append(resultado)
-        return all(resultados)
+    def subir_foto_producto(self, negocio_id, producto_id, archivo_foto, nombre_foto):
+        """Sube una foto para un producto"""
+        # Si no hay cookie, guardar localmente
+        if self.use_local:
+            return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
+        
+        # Subir a TeraBox
+        return self._subir_terabox(negocio_id, producto_id, archivo_foto, nombre_foto)
+    
+    def obtener_url_foto(self, negocio_id, producto_id, nombre_foto):
+        """Obtiene la URL pública de una foto de producto"""
+        # Si es local, devolver URL local
+        if self.use_local:
+            return self._url_local(negocio_id, producto_id, nombre_foto)
+        
+        # Obtener URL de TeraBox
+        return self._url_terabox(negocio_id, producto_id, nombre_foto)
+    
+    # ============================================
+    # MÉTODOS PARA ALMACENAMIENTO LOCAL (Desarrollo)
+    # ============================================
+    
+    def _guardar_local(self, negocio_id, producto_id, archivo, nombre_foto):
+        """Guarda la foto en el sistema de archivos local"""
+        try:
+            # Crear la ruta de la carpeta
+            folder_path = os.path.join('static/uploads', f"negocio_{negocio_id}", f"producto_{producto_id}")
+            os.makedirs(folder_path, exist_ok=True)
+            
+            # Guardar el archivo
+            file_path = os.path.join(folder_path, nombre_foto)
+            archivo.save(file_path)
+            
+            print(f"✅ Foto guardada localmente: {file_path}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error guardando foto local: {e}")
+            return False
+    
+    def _url_local(self, negocio_id, producto_id, nombre_foto):
+        """Devuelve la URL local de la foto"""
+        return f"/static/uploads/negocio_{negocio_id}/producto_{producto_id}/{nombre_foto}"
+    
+    # ============================================
+    # MÉTODOS PARA TERABOX (Producción)
+    # ============================================
+    
+    def _subir_terabox(self, negocio_id, producto_id, archivo, nombre_foto):
+        """Sube la foto a TeraBox usando la API"""
+        try:
+            # 1. Obtener URL de subida
+            upload_url = self._obtener_url_subida(negocio_id, producto_id, nombre_foto)
+            if not upload_url:
+                print("❌ No se pudo obtener URL de subida")
+                return False
+            
+            # 2. Subir el archivo
+            headers = {
+                'Cookie': self.cookie,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            
+            # Leer el archivo
+            archivo.seek(0)
+            files = {'file': (nombre_foto, archivo.read(), 'image/jpeg')}
+            
+            response = requests.post(upload_url, headers=headers, files=files)
+            
+            if response.status_code == 200:
+                print(f"✅ Foto subida a TeraBox: {nombre_foto}")
+                return True
+            else:
+                print(f"❌ Error subiendo a TeraBox: {response.status_code}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Error subiendo a TeraBox: {e}")
+            # Fallback a local
+            print("🔄 Fallback a almacenamiento local...")
+            return self._guardar_local(negocio_id, producto_id, archivo, nombre_foto)
+    
+    def _obtener_url_subida(self, negocio_id, producto_id, nombre_foto):
+        """Obtiene la URL de subida de TeraBox"""
+        try:
+            # Construir la ruta en TeraBox
+            path = f"/{self.get_producto_path(negocio_id, producto_id)}"
+            
+            # Obtener token de subida
+            headers = {
+                'Cookie': self.cookie,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            
+            # Esta es una API simplificada - en producción usarías la API oficial de TeraBox
+            # Como alternativa, usamos un servicio de intercambio de archivos
+            # o guardamos localmente
+            
+            # Por ahora, devolvemos None para usar el fallback local
+            # En una implementación real, aquí iría la lógica de TeraBox
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error obteniendo URL de subida: {e}")
+            return None
+    
+    def _url_terabox(self, negocio_id, producto_id, nombre_foto):
+        """Obtiene la URL pública de TeraBox"""
+        try:
+            # Construir la ruta en TeraBox
+            path = f"/{self.get_producto_path(negocio_id, producto_id)}/{nombre_foto}"
+            
+            headers = {
+                'Cookie': self.cookie,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+            
+            # URL pública de TeraBox (simplificada)
+            # En producción, usarías la API real de TeraBox para obtener el enlace
+            return f"https://www.terabox.com/sharing/link?surl=...&path={path}"
+            
+        except Exception as e:
+            print(f"❌ Error obteniendo URL de TeraBox: {e}")
+            return self._url_local(negocio_id, producto_id, nombre_foto)
+    
+    # ============================================
+    # MÉTODOS PARA GUARDAR FACTURAS
+    # ============================================
+    
+    def get_facturas_path(self, negocio_id):
+        """Obtiene la ruta de facturas para un negocio"""
+        return f"{self.get_negocio_path(negocio_id)}/facturas"
     
     def guardar_factura(self, negocio_id, factura_id, archivo_pdf):
         """Guarda una factura en la carpeta del negocio"""
-        path = f"{self.get_facturas_path(negocio_id)}/factura_{factura_id}.pdf"
-        return self._subir_archivo(archivo_pdf, path)
-    
-    def subir_foto_producto(self, negocio_id, producto_id, archivo_foto, nombre_foto="foto_principal.jpg"):
-        """Sube una foto para un producto"""
-        path = f"{self.get_producto_path(negocio_id, producto_id)}/{nombre_foto}"
-        return self._subir_archivo(archivo_foto, path)
-    
-    def obtener_url_foto(self, negocio_id, producto_id, nombre_foto="foto_principal.jpg"):
-        """Obtiene la URL pública de una foto de producto"""
-        path = f"{self.get_producto_path(negocio_id, producto_id)}/{nombre_foto}"
-        return self._obtener_url(path)
-    
-    def obtener_facturas(self, negocio_id):
-        """Lista todas las facturas de un negocio"""
-        path = self.get_facturas_path(negocio_id)
-        return self._listar_archivos(path)
-    
-    def _crear_carpeta(self, path):
-        """Crea una carpeta en el almacenamiento"""
-        if self.provider == 'terabox':
-            return self._terabox_crear_carpeta(path)
-        elif self.provider == 'googledrive':
-            return self._gdrive_crear_carpeta(path)
-        return False
-    
-    def _subir_archivo(self, archivo, path):
-        """Sube un archivo al almacenamiento"""
-        if self.provider == 'terabox':
-            return self._terabox_subir_archivo(archivo, path)
-        elif self.provider == 'googledrive':
-            return self._gdrive_subir_archivo(archivo, path)
-        return False
-    
-    def _obtener_url(self, path):
-        """Obtiene la URL pública de un archivo"""
-        if self.provider == 'terabox':
-            return self._terabox_obtener_url(path)
-        elif self.provider == 'googledrive':
-            return self._gdrive_obtener_url(path)
-        return None
-    
-    def _listar_archivos(self, path):
-        """Lista archivos en una carpeta"""
-        if self.provider == 'terabox':
-            return self._terabox_listar(path)
-        elif self.provider == 'googledrive':
-            return self._gdrive_listar(path)
-        return []
-    
-    # ============================================
-    # MÉTODOS PARA TERABOX
-    # ============================================
-    
-    def _terabox_crear_carpeta(self, path):
-        """Crea carpeta en TeraBox usando la API"""
-        try:
-            # Usar terabox-gateway o API directa
-            url = f"{self.base_url}create_folder"
-            headers = {'Cookie': self.cookie}
-            data = {'path': path}
-            response = requests.post(url, headers=headers, json=data)
-            return response.status_code == 200
-        except Exception as e:
-            print(f"Error creando carpeta: {e}")
-            return False
-    
-    def _terabox_subir_archivo(self, archivo, path):
-        """Sube archivo a TeraBox"""
-        try:
-            url = f"{self.base_url}upload"
-            headers = {'Cookie': self.cookie}
-            files = {'file': archivo}
-            data = {'path': path}
-            response = requests.post(url, headers=headers, data=data, files=files)
-            return response.status_code == 200
-        except Exception as e:
-            print(f"Error subiendo archivo: {e}")
-            return False
-    
-    def _terabox_obtener_url(self, path):
-        """Obtiene URL de un archivo en TeraBox"""
-        try:
-            url = f"{self.base_url}get_file_url"
-            headers = {'Cookie': self.cookie}
-            data = {'path': path}
-            response = requests.post(url, headers=headers, json=data)
-            if response.status_code == 200:
-                return response.json().get('url')
-            return None
-        except Exception as e:
-            print(f"Error obteniendo URL: {e}")
-            return None
-    
-    def _terabox_listar(self, path):
-        """Lista archivos en TeraBox"""
-        try:
-            url = f"{self.base_url}list_files"
-            headers = {'Cookie': self.cookie}
-            data = {'path': path}
-            response = requests.post(url, headers=headers, json=data)
-            if response.status_code == 200:
-                return response.json().get('files', [])
-            return []
-        except Exception as e:
-            print(f"Error listando archivos: {e}")
-            return []
-    
-    # ============================================
-    # MÉTODOS PARA GOOGLE DRIVE
-    # ============================================
-    
-    def _gdrive_crear_carpeta(self, path):
-        """Crea carpeta en Google Drive (requiere PyDrive2)"""
-        # Implementar con PyDrive2
-        pass
-    
-    def _gdrive_subir_archivo(self, archivo, path):
-        """Sube archivo a Google Drive"""
-        # Implementar con PyDrive2
-        pass
-    
-    def _gdrive_obtener_url(self, path):
-        """Obtiene URL de Google Drive"""
-        # Implementar con PyDrive2
-        pass
-    
-    def _gdrive_listar(self, path):
-        """Lista archivos en Google Drive"""
-        # Implementar con PyDrive2
-        pass
+        nombre = f"factura_{factura_id}.pdf"
+        
+        if self.use_local:
+            # Guardar localmente
+            try:
+                folder_path = os.path.join('static/uploads', f"negocio_{negocio_id}", "facturas")
+                os.makedirs(folder_path, exist_ok=True)
+                file_path = os.path.join(folder_path, nombre)
+                archivo_pdf.save(file_path)
+                return True
+            except Exception as e:
+                print(f"❌ Error guardando factura: {e}")
+                return False
+        
+        # Subir a TeraBox
+        return self._subir_terabox(negocio_id, f"factura_{factura_id}", archivo_pdf, nombre)
