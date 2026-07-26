@@ -77,6 +77,7 @@
         .tabla .badge.bajo { background: #442222; color: #ff6b6b; }
         .tabla .badge.medio { background: #443322; color: #ffbb33; }
         .tabla .badge.alto { background: #224422; color: #6bff6b; }
+        .tabla .badge.agotado { background: #442222; color: #ff6b6b; font-weight: bold; }
         .form-row {
             display: flex;
             gap: 12px;
@@ -154,9 +155,16 @@
             transform: scale(1.05);
             transition: all 0.3s;
         }
+        .acciones-cell {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
         @media (max-width: 600px) {
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .form-row { flex-direction: column; }
+            .acciones-cell { flex-direction: column; }
+            .acciones-cell .btn-sm { width: 100%; text-align: center; }
         }
     </style>
 </head>
@@ -392,10 +400,17 @@
             `;
 
             filtrados.forEach(p => {
-                const estado = p.stock === 0 ? '🚫 Agotado' : 
-                              p.stock <= p.stock_minimo ? '⚠️ Bajo stock' : '✅ Normal';
-                const clase = p.stock === 0 ? 'agotado' : 
-                             p.stock <= p.stock_minimo ? 'bajo' : 'alto';
+                let estado, clase;
+                if (p.stock === 0) {
+                    estado = '🚫 Agotado';
+                    clase = 'agotado';
+                } else if (p.stock <= (p.stock_minimo || 3)) {
+                    estado = '⚠️ Bajo stock';
+                    clase = 'bajo';
+                } else {
+                    estado = '✅ Normal';
+                    clase = 'alto';
+                }
                 const categoriaDisplay = categoriasMap[p.categoria] || p.categoria || '-';
                 const fotoUrl = p.foto_url || '/static/img/default_product.png';
                 
@@ -412,9 +427,11 @@
                         <td>${p.stock_minimo || 3}</td>
                         <td><span class="badge ${clase}">${estado}</span></td>
                         <td>
-                            <button class="btn btn-warning btn-sm" onclick="editarProducto(${p.id})">✏️</button>
-                            <button class="btn btn-danger btn-sm" onclick="eliminarProducto(${p.id}, '${p.nombre}')">🗑️</button>
-                            ${p.foto_url ? `<button class="btn btn-primary btn-sm" onclick="eliminarFoto(${p.id})">📷</button>` : ''}
+                            <div class="acciones-cell">
+                                <button class="btn btn-warning btn-sm" onclick="editarProducto(${p.id})">✏️</button>
+                                <button class="btn btn-danger btn-sm" onclick="eliminarProducto(${p.id}, '${p.nombre.replace(/'/g, "\\'")}')">🗑️</button>
+                                ${p.foto_url ? `<button class="btn btn-primary btn-sm" onclick="eliminarFoto(${p.id})">📷</button>` : ''}
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -586,7 +603,7 @@
         }
 
         // ============================================
-        // ELIMINAR PRODUCTO (CORREGIDO)
+        // ELIMINAR PRODUCTO (VERSIÓN CORREGIDA)
         // ============================================
 
         async function eliminarProducto(id, nombre) {
@@ -597,10 +614,19 @@
                 return;
             }
             
-            if (!confirm(`⚠️ ¿Estás seguro de eliminar el producto "${nombre}"?\n\nEsta acción no se puede deshacer.`)) {
+            // Mostrar información detallada antes de eliminar
+            const confirmMsg = `⚠️ ¿Estás seguro de eliminar el producto "${nombre}"?\n\n` +
+                              `📦 ID: ${id}\n` +
+                              `💰 Precio: $${parseFloat(producto.precio).toFixed(2)}\n` +
+                              `📊 Stock: ${producto.stock} unidades\n` +
+                              `📂 Categoría: ${producto.categoria || 'Sin categoría'}\n\n` +
+                              `❗ Esta acción NO se puede deshacer.`;
+            
+            if (!confirm(confirmMsg)) {
                 return;
             }
             
+            // Confirmación final
             if (!confirm(`⚠️ Confirmación final: ¿Eliminar "${nombre}" definitivamente?`)) {
                 return;
             }
@@ -619,9 +645,8 @@
                 });
                 
                 console.log(`📥 Status: ${response.status}`);
-                console.log(`📥 Headers: ${response.headers.get('content-type')}`);
                 
-                // Leer la respuesta como texto primero
+                // Leer la respuesta como texto primero para mejor debugging
                 const textResponse = await response.text();
                 console.log('📥 Respuesta completa:', textResponse);
                 
@@ -644,13 +669,16 @@
                 
                 if (data.success) {
                     mostrarMensaje(`✅ Producto "${nombre}" eliminado correctamente`, 'exito');
+                    // Recargar la lista de productos
                     await cargarProductos();
+                    // Actualizar estadísticas
+                    actualizarEstadisticas();
                 } else {
-                    mostrarMensaje(data.error || 'Error al eliminar el producto', 'error');
+                    mostrarMensaje(`❌ ${data.error || 'Error al eliminar el producto'}`, 'error');
                 }
             } catch (error) {
                 console.error('❌ Error detallado:', error);
-                mostrarMensaje('Error de conexión con el servidor: ' + error.message, 'error');
+                mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
             }
         }
 
