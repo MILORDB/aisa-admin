@@ -125,6 +125,7 @@ def init_db():
     )
     ''')
     
+    # TABLA DE VENTAS ACTUALIZADA CON NUEVOS CAMPOS
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS ventas (
         id SERIAL PRIMARY KEY,
@@ -140,6 +141,11 @@ def init_db():
         empresa TEXT,
         tipo TEXT DEFAULT 'producto',
         factura_url TEXT,
+        factura TEXT,
+        transferencia_id TEXT,
+        transferencia_cedula TEXT,
+        transferencia_banco TEXT,
+        transferencia_fecha TEXT,
         fecha TEXT NOT NULL,
         created_at TEXT NOT NULL,
         FOREIGN KEY (negocio_id) REFERENCES usuarios(id),
@@ -749,20 +755,26 @@ def rechazar_trabajador(user_id):
     conn.close()
 
 # ============================================
-# FUNCIONES PARA VENTAS (ACTUALIZADO CON ESTADO)
+# FUNCIONES PARA VENTAS (ACTUALIZADO CON NUEVOS CAMPOS)
 # ============================================
 
 def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, cantidad, precio, total,
-                estado='pagado', empresa=None, tipo='producto', factura_url=None):
+                estado='pagado', empresa=None, tipo='producto', factura_url=None,
+                factura=None, transferencia_id=None, transferencia_cedula=None,
+                transferencia_banco=None, transferencia_fecha=None):
     conn = get_db()
     cursor = conn.cursor()
     fecha = datetime.now().isoformat()
     cursor.execute('''
     INSERT INTO ventas (negocio_id, trabajador_id, cliente, producto, producto_id,
-                        cantidad, precio, total, estado, empresa, tipo, factura_url, fecha, created_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        cantidad, precio, total, estado, empresa, tipo, factura_url,
+                        factura, transferencia_id, transferencia_cedula,
+                        transferencia_banco, transferencia_fecha, fecha, created_at)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     ''', (negocio_id, trabajador_id, cliente, producto, producto_id,
-          cantidad, precio, total, estado, empresa, tipo, factura_url, fecha, fecha))
+          cantidad, precio, total, estado, empresa, tipo, factura_url,
+          factura, transferencia_id, transferencia_cedula,
+          transferencia_banco, transferencia_fecha, fecha, fecha))
     conn.commit()
     venta_id = cursor.lastrowid
     conn.close()
@@ -772,10 +784,25 @@ def obtener_ventas(negocio_id, trabajador_id=None):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     if trabajador_id:
-        cursor.execute('SELECT * FROM ventas WHERE negocio_id = %s AND trabajador_id = %s ORDER BY id DESC',
-                       (negocio_id, trabajador_id))
+        cursor.execute('''
+        SELECT id, cliente, producto, cantidad, total, fecha, estado, 
+               trabajador_id, producto_id, empresa, tipo, factura_url,
+               factura, transferencia_id, transferencia_cedula,
+               transferencia_banco, transferencia_fecha
+        FROM ventas 
+        WHERE negocio_id = %s AND trabajador_id = %s 
+        ORDER BY id DESC
+        ''', (negocio_id, trabajador_id))
     else:
-        cursor.execute('SELECT * FROM ventas WHERE negocio_id = %s ORDER BY id DESC', (negocio_id,))
+        cursor.execute('''
+        SELECT id, cliente, producto, cantidad, total, fecha, estado, 
+               trabajador_id, producto_id, empresa, tipo, factura_url,
+               factura, transferencia_id, transferencia_cedula,
+               transferencia_banco, transferencia_fecha
+        FROM ventas 
+        WHERE negocio_id = %s 
+        ORDER BY id DESC
+        ''', (negocio_id,))
     ventas = cursor.fetchall()
     conn.close()
     return ventas
@@ -827,7 +854,8 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
-    SELECT producto_id, cantidad, total, cliente, producto, fecha, empresa, tipo, factura_url
+    SELECT producto_id, cantidad, total, cliente, producto, fecha, empresa, tipo, factura_url,
+           factura, transferencia_id, transferencia_cedula, transferencia_banco, transferencia_fecha
     FROM ventas WHERE id = %s AND negocio_id = %s
     ''', (venta_id, negocio_id))
     venta = cursor.fetchone()
@@ -843,7 +871,7 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
     conn.commit()
     conn.close()
     return True, {'producto_id': producto_id, 'cantidad': cantidad, 'cliente': venta[3],
-                  'producto': venta[4], 'total': venta[7], 'fecha': venta[12]}
+                  'producto': venta[4], 'total': venta[7], 'fecha': venta[17]}
 
 # ============================================
 # FUNCIONES PARA SERVICIOS
