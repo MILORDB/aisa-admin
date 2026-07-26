@@ -753,7 +753,7 @@
         }
 
         /* ============================================
-           PANEL DERECHO - ESTADÍSTICAS
+           PANEL DERECHO - ESTADÍSTICAS MENSUALES
            ============================================ */
         .panel-right {
             width: 220px;
@@ -773,7 +773,19 @@
             letter-spacing: 1px;
             color: var(--text-muted);
             font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .panel-right .stats-periodo {
+            font-size: 13px;
+            color: var(--accent);
+            font-weight: 600;
             margin-bottom: 12px;
+            text-align: center;
+            padding: 4px 12px;
+            border-radius: 8px;
+            background: rgba(108, 60, 224, 0.1);
+            border: 1px solid rgba(108, 60, 224, 0.2);
         }
 
         .panel-right .stats-grid {
@@ -785,13 +797,18 @@
         .panel-right .stat-item {
             background: var(--bg-primary);
             border-radius: var(--radius);
-            padding: 10px 12px;
+            padding: 12px 10px;
             border: 1px solid var(--border-color);
             text-align: center;
+            transition: border-color 0.3s;
+        }
+
+        .panel-right .stat-item:hover {
+            border-color: var(--accent);
         }
 
         .panel-right .stat-item .number {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 700;
             color: var(--accent);
             display: block;
@@ -802,6 +819,12 @@
             color: var(--text-muted);
             display: block;
             margin-top: 2px;
+        }
+
+        .panel-right .stat-item .icon {
+            font-size: 14px;
+            display: block;
+            margin-bottom: 2px;
         }
 
         .panel-right .reports-section {
@@ -868,14 +891,14 @@
             padding: 20px 0;
         }
 
-        .panel-right .hoy-label {
+        .panel-right .mes-label {
             font-size: 11px;
             color: var(--text-muted);
             text-align: center;
             margin-bottom: 8px;
         }
 
-        .panel-right .hoy-label strong {
+        .panel-right .mes-label strong {
             color: var(--text-primary);
         }
 
@@ -1082,28 +1105,33 @@
         </div>
 
         <!-- ============================================
-        PANEL DERECHO - ESTADÍSTICAS RÁPIDAS
+        PANEL DERECHO - ESTADÍSTICAS MENSUALES
         ============================================ -->
         <div class="panel-right">
 
-            <div class="stats-title">📊 Estadísticas de hoy</div>
-            <div class="hoy-label" id="fechaHoy">📅 Cargando fecha...</div>
+            <div class="stats-title">📊 Estadísticas del Mes</div>
+            <div class="stats-periodo" id="periodoMes">📅 Cargando mes...</div>
+
             <div class="stats-grid">
                 <div class="stat-item">
-                    <span class="number" id="statVentasHoy">0</span>
-                    <span class="label">💰 Ventas</span>
+                    <span class="icon">💰</span>
+                    <span class="number" id="statVentasMes">0</span>
+                    <span class="label">Ventas del mes</span>
                 </div>
                 <div class="stat-item">
-                    <span class="number" id="statClientesHoy">0</span>
-                    <span class="label">👥 Clientes</span>
+                    <span class="icon">👥</span>
+                    <span class="number" id="statClientesMes">0</span>
+                    <span class="label">Clientes atendidos</span>
                 </div>
                 <div class="stat-item">
-                    <span class="number" id="statIngresosHoy">$0</span>
-                    <span class="label">💵 Ingresos</span>
+                    <span class="icon">💵</span>
+                    <span class="number" id="statIngresosMes">$0</span>
+                    <span class="label">Ingresos del mes</span>
                 </div>
                 <div class="stat-item">
+                    <span class="icon">🧩</span>
                     <span class="number" id="statModulosActivos">0</span>
-                    <span class="label">🧩 Módulos activos</span>
+                    <span class="label">Módulos activos</span>
                 </div>
             </div>
 
@@ -1126,6 +1154,58 @@
         let modulos = [];
         let intervaloActualizacion = null;
         let moduloCargado = false;
+
+        // ============================================
+        // OBTENER NOMBRE DEL MES
+        // ============================================
+
+        function obtenerNombreMes() {
+            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            const hoy = new Date();
+            return `${meses[hoy.getMonth()]} ${hoy.getFullYear()}`;
+        }
+
+        function obtenerInicioFinMes() {
+            const hoy = new Date();
+            const año = hoy.getFullYear();
+            const mes = hoy.getMonth();
+            const inicio = `${año}-${String(mes + 1).padStart(2, '0')}-01`;
+            const fin = `${año}-${String(mes + 1).padStart(2, '0')}-${String(new Date(año, mes + 1, 0).getDate()).padStart(2, '0')}`;
+            return { inicio, fin };
+        }
+
+        // ============================================
+        // CARGAR ESTADÍSTICAS MENSUALES
+        // ============================================
+
+        async function cargarEstadisticasMensuales() {
+            try {
+                const response = await fetch('/api/ventas');
+                if (!response.ok) throw new Error('Error al cargar ventas');
+                const ventas = await response.json();
+
+                const { inicio, fin } = obtenerInicioFinMes();
+                const ventasMes = ventas.filter(v => v.fecha >= inicio && v.fecha <= fin);
+
+                const totalVentasMes = ventasMes.length;
+                const clientesMes = new Set(ventasMes.map(v => v.cliente));
+                const ingresosMes = ventasMes.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+
+                document.getElementById('statVentasMes').textContent = totalVentasMes;
+                document.getElementById('statClientesMes').textContent = clientesMes.size || 0;
+                document.getElementById('statIngresosMes').textContent = `$${ingresosMes.toFixed(2)}`;
+
+                // Estadísticas totales
+                const totalVentas = ventas.length;
+                const totalIngresos = ventas.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+                document.getElementById('statTotalVentas').textContent = totalVentas;
+                document.getElementById('statIngresosTotales').textContent = `$${totalIngresos.toFixed(2)}`;
+
+            } catch (error) {
+                console.error('Error al cargar estadísticas mensuales:', error);
+            }
+        }
 
         // ============================================
         // MENÚ DESPLEGABLE
@@ -1267,13 +1347,14 @@
                 renderModulos(permisos);
 
                 if (!moduloCargado) {
-                    await cargarEstadisticasNegocio();
+                    await cargarEstadisticasMensuales();
                     await cargarTrabajadores();
                     await cargarAlertasStock();
                 }
 
+                // Actualizar periodo del mes
+                document.getElementById('periodoMes').textContent = `📅 ${obtenerNombreMes()}`;
                 document.getElementById('fechaActual').textContent = `📅 ${obtenerFechaHoy()}`;
-                document.getElementById('fechaHoy').innerHTML = `📅 ${obtenerFechaHoy()}`;
 
                 if (intervaloActualizacion) clearInterval(intervaloActualizacion);
                 intervaloActualizacion = setInterval(cargarDatos, 30000);
@@ -1291,7 +1372,6 @@
             const container = document.getElementById('modulosContainer');
             container.innerHTML = '';
 
-            // Nombres de módulos de negocio (incluyendo CONTRATOS)
             const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos'];
             
             const modulosNegocio = modulos.filter(m => 
@@ -1306,7 +1386,6 @@
             document.getElementById('totalModulos').textContent = modulosNegocio.length;
             let activos = 0;
 
-            // Iconos para cada módulo
             const iconos = {
                 'inventario': '📦', 
                 'tienda': '🛍️',
@@ -1404,54 +1483,13 @@
 
             moduloCargado = false;
 
-            cargarEstadisticasNegocio();
+            cargarEstadisticasMensuales();
             cargarTrabajadores();
             cargarAlertasStock();
 
             document.querySelectorAll('.modulo-item').forEach(item => {
                 item.classList.remove('active');
             });
-        }
-
-        // ============================================
-        // CARGAR ESTADÍSTICAS DEL NEGOCIO
-        // ============================================
-
-        async function cargarEstadisticasNegocio() {
-            try {
-                const ventasRes = await fetch('/api/ventas');
-                const ventas = await ventasRes.json();
-                const totalVentas = ventas.length;
-                const totalIngresos = ventas.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
-
-                document.getElementById('statTotalVentas').textContent = totalVentas;
-                document.getElementById('statIngresosTotales').textContent = `$${totalIngresos.toFixed(2)}`;
-
-                const prodRes = await fetch('/api/productos');
-                const productos = await prodRes.json();
-                document.getElementById('statProductosTotales').textContent = productos.length;
-
-                const servRes = await fetch('/api/servicios');
-                const servicios = await servRes.json();
-                document.getElementById('statServiciosTotales').textContent = servicios.length;
-
-                // Contratos
-                const contrRes = await fetch('/api/contratos');
-                const contratos = await contrRes.json();
-                document.getElementById('statContratosTotales').textContent = contratos.length;
-
-                const hoy = new Date().toISOString().split('T')[0];
-                const ventasHoy = ventas.filter(v => v.fecha === hoy);
-                const clientesHoy = new Set(ventasHoy.map(v => v.cliente));
-
-                document.getElementById('statVentasHoy').textContent = ventasHoy.length;
-                document.getElementById('statClientesHoy').textContent = clientesHoy.size || 0;
-                const ingresosHoy = ventasHoy.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
-                document.getElementById('statIngresosHoy').textContent = `$${ingresosHoy.toFixed(2)}`;
-
-            } catch (error) {
-                console.error('Error al cargar estadísticas:', error);
-            }
         }
 
         // ============================================
@@ -1549,6 +1587,29 @@
         }
 
         // ============================================
+        // CARGAR ESTADÍSTICAS DE PRODUCTOS Y SERVICIOS
+        // ============================================
+
+        async function cargarEstadisticasNegocio() {
+            try {
+                const prodRes = await fetch('/api/productos');
+                const productos = await prodRes.json();
+                document.getElementById('statProductosTotales').textContent = productos.length;
+
+                const servRes = await fetch('/api/servicios');
+                const servicios = await servRes.json();
+                document.getElementById('statServiciosTotales').textContent = servicios.length;
+
+                const contrRes = await fetch('/api/contratos');
+                const contratos = await contrRes.json();
+                document.getElementById('statContratosTotales').textContent = contratos.length;
+
+            } catch (error) {
+                console.error('Error al cargar estadísticas de negocio:', error);
+            }
+        }
+
+        // ============================================
         // REPORTES
         // ============================================
 
@@ -1583,6 +1644,7 @@
 
         renderReportes();
         cargarDatos();
+        cargarEstadisticasNegocio();
     </script>
 </body>
 </html>
