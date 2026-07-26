@@ -263,6 +263,7 @@
             padding: 4px 8px;
             background: #1a1a2e;
             border-radius: 6px;
+            flex-wrap: wrap;
         }
         .item-line .item-tipo {
             font-size: 10px;
@@ -278,7 +279,7 @@
         }
         .item-line select {
             flex: 2;
-            min-width: 100px;
+            min-width: 120px;
         }
         .item-line .input-cantidad {
             width: 70px;
@@ -464,8 +465,7 @@
         let lineasProductos = [];
         let lineasServicios = [];
         let nextId = 1;
-        let productosCargados = false;
-        let serviciosCargados = false;
+        let datosCargados = false;
 
         // ============================================
         // INICIALIZACIÓN
@@ -504,7 +504,7 @@
         }
 
         // ============================================
-        // CARGAR PRODUCTOS Y SERVICIOS
+        // CARGAR PRODUCTOS Y SERVICIOS (FUNCIONES GLOBALES)
         // ============================================
 
         async function cargarProductos() {
@@ -512,10 +512,11 @@
                 const response = await fetch('/api/productos/stock');
                 if (!response.ok) throw new Error('Error al cargar productos');
                 productos = await response.json();
-                productosCargados = true;
-                actualizarSelectoresProductos();
+                console.log('✅ Productos cargados:', productos.length);
+                return true;
             } catch (error) {
                 console.error('Error al cargar productos:', error);
+                return false;
             }
         }
 
@@ -525,14 +526,16 @@
                 if (!response.ok) throw new Error('Error al cargar servicios');
                 servicios = await response.json();
                 servicios = servicios.filter(s => s.activo === 1);
-                serviciosCargados = true;
-                actualizarSelectoresServicios();
+                console.log('✅ Servicios cargados:', servicios.length);
+                return true;
             } catch (error) {
                 console.error('Error al cargar servicios:', error);
+                return false;
             }
         }
 
         function actualizarSelectoresProductos() {
+            console.log('🔄 Actualizando selectores de productos...');
             document.querySelectorAll('.select-producto').forEach(select => {
                 const valorActual = select.value;
                 while (select.options.length > 1) {
@@ -573,6 +576,7 @@
         }
 
         function actualizarSelectoresServicios() {
+            console.log('🔄 Actualizando selectores de servicios...');
             document.querySelectorAll('.select-servicio').forEach(select => {
                 const valorActual = select.value;
                 while (select.options.length > 1) {
@@ -615,6 +619,7 @@
         // ============================================
 
         function agregarLineaProducto() {
+            console.log('➕ Agregando línea de producto...');
             const container = document.getElementById('productosContainer');
             const id = nextId++;
             const html = `
@@ -631,11 +636,11 @@
             `;
             container.insertAdjacentHTML('beforeend', html);
             
-            // Actualizar selectores con datos
-            if (productosCargados) {
+            // Actualizar selectores con datos si ya están cargados
+            if (productos.length > 0) {
                 actualizarSelectoresProductos();
             } else {
-                cargarProductos();
+                console.log('⏳ Productos no cargados aún, se actualizarán cuando estén listos');
             }
             
             lineasProductos.push({ id, tipo: 'producto' });
@@ -644,6 +649,7 @@
         }
 
         function agregarLineaServicio() {
+            console.log('➕ Agregando línea de servicio...');
             const container = document.getElementById('serviciosContainer');
             const id = nextId++;
             const html = `
@@ -659,10 +665,10 @@
             `;
             container.insertAdjacentHTML('beforeend', html);
             
-            if (serviciosCargados) {
+            if (servicios.length > 0) {
                 actualizarSelectoresServicios();
             } else {
-                cargarServicios();
+                console.log('⏳ Servicios no cargados aún, se actualizarán cuando estén listos');
             }
             
             lineasServicios.push({ id, tipo: 'servicio' });
@@ -919,10 +925,19 @@
         }
 
         // ============================================
-        // NUEVA VENTA - ABRIR MODAL
+        // NUEVA VENTA - ABRIR MODAL (CORREGIDO)
         // ============================================
 
         async function nuevaVenta() {
+            console.log('🔄 Abriendo modal de nueva venta...');
+            
+            // Mostrar loading en el botón
+            const btn = event ? event.target : document.querySelector('.btn-primary');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Cargando...';
+            }
+            
             // Resetear
             document.getElementById('ventaEmpresa').value = '';
             document.getElementById('ventaEstado').value = 'pagado';
@@ -936,16 +951,37 @@
             document.getElementById('countServicios').textContent = '0';
             nextId = 1;
             
-            // Cargar datos primero
+            // Cargar productos y servicios ANTES de abrir el modal
+            console.log('📦 Cargando productos...');
             await cargarProductos();
+            console.log('📋 Cargando servicios...');
             await cargarServicios();
             
-            // Agregar una línea por defecto después de cargar los datos
+            // Agregar una línea por defecto DESPUÉS de cargar los datos
+            console.log('➕ Agregando línea de producto por defecto...');
             agregarLineaProducto();
             
+            // Forzar actualización de selectores
+            if (productos.length > 0) {
+                actualizarSelectoresProductos();
+            }
+            if (servicios.length > 0) {
+                actualizarSelectoresServicios();
+            }
+            
             actualizarResumen();
+            
+            // Abrir modal
             document.getElementById('modalVenta').classList.add('show');
             document.getElementById('ventaEmpresa').focus();
+            
+            // Restaurar botón
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = '+ Nueva venta';
+            }
+            
+            console.log('✅ Modal abierto correctamente');
         }
 
         function cerrarModal() {
@@ -1127,9 +1163,11 @@
         // ============================================
 
         mostrarInfoTrabajador();
+        cargarVentas();
+        
+        // Cargar productos y servicios en segundo plano para tenerlos listos
         cargarProductos();
         cargarServicios();
-        cargarVentas();
         
         setInterval(() => {
             cargarProductos();
