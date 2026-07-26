@@ -6,6 +6,7 @@ import logging
 import json
 import psycopg2
 import traceback
+import time
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -60,7 +61,22 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 CORS(app)
 
-# Crear carpetas para archivos estáticos
+# ============================================
+# CONFIGURACIÓN DE CACHÉ (ANTI-CACHÉ)
+# ============================================
+
+@app.after_request
+def add_header(response):
+    """Agrega headers para evitar caché en el navegador"""
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
+
+# ============================================
+# CREAR CARPETAS PARA ARCHIVOS ESTÁTICOS
+# ============================================
+
 os.makedirs('static/uploads', exist_ok=True)
 os.makedirs('static/img', exist_ok=True)
 
@@ -230,18 +246,15 @@ def register():
         tipo = data.get('tipo', 'cliente')
         datos_negocio = data.get('datos_negocio')
         
-        # Validaciones
         if not username or not email or not password:
             return jsonify({'error': 'Todos los campos son requeridos'}), 400
         
         if len(password) < 6:
             return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
         
-        # Verificar si el usuario ya existe
         if obtener_usuario_por_username(username):
             return jsonify({'error': 'El nombre de usuario ya está en uso'}), 400
         
-        # Crear usuario
         user_id = crear_usuario(username, email, password, nombre, 'usuario', tipo, datos_negocio)
         
         if not user_id:
@@ -462,7 +475,7 @@ def verificar_usuario(username):
     return jsonify({'exists': False, 'message': 'Usuario no encontrado'})
 
 # ============================================
-# RUTAS DE MÓDULOS DE NEGOCIO
+# RUTAS DE MÓDULOS DE NEGOCIO (CON VERSIÓN PARA EVITAR CACHÉ)
 # ============================================
 
 @app.route('/negocio/inventario')
@@ -470,42 +483,42 @@ def verificar_usuario(username):
 def negocio_inventario():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
-    return render_template('negocio/inventario.html', usuario=usuario)
+    return render_template('negocio/inventario.html', usuario=usuario, version=int(time.time()))
 
 @app.route('/negocio/tienda')
 @login_required
 def negocio_tienda():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
-    return render_template('negocio/tienda.html', usuario=usuario)
+    return render_template('negocio/tienda.html', usuario=usuario, version=int(time.time()))
 
 @app.route('/negocio/trabajadores')
 @login_required
 def negocio_trabajadores():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
-    return render_template('negocio/trabajadores.html', usuario=usuario)
+    return render_template('negocio/trabajadores.html', usuario=usuario, version=int(time.time()))
 
 @app.route('/negocio/servicios')
 @login_required
 def negocio_servicios():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
-    return render_template('negocio/servicios.html', usuario=usuario)
+    return render_template('negocio/servicios.html', usuario=usuario, version=int(time.time()))
 
 @app.route('/negocio/ventas')
 @login_required
 def negocio_ventas():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
-    return render_template('negocio/ventas.html', usuario=usuario)
+    return render_template('negocio/ventas.html', usuario=usuario, version=int(time.time()))
 
 @app.route('/negocio/contratos')
 @login_required
 def negocio_contratos():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
-    return render_template('negocio/contratos.html', usuario=usuario)
+    return render_template('negocio/contratos.html', usuario=usuario, version=int(time.time()))
 
 # ============================================
 # API - USUARIOS
@@ -1063,31 +1076,6 @@ def api_tienda_eliminar_producto(tienda_id):
     
     return jsonify({'success': True})
 
-@app.route('/api/venta/<int:venta_id>/estado', methods=['PUT'])
-@login_required
-def api_actualizar_estado_venta(venta_id):
-    """Actualiza el estado de una venta"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    data = request.get_json()
-    estado = data.get('estado')
-    
-    if estado not in ['pagado', 'pendiente', 'cancelado']:
-        return jsonify({'error': 'Estado inválido'}), 400
-    
-    exito = actualizar_estado_venta(venta_id, usuario['id'], estado)
-    
-    if not exito:
-        return jsonify({'error': 'Venta no encontrada'}), 404
-    
-    registrar_log(usuario['id'], 'venta_estado', f'Venta {venta_id} estado={estado}')
-    
-    return jsonify({'success': True})
-
 # ============================================
 # API - TIENDA (CLIENTE)
 # ============================================
@@ -1141,7 +1129,7 @@ def api_tienda_public_negocio(negocio_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - VENTAS (ACTUALIZADO CON ESTADO)
+# API - VENTAS (ACTUALIZADO CON NUEVOS CAMPOS)
 # ============================================
 
 @app.route('/api/ventas', methods=['GET', 'POST'])
@@ -1166,10 +1154,15 @@ def api_ventas():
     precio = data.get('precio')
     total = data.get('total', precio * cantidad if precio else 0)
     trabajador_id = data.get('trabajador_id')
-    estado = data.get('estado', 'pagado')  # Nuevo campo
+    estado = data.get('estado', 'pagado')
     empresa = data.get('empresa')
     tipo = data.get('tipo', 'producto')
     factura_url = data.get('factura_url')
+    factura = data.get('factura')
+    transferencia_id = data.get('transferencia_id')
+    transferencia_cedula = data.get('transferencia_cedula')
+    transferencia_banco = data.get('transferencia_banco')
+    transferencia_fecha = data.get('transferencia_fecha')
     
     if not cliente or not producto or precio is None:
         return jsonify({'error': 'Cliente, producto y precio son requeridos'}), 400
@@ -1193,13 +1186,16 @@ def api_ventas():
     venta_id = crear_venta(
         usuario['id'], trabajador_id, cliente, producto, 
         producto_id, cantidad, precio, total, estado, 
-        empresa, tipo, factura_url
+        empresa, tipo, factura_url, factura,
+        transferencia_id, transferencia_cedula,
+        transferencia_banco, transferencia_fecha
     )
     
     if tipo == 'producto' and producto_id:
         actualizar_stock_producto(producto_id, cantidad)
     
-    registrar_log(usuario['id'], 'venta_creada', f'Venta: {producto} - Cliente: {cliente} - Cantidad: {cantidad} - Estado: {estado}')
+    registrar_log(usuario['id'], 'venta_creada', 
+                  f'Venta: {producto} - Cliente: {cliente} - Cantidad: {cantidad} - Estado: {estado}')
     
     return jsonify({'success': True, 'id': venta_id, 'stock_actualizado': True})
 
@@ -1233,7 +1229,7 @@ def api_actualizar_estado_venta(venta_id):
     data = request.get_json()
     estado = data.get('estado')
     
-    if estado not in ['pagado', 'pendiente', 'cancelado']:
+    if estado not in ['pagado', 'pendiente', 'cancelado', 'transferencia']:
         return jsonify({'error': 'Estado inválido'}), 400
     
     exito = actualizar_estado_venta(venta_id, usuario['id'], estado)
