@@ -280,6 +280,7 @@
                     <input type="file" id="prodFoto" accept="image/*" onchange="previewFoto()">
                     <div id="previewFoto" style="margin-top:8px;">
                         <img id="previewImage" src="" style="max-width:150px;display:none;border-radius:8px;border:2px solid #2a2a3e;">
+                        <div id="uploadStatus" style="font-size:12px;color:#888;margin-top:4px;"></div>
                     </div>
                 </div>
             </div>
@@ -465,11 +466,41 @@
 
         function previewFoto() {
             const file = document.getElementById('prodFoto').files[0];
+            const previewImg = document.getElementById('previewImage');
+            const statusEl = document.getElementById('uploadStatus');
+            
             if (file) {
+                // Validar tamaño
+                if (file.size > 2 * 1024 * 1024) {
+                    mostrarMensaje('❌ La imagen es demasiado grande. Máximo 2MB', 'error');
+                    document.getElementById('prodFoto').value = '';
+                    if (statusEl) {
+                        statusEl.textContent = '❌ Imagen demasiado grande (máx 2MB)';
+                        statusEl.style.color = '#ff6b6b';
+                    }
+                    return;
+                }
+                
+                // Validar tipo
+                const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (!validTypes.includes(file.type)) {
+                    mostrarMensaje('❌ Formato no permitido. Use: JPG, PNG, GIF o WEBP', 'error');
+                    document.getElementById('prodFoto').value = '';
+                    if (statusEl) {
+                        statusEl.textContent = '❌ Formato no permitido';
+                        statusEl.style.color = '#ff6b6b';
+                    }
+                    return;
+                }
+                
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    document.getElementById('previewImage').src = e.target.result;
-                    document.getElementById('previewImage').style.display = 'block';
+                    previewImg.src = e.target.result;
+                    previewImg.style.display = 'block';
+                    if (statusEl) {
+                        statusEl.textContent = `📷 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                        statusEl.style.color = '#6bff6b';
+                    }
                 }
                 reader.readAsDataURL(file);
                 archivoFoto = file;
@@ -483,6 +514,7 @@
             archivoFoto = null;
             document.getElementById('previewImage').style.display = 'none';
             document.getElementById('prodFoto').value = '';
+            document.getElementById('uploadStatus').textContent = '';
             document.getElementById('formTitle').textContent = '📦 Nuevo Producto';
             document.getElementById('btnGuardar').textContent = '💾 Guardar';
             document.getElementById('btnGuardar').className = 'btn btn-success';
@@ -497,6 +529,7 @@
             document.getElementById('prodMinimo').value = '';
             document.getElementById('prodFoto').value = '';
             document.getElementById('previewImage').style.display = 'none';
+            document.getElementById('uploadStatus').textContent = '';
             archivoFoto = null;
             editandoId = null;
         }
@@ -514,6 +547,7 @@
             
             editandoId = id;
             archivoFoto = null;
+            document.getElementById('uploadStatus').textContent = '';
             document.getElementById('formTitle').textContent = '✏️ Editar Producto';
             document.getElementById('btnGuardar').textContent = '💾 Actualizar';
             document.getElementById('btnGuardar').className = 'btn btn-warning';
@@ -526,6 +560,90 @@
             document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
+        // ============================================
+        // SUBIR FOTO A TERABOX
+        // ============================================
+
+        async function subirFotoProducto(producto_id, archivo) {
+            const statusEl = document.getElementById('uploadStatus');
+            if (!statusEl) {
+                const previewDiv = document.getElementById('previewFoto');
+                if (previewDiv) {
+                    const newStatus = document.createElement('div');
+                    newStatus.id = 'uploadStatus';
+                    newStatus.style.cssText = 'font-size:12px;color:#888;margin-top:4px;';
+                    previewDiv.appendChild(newStatus);
+                }
+            }
+            const status = document.getElementById('uploadStatus') || { textContent: '', style: { color: '#888' } };
+            status.textContent = '⏳ Subiendo foto a TeraBox...';
+            status.style.color = '#ffbb33';
+            
+            try {
+                const formData = new FormData();
+                formData.append('foto', archivo);
+
+                const response = await fetch(`/api/producto/${producto_id}/foto`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    status.textContent = '✅ Foto subida correctamente a TeraBox';
+                    status.style.color = '#6bff6b';
+                    console.log('📷 Foto subida a TeraBox:', result);
+                    return true;
+                } else {
+                    status.textContent = '❌ Error: ' + (result.error || 'Error al subir');
+                    status.style.color = '#ff6b6b';
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error al subir foto:', error);
+                status.textContent = '❌ Error de conexión: ' + error.message;
+                status.style.color = '#ff6b6b';
+                return false;
+            }
+        }
+
+        // ============================================
+        // ELIMINAR FOTO DE PRODUCTO
+        // ============================================
+
+        async function eliminarFoto(id) {
+            const producto = productos.find(p => p.id === id);
+            if (!producto) {
+                mostrarMensaje('❌ Producto no encontrado', 'error');
+                return;
+            }
+            
+            if (!confirm(`¿Eliminar la foto del producto "${producto.nombre}"?\n\nEsta acción eliminará la foto de TeraBox.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/producto/${id}/foto`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    mostrarMensaje('✅ Foto eliminada correctamente de TeraBox', 'exito');
+                    await cargarProductos();
+                } else {
+                    mostrarMensaje(data.error || 'Error al eliminar foto', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('❌ Error de conexión: ' + error.message, 'error');
+            }
+        }
+
+        // ============================================
+        // GUARDAR PRODUCTO CON FOTO EN TERABOX
+        // ============================================
+
         async function guardarProducto() {
             const nombre = document.getElementById('prodNombre').value.trim();
             const categoria = document.getElementById('prodCategoria').value;
@@ -534,7 +652,7 @@
             const stock_minimo = parseInt(document.getElementById('prodMinimo').value) || 3;
 
             if (!nombre || !categoria || isNaN(precio)) {
-                mostrarMensaje('Nombre, categoría y precio son obligatorios', 'error');
+                mostrarMensaje('❌ Nombre, categoría y precio son obligatorios', 'error');
                 return;
             }
 
@@ -545,6 +663,7 @@
                 let result;
 
                 if (editandoId) {
+                    // Actualizar producto existente
                     response = await fetch(`/api/producto/${editandoId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
@@ -553,12 +672,22 @@
                     result = await response.json();
                     
                     if (result.success) {
+                        // Si hay una nueva foto, subirla a TeraBox
+                        if (archivoFoto) {
+                            const exito = await subirFotoProducto(editandoId, archivoFoto);
+                            if (!exito) {
+                                mostrarMensaje('⚠️ Producto actualizado pero error al subir la foto', 'error');
+                                await cargarProductos();
+                                return;
+                            }
+                        }
                         mostrarMensaje(`✅ Producto "${nombre}" actualizado correctamente`, 'exito');
                     } else {
-                        mostrarMensaje(result.error || 'Error al actualizar producto', 'error');
+                        mostrarMensaje(result.error || '❌ Error al actualizar producto', 'error');
                         return;
                     }
                 } else {
+                    // Crear nuevo producto
                     response = await fetch('/api/productos', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -567,30 +696,21 @@
                     result = await response.json();
                     
                     if (!result.success) {
-                        mostrarMensaje(result.error || 'Error al crear producto', 'error');
+                        mostrarMensaje(result.error || '❌ Error al crear producto', 'error');
                         return;
                     }
                     
                     const producto_id = result.id;
 
                     if (archivoFoto) {
-                        const formData = new FormData();
-                        formData.append('foto', archivoFoto);
-
-                        const fotoResponse = await fetch(`/api/producto/${producto_id}/foto`, {
-                            method: 'POST',
-                            body: formData
-                        });
-
-                        const fotoResult = await fotoResponse.json();
-                        if (fotoResult.success) {
-                            mostrarMensaje('✅ Producto creado con foto', 'exito');
-                        } else {
-                            mostrarMensaje('⚠️ Producto creado, pero error al subir foto', 'error');
+                        const exito = await subirFotoProducto(producto_id, archivoFoto);
+                        if (!exito) {
+                            mostrarMensaje('⚠️ Producto creado pero error al subir la foto', 'error');
+                            await cargarProductos();
+                            return;
                         }
-                    } else {
-                        mostrarMensaje(`✅ Producto "${nombre}" creado correctamente`, 'exito');
                     }
+                    mostrarMensaje(`✅ Producto "${nombre}" creado correctamente`, 'exito');
                 }
 
                 cancelarFormulario();
@@ -598,7 +718,7 @@
                 
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión con el servidor: ' + error.message, 'error');
+                mostrarMensaje('❌ Error de conexión: ' + error.message, 'error');
             }
         }
 
@@ -679,30 +799,6 @@
             } catch (error) {
                 console.error('❌ Error detallado:', error);
                 mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
-            }
-        }
-
-        // ============================================
-        // ELIMINAR FOTO
-        // ============================================
-
-        async function eliminarFoto(id) {
-            if (!confirm('¿Eliminar la foto de este producto?')) return;
-            
-            try {
-                const response = await fetch(`/api/producto/${id}/foto`, {
-                    method: 'DELETE'
-                });
-                const data = await response.json();
-                if (data.success) {
-                    mostrarMensaje('Foto eliminada correctamente', 'exito');
-                    await cargarProductos();
-                } else {
-                    mostrarMensaje(data.error || 'Error al eliminar foto', 'error');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
             }
         }
 
