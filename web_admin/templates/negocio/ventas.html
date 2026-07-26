@@ -723,4 +723,226 @@
         // ============================================
 
         function filtrarVentas() {
-            const filtro =
+            const filtro = document.getElementById('searchInput').value;
+            const estado = document.getElementById('filtroEstado').value;
+            renderVentas(filtro, estado);
+        }
+
+        // ============================================
+        // NUEVA VENTA - ABRIR MODAL
+        // ============================================
+
+        function nuevaVenta() {
+            document.getElementById('ventaEmpresa').value = '';
+            document.getElementById('ventaCantidad').value = '1';
+            document.getElementById('ventaPrecio').value = '';
+            document.getElementById('ventaPrecioServicio').value = '';
+            document.getElementById('productoStockInfo').style.display = 'none';
+            document.getElementById('resumenVenta').style.display = 'none';
+            document.getElementById('ventaEstado').value = 'pagado';
+            
+            const productoSelect = document.getElementById('ventaProducto');
+            productoSelect.disabled = false;
+            productoSelect.classList.remove('campo-deshabilitado');
+            productoSelect.value = '';
+            
+            const servicioSelect = document.getElementById('ventaServicio');
+            servicioSelect.disabled = false;
+            servicioSelect.classList.remove('campo-deshabilitado');
+            servicioSelect.value = '';
+            
+            document.getElementById('ventaTipo').value = 'producto';
+            
+            cargarProductos();
+            cargarServicios();
+            document.getElementById('modalVenta').classList.add('show');
+            document.getElementById('ventaEmpresa').focus();
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalVenta').classList.remove('show');
+        }
+
+        // ============================================
+        // GUARDAR VENTA
+        // ============================================
+
+        function guardarVenta() {
+            const empresa = document.getElementById('ventaEmpresa').value.trim();
+            const productoId = document.getElementById('ventaProducto').value;
+            const servicioId = document.getElementById('ventaServicio').value;
+            const cantidad = parseInt(document.getElementById('ventaCantidad').value) || 1;
+            const precio = parseFloat(document.getElementById('ventaPrecio').value);
+            const tipo = document.getElementById('ventaTipo').value;
+            const estado = document.getElementById('ventaEstado').value;
+
+            if (!productoId && !servicioId) {
+                mostrarMensaje('❌ Selecciona un producto o un servicio', 'error');
+                return;
+            }
+
+            if (isNaN(precio) || precio <= 0) {
+                mostrarMensaje('❌ Ingresa un precio válido', 'error');
+                return;
+            }
+
+            let nombreItem = '';
+            let idItem = null;
+
+            if (productoId) {
+                const producto = productos.find(p => p.id == productoId);
+                if (!producto) {
+                    mostrarMensaje('❌ Producto no encontrado', 'error');
+                    return;
+                }
+                if (producto.stock < cantidad) {
+                    mostrarMensaje(`❌ Stock insuficiente. Disponible: ${producto.stock} unidades`, 'error');
+                    return;
+                }
+                nombreItem = producto.nombre;
+                idItem = productoId;
+            } else if (servicioId) {
+                const servicio = servicios.find(s => s.id == servicioId);
+                if (!servicio) {
+                    mostrarMensaje('❌ Servicio no encontrado', 'error');
+                    return;
+                }
+                nombreItem = servicio.nombre;
+                idItem = servicioId;
+            }
+
+            const cliente = empresa || 'Cliente sin empresa';
+
+            const data = {
+                cliente: cliente,
+                producto: nombreItem,
+                producto_id: idItem,
+                cantidad: cantidad,
+                precio: precio,
+                total: precio * cantidad,
+                empresa: empresa || null,
+                tipo: tipo,
+                trabajador_id: trabajadorId || null,
+                estado: estado
+            };
+
+            fetch('/api/ventas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mostrarMensaje(`✅ Venta registrada correctamente`, 'exito');
+                    cerrarModal();
+                    cargarVentas();
+                    cargarProductos();
+                } else {
+                    mostrarMensaje(data.error || 'Error al registrar la venta', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión con el servidor', 'error');
+            });
+        }
+
+        // ============================================
+        // CAMBIAR ESTADO DE VENTA (GUARDAR EN BD)
+        // ============================================
+
+        function cambiarEstadoVenta(id, estado) {
+            const venta = ventas.find(v => v.id === id);
+            if (!venta) return;
+            
+            if (venta.estado === estado) return;
+            
+            const estados = {
+                'pagado': '✅ Pagado',
+                'pendiente': '⏳ Pendiente',
+                'cancelado': '❌ Cancelado'
+            };
+            
+            if (!confirm(`¿Cambiar el estado de la venta #${id} de "${estados[venta.estado]}" a "${estados[estado]}"?`)) {
+                cargarVentas();
+                return;
+            }
+
+            fetch(`/api/venta/${id}/estado`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ estado: estado })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mostrarMensaje(`✅ Estado actualizado a "${estados[estado]}"`, 'exito');
+                    cargarVentas();
+                } else {
+                    mostrarMensaje(data.error || 'Error al actualizar estado', 'error');
+                    cargarVentas();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión con el servidor', 'error');
+                cargarVentas();
+            });
+        }
+
+        // ============================================
+        // ELIMINAR VENTA
+        // ============================================
+
+        async function eliminarVenta(id) {
+            const venta = ventas.find(v => v.id === id);
+            if (!venta) return;
+            
+            const estados = {
+                'pagado': '✅ Pagado',
+                'pendiente': '⏳ Pendiente',
+                'cancelado': '❌ Cancelado'
+            };
+            
+            if (!confirm(`⚠️ ¿Estás seguro de eliminar esta venta?\n\n📋 Cliente: ${venta.cliente}\n📦 Producto: ${venta.producto}\n📦 Cantidad: ${venta.cantidad}\n💰 Total: $${parseFloat(venta.total).toFixed(2)}\n📌 Estado: ${estados[venta.estado]}`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/venta/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    mostrarMensaje(`✅ Venta #${id} eliminada. Stock reintegrado.`, 'exito');
+                    await cargarVentas();
+                    await cargarProductos();
+                } else {
+                    mostrarMensaje(`❌ Error: ${data.error || 'Error desconocido'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('❌ Error de conexión', 'error');
+            }
+        }
+
+        // ============================================
+        // INICIO
+        // ============================================
+
+        mostrarInfoTrabajador();
+        cargarProductos();
+        cargarServicios();
+        cargarVentas();
+        
+        setInterval(() => {
+            cargarProductos();
+            cargarServicios();
+            cargarVentas();
+        }, 30000);
+    </script>
+</body>
+</html>
