@@ -582,29 +582,60 @@ def actualizar_producto(producto_id, nombre, categoria, precio, stock, stock_min
     conn.close()
 
 def eliminar_producto(producto_id):
-    """Elimina un producto de la base de datos"""
+    """Elimina un producto de la base de datos con manejo de errores mejorado"""
     conn = get_db()
     cursor = conn.cursor()
     
     try:
-        # Primero verificar si existe
-        cursor.execute('SELECT id FROM productos WHERE id = %s', (producto_id,))
-        resultado = cursor.fetchone()
+        # 1. Verificar si el producto existe
+        cursor.execute('SELECT id, nombre, negocio_id FROM productos WHERE id = %s', (producto_id,))
+        producto = cursor.fetchone()
         
-        if not resultado:
+        if not producto:
             conn.close()
             print(f"⚠️ Producto {producto_id} no encontrado")
             return False
         
-        # Eliminar el producto
-        cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
-        conn.commit()
-        conn.close()
-        print(f"✅ Producto {producto_id} eliminado correctamente")
-        return True
+        print(f"🗑️ Eliminando producto: {producto[1]} (ID: {producto_id})")
         
+        # 2. Verificar referencias en otras tablas antes de eliminar
+        # Verificar si está en productos_tienda
+        cursor.execute('SELECT id FROM productos_tienda WHERE producto_id = %s', (producto_id,))
+        tienda = cursor.fetchone()
+        if tienda:
+            print(f"⚠️ Eliminando referencia en productos_tienda para producto {producto_id}")
+            cursor.execute('DELETE FROM productos_tienda WHERE producto_id = %s', (producto_id,))
+        
+        # 3. Verificar si tiene ventas asociadas
+        cursor.execute('SELECT id FROM ventas WHERE producto_id = %s LIMIT 1', (producto_id,))
+        venta = cursor.fetchone()
+        if venta:
+            print(f"⚠️ El producto {producto_id} tiene ventas asociadas. No se puede eliminar.")
+            conn.close()
+            return False
+        
+        # 4. Eliminar el producto (ya no tiene referencias)
+        cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
+        
+        # 5. Verificar que se eliminó correctamente
+        if cursor.rowcount > 0:
+            conn.commit()
+            print(f"✅ Producto {producto_id} eliminado correctamente")
+            conn.close()
+            return True
+        else:
+            conn.rollback()
+            conn.close()
+            print(f"❌ No se eliminó ningún producto (rowcount=0)")
+            return False
+            
+    except psycopg2.Error as e:
+        print(f"❌ Error SQL en eliminar_producto: {e}")
+        conn.rollback()
+        conn.close()
+        return False
     except Exception as e:
-        print(f"❌ Error eliminando producto {producto_id}: {e}")
+        print(f"❌ Error inesperado en eliminar_producto: {e}")
         conn.rollback()
         conn.close()
         return False
