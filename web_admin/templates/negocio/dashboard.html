@@ -753,18 +753,18 @@
         }
 
         /* ============================================
-           PANEL DERECHO - ESTADÍSTICAS MENSUALES
+           PANEL DERECHO - ESTADÍSTICAS MENSUALES (Compacto)
            ============================================ */
         .panel-right {
-            width: 220px;
-            min-width: 220px;
+            width: 200px;
+            min-width: 200px;
             background: var(--bg-secondary);
             border-left: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
             overflow: hidden;
             flex-shrink: 0;
-            padding: 14px 16px;
+            padding: 12px 12px;
         }
 
         .panel-right .stats-title {
@@ -773,80 +773,84 @@
             letter-spacing: 1px;
             color: var(--text-muted);
             font-weight: 600;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
+            text-align: center;
         }
 
         .panel-right .stats-periodo {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--accent);
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             text-align: center;
-            padding: 4px 12px;
-            border-radius: 8px;
-            background: rgba(108, 60, 224, 0.1);
-            border: 1px solid rgba(108, 60, 224, 0.2);
+            padding: 3px 10px;
+            border-radius: 6px;
+            background: rgba(108, 60, 224, 0.08);
+            border: 1px solid rgba(108, 60, 224, 0.15);
         }
 
         .panel-right .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 6px;
         }
 
-        .panel-right .stat-item {
+        .panel-right .stat-item-small {
             background: var(--bg-primary);
-            border-radius: var(--radius);
-            padding: 12px 10px;
+            border-radius: 8px;
+            padding: 8px 6px;
             border: 1px solid var(--border-color);
             text-align: center;
             transition: border-color 0.3s;
         }
 
-        .panel-right .stat-item:hover {
+        .panel-right .stat-item-small:hover {
             border-color: var(--accent);
         }
 
-        .panel-right .stat-item .number {
-            font-size: 22px;
+        .panel-right .stat-item-small .icon {
+            font-size: 14px;
+            display: block;
+            margin-bottom: 0px;
+        }
+
+        .panel-right .stat-item-small .number {
+            font-size: 18px;
             font-weight: 700;
             color: var(--accent);
             display: block;
+            line-height: 1.2;
         }
 
-        .panel-right .stat-item .label {
-            font-size: 10px;
+        .panel-right .stat-item-small .label {
+            font-size: 9px;
             color: var(--text-muted);
             display: block;
-            margin-top: 2px;
-        }
-
-        .panel-right .stat-item .icon {
-            font-size: 14px;
-            display: block;
-            margin-bottom: 2px;
+            margin-top: 0px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .panel-right .reports-section {
             flex: 1;
-            padding-top: 12px;
+            padding-top: 10px;
             overflow-y: auto;
         }
 
         .panel-right .reports-title {
-            font-size: 11px;
+            font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 1px;
             color: var(--text-muted);
             font-weight: 600;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
         }
 
         .panel-right .report-item {
             background: var(--bg-primary);
-            border-radius: var(--radius);
-            padding: 10px 14px;
-            margin-bottom: 8px;
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin-bottom: 4px;
             border: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
@@ -860,20 +864,20 @@
         }
 
         .panel-right .report-item .report-name {
-            font-size: 13px;
+            font-size: 11px;
             font-weight: 500;
         }
 
         .panel-right .report-item .report-date {
-            font-size: 10px;
+            font-size: 9px;
             color: var(--text-muted);
         }
 
         .panel-right .report-item .report-download {
-            font-size: 11px;
-            padding: 2px 10px;
+            font-size: 10px;
+            padding: 1px 8px;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
             cursor: pointer;
             background: rgba(108, 60, 224, 0.15);
             color: var(--accent);
@@ -887,19 +891,8 @@
         .panel-right .reports-empty {
             text-align: center;
             color: var(--text-muted);
-            font-size: 13px;
-            padding: 20px 0;
-        }
-
-        .panel-right .mes-label {
             font-size: 11px;
-            color: var(--text-muted);
-            text-align: center;
-            margin-bottom: 8px;
-        }
-
-        .panel-right .mes-label strong {
-            color: var(--text-primary);
+            padding: 16px 0;
         }
 
         /* ============================================
@@ -907,7 +900,9 @@
            ============================================ */
         @media (max-width: 1024px) {
             .panel-left { width: 160px; min-width: 160px; }
-            .panel-right { width: 180px; min-width: 180px; }
+            .panel-right { width: 170px; min-width: 170px; padding: 10px 10px; }
+            .panel-right .stat-item-small .number { font-size: 16px; }
+            .panel-right .stat-item-small .label { font-size: 8px; }
             .stats-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
             .trabajadores-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
         }
@@ -919,35 +914,42 @@
                 min-width: unset;
                 border-left: none;
                 border-top: 1px solid var(--border-color);
-                max-height: 250px;
+                max-height: 180px;
                 flex-direction: row;
                 flex-wrap: wrap;
-                padding: 12px 16px;
+                padding: 8px 12px;
                 overflow-y: auto;
             }
-            .panel-right .stats-title { width: 100%; }
-            .panel-right .stats-grid { width: 100%; }
+            .panel-right .stats-title { width: 100%; font-size: 10px; margin-bottom: 2px; }
+            .panel-right .stats-periodo { font-size: 11px; margin-bottom: 6px; padding: 2px 8px; }
+            .panel-right .stats-grid { width: 100%; gap: 4px; }
+            .panel-right .stat-item-small { padding: 6px 4px; }
+            .panel-right .stat-item-small .number { font-size: 14px; }
+            .panel-right .stat-item-small .label { font-size: 8px; }
             .panel-right .reports-section { display: none; }
             .main-container { flex-direction: column; }
-            .panel-center { min-height: 400px; }
+            .panel-center { min-height: 350px; }
             .header-left .subtitle { display: none; }
             .header-right .user-info .role-badge { display: none; }
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .trabajadores-grid { grid-template-columns: 1fr 1fr; }
             .user-menu {
                 right: -10px;
-                min-width: 180px;
+                min-width: 160px;
             }
         }
 
         @media (max-width: 480px) {
             .header { padding: 10px 16px; flex-wrap: wrap; gap: 8px; }
             .panel-right .stats-grid { grid-template-columns: 1fr 1fr 1fr; }
+            .panel-right .stat-item-small { padding: 4px 2px; }
+            .panel-right .stat-item-small .number { font-size: 13px; }
+            .panel-right .stat-item-small .label { font-size: 7px; }
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .trabajadores-grid { grid-template-columns: 1fr; }
             .user-menu {
                 right: -20px;
-                min-width: 160px;
+                min-width: 150px;
             }
             .user-menu .menu-item { font-size: 12px; padding: 8px 14px; }
             .modal-content { padding: 20px; }
@@ -1105,7 +1107,7 @@
         </div>
 
         <!-- ============================================
-        PANEL DERECHO - ESTADÍSTICAS MENSUALES
+        PANEL DERECHO - ESTADÍSTICAS MENSUALES (Compacto)
         ============================================ -->
         <div class="panel-right">
 
@@ -1113,28 +1115,29 @@
             <div class="stats-periodo" id="periodoMes">📅 Cargando mes...</div>
 
             <div class="stats-grid">
-                <div class="stat-item">
+                <div class="stat-item-small">
                     <span class="icon">💰</span>
                     <span class="number" id="statVentasMes">0</span>
-                    <span class="label">Ventas del mes</span>
+                    <span class="label">Ventas</span>
                 </div>
-                <div class="stat-item">
+                <div class="stat-item-small">
                     <span class="icon">👥</span>
                     <span class="number" id="statClientesMes">0</span>
-                    <span class="label">Clientes atendidos</span>
+                    <span class="label">Clientes</span>
                 </div>
-                <div class="stat-item">
+                <div class="stat-item-small">
                     <span class="icon">💵</span>
                     <span class="number" id="statIngresosMes">$0</span>
-                    <span class="label">Ingresos del mes</span>
+                    <span class="label">Ingresos</span>
                 </div>
-                <div class="stat-item">
+                <div class="stat-item-small">
                     <span class="icon">🧩</span>
                     <span class="number" id="statModulosActivos">0</span>
-                    <span class="label">Módulos activos</span>
+                    <span class="label">Módulos</span>
                 </div>
             </div>
 
+            <!-- Reportes -->
             <div class="reports-section">
                 <div class="reports-title">📄 Reportes</div>
                 <div id="reportesContainer">
