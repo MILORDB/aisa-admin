@@ -413,7 +413,7 @@
                         <td><span class="badge ${clase}">${estado}</span></td>
                         <td>
                             <button class="btn btn-warning btn-sm" onclick="editarProducto(${p.id})">✏️</button>
-                            <button class="btn btn-danger btn-sm" onclick="eliminarProducto(${p.id})">🗑️</button>
+                            <button class="btn btn-danger btn-sm" onclick="eliminarProducto(${p.id}, '${p.nombre}')">🗑️</button>
                             ${p.foto_url ? `<button class="btn btn-primary btn-sm" onclick="eliminarFoto(${p.id})">📷</button>` : ''}
                         </td>
                     </tr>
@@ -488,7 +488,6 @@
             const p = productos.find(p => p.id === id);
             if (!p) return;
             
-            // Mostrar formulario
             document.getElementById('formProducto').style.display = 'block';
             document.getElementById('prodNombre').value = p.nombre;
             document.getElementById('prodCategoria').value = p.categoria || '';
@@ -507,7 +506,6 @@
                 document.getElementById('previewImage').style.display = 'block';
             }
             
-            // Scroll al formulario
             document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
@@ -529,9 +527,7 @@
                 let response;
                 let result;
 
-                // Determinar si es edición o creación
                 if (editandoId) {
-                    // EDITAR - PUT
                     response = await fetch(`/api/producto/${editandoId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
@@ -546,7 +542,6 @@
                         return;
                     }
                 } else {
-                    // CREAR - POST
                     response = await fetch('/api/productos', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -561,7 +556,6 @@
                     
                     const producto_id = result.id;
 
-                    // Si hay foto, subirla (solo en creación)
                     if (archivoFoto) {
                         const formData = new FormData();
                         formData.append('foto', archivoFoto);
@@ -587,27 +581,54 @@
                 
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión con el servidor', 'error');
+                mostrarMensaje('Error de conexión con el servidor: ' + error.message, 'error');
             }
         }
 
-        async function eliminarProducto(id) {
-            if (!confirm('¿Eliminar este producto?')) return;
+        // ============================================
+        // ELIMINAR PRODUCTO (CORREGIDO)
+        // ============================================
+
+        async function eliminarProducto(id, nombre) {
+            if (!confirm(`⚠️ ¿Estás seguro de eliminar el producto "${nombre}"?\n\nEsta acción no se puede deshacer.`)) {
+                return;
+            }
+            
+            // Segunda confirmación
+            if (!confirm(`⚠️ Confirmación final: ¿Eliminar "${nombre}" definitivamente?`)) {
+                return;
+            }
             
             try {
                 const response = await fetch(`/api/producto/${id}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
                 });
-                const data = await response.json();
+                
+                // Verificar si la respuesta es JSON
+                const contentType = response.headers.get('content-type');
+                let data;
+                
+                if (contentType && contentType.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    // Si no es JSON, leer como texto para depuración
+                    const text = await response.text();
+                    console.error('Respuesta no JSON:', text);
+                    throw new Error('El servidor no devolvió una respuesta JSON válida');
+                }
+                
                 if (data.success) {
-                    mostrarMensaje('Producto eliminado correctamente', 'exito');
+                    mostrarMensaje(`✅ Producto "${nombre}" eliminado correctamente`, 'exito');
                     await cargarProductos();
                 } else {
-                    mostrarMensaje(data.error || 'Error al eliminar', 'error');
+                    mostrarMensaje(data.error || 'Error al eliminar el producto', 'error');
                 }
             } catch (error) {
-                console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
+                console.error('Error detallado:', error);
+                mostrarMensaje('Error de conexión con el servidor: ' + error.message, 'error');
             }
         }
 
