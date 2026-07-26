@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Ventas - AIsa Negocio</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -374,6 +377,30 @@
             cursor: pointer;
         }
         .contrato-link:hover { text-decoration: underline; }
+        .stats-resumen {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+        }
+        .stats-resumen .stat-box {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stats-resumen .stat-box .number {
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .stats-resumen .stat-box .label {
+            font-size: 12px;
+            color: #888;
+        }
+        .stats-resumen .stat-box .number.total { color: #6c3ce0; }
+        .stats-resumen .stat-box .number.pagado { color: #6bff6b; }
+        .stats-resumen .stat-box .number.pendiente { color: #ffbb33; }
+        .stats-resumen .stat-box .number.cancelado { color: #ff6b6b; }
         @media (max-width: 600px) {
             .form-row { flex-direction: column; }
             .search-bar { flex-direction: column; }
@@ -383,6 +410,7 @@
             .item-line { flex-wrap: wrap; }
             .item-line select { flex: 1 1 100%; }
             .factura-preview { font-size: 10px; }
+            .stats-resumen { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -398,22 +426,22 @@
 
     <!-- Resumen de ventas por estado -->
     <div class="card">
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;">
-            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:8px;padding:12px;text-align:center;">
-                <div style="font-size:24px;font-weight:700;color:#6c3ce0;" id="totalVentas">0</div>
-                <div style="font-size:12px;color:#888;">📊 Total ventas</div>
+        <div class="stats-resumen" id="statsResumen">
+            <div class="stat-box">
+                <div class="number total" id="totalVentas">0</div>
+                <div class="label">📊 Total ventas</div>
             </div>
-            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:8px;padding:12px;text-align:center;">
-                <div style="font-size:24px;font-weight:700;color:#6bff6b;" id="totalPagado">0</div>
-                <div style="font-size:12px;color:#888;">✅ Pagadas</div>
+            <div class="stat-box">
+                <div class="number pagado" id="totalPagado">0</div>
+                <div class="label">✅ Pagadas</div>
             </div>
-            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:8px;padding:12px;text-align:center;">
-                <div style="font-size:24px;font-weight:700;color:#ffbb33;" id="totalPendiente">0</div>
-                <div style="font-size:12px;color:#888;">⏳ Pendientes</div>
+            <div class="stat-box">
+                <div class="number pendiente" id="totalPendiente">0</div>
+                <div class="label">⏳ Pendientes</div>
             </div>
-            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:8px;padding:12px;text-align:center;">
-                <div style="font-size:24px;font-weight:700;color:#ff6b6b;" id="totalCancelado">0</div>
-                <div style="font-size:12px;color:#888;">❌ Canceladas</div>
+            <div class="stat-box">
+                <div class="number cancelado" id="totalCancelado">0</div>
+                <div class="label">❌ Canceladas</div>
             </div>
         </div>
     </div>
@@ -1013,7 +1041,6 @@
             };
             document.getElementById('facturaEstado').textContent = estados[estado] || estado;
             
-            // Transferencia
             if (estado === 'transferencia') {
                 const transId = document.getElementById('transferenciaId').value || '-';
                 const cedula = document.getElementById('transferenciaCedula').value || '-';
@@ -1026,12 +1053,10 @@
                 document.getElementById('facturaCedula').style.display = 'none';
             }
             
-            // Atendido por
             const usuario = document.querySelector('.header-right .user-info span')?.textContent || 'Admin';
             document.getElementById('facturaAtendido').textContent = usuario;
         }
 
-        // Eventos para actualizar factura
         document.getElementById('ventaEmpresa').addEventListener('input', actualizarFactura);
         document.getElementById('ventaEstado').addEventListener('change', actualizarFactura);
         document.getElementById('transferenciaId').addEventListener('input', actualizarFactura);
@@ -1050,6 +1075,7 @@
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('Error al cargar ventas');
                 ventas = await response.json();
+                console.log('✅ Ventas cargadas:', ventas.length);
                 renderVentas();
                 actualizarResumenVentas();
             } catch (error) {
@@ -1165,6 +1191,8 @@
             document.getElementById('totalPagado').textContent = pagado;
             document.getElementById('totalPendiente').textContent = pendiente;
             document.getElementById('totalCancelado').textContent = cancelado;
+            
+            console.log('📊 Resumen actualizado:', { total, pagado, pendiente, cancelado });
         }
 
         // ============================================
@@ -1188,7 +1216,6 @@
                 btn.textContent = '⏳ Cargando...';
             }
             
-            // Resetear
             document.getElementById('ventaEmpresa').value = '';
             document.getElementById('ventaFactura').value = '';
             document.getElementById('ventaEstado').value = 'pagado';
@@ -1284,7 +1311,6 @@
             const nombres = items.map(item => `${item.cantidad}x ${item.nombre}`).join(', ');
             const primerItem = items[0];
             
-            // Datos de transferencia
             let transferenciaId = null;
             let transferenciaCedula = null;
             let transferenciaBanco = null;
