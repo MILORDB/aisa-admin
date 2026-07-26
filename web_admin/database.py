@@ -125,7 +125,6 @@ def init_db():
     )
     ''')
     
-    # TABLA DE VENTAS ACTUALIZADA CON NUEVOS CAMPOS
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS ventas (
         id SERIAL PRIMARY KEY,
@@ -588,13 +587,13 @@ def eliminar_producto(producto_id):
     cursor = conn.cursor()
     
     # Primero verificar si existe
-    cursor.execute('SELECT id FROM productos WHERE id = ?', (producto_id,))
+    cursor.execute('SELECT id FROM productos WHERE id = %s', (producto_id,))
     if not cursor.fetchone():
         conn.close()
         return False
     
     # Eliminar el producto
-    cursor.execute('DELETE FROM productos WHERE id = ?', (producto_id,))
+    cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
     conn.commit()
     conn.close()
     return True
@@ -765,7 +764,7 @@ def rechazar_trabajador(user_id):
     conn.close()
 
 # ============================================
-# FUNCIONES PARA VENTAS (ACTUALIZADO CON NUEVOS CAMPOS)
+# FUNCIONES PARA VENTAS
 # ============================================
 
 def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, cantidad, precio, total,
