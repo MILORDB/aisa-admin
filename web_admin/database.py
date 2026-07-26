@@ -586,17 +586,28 @@ def eliminar_producto(producto_id):
     conn = get_db()
     cursor = conn.cursor()
     
-    # Primero verificar si existe
-    cursor.execute('SELECT id FROM productos WHERE id = %s', (producto_id,))
-    if not cursor.fetchone():
+    try:
+        # Primero verificar si existe
+        cursor.execute('SELECT id FROM productos WHERE id = %s', (producto_id,))
+        resultado = cursor.fetchone()
+        
+        if not resultado:
+            conn.close()
+            print(f"⚠️ Producto {producto_id} no encontrado")
+            return False
+        
+        # Eliminar el producto
+        cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
+        conn.commit()
+        conn.close()
+        print(f"✅ Producto {producto_id} eliminado correctamente")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error eliminando producto {producto_id}: {e}")
+        conn.rollback()
         conn.close()
         return False
-    
-    # Eliminar el producto
-    cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
-    conn.commit()
-    conn.close()
-    return True
 
 def actualizar_stock_producto(producto_id, cantidad):
     conn = get_db()
