@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response
 from flask_cors import CORS
 import os
 import sys
@@ -8,6 +8,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import traceback
 import time
+from datetime import datetime
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -57,6 +58,7 @@ try:
     )
     from web_admin.auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
     from web_admin.storage import get_storage_manager
+    from web_admin.reportes import GeneradorReportes
     print("✅ Módulos importados correctamente")
 except Exception as e:
     print(f"❌ Error importando módulos: {e}")
@@ -530,7 +532,6 @@ def api_estadisticas():
     activos = len([u for u in usuarios if u['activo'] == 1])
     trabajadores = len([u for u in usuarios if u['rol'] == 'trabajador'])
     
-    from datetime import datetime
     hoy = datetime.now().date()
     registros_hoy = len([l for l in logs if datetime.fromisoformat(l['fecha']).date() == hoy])
     
@@ -786,7 +787,7 @@ def api_asignar_permiso(user_id, modulo_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - NEGOCIO - TRABAJADORES (ACTUALIZADO)
+# API - NEGOCIO - TRABAJADORES
 # ============================================
 
 @app.route('/api/negocio/trabajadores')
@@ -839,7 +840,6 @@ def api_obtener_trabajadores():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/api/negocio/trabajador/crear', methods=['POST'])
 @login_required
@@ -930,7 +930,6 @@ def api_crear_trabajador():
         'user_id': user_id
     })
 
-
 @app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['PUT'])
 @login_required
 def api_actualizar_trabajador(trabajador_id):
@@ -1000,6 +999,23 @@ def api_actualizar_trabajador(trabajador_id):
         'success': True,
         'message': 'Trabajador actualizado correctamente'
     })
+
+@app.route('/api/negocio/trabajador/<int:trabajador_id>/toggle', methods=['POST'])
+@login_required
+def api_toggle_trabajador_negocio(trabajador_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    data = request.get_json()
+    activo = data.get('activo', 1)
+    
+    toggle_trabajador_negocio(usuario['id'], trabajador_id, activo)
+    registrar_log(usuario['id'], 'trabajador_toggle', f'Trabajador {trabajador_id} activo={activo}')
+    
+    return jsonify({'success': True})
 
 # ============================================
 # API - PRODUCTOS
@@ -1217,7 +1233,7 @@ def api_eliminar_foto_producto(producto_id):
         return jsonify({'success': True, 'message': 'Foto eliminada de la base de datos'})
 
 # ============================================
-# API - TIENDA (NEGOCIO) - CORREGIDO
+# API - TIENDA (NEGOCIO)
 # ============================================
 
 @app.route('/api/tienda/productos', methods=['GET'])
@@ -1267,7 +1283,6 @@ def api_tienda_productos():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/api/tienda/producto/agregar', methods=['POST'])
 @login_required
@@ -1320,7 +1335,6 @@ def api_tienda_agregar_producto():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/tienda/producto/<int:tienda_id>/destacar', methods=['POST'])
 @login_required
 def api_tienda_destacar_producto(tienda_id):
@@ -1351,7 +1365,6 @@ def api_tienda_destacar_producto(tienda_id):
         print(f"❌ Error en api_tienda_destacar_producto: {e}")
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/tienda/producto/<int:tienda_id>', methods=['DELETE'])
 @login_required
 def api_tienda_eliminar_producto(tienda_id):
@@ -1375,34 +1388,6 @@ def api_tienda_eliminar_producto(tienda_id):
     except Exception as e:
         print(f"❌ Error en api_tienda_eliminar_producto: {e}")
         return jsonify({'error': str(e)}), 500
-
-# ============================================
-# API - PRODUCTOS PARA TIENDA CLIENTE
-# ============================================
-
-@app.route('/api/productos/tienda', methods=['GET'])
-@login_required
-def api_productos_tienda():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'cliente':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    productos = obtener_productos_tienda()
-    
-    result = []
-    for p in productos:
-        result.append({
-            'id': p[0],
-            'nombre': p[1],
-            'categoria': p[2] or '',
-            'precio': p[3],
-            'stock': p[4],
-            'foto_url': p[5] or '/static/img/default_product.png'
-        })
-    
-    return jsonify(result)
 
 # ============================================
 # API - TIENDA PÚBLICA
@@ -1769,6 +1754,139 @@ def api_eliminar_contrato(contrato_id):
     registrar_log(usuario['id'], 'contrato_eliminado', f'Contrato {contrato_id} eliminado')
     
     return jsonify({'success': True})
+
+# ============================================
+# API - REPORTES
+# ============================================
+
+@app.route('/api/reportes/contratos', methods=['GET'])
+@login_required
+def api_reporte_contratos():
+    """Genera un reporte PDF de contratos"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    tipo = request.args.get('tipo', 'todos')
+    
+    try:
+        # Obtener contratos del negocio
+        contratos = obtener_contratos(usuario['id'])
+        
+        # Obtener datos del negocio
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
+        negocio = cursor.fetchone()
+        conn.close()
+        
+        negocio_nombre = negocio[0] or 'Mi Negocio'
+        datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
+        negocio_telefono = datos_negocio.get('telefono', '')
+        
+        # Procesar contratos para el reporte
+        hoy = datetime.now().date()
+        contratos_procesados = []
+        
+        for c in contratos:
+            # Determinar estado real
+            fecha_fin = datetime.fromisoformat(c['fecha_fin']).date() if c['fecha_fin'] else None
+            estado = c['estado']
+            
+            # Si está activo pero la fecha ya pasó, marcarlo como vencido
+            if estado == 'activo' and fecha_fin and fecha_fin < hoy:
+                estado = 'vencido'
+            
+            # Filtrar por tipo
+            if tipo == 'activos' and estado != 'activo':
+                continue
+            if tipo == 'vencidos' and estado != 'vencido':
+                continue
+            
+            contratos_procesados.append({
+                'id': c['id'],
+                'numero_contrato': c['numero_contrato'],
+                'empresa': c['empresa'],
+                'fecha_inicio': c['fecha_inicio'],
+                'fecha_fin': c['fecha_fin'],
+                'monto': c['monto'] or 0,
+                'estado': estado,
+                'tipo': c['tipo']
+            })
+        
+        # Generar PDF
+        generador = GeneradorReportes(
+            negocio_id=usuario['id'],
+            negocio_nombre=negocio_nombre,
+            negocio_telefono=negocio_telefono
+        )
+        
+        pdf_bytes = generador.generar_reporte_contratos(
+            contratos_procesados,
+            tipo_reporte=tipo
+        )
+        
+        # Crear respuesta con el PDF
+        response = make_response(pdf_bytes)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=reporte_contratos_{tipo}_{datetime.now().strftime("%Y%m%d")}.pdf'
+        
+        registrar_log(usuario['id'], 'reporte_generado', f'Reporte de contratos ({tipo})')
+        
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error generando reporte: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reportes/contratos/resumen', methods=['GET'])
+@login_required
+def api_resumen_contratos():
+    """Obtiene un resumen de contratos para el panel lateral"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    try:
+        contratos = obtener_contratos(usuario['id'])
+        
+        hoy = datetime.now().date()
+        total = len(contratos)
+        activos = 0
+        vencidos = 0
+        total_gastos = 0
+        
+        for c in contratos:
+            fecha_fin = datetime.fromisoformat(c['fecha_fin']).date() if c['fecha_fin'] else None
+            estado = c['estado']
+            
+            if estado == 'activo' and fecha_fin and fecha_fin < hoy:
+                estado = 'vencido'
+            
+            if estado == 'activo':
+                activos += 1
+            elif estado == 'vencido':
+                vencidos += 1
+            
+            total_gastos += c['monto'] or 0
+        
+        return jsonify({
+            'total': total,
+            'activos': activos,
+            'vencidos': vencidos,
+            'total_gastos': total_gastos,
+            'tiene_contratos': total > 0
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en resumen de contratos: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # ============================================
 # API - ESTADÍSTICAS TRABAJADOR
