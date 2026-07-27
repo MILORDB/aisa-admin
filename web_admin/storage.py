@@ -5,16 +5,20 @@ import time
 import uuid
 from datetime import datetime
 from urllib.parse import urlparse
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
 
 class StorageManager:
     """Gestor de almacenamiento en TeraBox para fotos de productos y facturas"""
     
     def __init__(self):
-        # Configuración de TeraBox - Cookie proporcionada por el usuario
-        self.cookie = os.environ.get('TERABOX_COOKIE', 'Y2duleyteHuirBC6zt0pERO_yHb9GY1FCd6_J73n')
+        # Configuración de TeraBox - Desde .env
+        self.cookie = os.environ.get('TERABOX_COOKIE', '')
         self.base_url = "https://www.terabox.com"
         self.api_url = "https://www.terabox.com/api/v1"
-        self.use_local = not self.cookie or self.cookie == 'Y2duleyteHuirBC6zt0pERO_yHb9GY1FCd6_J73n'
+        self.use_local = not self.cookie
         
         # Headers para las peticiones a TeraBox
         self.headers = {
@@ -26,7 +30,7 @@ class StorageManager:
             'Referer': 'https://www.terabox.com/'
         }
         
-        if self.cookie and self.cookie != 'Y2duleyteHuirBC6zt0pERO_yHb9GY1FCd6_J73n':
+        if self.cookie:
             self.headers['Cookie'] = self.cookie
             print("📁 Usando almacenamiento en TeraBox con cookie configurada")
             self._verificar_sesion()
@@ -35,7 +39,7 @@ class StorageManager:
             # Crear carpeta local para desarrollo
             os.makedirs('static/uploads', exist_ok=True)
             print("📁 Usando almacenamiento LOCAL (sin TeraBox)")
-            print("⚠️ Para usar TeraBox, configura la variable TERABOX_COOKIE correctamente")
+            print("⚠️ Para usar TeraBox, configura TERABOX_COOKIE en .env")
     
     def _verificar_sesion(self):
         """Verifica que la sesión de TeraBox sea válida"""
@@ -116,7 +120,6 @@ class StorageManager:
     def _crear_carpeta(self, path):
         """Crea una carpeta en TeraBox si no existe"""
         try:
-            # Limpiar el path
             clean_path = path.replace('//', '/')
             if not clean_path.startswith('/'):
                 clean_path = '/' + clean_path
@@ -138,7 +141,6 @@ class StorageManager:
                     print(f"✅ Carpeta creada/verificada: {path}")
                     return True
                 else:
-                    # Si la carpeta ya existe, no es un error
                     if result.get('errmsg') and 'exists' in result.get('errmsg', '').lower():
                         return True
                     print(f"⚠️ Error creando carpeta: {result.get('errmsg')}")
@@ -151,16 +153,13 @@ class StorageManager:
     def _obtener_url_subida(self, folder_path, filename):
         """Obtiene la URL de subida de TeraBox"""
         try:
-            # Limpiar el path
             clean_path = folder_path.replace('//', '/')
             if not clean_path.startswith('/'):
                 clean_path = '/' + clean_path
             
-            # Agregar el nombre del archivo al path
             full_path = f"{clean_path}/{filename}"
             full_path = full_path.replace('//', '/')
             
-            # Generar un token de subida
             data = {
                 'path': full_path,
                 'size': '0',
@@ -198,21 +197,18 @@ class StorageManager:
     
     def obtener_url_foto(self, negocio_id, producto_id, nombre_foto):
         """Obtiene la URL pública de una foto de producto"""
-        # Si es local, devolver URL local
         if self.use_local:
             return self._url_local(negocio_id, producto_id, nombre_foto)
         
         try:
-            # Construir la ruta completa
             path = f"{self.get_producto_path(negocio_id, producto_id)}/{nombre_foto}"
             path = path.replace('//', '/')
             if not path.startswith('/'):
                 path = '/' + path
             
-            # Obtener enlace compartido
             data = {
                 'path': path,
-                'period': 86400  # 24 horas
+                'period': 86400
             }
             
             response = requests.post(
@@ -229,7 +225,6 @@ class StorageManager:
                     if url:
                         return url
                     else:
-                        # Fallback a URL directa
                         return f"{self.base_url}{path}"
                 else:
                     print(f"⚠️ Error creando enlace: {result.get('errmsg')}")
@@ -248,17 +243,12 @@ class StorageManager:
     def _guardar_local(self, negocio_id, producto_id, archivo, nombre_foto):
         """Guarda la foto en el sistema de archivos local"""
         try:
-            # Crear la ruta de la carpeta
             folder_path = os.path.join('static/uploads', f"negocio_{negocio_id}", f"producto_{producto_id}")
             os.makedirs(folder_path, exist_ok=True)
-            
-            # Guardar el archivo
             file_path = os.path.join(folder_path, nombre_foto)
             archivo.save(file_path)
-            
             print(f"✅ Foto guardada localmente: {file_path}")
             return True
-            
         except Exception as e:
             print(f"❌ Error guardando foto local: {e}")
             return False
@@ -276,7 +266,6 @@ class StorageManager:
         nombre = f"factura_{factura_id}.pdf"
         
         if self.use_local:
-            # Guardar localmente
             try:
                 folder_path = os.path.join('static/uploads', f"negocio_{negocio_id}", "facturas")
                 os.makedirs(folder_path, exist_ok=True)
@@ -288,19 +277,14 @@ class StorageManager:
                 return False
         
         try:
-            # 1. Crear carpeta si no existe
             folder_path = self.get_facturas_path(negocio_id)
             self._crear_carpeta(folder_path)
-            
-            # 2. Obtener URL de subida
             upload_url = self._obtener_url_subida(folder_path, nombre)
             if not upload_url:
                 return self._guardar_local_factura(negocio_id, factura_id, archivo_pdf)
             
-            # 3. Subir el archivo
             archivo_pdf.seek(0)
             files = {'file': (nombre, archivo_pdf.read(), 'application/pdf')}
-            
             response = requests.post(upload_url, files=files, headers=self.headers)
             
             if response.status_code == 200:
@@ -332,7 +316,6 @@ class StorageManager:
     def eliminar_foto_producto(self, negocio_id, producto_id, nombre_foto):
         """Elimina una foto de producto de TeraBox"""
         if self.use_local:
-            # Eliminar localmente
             try:
                 file_path = os.path.join('static/uploads', f"negocio_{negocio_id}", f"producto_{producto_id}", nombre_foto)
                 if os.path.exists(file_path):
@@ -372,17 +355,13 @@ class StorageManager:
             print(f"❌ Error eliminando de TeraBox: {e}")
             return False
     
-    # ============================================
-    # MÉTODOS DE UTILIDAD
-    # ============================================
-    
     def obtener_estado(self):
         """Devuelve el estado del almacenamiento"""
         return {
             'tipo': 'TeraBox' if not self.use_local else 'Local',
-            'cookie_configurada': bool(self.cookie) and self.cookie != 'Y2duleyteHuirBC6zt0pERO_yHb9GY1FCd6_J73n',
+            'cookie_configurada': bool(self.cookie),
             'use_local': self.use_local,
-            'cookie': self.cookie[:20] + '...' if self.cookie and len(self.cookie) > 20 else self.cookie
+            'cookie_preview': self.cookie[:20] + '...' if self.cookie and len(self.cookie) > 20 else self.cookie
         }
 
 # ============================================
