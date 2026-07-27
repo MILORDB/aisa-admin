@@ -1,0 +1,65 @@
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+
+# Archivos de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Bases de datos
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+*.log
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de despliegue
+*.pyc
+*.pyd
+*.pyo
+*.pid
+*.seed
+*.pid.lock
+
+# Archivos de cobertura
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Archivos de logs
+logs/
+*.log
+
+# Archivos de uploads (si usas almacenamiento local)
+static/uploads/
