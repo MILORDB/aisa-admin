@@ -38,6 +38,9 @@
         .btn-warning { background: #ff9800; color: #fff; }
         .btn-warning:hover { background: #e68900; }
         .btn-sm { padding: 4px 12px; font-size: 11px; }
+        .btn-info { background: #2196f3; color: #fff; }
+        .btn-info:hover { background: #1976d2; }
+        
         .productos-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -64,6 +67,19 @@
             border-radius: 8px;
             margin-bottom: 10px;
             background: #1a1a2e;
+        }
+        .producto-card .foto-placeholder {
+            width: 100%;
+            height: 150px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: #1a1a2e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: #444;
+            border: 1px dashed #2a2a3e;
         }
         .producto-card .nombre {
             font-size: 14px;
@@ -115,8 +131,16 @@
             min-width: 150px;
         }
         .search-bar input:focus { border-color: #6c3ce0; outline: none; }
+        .search-bar select {
+            padding: 8px 14px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+        }
         .empty { text-align: center; color: #888; padding: 40px; }
         .loading { text-align: center; color: #888; padding: 20px; }
+        
         .modal-overlay {
             display: none;
             position: fixed;
@@ -135,6 +159,8 @@
             max-width: 500px;
             width: 90%;
             border: 1px solid #2a2a3e;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         .modal-content h3 { margin-bottom: 16px; }
         .modal-content .form-row {
@@ -164,6 +190,16 @@
             gap: 10px;
             margin-top: 16px;
         }
+        .modal-content .producto-info {
+            background: #0f0f1a;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #2a2a3e;
+        }
+        .modal-content .producto-info .label { color: #888; font-size: 12px; }
+        .modal-content .producto-info .value { color: #fff; font-weight: 600; }
+        
         .mensaje-exito {
             background: #224422;
             color: #6bff6b;
@@ -182,32 +218,73 @@
             display: none;
         }
         .mensaje-error.show { display: block; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stat-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+        .stat-item .number { font-size: 24px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
+        
         @media (max-width: 600px) {
             .productos-grid { grid-template-columns: 1fr 1fr; }
             .modal-content { padding: 20px; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .search-bar { flex-direction: column; }
         }
     </style>
 </head>
 <body>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-        <h1 style="font-size:22px;display:flex;align-items:center;gap:10px;">🛍️ Tienda <span style="font-size:14px;font-weight:normal;opacity:0.7;">Gestión de productos en venta</span></h1>
+        <h1 style="font-size:22px;display:flex;align-items:center;gap:10px;">🛍️ Mi Tienda <span style="font-size:14px;font-weight:normal;opacity:0.7;">Gestiona tus productos en venta</span></h1>
     </div>
 
     <div class="mensaje-error" id="mensajeError"></div>
     <div class="mensaje-exito" id="mensajeExito"></div>
 
+    <!-- Estadísticas -->
+    <div class="card">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="number" id="totalProductos">0</span>
+                <span class="label">📦 Productos en tienda</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="productosDestacados">0</span>
+                <span class="label">⭐ Destacados</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="productosDisponibles">0</span>
+                <span class="label">✅ Disponibles para vender</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Barra de búsqueda y botón agregar -->
     <div class="card">
         <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="🔍 Buscar en tienda..." oninput="filtrarProductos()">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar en mi tienda..." oninput="filtrarProductos()">
+            <select id="filtroDestacado" onchange="filtrarProductos()">
+                <option value="todos">Todos los productos</option>
+                <option value="destacados">⭐ Destacados</option>
+                <option value="normales">📦 Normales</option>
+            </select>
             <button class="btn btn-primary" onclick="abrirModalAgregar()">+ Agregar producto</button>
         </div>
     </div>
 
     <!-- Productos en tienda -->
     <div class="card">
-        <h2>📦 Productos en tu tienda</h2>
         <div id="productosContainer">
             <div class="loading">Cargando productos...</div>
         </div>
@@ -217,18 +294,29 @@
     <div class="modal-overlay" id="modalAgregar">
         <div class="modal-content">
             <h3>➕ Agregar producto a la tienda</h3>
+            <p style="color:#888;font-size:13px;margin-bottom:16px;">Selecciona un producto de tu inventario para ponerlo a la venta</p>
+            
             <div class="form-row">
                 <select id="selectProducto">
                     <option value="">-- Seleccionar producto --</option>
                 </select>
             </div>
+            
+            <div id="productoInfo" class="producto-info" style="display:none;">
+                <div class="label">📊 Información del producto</div>
+                <div class="value" id="infoProductoNombre">-</div>
+                <div class="value" id="infoProductoPrecio">-</div>
+                <div class="value" id="infoProductoStock">-</div>
+            </div>
+            
             <div class="form-row">
                 <label>
                     <input type="checkbox" id="checkDestacado"> ⭐ Destacar producto
                 </label>
             </div>
+            
             <div class="form-actions">
-                <button class="btn btn-success" onclick="agregarProductoTienda()">💾 Agregar</button>
+                <button class="btn btn-success" onclick="agregarProductoTienda()">💾 Agregar a la tienda</button>
                 <button class="btn btn-danger" onclick="cerrarModal()">✕ Cancelar</button>
             </div>
         </div>
@@ -237,6 +325,7 @@
     <script>
         let productosTienda = [];
         let productosDisponibles = [];
+        let productoSeleccionado = null;
 
         // ============================================
         // FUNCIONES DE MENSAJES
@@ -273,9 +362,10 @@
                 if (!response.ok) throw new Error('Error al cargar tienda');
                 productosTienda = await response.json();
                 renderTienda();
+                actualizarEstadisticas();
             } catch (error) {
                 console.error('Error:', error);
-                container.innerHTML = `<div class="empty">❌ Error al cargar productos</div>`;
+                container.innerHTML = `<div class="empty">❌ Error al cargar productos de la tienda</div>`;
             }
         }
 
@@ -283,17 +373,31 @@
         // RENDER TIENDA
         // ============================================
 
-        function renderTienda(filtro = '') {
+        function renderTienda(filtro = '', destacadoFiltro = 'todos') {
             const container = document.getElementById('productosContainer');
             const filtroLower = filtro.toLowerCase();
             
-            const filtrados = productosTienda.filter(p => 
+            let filtrados = productosTienda.filter(p => 
                 p.nombre.toLowerCase().includes(filtroLower) ||
                 (p.categoria && p.categoria.toLowerCase().includes(filtroLower))
             );
 
+            if (destacadoFiltro === 'destacados') {
+                filtrados = filtrados.filter(p => p.destacado === 1);
+            } else if (destacadoFiltro === 'normales') {
+                filtrados = filtrados.filter(p => p.destacado === 0);
+            }
+
             if (filtrados.length === 0) {
-                container.innerHTML = `<div class="empty">No hay productos en tu tienda</div>`;
+                container.innerHTML = `
+                    <div class="empty">
+                        <div style="font-size:48px;margin-bottom:12px;">🛍️</div>
+                        <div style="font-size:16px;margin-bottom:8px;">No hay productos en tu tienda</div>
+                        <div style="font-size:13px;color:#666;">Agrega productos desde tu inventario</div>
+                        <br>
+                        <button class="btn btn-primary" onclick="abrirModalAgregar()">+ Agregar producto</button>
+                    </div>
+                `;
                 return;
             }
 
@@ -301,22 +405,24 @@
             filtrados.forEach(p => {
                 const stockClass = p.stock < 5 ? 'bajo' : '';
                 const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
-                const fotoUrl = p.foto_url || '/static/img/default_product.png';
+                const fotoUrl = p.foto_url || null;
+                const fotoHtml = fotoUrl 
+                    ? `<img src="${fotoUrl}" alt="${p.nombre}" class="foto" onerror="this.src=''">`
+                    : `<div class="foto-placeholder">📷</div>`;
                 const destacadoHtml = p.destacado ? '<span class="destacado-badge">⭐ Destacado</span>' : '';
                 
                 html += `
                     <div class="producto-card">
                         ${destacadoHtml}
-                        <img src="${fotoUrl}" alt="${p.nombre}" class="foto" 
-                             onerror="this.src='/static/img/default_product.png'">
+                        ${fotoHtml}
                         <div class="nombre">${p.nombre}</div>
                         <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
                         <div class="stock ${stockClass}">${stockText}</div>
                         <div class="acciones">
-                            <button class="btn btn-warning btn-sm" onclick="toggleDestacado(${p.id}, ${p.destacado ? 0 : 1})">
+                            <button class="btn btn-warning btn-sm" onclick="toggleDestacado(${p.id}, ${p.destacado ? 0 : 1})" title="${p.destacado ? 'Quitar destacado' : 'Destacar'}">
                                 ${p.destacado ? '⭐' : '☆'}
                             </button>
-                            <button class="btn btn-danger btn-sm" onclick="eliminarDeTienda(${p.id})">🗑️</button>
+                            <button class="btn btn-danger btn-sm" onclick="eliminarDeTienda(${p.id})" title="Eliminar de la tienda">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -326,12 +432,27 @@
         }
 
         // ============================================
+        // ESTADÍSTICAS
+        // ============================================
+
+        function actualizarEstadisticas() {
+            const total = productosTienda.length;
+            const destacados = productosTienda.filter(p => p.destacado === 1).length;
+            const disponibles = productosTienda.filter(p => p.stock > 0).length;
+            
+            document.getElementById('totalProductos').textContent = total;
+            document.getElementById('productosDestacados').textContent = destacados;
+            document.getElementById('productosDisponibles').textContent = disponibles;
+        }
+
+        // ============================================
         // FILTRAR
         // ============================================
 
         function filtrarProductos() {
             const filtro = document.getElementById('searchInput').value;
-            renderTienda(filtro);
+            const destacado = document.getElementById('filtroDestacado').value;
+            renderTienda(filtro, destacado);
         }
 
         // ============================================
@@ -339,10 +460,12 @@
         // ============================================
 
         async function abrirModalAgregar() {
-            // Cargar productos disponibles (los que no están en la tienda)
             try {
-                const response = await fetch('/api/productos');
+                // Cargar productos disponibles (los que no están en la tienda)
+                const response = await fetch('/api/productos/stock');
+                if (!response.ok) throw new Error('Error al cargar productos');
                 const productos = await response.json();
+                
                 const idsEnTienda = productosTienda.map(p => p.producto_id);
                 productosDisponibles = productos.filter(p => !idsEnTienda.includes(p.id));
                 
@@ -351,16 +474,43 @@
                 
                 if (productosDisponibles.length === 0) {
                     select.innerHTML = '<option value="">-- No hay productos disponibles --</option>';
+                    document.getElementById('productoInfo').style.display = 'none';
+                    mostrarMensaje('Todos tus productos ya están en la tienda', 'error');
                 } else {
                     productosDisponibles.forEach(p => {
                         const opt = document.createElement('option');
                         opt.value = p.id;
                         opt.textContent = `${p.nombre} (Stock: ${p.stock})`;
+                        opt.dataset.precio = p.precio;
+                        opt.dataset.stock = p.stock;
+                        opt.dataset.nombre = p.nombre;
                         select.appendChild(opt);
                     });
                 }
                 
+                document.getElementById('checkDestacado').checked = false;
                 document.getElementById('modalAgregar').classList.add('show');
+                
+                // Evento para mostrar info al seleccionar
+                select.onchange = function() {
+                    const selected = this.options[this.selectedIndex];
+                    if (selected && selected.value) {
+                        document.getElementById('productoInfo').style.display = 'block';
+                        document.getElementById('infoProductoNombre').textContent = selected.dataset.nombre || 'Sin nombre';
+                        document.getElementById('infoProductoPrecio').textContent = `💰 $${parseFloat(selected.dataset.precio || 0).toFixed(2)}`;
+                        document.getElementById('infoProductoStock').textContent = `📦 Stock: ${selected.dataset.stock || 0} unidades`;
+                        productoSeleccionado = {
+                            id: parseInt(selected.value),
+                            nombre: selected.dataset.nombre,
+                            precio: parseFloat(selected.dataset.precio),
+                            stock: parseInt(selected.dataset.stock)
+                        };
+                    } else {
+                        document.getElementById('productoInfo').style.display = 'none';
+                        productoSeleccionado = null;
+                    }
+                };
+                
             } catch (error) {
                 console.error('Error:', error);
                 mostrarMensaje('Error al cargar productos disponibles', 'error');
@@ -369,18 +519,27 @@
 
         function cerrarModal() {
             document.getElementById('modalAgregar').classList.remove('show');
+            productoSeleccionado = null;
         }
+
+        // Cerrar modal al hacer clic fuera
+        document.getElementById('modalAgregar').addEventListener('click', function(e) {
+            if (e.target === this) {
+                cerrarModal();
+            }
+        });
 
         // ============================================
         // AGREGAR PRODUCTO A LA TIENDA
         // ============================================
 
         async function agregarProductoTienda() {
-            const productoId = document.getElementById('selectProducto').value;
+            const select = document.getElementById('selectProducto');
+            const productoId = select.value;
             const destacado = document.getElementById('checkDestacado').checked ? 1 : 0;
 
             if (!productoId) {
-                mostrarMensaje('Selecciona un producto', 'error');
+                mostrarMensaje('❌ Selecciona un producto', 'error');
                 return;
             }
 
@@ -388,20 +547,22 @@
                 const response = await fetch('/api/tienda/producto/agregar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ producto_id: productoId, destacado })
+                    body: JSON.stringify({ producto_id: parseInt(productoId), destacado })
                 });
+                
                 const data = await response.json();
 
                 if (data.success) {
-                    mostrarMensaje('✅ Producto agregado a la tienda', 'exito');
+                    const nombre = select.options[select.selectedIndex]?.text || 'Producto';
+                    mostrarMensaje(`✅ "${nombre}" agregado a la tienda${destacado ? ' como destacado' : ''}`, 'exito');
                     cerrarModal();
-                    cargarTienda();
+                    await cargarTienda();
                 } else {
-                    mostrarMensaje(data.error || 'Error al agregar', 'error');
+                    mostrarMensaje(data.error || '❌ Error al agregar a la tienda', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
+                mostrarMensaje('❌ Error de conexión: ' + error.message, 'error');
             }
         }
 
@@ -416,17 +577,18 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ destacado })
                 });
+                
                 const data = await response.json();
 
                 if (data.success) {
-                    mostrarMensaje(`Producto ${destacado ? 'destacado' : 'no destacado'}`, 'exito');
-                    cargarTienda();
+                    mostrarMensaje(`✅ Producto ${destacado ? 'destacado' : 'no destacado'}`, 'exito');
+                    await cargarTienda();
                 } else {
-                    mostrarMensaje(data.error || 'Error', 'error');
+                    mostrarMensaje(data.error || '❌ Error al cambiar estado', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
+                mostrarMensaje('❌ Error de conexión: ' + error.message, 'error');
             }
         }
 
@@ -435,24 +597,38 @@
         // ============================================
 
         async function eliminarDeTienda(tiendaId) {
-            if (!confirm('¿Eliminar este producto de la tienda?')) return;
+            const producto = productosTienda.find(p => p.id === tiendaId);
+            if (!producto) return;
+            
+            if (!confirm(`⚠️ ¿Eliminar "${producto.nombre}" de la tienda?\n\nLos clientes ya no podrán verlo.`)) {
+                return;
+            }
 
             try {
                 const response = await fetch(`/api/tienda/producto/${tiendaId}`, {
                     method: 'DELETE'
                 });
+                
                 const data = await response.json();
 
                 if (data.success) {
-                    mostrarMensaje('✅ Producto eliminado de la tienda', 'exito');
-                    cargarTienda();
+                    mostrarMensaje(`✅ "${producto.nombre}" eliminado de la tienda`, 'exito');
+                    await cargarTienda();
                 } else {
-                    mostrarMensaje(data.error || 'Error al eliminar', 'error');
+                    mostrarMensaje(data.error || '❌ Error al eliminar de la tienda', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
+                mostrarMensaje('❌ Error de conexión: ' + error.message, 'error');
             }
+        }
+
+        // ============================================
+        // VISTA PREVIA DE LA TIENDA (Cliente)
+        // ============================================
+
+        function verTiendaPublica() {
+            window.open('/tienda/public', '_blank');
         }
 
         // ============================================
