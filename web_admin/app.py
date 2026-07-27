@@ -694,7 +694,12 @@ def api_eliminar_usuario(user_id):
     if not user:
         return jsonify({'error': 'Usuario no encontrado'}), 404
     
-    eliminar_usuario(user_id)
+    # Usar la función mejorada que elimina sesiones y permisos primero
+    exito = eliminar_usuario(user_id)
+    
+    if not exito:
+        return jsonify({'error': 'Error al eliminar el usuario'}), 500
+    
     registrar_log(usuario['id'], 'usuario_eliminado', f'Usuario {user_id} eliminado')
     
     return jsonify({'success': True, 'message': 'Usuario eliminado correctamente'})
@@ -1046,13 +1051,19 @@ def api_eliminar_trabajador(trabajador_id):
         # 2. Obtener nombre para el log
         nombre_trabajador = trabajador[2] or trabajador[1] or 'Desconocido'
         
-        # 3. Eliminar la relación en trabajadores_negocio
+        # 3. ELIMINAR SESIONES DEL TRABAJADOR (PRIMERO - importante)
+        cursor.execute('DELETE FROM sesiones WHERE usuario_id = %s', (trabajador_id,))
+        
+        # 4. Eliminar permisos del trabajador
+        cursor.execute('DELETE FROM permisos_usuario WHERE usuario_id = %s', (trabajador_id,))
+        
+        # 5. Eliminar la relación en trabajadores_negocio
         cursor.execute('''
             DELETE FROM trabajadores_negocio 
             WHERE negocio_id = %s AND trabajador_id = %s
         ''', (usuario['id'], trabajador_id))
         
-        # 4. Eliminar el usuario (esto eliminará también sus sesiones y permisos por cascada)
+        # 6. Eliminar el usuario (ya no tiene sesiones ni permisos)
         cursor.execute('DELETE FROM usuarios WHERE id = %s', (trabajador_id,))
         
         conn.commit()
@@ -1066,6 +1077,11 @@ def api_eliminar_trabajador(trabajador_id):
             'message': f'Trabajador eliminado correctamente'
         })
         
+    except psycopg2.Error as e:
+        print(f"❌ Error SQL eliminando trabajador: {e}")
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': f'Error de base de datos: {str(e)}'}), 500
     except Exception as e:
         print(f"❌ Error eliminando trabajador: {e}")
         import traceback
@@ -2228,7 +2244,7 @@ def api_trabajadores_pendientes():
     trabajadores = obtener_trabajadores_pendientes()
     return jsonify([dict(t) for t in trabajadores])
 
-@app.route('/api/trabajador/<int:user_id>/aprobar', methods=['POST'])
+@app.route('/api/trabajador/<int:user_id>/aprobar', methods(['POST'])
 @admin_required
 def api_aprobar_trabajador(user_id):
     aprobar_trabajador(user_id)
