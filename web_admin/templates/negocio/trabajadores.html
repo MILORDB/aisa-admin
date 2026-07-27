@@ -53,6 +53,8 @@
         .btn-warning { background: #ff9800; color: #fff; }
         .btn-warning:hover { background: #e68900; }
         .btn-sm { padding: 4px 12px; font-size: 11px; }
+        .btn-info { background: #2196f3; color: #fff; }
+        .btn-info:hover { background: #1976d2; }
         .tabla {
             width: 100%;
             border-collapse: collapse;
@@ -78,13 +80,21 @@
         .tabla .badge.inactivo { background: #442222; color: #ff6b6b; }
         .tabla .badge.diaria { background: #1a237e; color: #fff; }
         .tabla .badge.cada2dias { background: #ff9800; color: #000; }
+        .tabla .badge.modulo { 
+            background: rgba(108, 60, 224, 0.2); 
+            color: #6c3ce0; 
+            font-size: 9px;
+            padding: 1px 8px;
+            margin: 1px 2px;
+            display: inline-block;
+        }
         .form-row {
             display: flex;
             gap: 12px;
             flex-wrap: wrap;
             margin-bottom: 12px;
         }
-        .form-row input, .form-row select {
+        .form-row input, .form-row select, .form-row textarea {
             padding: 8px 14px;
             border: 1px solid #2a2a3e;
             border-radius: 8px;
@@ -94,7 +104,7 @@
             flex: 1;
             min-width: 120px;
         }
-        .form-row input:focus, .form-row select:focus {
+        .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
             border-color: #6c3ce0;
             outline: none;
         }
@@ -113,6 +123,44 @@
             font-size: 11px;
             color: #666;
             margin-top: 2px;
+        }
+        .form-row .modulos-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 8px;
+            width: 100%;
+        }
+        .form-row .modulos-grid .modulo-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #0f0f1a;
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid #2a2a3e;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .form-row .modulos-grid .modulo-check:hover {
+            border-color: #6c3ce0;
+        }
+        .form-row .modulos-grid .modulo-check.checked {
+            border-color: #6c3ce0;
+            background: rgba(108, 60, 224, 0.1);
+        }
+        .form-row .modulos-grid .modulo-check input[type="checkbox"] {
+            width: auto;
+            min-width: auto;
+            flex: none;
+            accent-color: #6c3ce0;
+            cursor: pointer;
+        }
+        .form-row .modulos-grid .modulo-check .modulo-icon {
+            font-size: 16px;
+        }
+        .form-row .modulos-grid .modulo-check .modulo-label {
+            font-size: 12px;
+            flex: 1;
         }
         .search-bar {
             display: flex;
@@ -172,7 +220,7 @@
             background: #1a1a2e;
             padding: 30px;
             border-radius: 12px;
-            max-width: 580px;
+            max-width: 650px;
             width: 95%;
             border: 1px solid #2a2a3e;
             max-height: 95vh;
@@ -188,9 +236,26 @@
             display: flex;
             gap: 10px;
             margin-top: 16px;
+            border-top: 1px solid #2a2a3e;
+            padding-top: 16px;
         }
         .modal-content .form-actions .btn {
             flex: 1;
+        }
+        .modal-content .seccion-datos {
+            background: #0f0f1a;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #2a2a3e;
+        }
+        .modal-content .seccion-datos .seccion-titulo {
+            font-size: 13px;
+            color: #6c3ce0;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .info-trabajador {
             background: #0f0f1a;
@@ -206,12 +271,27 @@
             gap: 4px;
             flex-wrap: wrap;
         }
+        .modulos-asignados {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+        }
+        .modulos-asignados .modulo-tag {
+            display: inline-block;
+            background: rgba(108, 60, 224, 0.15);
+            color: #6c3ce0;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 9px;
+            margin: 1px;
+        }
         @media (max-width: 600px) {
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .form-row { flex-direction: column; }
             .modal-content { padding: 16px; }
             .acciones-cell { flex-direction: column; }
             .acciones-cell .btn-sm { width: 100%; text-align: center; }
+            .form-row .modulos-grid { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -258,11 +338,11 @@
 
         <div id="formTrabajador" style="display:none;border-top:1px solid #2a2a3e;padding-top:16px;margin-top:12px;">
             <h3 id="modalTitle">👤 Nuevo Trabajador</h3>
-            <div class="modal-subtitle">Complete los datos personales y laborales del trabajador</div>
+            <div class="modal-subtitle">Complete los datos personales, laborales y seleccione los módulos a los que tendrá acceso</div>
 
             <!-- DATOS PERSONALES -->
-            <div style="background:#0f0f1a;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #2a2a3e;">
-                <div style="font-size:13px;color:#6c3ce0;margin-bottom:8px;">📋 Datos Personales</div>
+            <div class="seccion-datos">
+                <div class="seccion-titulo">📋 Datos Personales</div>
                 
                 <div class="form-row campo-obligatorio">
                     <div style="flex:1;">
@@ -295,8 +375,8 @@
             </div>
 
             <!-- DATOS LABORALES -->
-            <div style="background:#0f0f1a;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #2a2a3e;">
-                <div style="font-size:13px;color:#6c3ce0;margin-bottom:8px;">💼 Datos Laborales</div>
+            <div class="seccion-datos">
+                <div class="seccion-titulo">💼 Datos Laborales</div>
                 
                 <div class="form-row campo-obligatorio">
                     <div style="flex:1;">
@@ -322,9 +402,24 @@
                 </div>
             </div>
 
+            <!-- MÓDULOS A ASIGNAR -->
+            <div class="seccion-datos">
+                <div class="seccion-titulo">🧩 Módulos a Asignar</div>
+                <div class="help-text" style="margin-bottom:8px;">Selecciona los módulos a los que el trabajador tendrá acceso. <strong>Selecciona al menos uno.</strong></div>
+                
+                <div class="form-row">
+                    <div class="modulos-grid" id="modulosGrid">
+                        <!-- Los módulos se cargarán dinámicamente con JavaScript -->
+                    </div>
+                </div>
+                <div class="help-text" id="modulosSeleccionados" style="margin-top:4px;color:#6c3ce0;">
+                    📌 Módulos seleccionados: <span id="modulosCount">0</span>
+                </div>
+            </div>
+
             <!-- DATOS DE ACCESO -->
-            <div style="background:#0f0f1a;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #2a2a3e;">
-                <div style="font-size:13px;color:#6c3ce0;margin-bottom:8px;">🔑 Datos de Acceso al Sistema</div>
+            <div class="seccion-datos">
+                <div class="seccion-titulo">🔑 Datos de Acceso al Sistema</div>
                 <div class="form-row campo-obligatorio">
                     <div style="flex:1;">
                         <label>Usuario para login</label>
@@ -356,6 +451,12 @@
     <script>
         let trabajadores = [];
         let editandoId = null;
+        let modulosDisponibles = [];
+        let modulosSeleccionados = [];
+
+        // ============================================
+        // FUNCIONES DE MENSAJES
+        // ============================================
 
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
@@ -376,6 +477,117 @@
         }
 
         // ============================================
+        // CARGAR MÓDULOS DISPONIBLES
+        // ============================================
+
+        async function cargarModulosDisponibles() {
+            try {
+                const response = await fetch('/api/modulos');
+                if (!response.ok) throw new Error('Error al cargar módulos');
+                const data = await response.json();
+                
+                // Filtrar solo módulos de negocio
+                const nombresNegocio = ['inventario', 'tienda', 'trabajadores', 'servicios', 'ventas', 'contratos'];
+                modulosDisponibles = data.filter(m => 
+                    nombresNegocio.includes(m.nombre.toLowerCase())
+                );
+                
+                console.log('📦 Módulos disponibles:', modulosDisponibles);
+                renderModulosCheckboxes();
+            } catch (error) {
+                console.error('Error al cargar módulos:', error);
+            }
+        }
+
+        // ============================================
+        // RENDER MÓDULOS CHECKBOXES
+        // ============================================
+
+        function renderModulosCheckboxes(modulosSeleccionadosPredefinidos = null) {
+            const container = document.getElementById('modulosGrid');
+            container.innerHTML = '';
+            
+            const iconos = {
+                'inventario': '📦',
+                'tienda': '🛍️',
+                'trabajadores': '👥',
+                'servicios': '📋',
+                'ventas': '💰',
+                'contratos': '📄'
+            };
+            
+            const nombresMostrar = {
+                'inventario': 'Inventario',
+                'tienda': 'Tienda',
+                'trabajadores': 'Trabajadores',
+                'servicios': 'Servicios',
+                'ventas': 'Ventas',
+                'contratos': 'Contratos'
+            };
+
+            modulosDisponibles.forEach(mod => {
+                const div = document.createElement('div');
+                div.className = 'modulo-check';
+                div.dataset.moduloId = mod.id;
+                div.dataset.moduloNombre = mod.nombre;
+                
+                // Verificar si el módulo está seleccionado
+                let checked = false;
+                if (modulosSeleccionadosPredefinidos) {
+                    checked = modulosSeleccionadosPredefinidos.includes(mod.nombre);
+                }
+                
+                const icono = iconos[mod.nombre] || '📦';
+                const nombreMostrar = nombresMostrar[mod.nombre] || mod.nombre;
+                
+                div.innerHTML = `
+                    <input type="checkbox" class="modulo-checkbox" value="${mod.nombre}" data-id="${mod.id}" ${checked ? 'checked' : ''}>
+                    <span class="modulo-icon">${icono}</span>
+                    <span class="modulo-label">${nombreMostrar}</span>
+                `;
+                
+                // Evento para cambiar estilo al seleccionar
+                const checkbox = div.querySelector('.modulo-checkbox');
+                checkbox.addEventListener('change', function() {
+                    if (this.checked) {
+                        div.classList.add('checked');
+                    } else {
+                        div.classList.remove('checked');
+                    }
+                    actualizarContadorModulos();
+                });
+                
+                // Si está seleccionado, marcar visualmente
+                if (checked) {
+                    div.classList.add('checked');
+                }
+                
+                container.appendChild(div);
+            });
+            
+            actualizarContadorModulos();
+        }
+
+        // ============================================
+        // ACTUALIZAR CONTADOR DE MÓDULOS
+        // ============================================
+
+        function actualizarContadorModulos() {
+            const checkboxes = document.querySelectorAll('.modulo-checkbox:checked');
+            const count = checkboxes.length;
+            document.getElementById('modulosCount').textContent = count;
+        }
+
+        // ============================================
+        // OBTENER MÓDULOS SELECCIONADOS
+        // ============================================
+
+        function getModulosSeleccionados() {
+            const checkboxes = document.querySelectorAll('.modulo-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        // ============================================
         // CARGAR TRABAJADORES DESDE EL SERVIDOR
         // ============================================
 
@@ -389,6 +601,7 @@
                     throw new Error('Error al cargar trabajadores');
                 }
                 trabajadores = await response.json();
+                console.log('👥 Trabajadores cargados:', trabajadores);
                 renderTrabajadores();
                 actualizarEstadisticas();
             } catch (error) {
@@ -434,6 +647,7 @@
                                 <th>Dirección</th>
                                 <th>Frecuencia</th>
                                 <th>Salario</th>
+                                <th>Módulos</th>
                                 <th>Estado</th>
                                 <th>Acciones</th>
                             </tr>
@@ -448,6 +662,20 @@
                 const estadoClass = t.activo ? 'activo' : 'inactivo';
                 const estadoLabel = t.activo ? '🟢 Activo' : '🔴 Inactivo';
                 
+                // Mostrar módulos asignados
+                let modulosHtml = '';
+                if (t.modulos && t.modulos.length > 0) {
+                    const modulosList = Array.isArray(t.modulos) ? t.modulos : t.modulos.split(',');
+                    modulosList.forEach(mod => {
+                        const nombreMod = mod.trim();
+                        if (nombreMod) {
+                            modulosHtml += `<span class="modulo-tag">${nombreMod}</span>`;
+                        }
+                    });
+                } else {
+                    modulosHtml = '<span style="color:#666;font-size:11px;">Sin módulos</span>';
+                }
+                
                 html += `
                     <tr>
                         <td><strong>${nombreCompleto}</strong></td>
@@ -456,6 +684,7 @@
                         <td>${t.direccion || '-'}</td>
                         <td><span class="badge ${frecuenciaClass}">${frecuenciaLabel}</span></td>
                         <td>$${t.salario ? parseFloat(t.salario).toFixed(2) : '0.00'}</td>
+                        <td><div class="modulos-asignados">${modulosHtml}</div></td>
                         <td><span class="badge ${estadoClass}">${estadoLabel}</span></td>
                         <td>
                             <div class="acciones-cell">
@@ -505,16 +734,17 @@
         }
 
         // ============================================
-        // FORMULARIO
+        // FORMULARIO - NUEVO TRABAJADOR
         // ============================================
 
-        function mostrarFormulario() {
+        async function mostrarFormulario() {
             document.getElementById('formTrabajador').style.display = 'block';
             document.getElementById('traNombre').focus();
             editandoId = null;
             document.getElementById('modalTitle').textContent = '👤 Nuevo Trabajador';
             document.getElementById('btnGuardar').textContent = '💾 Guardar trabajador';
             document.getElementById('btnGuardar').className = 'btn btn-success';
+            document.getElementById('traId').value = '';
             
             // Resetear campos
             document.getElementById('traNombre').value = '';
@@ -527,28 +757,22 @@
             document.getElementById('traEmail').value = '';
             document.getElementById('traUsuario').value = '';
             document.getElementById('traPassword').value = '';
-            document.getElementById('traId').value = '';
+            
+            // Cargar módulos disponibles si no están cargados
+            if (modulosDisponibles.length === 0) {
+                await cargarModulosDisponibles();
+            } else {
+                renderModulosCheckboxes();
+            }
             
             document.getElementById('formTrabajador').scrollIntoView({ behavior: 'smooth' });
         }
 
-        function cancelarFormulario() {
-            document.getElementById('formTrabajador').style.display = 'none';
-            document.getElementById('traNombre').value = '';
-            document.getElementById('traApellidos').value = '';
-            document.getElementById('traCI').value = '';
-            document.getElementById('traMovil').value = '';
-            document.getElementById('traDireccion').value = '';
-            document.getElementById('traFrecuencia').value = 'diaria';
-            document.getElementById('traSalario').value = '';
-            document.getElementById('traEmail').value = '';
-            document.getElementById('traUsuario').value = '';
-            document.getElementById('traPassword').value = '';
-            document.getElementById('traId').value = '';
-            editandoId = null;
-        }
+        // ============================================
+        // FORMULARIO - EDITAR TRABAJADOR
+        // ============================================
 
-        function editarTrabajador(id) {
+        async function editarTrabajador(id) {
             const t = trabajadores.find(t => t.id === id);
             if (!t) return;
             
@@ -570,7 +794,36 @@
             document.getElementById('btnGuardar').textContent = '💾 Actualizar trabajador';
             document.getElementById('btnGuardar').className = 'btn btn-warning';
             
+            // Cargar módulos disponibles si no están cargados
+            if (modulosDisponibles.length === 0) {
+                await cargarModulosDisponibles();
+            }
+            
+            // Renderizar checkboxes con los módulos del trabajador
+            const modulosDelTrabajador = t.modulos || [];
+            renderModulosCheckboxes(modulosDelTrabajador);
+            
             document.getElementById('formTrabajador').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // ============================================
+        // CANCELAR FORMULARIO
+        // ============================================
+
+        function cancelarFormulario() {
+            document.getElementById('formTrabajador').style.display = 'none';
+            document.getElementById('traNombre').value = '';
+            document.getElementById('traApellidos').value = '';
+            document.getElementById('traCI').value = '';
+            document.getElementById('traMovil').value = '';
+            document.getElementById('traDireccion').value = '';
+            document.getElementById('traFrecuencia').value = 'diaria';
+            document.getElementById('traSalario').value = '';
+            document.getElementById('traEmail').value = '';
+            document.getElementById('traUsuario').value = '';
+            document.getElementById('traPassword').value = '';
+            document.getElementById('traId').value = '';
+            editandoId = null;
         }
 
         // ============================================
@@ -588,6 +841,9 @@
             const email = document.getElementById('traEmail').value.trim();
             const usuario = document.getElementById('traUsuario').value.trim();
             const password = document.getElementById('traPassword').value.trim();
+            
+            // Obtener módulos seleccionados
+            const modulosSeleccionados = getModulosSeleccionados();
 
             // Validaciones
             if (!nombre) {
@@ -632,6 +888,11 @@
                 return;
             }
 
+            if (modulosSeleccionados.length === 0) {
+                mostrarMensaje('❌ Debes seleccionar al menos un módulo para el trabajador', 'error');
+                return;
+            }
+
             // Preparar datos para el backend
             const data = {
                 nombre: nombre,
@@ -644,8 +905,7 @@
                 email: email || '',
                 usuario: usuario,
                 password: password,
-                // Módulos por defecto (todos activos)
-                modulos: ['inventario', 'tienda', 'servicios', 'ventas']
+                modulos: modulosSeleccionados
             };
 
             try {
@@ -701,8 +961,17 @@
         // INICIO
         // ============================================
 
+        // Cargar módulos disponibles al inicio
+        cargarModulosDisponibles();
+        
+        // Cargar trabajadores
         cargarTrabajadores();
-        setInterval(cargarTrabajadores, 30000);
+        
+        // Actualizar cada 30 segundos
+        setInterval(() => {
+            cargarTrabajadores();
+            cargarModulosDisponibles();
+        }, 30000);
     </script>
 </body>
 </html>
