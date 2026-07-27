@@ -5,14 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AIsa - Negocio</title>
     <style>
-        /* ============================================
-           RESET Y VARIABLES
-           ============================================ */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
             --bg-primary: #0f0f1a;
@@ -43,9 +36,6 @@
             overflow: hidden;
         }
 
-        /* ============================================
-           HEADER
-           ============================================ */
         .header {
             background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
             padding: 14px 24px;
@@ -57,37 +47,12 @@
             z-index: 10;
         }
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-left .logo { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .header-left .logo span { font-size: 26px; }
+        .header-left .subtitle { font-size: 13px; opacity: 0.7; font-weight: 400; }
 
-        .header-left .logo {
-            font-size: 22px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .header-left .logo span {
-            font-size: 26px;
-        }
-
-        .header-left .subtitle {
-            font-size: 13px;
-            opacity: 0.7;
-            font-weight: 400;
-        }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            position: relative;
-        }
-
+        .header-right { display: flex; align-items: center; gap: 16px; position: relative; }
         .header-right .user-info {
             display: flex;
             align-items: center;
@@ -97,856 +62,228 @@
             padding: 6px 12px;
             border-radius: 30px;
             transition: background 0.3s;
-            position: relative;
         }
-
-        .header-right .user-info:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
+        .header-right .user-info:hover { background: rgba(255,255,255,0.05); }
         .header-right .user-info .avatar {
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            flex-shrink: 0;
-            transition: transform 0.3s;
+            width: 34px; height: 34px; border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; flex-shrink: 0;
         }
-
-        .header-right .user-info:hover .avatar {
-            transform: scale(1.05);
-        }
-
         .header-right .user-info .role-badge {
-            font-size: 10px;
-            padding: 2px 10px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.15);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            font-size: 10px; padding: 2px 10px; border-radius: 12px;
+            background: rgba(255,255,255,0.15); text-transform: uppercase;
         }
+        .header-right .user-info .arrow { font-size: 12px; opacity: 0.5; }
 
-        .header-right .user-info .arrow {
-            font-size: 12px;
-            opacity: 0.5;
-            transition: transform 0.3s;
-        }
-
-        .header-right .user-info:hover .arrow {
-            opacity: 1;
-        }
-
-        /* ============================================
-           MENÚ DESPLEGABLE DEL USUARIO
-           ============================================ */
         .user-menu {
-            position: absolute;
-            top: calc(100% + 8px);
-            right: 0;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-            min-width: 200px;
-            padding: 8px 0;
-            box-shadow: var(--shadow);
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(-8px);
-            transition: all 0.25s ease;
-            z-index: 100;
+            position: absolute; top: calc(100% + 8px); right: 0;
+            background: var(--bg-secondary); border: 1px solid var(--border-color);
+            border-radius: var(--radius); min-width: 200px; padding: 8px 0;
+            box-shadow: var(--shadow); opacity: 0; visibility: hidden;
+            transform: translateY(-8px); transition: all 0.25s ease; z-index: 100;
         }
-
-        .user-menu.open {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-
+        .user-menu.open { opacity: 1; visibility: visible; transform: translateY(0); }
         .user-menu .menu-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 18px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 13px;
-            transition: background 0.2s, color 0.2s;
-            cursor: pointer;
-            border: none;
-            background: none;
-            width: 100%;
-            text-align: left;
+            display: flex; align-items: center; gap: 10px; padding: 10px 18px;
+            color: var(--text-secondary); text-decoration: none; font-size: 13px;
+            transition: background 0.2s; cursor: pointer; border: none;
+            background: none; width: 100%; text-align: left;
         }
+        .user-menu .menu-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .user-menu .menu-item .menu-icon { font-size: 16px; width: 24px; text-align: center; }
+        .user-menu .menu-divider { height: 1px; background: var(--border-color); margin: 4px 12px; }
+        .user-menu .menu-item.danger { color: var(--danger); }
+        .user-menu .menu-item.danger:hover { background: rgba(244,67,54,0.1); }
 
-        .user-menu .menu-item:hover {
-            background: var(--bg-hover);
-            color: var(--text-primary);
-        }
-
-        .user-menu .menu-item .menu-icon {
-            font-size: 16px;
-            width: 24px;
-            text-align: center;
-        }
-
-        .user-menu .menu-divider {
-            height: 1px;
-            background: var(--border-color);
-            margin: 4px 12px;
-        }
-
-        .user-menu .menu-item.danger {
-            color: var(--danger);
-        }
-
-        .user-menu .menu-item.danger:hover {
-            background: rgba(244, 67, 54, 0.1);
-            color: var(--danger);
-        }
-
-        /* ============================================
-           MODAL PARA CAMBIAR CONTRASEÑA
-           ============================================ */
         .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.7);
+            z-index: 1000; align-items: center; justify-content: center;
         }
-
-        .modal-overlay.show {
-            display: flex;
-        }
-
+        .modal-overlay.show { display: flex; }
         .modal-content {
-            background: var(--bg-secondary);
-            padding: 30px;
-            border-radius: var(--radius);
-            max-width: 420px;
-            width: 90%;
-            border: 1px solid var(--border-color);
+            background: var(--bg-secondary); padding: 30px; border-radius: var(--radius);
+            max-width: 420px; width: 90%; border: 1px solid var(--border-color);
             animation: fadeIn 0.3s ease;
         }
-
-        .modal-content h3 {
-            font-size: 20px;
-            color: var(--accent);
-            margin-bottom: 8px;
-        }
-
-        .modal-content .subtitle {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-bottom: 20px;
-        }
-
-        .modal-content .form-group {
-            margin-bottom: 16px;
-        }
-
-        .modal-content .form-group label {
-            display: block;
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
-        }
-
+        .modal-content h3 { font-size: 20px; color: var(--accent); margin-bottom: 8px; }
+        .modal-content .subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+        .modal-content .form-group { margin-bottom: 16px; }
+        .modal-content .form-group label { display: block; font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; }
         .modal-content .form-group input {
-            width: 100%;
-            padding: 10px 14px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 14px;
-            outline: none;
-            transition: border-color 0.3s;
+            width: 100%; padding: 10px 14px; border: 1px solid var(--border-color);
+            border-radius: 8px; background: var(--bg-primary); color: var(--text-primary);
+            font-size: 14px; outline: none; transition: border-color 0.3s;
         }
-
-        .modal-content .form-group input:focus {
-            border-color: var(--accent);
-        }
-
-        .modal-content .form-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
+        .modal-content .form-group input:focus { border-color: var(--accent); }
+        .modal-content .form-actions { display: flex; gap: 10px; margin-top: 20px; }
         .modal-content .form-actions .btn {
-            flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.3s;
+            flex: 1; padding: 10px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.3s;
         }
-
-        .modal-content .form-actions .btn-primary {
-            background: var(--accent);
-            color: #fff;
-        }
-
-        .modal-content .form-actions .btn-primary:hover {
-            background: var(--accent-hover);
-        }
-
-        .modal-content .form-actions .btn-secondary {
-            background: var(--bg-hover);
-            color: var(--text-secondary);
-        }
-
-        .modal-content .form-actions .btn-secondary:hover {
-            background: var(--border-color);
-        }
-
+        .modal-content .form-actions .btn-primary { background: var(--accent); color: #fff; }
+        .modal-content .form-actions .btn-primary:hover { background: var(--accent-hover); }
+        .modal-content .form-actions .btn-secondary { background: var(--bg-hover); color: var(--text-secondary); }
+        .modal-content .form-actions .btn-secondary:hover { background: var(--border-color); }
         .modal-content .mensaje {
-            padding: 10px 14px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            display: none;
+            padding: 10px 14px; border-radius: 8px; margin-bottom: 16px;
+            font-size: 13px; display: none;
         }
+        .modal-content .mensaje.exito { background: rgba(76,175,80,0.15); color: var(--success); display: block; }
+        .modal-content .mensaje.error { background: rgba(244,67,54,0.15); color: var(--danger); display: block; }
 
-        .modal-content .mensaje.exito {
-            background: rgba(76, 175, 80, 0.15);
-            color: var(--success);
-            display: block;
-        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
-        .modal-content .mensaje.error {
-            background: rgba(244, 67, 54, 0.15);
-            color: var(--danger);
-            display: block;
-        }
+        .main-container { display: flex; flex: 1; overflow: hidden; gap: 0; }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* ============================================
-           MAIN CONTAINER - 3 COLUMNAS
-           ============================================ */
-        .main-container {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-            gap: 0;
-        }
-
-        /* ============================================
-           PANEL IZQUIERDO - MÓDULOS (Compacto)
-           ============================================ */
         .panel-left {
-            width: 170px;
-            min-width: 170px;
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            flex-shrink: 0;
-            padding: 8px 0;
+            width: 170px; min-width: 170px; background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color); display: flex; flex-direction: column;
+            overflow: hidden; flex-shrink: 0; padding: 8px 0;
         }
-
         .panel-left .panel-title {
-            padding: 0 12px 8px 12px;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
-            font-weight: 600;
-            border-bottom: 1px solid var(--border-color);
-            flex-shrink: 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            padding: 0 12px 8px 12px; font-size: 11px; text-transform: uppercase;
+            letter-spacing: 1px; color: var(--text-muted); font-weight: 600;
+            border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+            display: flex; justify-content: space-between; align-items: center;
         }
-
         .panel-left .panel-title .count {
-            background: var(--bg-hover);
-            padding: 0 6px;
-            border-radius: 10px;
-            font-size: 9px;
-            margin-left: 6px;
-            color: var(--text-gray);
+            background: var(--bg-hover); padding: 0 6px; border-radius: 10px;
+            font-size: 9px; color: var(--text-gray);
         }
-
-        .panel-left .modulos-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 4px 0;
-        }
-
-        .panel-left .modulos-container::-webkit-scrollbar {
-            width: 3px;
-        }
-
-        .panel-left .modulos-container::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 2px;
-        }
-
+        .panel-left .modulos-container { flex: 1; overflow-y: auto; padding: 4px 0; }
+        .panel-left .modulos-container::-webkit-scrollbar { width: 3px; }
+        .panel-left .modulos-container::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
         .panel-left .modulo-item {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 10px;
-            margin: 1px 6px;
-            border-radius: 6px;
-            transition: all 0.2s;
-            border-left: 2px solid transparent;
-            cursor: default;
+            display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+            margin: 1px 6px; border-radius: 6px; transition: all 0.2s;
+            border-left: 2px solid transparent; cursor: default;
         }
-
-        .panel-left .modulo-item:hover {
-            background: var(--bg-hover);
-        }
-
-        .panel-left .modulo-item.active {
-            border-left-color: var(--success);
-            background: rgba(76, 175, 80, 0.06);
-            cursor: pointer;
-        }
-
-        .panel-left .modulo-item.active:hover {
-            background: rgba(76, 175, 80, 0.12);
-        }
-
-        .panel-left .modulo-item.inactive {
-            border-left-color: transparent;
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        .panel-left .modulo-item .modulo-icon {
-            font-size: 14px;
-            width: 24px;
-            text-align: center;
-            flex-shrink: 0;
-        }
-
-        .panel-left .modulo-item .modulo-name {
-            font-size: 12px;
-            flex: 1;
-            font-weight: 500;
-        }
-
-        .panel-left .modulo-item .modulo-name.active-text {
-            color: var(--text-primary);
-        }
-
-        .panel-left .modulo-item .modulo-name.inactive-text {
-            color: var(--text-gray);
-        }
-
+        .panel-left .modulo-item:hover { background: var(--bg-hover); }
+        .panel-left .modulo-item.active { border-left-color: var(--success); background: rgba(76,175,80,0.06); cursor: pointer; }
+        .panel-left .modulo-item.active:hover { background: rgba(76,175,80,0.12); }
+        .panel-left .modulo-item.inactive { border-left-color: transparent; opacity: 0.4; cursor: not-allowed; }
+        .panel-left .modulo-item .modulo-icon { font-size: 14px; width: 24px; text-align: center; flex-shrink: 0; }
+        .panel-left .modulo-item .modulo-name { font-size: 12px; flex: 1; font-weight: 500; }
+        .panel-left .modulo-item .modulo-name.active-text { color: var(--text-primary); }
+        .panel-left .modulo-item .modulo-name.inactive-text { color: var(--text-gray); }
         .panel-left .modulo-item .modulo-status {
-            font-size: 8px;
-            padding: 0px 6px;
-            border-radius: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
+            font-size: 8px; padding: 0px 6px; border-radius: 8px;
+            text-transform: uppercase; letter-spacing: 0.3px;
         }
+        .panel-left .modulo-item .modulo-status.active { background: rgba(76,175,80,0.12); color: var(--success); }
+        .panel-left .modulo-item .modulo-status.inactive { background: rgba(244,67,54,0.08); color: var(--text-gray); }
+        .panel-left .empty-message { padding: 16px; text-align: center; color: var(--text-muted); font-size: 12px; }
 
-        .panel-left .modulo-item .modulo-status.active {
-            background: rgba(76, 175, 80, 0.12);
-            color: var(--success);
-        }
-
-        .panel-left .modulo-item .modulo-status.inactive {
-            background: rgba(244, 67, 54, 0.08);
-            color: var(--text-gray);
-        }
-
-        .panel-left .empty-message {
-            padding: 16px;
-            text-align: center;
-            color: var(--text-muted);
-            font-size: 12px;
-        }
-
-        /* ============================================
-           PANEL CENTRAL - ESTILOS MEJORADOS
-           ============================================ */
         .panel-center {
-            flex: 1;
-            background: var(--bg-primary);
-            padding: 0;
-            overflow: hidden;
-            min-width: 300px;
-            position: relative;
+            flex: 1; background: var(--bg-primary); padding: 0;
+            overflow: hidden; min-width: 300px; position: relative;
         }
+        .panel-center .dashboard-content { padding: 16px 20px; overflow-y: auto; height: 100%; }
+        .panel-center .dashboard-content::-webkit-scrollbar { width: 4px; }
+        .panel-center .dashboard-content::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
+        .panel-center .dashboard-content.hidden { display: none; }
 
-        .panel-center .dashboard-content {
-            padding: 16px 20px;
-            overflow-y: auto;
-            height: 100%;
-        }
+        .page-title { font-size: 20px; font-weight: 600; margin-bottom: 2px; }
+        .page-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
 
-        .panel-center .dashboard-content::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        .panel-center .dashboard-content::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 2px;
-        }
-
-        .panel-center .dashboard-content.hidden {
-            display: none;
-        }
-
-        .page-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 2px;
-        }
-
-        .page-subtitle {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-        }
-
-        /* ============================================
-           ESTADÍSTICAS CENTRALES - CUADROS MEJORADOS
-           ============================================ */
         .stats-grid-central {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 12px;
-            margin-bottom: 20px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px; margin-bottom: 20px;
         }
-
         .stat-card-central {
-            background: var(--bg-secondary);
-            border-radius: var(--radius);
-            padding: 14px 12px;
-            border: 1px solid var(--border-color);
-            text-align: center;
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
+            background: var(--bg-secondary); border-radius: var(--radius); padding: 14px 12px;
+            border: 1px solid var(--border-color); text-align: center;
+            transition: all 0.3s; position: relative; overflow: hidden;
         }
+        .stat-card-central:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 15px rgba(108,60,224,0.1); }
+        .stat-card-central .stat-icon-box { font-size: 24px; display: block; margin-bottom: 4px; }
+        .stat-card-central .stat-number { font-size: 26px; font-weight: 700; color: var(--accent); display: block; line-height: 1.2; margin-bottom: 2px; }
+        .stat-card-central .stat-label { font-size: 11px; color: var(--text-muted); display: block; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
 
-        .stat-card-central:hover {
-            border-color: var(--accent);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(108, 60, 224, 0.1);
-        }
+        .section-title { font-size: 15px; font-weight: 600; color: var(--text-secondary); margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+        .section-title .badge-count { font-size: 11px; background: var(--bg-hover); padding: 0 10px; border-radius: 12px; color: var(--text-muted); }
 
-        .stat-card-central .stat-icon-box {
-            font-size: 24px;
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .stat-card-central .stat-number {
-            font-size: 26px;
-            font-weight: 700;
-            color: var(--accent);
-            display: block;
-            line-height: 1.2;
-            margin-bottom: 2px;
-        }
-
-        .stat-card-central .stat-label {
-            font-size: 11px;
-            color: var(--text-muted);
-            display: block;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-weight: 500;
-        }
-
-        /* ============================================
-           TRABAJADORES
-           ============================================ */
-        .section-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .section-title .badge-count {
-            font-size: 11px;
-            background: var(--bg-hover);
-            padding: 0 10px;
-            border-radius: 12px;
-            color: var(--text-muted);
-        }
-
-        .trabajadores-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 10px;
-            margin-bottom: 20px;
-        }
-
+        .trabajadores-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-bottom: 20px; }
         .trabajador-card {
-            background: var(--bg-secondary);
-            border-radius: var(--radius);
-            padding: 12px 14px;
-            border: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            background: var(--bg-secondary); border-radius: var(--radius); padding: 12px 14px;
+            border: 1px solid var(--border-color); display: flex; align-items: center; gap: 10px;
             transition: border-color 0.3s;
         }
+        .trabajador-card:hover { border-color: var(--accent); }
+        .trabajador-card .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+        .trabajador-card .info { flex: 1; }
+        .trabajador-card .info .nombre { font-size: 13px; font-weight: 600; }
+        .trabajador-card .info .cargo { font-size: 11px; color: var(--text-muted); }
+        .trabajador-card .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .trabajador-card .status-dot.online { background: var(--success); box-shadow: 0 0 8px rgba(76,175,80,0.4); }
+        .trabajador-card .status-dot.offline { background: var(--text-muted); }
+        .trabajador-card .status-dot.ocupado { background: var(--warning); box-shadow: 0 0 8px rgba(255,152,0,0.4); }
+        .trabajador-empty { text-align: center; color: var(--text-muted); padding: 16px; font-size: 13px; }
 
-        .trabajador-card:hover {
-            border-color: var(--accent);
-        }
+        .alertas-container { background: var(--bg-secondary); border-radius: var(--radius); padding: 12px 16px; border: 1px solid var(--border-color); margin-top: 6px; }
+        .alertas-container .alerta-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+        .alertas-container .alerta-item:last-child { border-bottom: none; }
+        .alertas-container .alerta-item .alerta-icon { font-size: 18px; }
+        .alertas-container .alerta-item .alerta-info { flex: 1; }
+        .alertas-container .alerta-item .alerta-info .producto { font-size: 13px; font-weight: 500; }
+        .alertas-container .alerta-item .alerta-info .detalle { font-size: 11px; color: var(--text-muted); }
+        .alertas-container .alerta-item .alerta-accion { font-size: 10px; padding: 3px 10px; border: none; border-radius: 10px; cursor: pointer; background: rgba(255,152,0,0.15); color: var(--warning); transition: background 0.3s; }
+        .alertas-container .alerta-item .alerta-accion:hover { background: rgba(255,152,0,0.3); }
+        .alertas-empty { text-align: center; color: var(--text-muted); padding: 12px; font-size: 13px; }
 
-        .trabajador-card .avatar {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: var(--accent);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            flex-shrink: 0;
-        }
-
-        .trabajador-card .info {
-            flex: 1;
-        }
-
-        .trabajador-card .info .nombre {
-            font-size: 13px;
-            font-weight: 600;
-        }
-
-        .trabajador-card .info .cargo {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        .trabajador-card .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-
-        .trabajador-card .status-dot.online {
-            background: var(--success);
-            box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
-        }
-
-        .trabajador-card .status-dot.offline {
-            background: var(--text-muted);
-        }
-
-        .trabajador-card .status-dot.ocupado {
-            background: var(--warning);
-            box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
-        }
-
-        .trabajador-empty {
-            text-align: center;
-            color: var(--text-muted);
-            padding: 16px;
-            font-size: 13px;
-        }
-
-        /* ============================================
-           ALERTAS DE STOCK
-           ============================================ */
-        .alertas-container {
-            background: var(--bg-secondary);
-            border-radius: var(--radius);
-            padding: 12px 16px;
-            border: 1px solid var(--border-color);
-            margin-top: 6px;
-        }
-
-        .alertas-container .alerta-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .alertas-container .alerta-item:last-child {
-            border-bottom: none;
-        }
-
-        .alertas-container .alerta-item .alerta-icon {
-            font-size: 18px;
-        }
-
-        .alertas-container .alerta-item .alerta-info {
-            flex: 1;
-        }
-
-        .alertas-container .alerta-item .alerta-info .producto {
-            font-size: 13px;
-            font-weight: 500;
-        }
-
-        .alertas-container .alerta-item .alerta-info .detalle {
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        .alertas-container .alerta-item .alerta-accion {
-            font-size: 10px;
-            padding: 3px 10px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            background: rgba(255, 152, 0, 0.15);
-            color: var(--warning);
-            transition: background 0.3s;
-        }
-
-        .alertas-container .alerta-item .alerta-accion:hover {
-            background: rgba(255, 152, 0, 0.3);
-        }
-
-        .alertas-empty {
-            text-align: center;
-            color: var(--text-muted);
-            padding: 12px;
-            font-size: 13px;
-        }
-
-        /* ============================================
-           IFRAME Y LOADER
-           ============================================ */
-        .panel-center .module-frame {
-            width: 100%;
-            height: 100%;
-            border: none;
-            background: var(--bg-primary);
-            display: none;
-        }
-
-        .panel-center .module-frame.visible {
-            display: block;
-        }
-
+        .panel-center .module-frame { width: 100%; height: 100%; border: none; background: var(--bg-primary); display: none; }
+        .panel-center .module-frame.visible { display: block; }
         .panel-center .loader {
-            display: none;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
-            color: var(--text-muted);
-            font-size: 16px;
-            flex-direction: column;
-            gap: 12px;
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--bg-primary);
+            display: none; align-items: center; justify-content: center; height: 100%;
+            color: var(--text-muted); font-size: 16px; flex-direction: column; gap: 12px;
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-primary);
         }
+        .panel-center .loader .spinner { width: 36px; height: 36px; border: 3px solid var(--border-color); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        .panel-center .loader .spinner {
-            width: 36px;
-            height: 36px;
-            border: 3px solid var(--border-color);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* ============================================
-           PANEL DERECHO - REPORTES Y ESTADÍSTICAS
-           ============================================ */
         .panel-right {
-            width: 260px;
-            min-width: 260px;
-            background: var(--bg-secondary);
-            border-left: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            flex-shrink: 0;
-            padding: 16px 18px;
+            width: 300px; min-width: 300px; background: var(--bg-secondary);
+            border-left: 1px solid var(--border-color); display: flex; flex-direction: column;
+            overflow: hidden; flex-shrink: 0; padding: 16px 18px;
         }
+        .panel-right .stats-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #666680; margin-bottom: 12px; border-bottom: 1px solid #2a2a3e; padding-bottom: 10px; }
 
-        .panel-right .stats-title {
-            font-size: 13px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: #666680;
-            margin-bottom: 12px;
-            border-bottom: 1px solid #2a2a3e;
-            padding-bottom: 10px;
-        }
+        .panel-right .resumen-contratos { background: #0f0f1a; border-radius: 8px; padding: 12px; margin-bottom: 12px; border: 1px solid #2a2a3e; }
+        .panel-right .resumen-contratos .titulo { font-size: 12px; color: #888; margin-bottom: 8px; }
+        .panel-right .resumen-contratos .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .panel-right .resumen-contratos .item { text-align: center; }
+        .panel-right .resumen-contratos .item .numero { font-size: 18px; font-weight: 700; }
+        .panel-right .resumen-contratos .item .numero.activos { color: #6bff6b; }
+        .panel-right .resumen-contratos .item .numero.vencidos { color: #ff6b6b; }
+        .panel-right .resumen-contratos .item .numero.total { color: #6c3ce0; }
+        .panel-right .resumen-contratos .item .label { font-size: 9px; color: #888; }
+        .panel-right .resumen-contratos .total-gastos { text-align: center; margin-top: 8px; font-size: 11px; color: #666; padding-top: 8px; border-top: 1px solid #2a2a3e; }
+        .panel-right .resumen-contratos .total-gastos strong { color: #6c3ce0; }
 
-        /* Resumen de contratos */
-        .panel-right .resumen-contratos {
-            background: #0f0f1a;
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 12px;
-            border: 1px solid #2a2a3e;
-        }
-
-        .panel-right .resumen-contratos .titulo {
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 8px;
-        }
-
-        .panel-right .resumen-contratos .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-
-        .panel-right .resumen-contratos .item {
-            text-align: center;
-        }
-
-        .panel-right .resumen-contratos .item .numero {
-            font-size: 18px;
-            font-weight: 700;
-        }
-
-        .panel-right .resumen-contratos .item .numero.activos {
-            color: #6bff6b;
-        }
-
-        .panel-right .resumen-contratos .item .numero.vencidos {
-            color: #ff6b6b;
-        }
-
-        .panel-right .resumen-contratos .item .numero.total {
-            color: #6c3ce0;
-        }
-
-        .panel-right .resumen-contratos .item .label {
-            font-size: 9px;
-            color: #888;
-        }
-
-        .panel-right .resumen-contratos .total-gastos {
-            text-align: center;
-            margin-top: 8px;
-            font-size: 11px;
-            color: #666;
-            padding-top: 8px;
-            border-top: 1px solid #2a2a3e;
-        }
-
-        .panel-right .resumen-contratos .total-gastos strong {
-            color: #6c3ce0;
-        }
-
-        /* Botones de reportes */
         .panel-right .btn-reporte {
-            padding: 10px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.3s;
-            width: 100%;
-            text-align: center;
-            margin-bottom: 6px;
+            padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 12px;
+            transition: all 0.3s; width: 100%; text-align: center; margin-bottom: 6px;
         }
+        .panel-right .btn-reporte:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .panel-right .btn-reporte:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+        .panel-right .btn-reporte.general { background: linear-gradient(135deg, #6c3ce0, #4a1a9e); color: #fff; }
+        .panel-right .btn-reporte.activos { background: #224422; color: #6bff6b; border: 1px solid #6bff6b; }
+        .panel-right .btn-reporte.vencidos { background: #442222; color: #ff6b6b; border: 1px solid #ff6b6b; }
 
-        .panel-right .btn-reporte:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
+        .panel-right .ultimos-reportes { margin-top: 12px; border-top: 1px solid #2a2a3e; padding-top: 12px; }
+        .panel-right .ultimos-reportes .titulo { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+        .panel-right .ultimos-reportes .reporte-item { padding: 4px 0; border-bottom: 1px solid #1a1a2e; display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #666; }
+        .panel-right .ultimos-reportes .reporte-item .fecha { font-size: 9px; color: #444; }
+        .panel-right .ultimos-reportes .empty { font-size: 11px; color: #666; padding: 4px 0; }
 
-        .panel-right .btn-reporte:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none !important;
-        }
-
-        .panel-right .btn-reporte.general {
-            background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
-            color: #fff;
-        }
-
-        .panel-right .btn-reporte.activos {
-            background: #224422;
-            color: #6bff6b;
-            border: 1px solid #6bff6b;
-        }
-
-        .panel-right .btn-reporte.vencidos {
-            background: #442222;
-            color: #ff6b6b;
-            border: 1px solid #ff6b6b;
-        }
-
-        /* Últimos reportes */
-        .panel-right .ultimos-reportes {
-            margin-top: 12px;
-            border-top: 1px solid #2a2a3e;
-            padding-top: 12px;
-        }
-
-        .panel-right .ultimos-reportes .titulo {
-            font-size: 10px;
-            color: #888;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 6px;
-        }
-
-        .panel-right .ultimos-reportes .reporte-item {
-            padding: 4px 0;
-            border-bottom: 1px solid #1a1a2e;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 11px;
-            color: #666;
-        }
-
-        .panel-right .ultimos-reportes .reporte-item .fecha {
-            font-size: 9px;
-            color: #444;
-        }
-
-        .panel-right .ultimos-reportes .empty {
-            font-size: 11px;
-            color: #666;
-            padding: 4px 0;
-        }
-
-        /* Responsive */
         @media (max-width: 1024px) {
             .panel-left { width: 150px; min-width: 150px; padding: 6px 0; }
             .panel-left .modulo-item { padding: 5px 8px; margin: 1px 4px; }
             .panel-left .modulo-item .modulo-icon { font-size: 13px; width: 20px; }
             .panel-left .modulo-item .modulo-name { font-size: 11px; }
-            .panel-right { width: 220px; min-width: 220px; padding: 12px 14px; }
+            .panel-right { width: 280px; min-width: 280px; padding: 12px 14px; }
             .stats-grid-central { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
             .stat-card-central .stat-number { font-size: 22px; }
             .trabajadores-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
@@ -955,19 +292,12 @@
         @media (max-width: 768px) {
             .panel-left { display: none; }
             .panel-right {
-                width: 100%;
-                min-width: unset;
-                border-left: none;
-                border-top: 1px solid var(--border-color);
-                max-height: 220px;
-                flex-direction: row;
-                flex-wrap: wrap;
-                padding: 10px 14px;
-                overflow-y: auto;
+                width: 100%; min-width: unset; border-left: none; border-top: 1px solid var(--border-color);
+                max-height: 280px; flex-direction: row; flex-wrap: wrap; padding: 10px 14px; overflow-y: auto;
             }
             .panel-right .stats-title { width: 100%; font-size: 11px; margin-bottom: 6px; }
-            .panel-right .resumen-contratos { flex: 1; min-width: 160px; margin-right: 10px; }
-            .panel-right .btn-reporte { flex: 1; min-width: 120px; font-size: 11px; padding: 8px; }
+            .panel-right .resumen-contratos { flex: 1; min-width: 140px; margin-right: 8px; }
+            .panel-right .btn-reporte { flex: 1; min-width: 100px; font-size: 10px; padding: 6px; }
             .panel-right .ultimos-reportes { display: none; }
             .main-container { flex-direction: column; }
             .panel-center { min-height: 350px; }
@@ -992,10 +322,10 @@
 
         @media (max-width: 480px) {
             .header { padding: 10px 16px; flex-wrap: wrap; gap: 8px; }
-            .panel-right { max-height: 180px; padding: 8px 10px; }
-            .panel-right .resumen-contratos { min-width: 120px; padding: 8px; }
+            .panel-right { max-height: 260px; padding: 8px 10px; }
+            .panel-right .resumen-contratos { min-width: 110px; padding: 8px; }
             .panel-right .resumen-contratos .item .numero { font-size: 14px; }
-            .panel-right .btn-reporte { font-size: 10px; padding: 6px; min-width: 80px; }
+            .panel-right .btn-reporte { font-size: 9px; padding: 4px; min-width: 70px; }
             .stats-grid-central { grid-template-columns: 1fr 1fr; gap: 6px; }
             .stat-card-central { padding: 8px 6px; }
             .stat-card-central .stat-number { font-size: 18px; }
@@ -1010,9 +340,6 @@
 </head>
 <body>
 
-    <!-- ============================================
-    HEADER - CON MENÚ DESPLEGABLE
-    ============================================ -->
     <header class="header">
         <div class="header-left">
             <div class="logo">
@@ -1028,32 +355,23 @@
                 <span class="role-badge">{{ usuario.rol }}</span>
                 <span class="arrow">▼</span>
             </div>
-
-            <!-- Menú desplegable -->
             <div class="user-menu" id="userMenu">
                 <button class="menu-item" onclick="abrirModalPassword()">
-                    <span class="menu-icon">🔑</span>
-                    Cambiar contraseña
+                    <span class="menu-icon">🔑</span> Cambiar contraseña
                 </button>
                 <div class="menu-divider"></div>
                 <a href="/logout" class="menu-item danger">
-                    <span class="menu-icon">🚪</span>
-                    Cerrar sesión
+                    <span class="menu-icon">🚪</span> Cerrar sesión
                 </a>
             </div>
         </div>
     </header>
 
-    <!-- ============================================
-    MODAL PARA CAMBIAR CONTRASEÑA
-    ============================================ -->
     <div class="modal-overlay" id="modalPassword">
         <div class="modal-content">
             <h3>🔑 Cambiar Contraseña</h3>
             <div class="subtitle">Actualiza tu contraseña de acceso</div>
-
             <div class="mensaje" id="mensajePassword"></div>
-
             <div class="form-group">
                 <label>Contraseña actual</label>
                 <input type="password" id="currentPassword" placeholder="Ingresa tu contraseña actual">
@@ -1066,7 +384,6 @@
                 <label>Confirmar nueva contraseña</label>
                 <input type="password" id="confirmPassword" placeholder="Confirma tu nueva contraseña">
             </div>
-
             <div class="form-actions">
                 <button class="btn btn-primary" onclick="cambiarPassword()">Actualizar</button>
                 <button class="btn btn-secondary" onclick="cerrarModalPassword()">Cancelar</button>
@@ -1074,14 +391,8 @@
         </div>
     </div>
 
-    <!-- ============================================
-    MAIN CONTAINER - 3 COLUMNAS
-    ============================================ -->
     <div class="main-container">
 
-        <!-- ============================================
-        PANEL IZQUIERDO - MÓDULOS (Compacto)
-        ============================================ -->
         <div class="panel-left">
             <div class="panel-title">
                 🧩 Módulos
@@ -1092,17 +403,11 @@
             </div>
         </div>
 
-        <!-- ============================================
-        PANEL CENTRAL - CONTENEDOR DE MÓDULOS
-        ============================================ -->
         <div class="panel-center" id="panelCenter">
-
-            <!-- Dashboard (vista por defecto) -->
             <div class="dashboard-content" id="dashboardContent">
                 <div class="page-title">📊 Resumen del Negocio</div>
                 <div class="page-subtitle" id="fechaActual">Cargando fecha...</div>
 
-                <!-- Estadísticas generales -->
                 <div class="stats-grid-central" id="statsGrid">
                     <div class="stat-card-central">
                         <div class="stat-icon-box">💰</div>
@@ -1131,7 +436,6 @@
                     </div>
                 </div>
 
-                <!-- Trabajadores activos -->
                 <div class="section-title">
                     👷 Trabajadores en turno
                     <span class="badge-count" id="trabajadoresCount">0</span>
@@ -1140,7 +444,6 @@
                     <div class="trabajador-empty">Cargando trabajadores...</div>
                 </div>
 
-                <!-- Alertas de stock -->
                 <div class="section-title">
                     ⚠️ Alertas de stock bajo
                     <span class="badge-count" id="alertasCount">0</span>
@@ -1150,25 +453,18 @@
                 </div>
             </div>
 
-            <!-- Contenedor del iframe para módulos -->
             <iframe id="moduleFrame" class="module-frame"></iframe>
-
-            <!-- Loader -->
             <div class="loader" id="moduleLoader">
                 <div class="spinner"></div>
                 <span>Cargando módulo...</span>
             </div>
-
         </div>
 
-        <!-- ============================================
-        PANEL DERECHO - REPORTES Y ESTADÍSTICAS
-        ============================================ -->
         <div class="panel-right">
 
             <div class="stats-title">📄 Reportes</div>
 
-            <!-- Resumen de contratos -->
+            <!-- CONTRATOS -->
             <div class="resumen-contratos">
                 <div class="titulo">📊 Resumen de Contratos</div>
                 <div class="grid">
@@ -1185,23 +481,66 @@
                         <div class="label">📄 Total contratos</div>
                     </div>
                 </div>
-                <div class="total-gastos">
-                    💰 Gastos totales: <strong id="gastosTotales">$0.00</strong>
-                </div>
+                <div class="total-gastos">💰 Gastos totales: <strong id="gastosTotales">$0.00</strong></div>
             </div>
 
-            <!-- Botones de reportes -->
-            <button onclick="generarReporte('todos')" class="btn-reporte general" id="btnReporteTodos">
-                📄 Reporte General
-            </button>
-            <button onclick="generarReporte('activos')" class="btn-reporte activos" id="btnReporteActivos">
-                🟢 Reporte Activos
-            </button>
-            <button onclick="generarReporte('vencidos')" class="btn-reporte vencidos" id="btnReporteVencidos">
-                🔴 Reporte Vencidos
-            </button>
+            <button onclick="generarReporte('contratos', 'todos')" class="btn-reporte general" id="btnReporteContratosTodos">📄 Reporte General Contratos</button>
+            <button onclick="generarReporte('contratos', 'activos')" class="btn-reporte activos" id="btnReporteContratosActivos">🟢 Contratos Activos</button>
+            <button onclick="generarReporte('contratos', 'vencidos')" class="btn-reporte vencidos" id="btnReporteContratosVencidos">🔴 Contratos Vencidos</button>
 
-            <!-- Últimos reportes generados -->
+            <div style="border-top:1px solid #2a2a3e;margin:10px 0;"></div>
+
+            <!-- INGRESOS -->
+            <div class="resumen-contratos">
+                <div class="titulo">💰 Resumen de Ingresos</div>
+                <div class="grid">
+                    <div class="item">
+                        <div class="numero" style="color:#6bff6b;" id="ingresosHoy">$0</div>
+                        <div class="label">📅 Hoy</div>
+                    </div>
+                    <div class="item">
+                        <div class="numero" style="color:#ffbb33;" id="ingresosSemana">$0</div>
+                        <div class="label">📅 Esta semana</div>
+                    </div>
+                    <div class="item" style="grid-column: span 2;">
+                        <div class="numero total" id="ingresosMes">$0</div>
+                        <div class="label">📅 Este mes</div>
+                    </div>
+                </div>
+                <div class="total-gastos">💰 Total ingresos: <strong id="totalIngresos">$0.00</strong></div>
+            </div>
+
+            <button onclick="generarReporte('ingresos', 'hoy')" class="btn-reporte general" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:#fff;">📅 Ingresos de Hoy</button>
+            <button onclick="generarReporte('ingresos', 'semana')" class="btn-reporte general" style="background:linear-gradient(135deg,#ff9800,#e68900);color:#fff;">📅 Ingresos de la Semana</button>
+            <button onclick="generarReporte('ingresos', 'mes')" class="btn-reporte general" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;">📅 Ingresos del Mes</button>
+            <button onclick="generarReporte('ingresos', 'todos')" class="btn-reporte general" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:#fff;">📊 Todos los Ingresos</button>
+
+            <div style="border-top:1px solid #2a2a3e;margin:10px 0;"></div>
+
+            <!-- PRODUCTOS -->
+            <div class="resumen-contratos">
+                <div class="titulo">📦 Resumen de Inventario</div>
+                <div class="grid">
+                    <div class="item">
+                        <div class="numero" style="color:#ff6b6b;" id="productosAgotados">0</div>
+                        <div class="label">🚫 Agotados</div>
+                    </div>
+                    <div class="item">
+                        <div class="numero" style="color:#ffbb33;" id="productosBajoStock">0</div>
+                        <div class="label">⚠️ Stock bajo</div>
+                    </div>
+                    <div class="item" style="grid-column: span 2;">
+                        <div class="numero total" id="productosTotal">0</div>
+                        <div class="label">📦 Total productos</div>
+                    </div>
+                </div>
+                <div class="total-gastos">💰 Valor inventario: <strong id="valorInventario">$0.00</strong></div>
+            </div>
+
+            <button onclick="generarReporte('productos')" class="btn-reporte general" style="background:linear-gradient(135deg,#607d8b,#37474f);color:#fff;">📦 Reporte de Inventario</button>
+
+            <div style="border-top:1px solid #2a2a3e;margin:10px 0;"></div>
+
             <div class="ultimos-reportes">
                 <div class="titulo">📋 Últimos reportes</div>
                 <div id="ultimosReportes">
@@ -1213,18 +552,11 @@
 
     </div>
 
-    <!-- ============================================
-    SCRIPTS
-    ============================================ -->
     <script>
         let usuarioId = {{ usuario.id }};
         let modulos = [];
         let intervaloActualizacion = null;
         let moduloCargado = false;
-
-        // ============================================
-        // OBTENER NOMBRE DEL MES
-        // ============================================
 
         function obtenerNombreMes() {
             const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
@@ -1242,34 +574,20 @@
             return { inicio, fin };
         }
 
-        // ============================================
-        // OBTENER FECHA ACTUAL
-        // ============================================
-
         function obtenerFechaHoy() {
             const hoy = new Date();
             const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             return hoy.toLocaleDateString('es-ES', opciones);
         }
 
-        // ============================================
-        // MENÚ DESPLEGABLE
-        // ============================================
-
         document.getElementById('userMenuToggle').addEventListener('click', function(e) {
             e.stopPropagation();
-            const menu = document.getElementById('userMenu');
-            menu.classList.toggle('open');
+            document.getElementById('userMenu').classList.toggle('open');
         });
 
         document.addEventListener('click', function() {
-            const menu = document.getElementById('userMenu');
-            menu.classList.remove('open');
+            document.getElementById('userMenu').classList.remove('open');
         });
-
-        // ============================================
-        // MODAL DE CONTRASEÑA
-        // ============================================
 
         function abrirModalPassword() {
             document.getElementById('modalPassword').classList.add('show');
@@ -1286,9 +604,7 @@
         }
 
         document.getElementById('modalPassword').addEventListener('click', function(e) {
-            if (e.target === this) {
-                cerrarModalPassword();
-            }
+            if (e.target === this) { cerrarModalPassword(); }
         });
 
         document.getElementById('currentPassword').addEventListener('keydown', function(e) {
@@ -1302,10 +618,6 @@
         document.getElementById('confirmPassword').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') cambiarPassword();
         });
-
-        // ============================================
-        // CAMBIAR CONTRASEÑA
-        // ============================================
 
         async function cambiarPassword() {
             const current = document.getElementById('currentPassword').value;
@@ -1352,9 +664,7 @@
                     document.getElementById('currentPassword').value = '';
                     document.getElementById('newPassword').value = '';
                     document.getElementById('confirmPassword').value = '';
-                    setTimeout(() => {
-                        cerrarModalPassword();
-                    }, 1500);
+                    setTimeout(() => { cerrarModalPassword(); }, 1500);
                 } else {
                     mensajeEl.className = 'mensaje error';
                     mensajeEl.textContent = `❌ ${data.error || 'Error al cambiar contraseña'}`;
@@ -1365,10 +675,6 @@
                 console.error(error);
             }
         }
-
-        // ============================================
-        // CARGAR DATOS PRINCIPALES
-        // ============================================
 
         async function cargarDatos() {
             try {
@@ -1387,6 +693,8 @@
                     await cargarAlertasStock();
                     await cargarEstadisticasNegocio();
                     await cargarResumenContratos();
+                    await cargarResumenIngresos();
+                    await cargarResumenProductos();
                 }
 
                 document.getElementById('fechaActual').textContent = `📅 ${obtenerFechaHoy()}`;
@@ -1398,10 +706,6 @@
                 console.error('Error al cargar datos:', error);
             }
         }
-
-        // ============================================
-        // RENDER MÓDULOS (Panel Izquierdo)
-        // ============================================
 
         function renderModulos(permisos) {
             const container = document.getElementById('modulosContainer');
@@ -1422,12 +726,8 @@
             let activos = 0;
 
             const iconos = {
-                'inventario': '📦', 
-                'tienda': '🛍️',
-                'trabajadores': '👥', 
-                'servicios': '📋', 
-                'ventas': '💰',
-                'contratos': '📄'
+                'inventario': '📦', 'tienda': '🛍️', 'trabajadores': '👥', 
+                'servicios': '📋', 'ventas': '💰', 'contratos': '📄'
             };
 
             modulosNegocio.forEach(mod => {
@@ -1470,10 +770,6 @@
             });
         }
 
-        // ============================================
-        // CARGAR MÓDULO EN EL PANEL CENTRAL (IFRAME)
-        // ============================================
-
         function cargarModulo(nombre) {
             const dashboardContent = document.getElementById('dashboardContent');
             const moduleFrame = document.getElementById('moduleFrame');
@@ -1500,10 +796,6 @@
             });
         }
 
-        // ============================================
-        // VOLVER AL DASHBOARD
-        // ============================================
-
         function volverDashboard() {
             const dashboardContent = document.getElementById('dashboardContent');
             const moduleFrame = document.getElementById('moduleFrame');
@@ -1521,15 +813,13 @@
             cargarAlertasStock();
             cargarEstadisticasNegocio();
             cargarResumenContratos();
+            cargarResumenIngresos();
+            cargarResumenProductos();
 
             document.querySelectorAll('.modulo-item').forEach(item => {
                 item.classList.remove('active');
             });
         }
-
-        // ============================================
-        // CARGAR ESTADÍSTICAS MENSUALES
-        // ============================================
 
         async function cargarEstadisticasMensuales() {
             try {
@@ -1537,14 +827,6 @@
                 if (!response.ok) throw new Error('Error al cargar ventas');
                 const ventas = await response.json();
 
-                const { inicio, fin } = obtenerInicioFinMes();
-                const ventasMes = ventas.filter(v => v.fecha >= inicio && v.fecha <= fin);
-
-                const totalVentasMes = ventasMes.length;
-                const clientesMes = new Set(ventasMes.map(v => v.cliente));
-                const ingresosMes = ventasMes.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
-
-                // Estadísticas totales
                 const totalVentas = ventas.length;
                 const totalIngresos = ventas.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
                 document.getElementById('statTotalVentas').textContent = totalVentas;
@@ -1554,10 +836,6 @@
                 console.error('Error al cargar estadísticas mensuales:', error);
             }
         }
-
-        // ============================================
-        // CARGAR TRABAJADORES
-        // ============================================
 
         async function cargarTrabajadores() {
             const grid = document.getElementById('trabajadoresGrid');
@@ -1601,10 +879,6 @@
             }
         }
 
-        // ============================================
-        // CARGAR ALERTAS DE STOCK
-        // ============================================
-
         async function cargarAlertasStock() {
             const container = document.getElementById('alertasContainer');
 
@@ -1617,11 +891,7 @@
                 document.getElementById('alertasCount').textContent = alertas.length;
 
                 if (alertas.length === 0) {
-                    container.innerHTML = `
-                        <div class="alertas-empty">
-                            ✅ No hay alertas de stock bajo. ¡Todo en orden!
-                        </div>
-                    `;
+                    container.innerHTML = `<div class="alertas-empty">✅ No hay alertas de stock bajo. ¡Todo en orden!</div>`;
                     return;
                 }
 
@@ -1650,10 +920,6 @@
             }
         }
 
-        // ============================================
-        // CARGAR ESTADÍSTICAS DE PRODUCTOS Y SERVICIOS
-        // ============================================
-
         async function cargarEstadisticasNegocio() {
             try {
                 const prodRes = await fetch('/api/productos');
@@ -1673,14 +939,10 @@
             }
         }
 
-        // ============================================
-        // CARGAR RESUMEN DE CONTRATOS
-        // ============================================
-
         async function cargarResumenContratos() {
             try {
                 const response = await fetch('/api/reportes/contratos/resumen');
-                if (!response.ok) throw new Error('Error al cargar resumen');
+                if (!response.ok) throw new Error('Error al cargar resumen de contratos');
                 const data = await response.json();
 
                 document.getElementById('contratosActivos').textContent = data.activos || 0;
@@ -1688,16 +950,12 @@
                 document.getElementById('contratosTotal').textContent = data.total || 0;
                 document.getElementById('gastosTotales').textContent = `$${(data.total_gastos || 0).toFixed(2)}`;
 
-                // Actualizar botones si no hay contratos
-                const botones = ['btnReporteTodos', 'btnReporteActivos', 'btnReporteVencidos'];
+                const botones = ['btnReporteContratosTodos', 'btnReporteContratosActivos', 'btnReporteContratosVencidos'];
                 botones.forEach(id => {
                     const btn = document.getElementById(id);
-                    if (!data.tiene_contratos) {
-                        btn.disabled = true;
-                        btn.title = 'No hay contratos para generar reportes';
-                    } else {
-                        btn.disabled = false;
-                        btn.title = '';
+                    if (btn) {
+                        btn.disabled = !data.tiene_contratos;
+                        if (!data.tiene_contratos) btn.title = 'No hay contratos para generar reportes';
                     }
                 });
 
@@ -1706,40 +964,99 @@
             }
         }
 
-        // ============================================
-        // GENERAR REPORTE PDF
-        // ============================================
+        async function cargarResumenIngresos() {
+            try {
+                const response = await fetch('/api/reportes/ingresos/resumen');
+                if (!response.ok) throw new Error('Error al cargar resumen de ingresos');
+                const data = await response.json();
 
-        function generarReporte(tipo) {
-            const boton = event.target;
+                document.getElementById('ingresosHoy').textContent = `$${(data.ingresos_hoy || 0).toFixed(2)}`;
+                document.getElementById('ingresosSemana').textContent = `$${(data.ingresos_semana || 0).toFixed(2)}`;
+                document.getElementById('ingresosMes').textContent = `$${(data.ingresos_mes || 0).toFixed(2)}`;
+                document.getElementById('totalIngresos').textContent = `$${(data.total_ingresos || 0).toFixed(2)}`;
+
+                const botonesIngresos = document.querySelectorAll('[onclick*="generarReporte(\'ingresos\'"]');
+                botonesIngresos.forEach(btn => {
+                    btn.disabled = !(data.tiene_ventas || false);
+                    if (!data.tiene_ventas) btn.title = 'No hay ventas para generar reportes';
+                });
+
+            } catch (error) {
+                console.error('Error al cargar resumen de ingresos:', error);
+            }
+        }
+
+        async function cargarResumenProductos() {
+            try {
+                const response = await fetch('/api/reportes/productos/resumen');
+                if (!response.ok) throw new Error('Error al cargar resumen de productos');
+                const data = await response.json();
+
+                document.getElementById('productosTotal').textContent = data.total || 0;
+                document.getElementById('productosBajoStock').textContent = data.stock_bajo || 0;
+                document.getElementById('productosAgotados').textContent = data.stock_agotado || 0;
+                document.getElementById('valorInventario').textContent = `$${(data.valor_total || 0).toFixed(2)}`;
+
+                const btnProductos = document.querySelector('[onclick*="generarReporte(\'productos\'"]');
+                if (btnProductos) {
+                    btnProductos.disabled = !(data.tiene_productos || false);
+                    if (!data.tiene_productos) btnProductos.title = 'No hay productos para generar reportes';
+                }
+
+            } catch (error) {
+                console.error('Error al cargar resumen de productos:', error);
+            }
+        }
+
+        function generarReporte(tipo, filtro = null) {
+            const boton = event?.target || document.querySelector(`[onclick*="generarReporte('${tipo}'"]`);
+            if (!boton) return;
+            
             const textoOriginal = boton.textContent;
             
-            // Verificar que hay contratos
-            const total = parseInt(document.getElementById('contratosTotal').textContent) || 0;
-            if (total === 0) {
-                alert('⚠️ No hay contratos registrados para generar reportes.\n\nPrimero debes crear contratos en el módulo de Contratos.');
+            let tieneDatos = true;
+            let mensajeVacio = '';
+            
+            if (tipo === 'contratos') {
+                const total = parseInt(document.getElementById('contratosTotal').textContent) || 0;
+                tieneDatos = total > 0;
+                mensajeVacio = 'No hay contratos registrados para generar reportes.';
+            } else if (tipo === 'ingresos') {
+                const total = parseFloat(document.getElementById('totalIngresos').textContent.replace('$', '')) || 0;
+                tieneDatos = total > 0;
+                mensajeVacio = 'No hay ventas registradas para generar reportes de ingresos.';
+            } else if (tipo === 'productos') {
+                const total = parseInt(document.getElementById('productosTotal').textContent) || 0;
+                tieneDatos = total > 0;
+                mensajeVacio = 'No hay productos registrados en el almacén.';
+            }
+
+            if (!tieneDatos) {
+                alert(`⚠️ ${mensajeVacio}\n\nPrimero debes registrar datos en el sistema.`);
                 return;
             }
 
-            // Mapeo de tipos
-            const tipos = {
-                'todos': 'General',
-                'activos': 'Activos',
-                'vencidos': 'Vencidos'
+            const nombres = { 'contratos': 'Contratos', 'ingresos': 'Ingresos', 'productos': 'Inventario' };
+            const filtros = {
+                'todos': 'General', 'activos': 'Activos', 'vencidos': 'Vencidos',
+                'hoy': 'Hoy', 'semana': 'Semana', 'mes': 'Mes'
             };
-            const nombreTipo = tipos[tipo] || 'General';
 
-            // Confirmar descarga
-            if (!confirm(`📄 ¿Generar reporte de contratos ${nombreTipo.toLowerCase()}?\n\nEl PDF se descargará automáticamente.`)) {
+            const nombreTipo = nombres[tipo] || tipo;
+            const nombreFiltro = filtros[filtro] || filtro || 'General';
+            const nombreCompleto = filtro ? `${nombreTipo} - ${nombreFiltro}` : nombreTipo;
+
+            if (!confirm(`📄 ¿Generar reporte de ${nombreCompleto.toLowerCase()}?\n\nEl PDF se descargará automáticamente.`)) {
                 return;
             }
 
-            // Mostrar loading
             boton.textContent = '⏳ Generando...';
             boton.disabled = true;
 
-            // Generar y descargar
-            fetch(`/api/reportes/contratos?tipo=${tipo}`)
+            let url = `/api/reportes/${tipo}`;
+            if (filtro) { url += `?tipo=${filtro}`; }
+
+            fetch(url)
                 .then(response => {
                     if (!response.ok) {
                         return response.json().then(data => {
@@ -1748,7 +1065,7 @@
                     }
 
                     const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = `reporte_contratos_${tipo}.pdf`;
+                    let filename = `reporte_${tipo}_${filtro || 'general'}.pdf`;
                     if (contentDisposition) {
                         const match = contentDisposition.match(/filename=(.+)/);
                         if (match) filename = match[1];
@@ -1763,9 +1080,7 @@
                         a.click();
                         document.body.removeChild(a);
                         window.URL.revokeObjectURL(url);
-
-                        // Registrar en historial
-                        agregarReporteHistorial(nombreTipo);
+                        agregarReporteHistorial(nombreCompleto);
                     });
                 })
                 .catch(error => {
@@ -1778,38 +1093,22 @@
                 });
         }
 
-        // ============================================
-        // AGREGAR REPORTE AL HISTORIAL
-        // ============================================
-
         function agregarReporteHistorial(tipo) {
             const container = document.getElementById('ultimosReportes');
             const fecha = new Date().toLocaleString();
 
-            // Eliminar mensaje vacío si existe
             const empty = container.querySelector('.empty');
-            if (empty) {
-                container.innerHTML = '';
-            }
+            if (empty) { container.innerHTML = ''; }
 
-            // Agregar nuevo reporte al principio
             const div = document.createElement('div');
             div.className = 'reporte-item';
-            div.innerHTML = `
-                <span>📄 ${tipo}</span>
-                <span class="fecha">${fecha}</span>
-            `;
+            div.innerHTML = `<span>📄 ${tipo}</span><span class="fecha">${fecha}</span>`;
             container.insertBefore(div, container.firstChild);
 
-            // Limitar a 5 reportes
             while (container.children.length > 5) {
                 container.removeChild(container.lastChild);
             }
         }
-
-        // ============================================
-        // INICIO
-        // ============================================
 
         cargarDatos();
     </script>
