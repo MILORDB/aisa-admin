@@ -2,18 +2,16 @@ services:
   - type: web
     name: aisa-admin
     env: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      pip install -r requirements.txt
+      python init_storage.py
     startCommand: gunicorn web_admin.app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
       - key: FLASK_ENV
         value: production
-      - key: SECRET_KEY
-        generateValue: true
       - key: DATABASE_URL
         fromDatabase:
           name: aisa-db
           property: connectionString
-      - key: TERABOX_COOKIE
-        value: Y2duleyteHuirBC6zt0pERO_yHb9GY1FCd6_J73n
