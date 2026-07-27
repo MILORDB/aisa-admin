@@ -53,8 +53,6 @@
         .btn-warning { background: #ff9800; color: #fff; }
         .btn-warning:hover { background: #e68900; }
         .btn-sm { padding: 4px 12px; font-size: 11px; }
-        .btn-info { background: #2196f3; color: #fff; }
-        .btn-info:hover { background: #1976d2; }
         .btn-eliminar { background: #d32f2f; color: #fff; }
         .btn-eliminar:hover { background: #b71c1c; }
         .tabla {
@@ -259,15 +257,6 @@
             align-items: center;
             gap: 8px;
         }
-        .info-trabajador {
-            background: #0f0f1a;
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 12px;
-            border: 1px solid #2a2a3e;
-        }
-        .info-trabajador .label { color: #888; font-size: 11px; }
-        .info-trabajador .value { color: #fff; font-weight: 600; }
         .acciones-cell {
             display: flex;
             gap: 4px;
@@ -287,7 +276,7 @@
             font-size: 9px;
             margin: 1px;
         }
-        /* Estilos para el modal de confirmación de eliminación */
+        /* Modal de confirmación de eliminación */
         .modal-confirm {
             max-width: 450px;
         }
@@ -342,6 +331,8 @@
         }
         .btn-peligro { background: #d32f2f; color: #fff; }
         .btn-peligro:hover { background: #b71c1c; }
+        .btn-secondary { background: #2a2a3e; color: #fff; }
+        .btn-secondary:hover { background: #3a3a4e; }
         @media (max-width: 600px) {
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .form-row { flex-direction: column; }
@@ -546,7 +537,7 @@
 
             <div class="form-actions">
                 <button class="btn btn-peligro" onclick="confirmarEliminar()" id="btnConfirmarEliminar">🗑️ Eliminar definitivamente</button>
-                <button class="btn btn-secondary" onclick="cerrarModalEliminar()" style="background:#2a2a3e;color:#fff;">✕ Cancelar</button>
+                <button class="btn btn-secondary" onclick="cerrarModalEliminar()">✕ Cancelar</button>
             </div>
         </div>
     </div>
@@ -555,7 +546,6 @@
         let trabajadores = [];
         let editandoId = null;
         let modulosDisponibles = [];
-        let modulosSeleccionados = [];
         let trabajadorAEliminar = null;
 
         // ============================================
@@ -1102,7 +1092,8 @@
             btn.textContent = '⏳ Eliminando...';
             
             try {
-                const response = await fetch(`/api/usuario/${trabajadorAEliminar.id}`, {
+                // Usar el nuevo endpoint específico para eliminar trabajadores
+                const response = await fetch(`/api/negocio/trabajador/${trabajadorAEliminar.id}`, {
                     method: 'DELETE'
                 });
                 
