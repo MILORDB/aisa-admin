@@ -55,6 +55,8 @@
         .btn-sm { padding: 4px 12px; font-size: 11px; }
         .btn-info { background: #2196f3; color: #fff; }
         .btn-info:hover { background: #1976d2; }
+        .btn-eliminar { background: #d32f2f; color: #fff; }
+        .btn-eliminar:hover { background: #b71c1c; }
         .tabla {
             width: 100%;
             border-collapse: collapse;
@@ -285,6 +287,61 @@
             font-size: 9px;
             margin: 1px;
         }
+        /* Estilos para el modal de confirmación de eliminación */
+        .modal-confirm {
+            max-width: 450px;
+        }
+        .modal-confirm .icono-eliminar {
+            font-size: 48px;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .modal-confirm .mensaje-eliminar {
+            text-align: center;
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+        .modal-confirm .nombre-eliminar {
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: #ff6b6b;
+            margin-bottom: 16px;
+        }
+        .modal-confirm .detalles-eliminar {
+            background: #0f0f1a;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            border: 1px solid #2a2a3e;
+            font-size: 12px;
+        }
+        .modal-confirm .detalles-eliminar .fila {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .modal-confirm .detalles-eliminar .fila:last-child {
+            border-bottom: none;
+        }
+        .modal-confirm .detalles-eliminar .label {
+            color: #888;
+        }
+        .modal-confirm .detalles-eliminar .value {
+            color: #fff;
+            font-weight: 600;
+        }
+        .modal-confirm .form-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .modal-confirm .form-actions .btn {
+            flex: 1;
+        }
+        .btn-peligro { background: #d32f2f; color: #fff; }
+        .btn-peligro:hover { background: #b71c1c; }
         @media (max-width: 600px) {
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .form-row { flex-direction: column; }
@@ -448,11 +505,58 @@
         </div>
     </div>
 
+    <!-- Modal de Confirmación para Eliminar -->
+    <div class="modal-overlay" id="modalEliminar">
+        <div class="modal-content modal-confirm">
+            <div class="icono-eliminar">🗑️</div>
+            <h3 style="text-align:center;color:#ff6b6b;">Eliminar Trabajador</h3>
+            <div class="mensaje-eliminar">¿Estás seguro de que deseas eliminar este trabajador?</div>
+            <div class="nombre-eliminar" id="nombreEliminar">-</div>
+            
+            <div class="detalles-eliminar" id="detallesEliminar">
+                <div class="fila">
+                    <span class="label">👤 Nombre completo</span>
+                    <span class="value" id="detalleNombre">-</span>
+                </div>
+                <div class="fila">
+                    <span class="label">🪪 Carnet de Identidad</span>
+                    <span class="value" id="detalleCI">-</span>
+                </div>
+                <div class="fila">
+                    <span class="label">📱 Móvil</span>
+                    <span class="value" id="detalleMovil">-</span>
+                </div>
+                <div class="fila">
+                    <span class="label">💰 Salario</span>
+                    <span class="value" id="detalleSalario">-</span>
+                </div>
+                <div class="fila">
+                    <span class="label">📌 Estado</span>
+                    <span class="value" id="detalleEstado">-</span>
+                </div>
+                <div class="fila">
+                    <span class="label">🧩 Módulos</span>
+                    <span class="value" id="detalleModulos">-</span>
+                </div>
+            </div>
+
+            <div style="color:#888;font-size:12px;text-align:center;margin-bottom:16px;">
+                ⚠️ Esta acción eliminará todos los datos del trabajador y no se puede deshacer.
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-peligro" onclick="confirmarEliminar()" id="btnConfirmarEliminar">🗑️ Eliminar definitivamente</button>
+                <button class="btn btn-secondary" onclick="cerrarModalEliminar()" style="background:#2a2a3e;color:#fff;">✕ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let trabajadores = [];
         let editandoId = null;
         let modulosDisponibles = [];
         let modulosSeleccionados = [];
+        let trabajadorAEliminar = null;
 
         // ============================================
         // FUNCIONES DE MENSAJES
@@ -486,7 +590,6 @@
                 if (!response.ok) throw new Error('Error al cargar módulos');
                 const data = await response.json();
                 
-                // Filtrar solo módulos de negocio
                 const nombresNegocio = ['inventario', 'tienda', 'trabajadores', 'servicios', 'ventas', 'contratos'];
                 modulosDisponibles = data.filter(m => 
                     nombresNegocio.includes(m.nombre.toLowerCase())
@@ -531,7 +634,6 @@
                 div.dataset.moduloId = mod.id;
                 div.dataset.moduloNombre = mod.nombre;
                 
-                // Verificar si el módulo está seleccionado
                 let checked = false;
                 if (modulosSeleccionadosPredefinidos) {
                     checked = modulosSeleccionadosPredefinidos.includes(mod.nombre);
@@ -546,7 +648,6 @@
                     <span class="modulo-label">${nombreMostrar}</span>
                 `;
                 
-                // Evento para cambiar estilo al seleccionar
                 const checkbox = div.querySelector('.modulo-checkbox');
                 checkbox.addEventListener('change', function() {
                     if (this.checked) {
@@ -557,7 +658,6 @@
                     actualizarContadorModulos();
                 });
                 
-                // Si está seleccionado, marcar visualmente
                 if (checked) {
                     div.classList.add('checked');
                 }
@@ -662,7 +762,6 @@
                 const estadoClass = t.activo ? 'activo' : 'inactivo';
                 const estadoLabel = t.activo ? '🟢 Activo' : '🔴 Inactivo';
                 
-                // Mostrar módulos asignados
                 let modulosHtml = '';
                 if (t.modulos && t.modulos.length > 0) {
                     const modulosList = Array.isArray(t.modulos) ? t.modulos : t.modulos.split(',');
@@ -688,10 +787,11 @@
                         <td><span class="badge ${estadoClass}">${estadoLabel}</span></td>
                         <td>
                             <div class="acciones-cell">
-                                <button class="btn btn-warning btn-sm" onclick="editarTrabajador(${t.id})">✏️</button>
-                                <button class="btn ${t.activo ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleTrabajador(${t.id}, ${t.activo ? 0 : 1})">
+                                <button class="btn btn-warning btn-sm" onclick="editarTrabajador(${t.id})" title="Editar">✏️</button>
+                                <button class="btn ${t.activo ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleTrabajador(${t.id}, ${t.activo ? 0 : 1})" title="${t.activo ? 'Desactivar' : 'Activar'}">
                                     ${t.activo ? '🔴' : '🟢'}
                                 </button>
+                                <button class="btn btn-eliminar btn-sm" onclick="abrirModalEliminar(${t.id})" title="Eliminar trabajador">🗑️</button>
                             </div>
                         </td>
                     </tr>
@@ -746,7 +846,6 @@
             document.getElementById('btnGuardar').className = 'btn btn-success';
             document.getElementById('traId').value = '';
             
-            // Resetear campos
             document.getElementById('traNombre').value = '';
             document.getElementById('traApellidos').value = '';
             document.getElementById('traCI').value = '';
@@ -758,7 +857,6 @@
             document.getElementById('traUsuario').value = '';
             document.getElementById('traPassword').value = '';
             
-            // Cargar módulos disponibles si no están cargados
             if (modulosDisponibles.length === 0) {
                 await cargarModulosDisponibles();
             } else {
@@ -794,12 +892,10 @@
             document.getElementById('btnGuardar').textContent = '💾 Actualizar trabajador';
             document.getElementById('btnGuardar').className = 'btn btn-warning';
             
-            // Cargar módulos disponibles si no están cargados
             if (modulosDisponibles.length === 0) {
                 await cargarModulosDisponibles();
             }
             
-            // Renderizar checkboxes con los módulos del trabajador
             const modulosDelTrabajador = t.modulos || [];
             renderModulosCheckboxes(modulosDelTrabajador);
             
@@ -842,10 +938,8 @@
             const usuario = document.getElementById('traUsuario').value.trim();
             const password = document.getElementById('traPassword').value.trim();
             
-            // Obtener módulos seleccionados
             const modulosSeleccionados = getModulosSeleccionados();
 
-            // Validaciones
             if (!nombre) {
                 mostrarMensaje('❌ El nombre es obligatorio', 'error');
                 document.getElementById('traNombre').focus();
@@ -893,7 +987,6 @@
                 return;
             }
 
-            // Preparar datos para el backend
             const data = {
                 nombre: nombre,
                 apellidos: apellidos,
@@ -958,16 +1051,89 @@
         }
 
         // ============================================
+        // MODAL - ELIMINAR TRABAJADOR
+        // ============================================
+
+        function abrirModalEliminar(id) {
+            const t = trabajadores.find(t => t.id === id);
+            if (!t) return;
+            
+            trabajadorAEliminar = t;
+            
+            const nombreCompleto = t.apellidos ? `${t.nombre} ${t.apellidos}` : t.nombre;
+            document.getElementById('nombreEliminar').textContent = nombreCompleto;
+            document.getElementById('detalleNombre').textContent = nombreCompleto;
+            document.getElementById('detalleCI').textContent = t.ci || 'No registrado';
+            document.getElementById('detalleMovil').textContent = t.movil || 'No registrado';
+            document.getElementById('detalleSalario').textContent = `$${t.salario ? parseFloat(t.salario).toFixed(2) : '0.00'}`;
+            document.getElementById('detalleEstado').textContent = t.activo ? '🟢 Activo' : '🔴 Inactivo';
+            
+            let modulosText = 'Sin módulos';
+            if (t.modulos && t.modulos.length > 0) {
+                const modulosList = Array.isArray(t.modulos) ? t.modulos : t.modulos.split(',');
+                modulosText = modulosList.map(m => m.trim()).join(', ');
+            }
+            document.getElementById('detalleModulos').textContent = modulosText;
+            
+            document.getElementById('modalEliminar').classList.add('show');
+        }
+
+        function cerrarModalEliminar() {
+            document.getElementById('modalEliminar').classList.remove('show');
+            trabajadorAEliminar = null;
+        }
+
+        // Cerrar modal al hacer clic fuera
+        document.getElementById('modalEliminar').addEventListener('click', function(e) {
+            if (e.target === this) {
+                cerrarModalEliminar();
+            }
+        });
+
+        // ============================================
+        // CONFIRMAR ELIMINAR TRABAJADOR
+        // ============================================
+
+        async function confirmarEliminar() {
+            if (!trabajadorAEliminar) return;
+            
+            const btn = document.getElementById('btnConfirmarEliminar');
+            btn.disabled = true;
+            btn.textContent = '⏳ Eliminando...';
+            
+            try {
+                const response = await fetch(`/api/usuario/${trabajadorAEliminar.id}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const nombre = trabajadorAEliminar.apellidos ? 
+                        `${trabajadorAEliminar.nombre} ${trabajadorAEliminar.apellidos}` : 
+                        trabajadorAEliminar.nombre;
+                    mostrarMensaje(`✅ Trabajador "${nombre}" eliminado correctamente`, 'exito');
+                    cerrarModalEliminar();
+                    await cargarTrabajadores();
+                } else {
+                    mostrarMensaje(data.error || '❌ Error al eliminar el trabajador', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('❌ Error de conexión con el servidor', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🗑️ Eliminar definitivamente';
+            }
+        }
+
+        // ============================================
         // INICIO
         // ============================================
 
-        // Cargar módulos disponibles al inicio
         cargarModulosDisponibles();
-        
-        // Cargar trabajadores
         cargarTrabajadores();
         
-        // Actualizar cada 30 segundos
         setInterval(() => {
             cargarTrabajadores();
             cargarModulosDisponibles();
