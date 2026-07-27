@@ -38,8 +38,6 @@
         .btn-warning { background: #ff9800; color: #fff; }
         .btn-warning:hover { background: #e68900; }
         .btn-sm { padding: 4px 12px; font-size: 11px; }
-        .btn-info { background: #2196f3; color: #fff; }
-        .btn-info:hover { background: #1976d2; }
         
         .productos-grid {
             display: grid;
@@ -327,10 +325,6 @@
         let productosDisponibles = [];
         let productoSeleccionado = null;
 
-        // ============================================
-        // FUNCIONES DE MENSAJES
-        // ============================================
-
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
             const exitoEl = document.getElementById('mensajeExito');
@@ -360,7 +354,6 @@
             try {
                 const response = await fetch('/api/tienda/productos');
                 
-                // Verificar si la respuesta es OK
                 if (!response.ok) {
                     const errorText = await response.text();
                     console.error('Error response:', errorText);
@@ -368,9 +361,8 @@
                 }
                 
                 const data = await response.json();
-                console.log('Productos en tienda:', data);
+                console.log('📦 Productos en tienda:', data);
                 
-                // Asegurar que data es un array
                 productosTienda = Array.isArray(data) ? data : [];
                 renderTienda();
                 actualizarEstadisticas();
@@ -396,7 +388,6 @@
             const container = document.getElementById('productosContainer');
             const filtroLower = filtro.toLowerCase();
             
-            // Filtrar productos
             let filtrados = productosTienda.filter(p => {
                 const matchNombre = p.nombre ? p.nombre.toLowerCase().includes(filtroLower) : false;
                 const matchCategoria = p.categoria ? p.categoria.toLowerCase().includes(filtroLower) : false;
@@ -482,21 +473,18 @@
 
         async function abrirModalAgregar() {
             try {
-                // Cargar productos disponibles (los que no están en la tienda)
                 const response = await fetch('/api/productos');
                 if (!response.ok) throw new Error('Error al cargar productos');
                 const productos = await response.json();
                 
-                console.log('Todos los productos:', productos);
-                console.log('Productos en tienda:', productosTienda);
+                console.log('📦 Todos los productos:', productos);
+                console.log('📦 Productos en tienda:', productosTienda);
                 
-                // Obtener IDs de productos que ya están en la tienda
                 const idsEnTienda = productosTienda.map(p => p.producto_id || p.id);
-                console.log('IDs en tienda:', idsEnTienda);
+                console.log('📦 IDs en tienda:', idsEnTienda);
                 
-                // Filtrar productos que NO están en la tienda
                 productosDisponibles = productos.filter(p => !idsEnTienda.includes(p.id));
-                console.log('Productos disponibles:', productosDisponibles);
+                console.log('📦 Productos disponibles:', productosDisponibles);
                 
                 const select = document.getElementById('selectProducto');
                 select.innerHTML = '<option value="">-- Seleccionar producto --</option>';
@@ -520,7 +508,6 @@
                 document.getElementById('checkDestacado').checked = false;
                 document.getElementById('modalAgregar').classList.add('show');
                 
-                // Evento para mostrar info al seleccionar
                 select.onchange = function() {
                     const selected = this.options[this.selectedIndex];
                     if (selected && selected.value) {
@@ -551,7 +538,6 @@
             productoSeleccionado = null;
         }
 
-        // Cerrar modal al hacer clic fuera
         document.getElementById('modalAgregar').addEventListener('click', function(e) {
             if (e.target === this) {
                 cerrarModal();
@@ -632,7 +618,7 @@
             const producto = productosTienda.find(p => p.id === tiendaId);
             if (!producto) return;
             
-            if (!confirm(`⚠️ ¿Eliminar "${producto.nombre}" de la tienda?\n\nLos clientes ya no podrán verlo.`)) {
+            if (!confirm(`⚠️ ¿Eliminar "${producto.nombre}" de la tienda?`)) {
                 return;
             }
 
