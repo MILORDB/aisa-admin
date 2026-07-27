@@ -80,3 +80,4 @@ def fix_foreign_keys():
 
 if __name__ == "__main__":
     fix_foreign_keys()
+
