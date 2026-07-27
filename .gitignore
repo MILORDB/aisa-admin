@@ -26,40 +26,13 @@ data/*.db
 Thumbs.db
 *.log
 
+# 📸 ARCHIVOS SUBIDOS (IMÁGENES Y FACTURAS)
+static/uploads/
+static/uploads/**
+!static/uploads/.gitkeep
+
 # Archivos de IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# Archivos de despliegue
-*.pyc
-*.pyd
-*.pyo
-*.pid
-*.seed
-*.pid.lock
-
-# Archivos de cobertura
-.coverage
-.coverage.*
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Archivos de logs
-logs/
-*.log
-
-# Archivos de uploads (si usas almacenamiento local)
-static/uploads/
