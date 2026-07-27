@@ -830,7 +830,8 @@ def api_obtener_trabajadores():
                 'frecuencia': datos.get('frecuencia', 'diaria'),
                 'salario': datos.get('salario', 0),
                 'activo': row[4],
-                'fecha_registro': row[6]
+                'fecha_registro': row[6],
+                'modulos': datos.get('modulos', [])
             })
         
         return jsonify(resultado)
@@ -840,6 +841,7 @@ def api_obtener_trabajadores():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/negocio/trabajador/crear', methods=['POST'])
 @login_required
@@ -888,7 +890,8 @@ def api_crear_trabajador():
         'direccion': direccion,
         'frecuencia': frecuencia,
         'salario': salario,
-        'empresa_id': usuario['id']
+        'empresa_id': usuario['id'],
+        'modulos': modulos
     }
     
     user_id = crear_usuario(
@@ -923,6 +926,7 @@ def api_crear_trabajador():
         'user_id': user_id
     })
 
+
 @app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['PUT'])
 @login_required
 def api_actualizar_trabajador(trabajador_id):
@@ -942,6 +946,7 @@ def api_actualizar_trabajador(trabajador_id):
     frecuencia = data.get('frecuencia', 'diaria')
     salario = data.get('salario', 0)
     email = data.get('email', '')
+    modulos = data.get('modulos', [])
     
     if not nombre:
         return jsonify({'error': 'El nombre es obligatorio'}), 400
@@ -968,16 +973,37 @@ def api_actualizar_trabajador(trabajador_id):
         'movil': movil,
         'direccion': direccion,
         'frecuencia': frecuencia,
-        'salario': salario
+        'salario': salario,
+        'modulos': modulos
     })
     
+    # Actualizar módulos (eliminar permisos anteriores y asignar nuevos)
     conn = get_db()
     cursor = conn.cursor()
+    
+    # Eliminar permisos antiguos
+    cursor.execute('''
+        DELETE FROM permisos_usuario 
+        WHERE usuario_id = %s
+    ''', (trabajador_id,))
+    
+    # Asignar nuevos permisos
+    for modulo_nombre in modulos:
+        cursor.execute("SELECT id FROM modulos WHERE nombre = %s", (modulo_nombre,))
+        mod = cursor.fetchone()
+        if mod:
+            cursor.execute('''
+            INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+            VALUES (%s, %s, 1, 'aprobado')
+            ''', (trabajador_id, mod[0]))
+    
+    # Actualizar datos del usuario
     cursor.execute('''
         UPDATE usuarios 
         SET nombre = %s, email = %s, datos_negocio = %s
         WHERE id = %s
     ''', (f"{nombre} {apellidos}", email, json.dumps(datos_actuales), trabajador_id))
+    
     conn.commit()
     conn.close()
     
@@ -987,6 +1013,65 @@ def api_actualizar_trabajador(trabajador_id):
         'success': True,
         'message': 'Trabajador actualizado correctamente'
     })
+
+
+@app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_trabajador(trabajador_id):
+    """Elimina un trabajador de un negocio"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # 1. Verificar que el trabajador existe y pertenece al negocio
+        cursor.execute('''
+            SELECT u.id, u.username, u.nombre, u.datos_negocio
+            FROM trabajadores_negocio tn
+            JOIN usuarios u ON tn.trabajador_id = u.id
+            WHERE tn.negocio_id = %s AND tn.trabajador_id = %s AND tn.activo = 1
+        ''', (usuario['id'], trabajador_id))
+        
+        trabajador = cursor.fetchone()
+        
+        if not trabajador:
+            conn.close()
+            return jsonify({'error': 'Trabajador no encontrado o no pertenece a tu negocio'}), 404
+        
+        # 2. Obtener nombre para el log
+        nombre_trabajador = trabajador[2] or trabajador[1] or 'Desconocido'
+        
+        # 3. Eliminar la relación en trabajadores_negocio
+        cursor.execute('''
+            DELETE FROM trabajadores_negocio 
+            WHERE negocio_id = %s AND trabajador_id = %s
+        ''', (usuario['id'], trabajador_id))
+        
+        # 4. Eliminar el usuario (esto eliminará también sus sesiones y permisos por cascada)
+        cursor.execute('DELETE FROM usuarios WHERE id = %s', (trabajador_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        registrar_log(usuario['id'], 'trabajador_eliminado', 
+                     f'Eliminó trabajador: {nombre_trabajador} (ID: {trabajador_id})')
+        
+        return jsonify({
+            'success': True,
+            'message': f'Trabajador eliminado correctamente'
+        })
+        
+    except Exception as e:
+        print(f"❌ Error eliminando trabajador: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/negocio/trabajador/<int:trabajador_id>/toggle', methods=['POST'])
 @login_required
