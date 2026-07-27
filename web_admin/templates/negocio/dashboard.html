@@ -778,159 +778,175 @@
         }
 
         /* ============================================
-           PANEL DERECHO - ESTADÍSTICAS MENSUALES (Compacto)
+           PANEL DERECHO - REPORTES Y ESTADÍSTICAS
            ============================================ */
         .panel-right {
-            width: 200px;
-            min-width: 200px;
+            width: 260px;
+            min-width: 260px;
             background: var(--bg-secondary);
             border-left: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
             overflow: hidden;
             flex-shrink: 0;
-            padding: 12px 12px;
+            padding: 16px 18px;
         }
 
         .panel-right .stats-title {
-            font-size: 11px;
+            font-size: 13px;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: var(--text-muted);
-            font-weight: 600;
-            margin-bottom: 2px;
-            text-align: center;
+            color: #666680;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #2a2a3e;
+            padding-bottom: 10px;
         }
 
-        .panel-right .stats-periodo {
-            font-size: 12px;
-            color: var(--accent);
-            font-weight: 600;
-            margin-bottom: 10px;
-            text-align: center;
-            padding: 3px 10px;
-            border-radius: 6px;
-            background: rgba(108, 60, 224, 0.08);
-            border: 1px solid rgba(108, 60, 224, 0.15);
-        }
-
-        .panel-right .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px;
-        }
-
-        .panel-right .stat-item-small {
-            background: var(--bg-primary);
+        /* Resumen de contratos */
+        .panel-right .resumen-contratos {
+            background: #0f0f1a;
             border-radius: 8px;
-            padding: 8px 6px;
-            border: 1px solid var(--border-color);
-            text-align: center;
-            transition: border-color 0.3s;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #2a2a3e;
         }
 
-        .panel-right .stat-item-small:hover {
-            border-color: var(--accent);
-        }
-
-        .panel-right .stat-item-small .icon {
-            font-size: 14px;
-            display: block;
-            margin-bottom: 0px;
-        }
-
-        .panel-right .stat-item-small .number {
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--accent);
-            display: block;
-            line-height: 1.2;
-        }
-
-        .panel-right .stat-item-small .label {
-            font-size: 9px;
-            color: var(--text-muted);
-            display: block;
-            margin-top: 0px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .panel-right .reports-section {
-            flex: 1;
-            padding-top: 10px;
-            overflow-y: auto;
-        }
-
-        .panel-right .reports-title {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
-            font-weight: 600;
+        .panel-right .resumen-contratos .titulo {
+            font-size: 12px;
+            color: #888;
             margin-bottom: 8px;
         }
 
-        .panel-right .report-item {
-            background: var(--bg-primary);
-            border-radius: 6px;
-            padding: 6px 10px;
-            margin-bottom: 4px;
-            border: 1px solid var(--border-color);
+        .panel-right .resumen-contratos .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .panel-right .resumen-contratos .item {
+            text-align: center;
+        }
+
+        .panel-right .resumen-contratos .item .numero {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .panel-right .resumen-contratos .item .numero.activos {
+            color: #6bff6b;
+        }
+
+        .panel-right .resumen-contratos .item .numero.vencidos {
+            color: #ff6b6b;
+        }
+
+        .panel-right .resumen-contratos .item .numero.total {
+            color: #6c3ce0;
+        }
+
+        .panel-right .resumen-contratos .item .label {
+            font-size: 9px;
+            color: #888;
+        }
+
+        .panel-right .resumen-contratos .total-gastos {
+            text-align: center;
+            margin-top: 8px;
+            font-size: 11px;
+            color: #666;
+            padding-top: 8px;
+            border-top: 1px solid #2a2a3e;
+        }
+
+        .panel-right .resumen-contratos .total-gastos strong {
+            color: #6c3ce0;
+        }
+
+        /* Botones de reportes */
+        .panel-right .btn-reporte {
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+            width: 100%;
+            text-align: center;
+            margin-bottom: 6px;
+        }
+
+        .panel-right .btn-reporte:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel-right .btn-reporte:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .panel-right .btn-reporte.general {
+            background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
+            color: #fff;
+        }
+
+        .panel-right .btn-reporte.activos {
+            background: #224422;
+            color: #6bff6b;
+            border: 1px solid #6bff6b;
+        }
+
+        .panel-right .btn-reporte.vencidos {
+            background: #442222;
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+        }
+
+        /* Últimos reportes */
+        .panel-right .ultimos-reportes {
+            margin-top: 12px;
+            border-top: 1px solid #2a2a3e;
+            padding-top: 12px;
+        }
+
+        .panel-right .ultimos-reportes .titulo {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .panel-right .ultimos-reportes .reporte-item {
+            padding: 4px 0;
+            border-bottom: 1px solid #1a1a2e;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            transition: border-color 0.3s;
-            cursor: pointer;
-        }
-
-        .panel-right .report-item:hover {
-            border-color: var(--accent);
-        }
-
-        .panel-right .report-item .report-name {
             font-size: 11px;
-            font-weight: 500;
+            color: #666;
         }
 
-        .panel-right .report-item .report-date {
+        .panel-right .ultimos-reportes .reporte-item .fecha {
             font-size: 9px;
-            color: var(--text-muted);
+            color: #444;
         }
 
-        .panel-right .report-item .report-download {
-            font-size: 10px;
-            padding: 1px 8px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            background: rgba(108, 60, 224, 0.15);
-            color: var(--accent);
-            transition: background 0.3s;
-        }
-
-        .panel-right .report-item .report-download:hover {
-            background: rgba(108, 60, 224, 0.3);
-        }
-
-        .panel-right .reports-empty {
-            text-align: center;
-            color: var(--text-muted);
+        .panel-right .ultimos-reportes .empty {
             font-size: 11px;
-            padding: 16px 0;
+            color: #666;
+            padding: 4px 0;
         }
 
-        /* ============================================
-           RESPONSIVE
-           ============================================ */
+        /* Responsive */
         @media (max-width: 1024px) {
             .panel-left { width: 150px; min-width: 150px; padding: 6px 0; }
             .panel-left .modulo-item { padding: 5px 8px; margin: 1px 4px; }
             .panel-left .modulo-item .modulo-icon { font-size: 13px; width: 20px; }
             .panel-left .modulo-item .modulo-name { font-size: 11px; }
-            .panel-right { width: 170px; min-width: 170px; padding: 10px 10px; }
-            .panel-right .stat-item-small .number { font-size: 16px; }
-            .panel-right .stat-item-small .label { font-size: 8px; }
+            .panel-right { width: 220px; min-width: 220px; padding: 12px 14px; }
             .stats-grid-central { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
             .stat-card-central .stat-number { font-size: 22px; }
             .trabajadores-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
@@ -943,19 +959,16 @@
                 min-width: unset;
                 border-left: none;
                 border-top: 1px solid var(--border-color);
-                max-height: 180px;
+                max-height: 220px;
                 flex-direction: row;
                 flex-wrap: wrap;
-                padding: 8px 12px;
+                padding: 10px 14px;
                 overflow-y: auto;
             }
-            .panel-right .stats-title { width: 100%; font-size: 10px; margin-bottom: 2px; }
-            .panel-right .stats-periodo { font-size: 11px; margin-bottom: 6px; padding: 2px 8px; }
-            .panel-right .stats-grid { width: 100%; gap: 4px; }
-            .panel-right .stat-item-small { padding: 6px 4px; }
-            .panel-right .stat-item-small .number { font-size: 14px; }
-            .panel-right .stat-item-small .label { font-size: 8px; }
-            .panel-right .reports-section { display: none; }
+            .panel-right .stats-title { width: 100%; font-size: 11px; margin-bottom: 6px; }
+            .panel-right .resumen-contratos { flex: 1; min-width: 160px; margin-right: 10px; }
+            .panel-right .btn-reporte { flex: 1; min-width: 120px; font-size: 11px; padding: 8px; }
+            .panel-right .ultimos-reportes { display: none; }
             .main-container { flex-direction: column; }
             .panel-center { min-height: 350px; }
             .panel-center .dashboard-content { padding: 12px 14px; }
@@ -971,10 +984,7 @@
             .trabajador-card .info .cargo { font-size: 10px; }
             .header-left .subtitle { display: none; }
             .header-right .user-info .role-badge { display: none; }
-            .user-menu {
-                right: -10px;
-                min-width: 160px;
-            }
+            .user-menu { right: -10px; min-width: 160px; }
             .page-title { font-size: 18px; }
             .page-subtitle { font-size: 12px; }
             .section-title { font-size: 14px; }
@@ -982,20 +992,17 @@
 
         @media (max-width: 480px) {
             .header { padding: 10px 16px; flex-wrap: wrap; gap: 8px; }
-            .panel-right .stats-grid { grid-template-columns: 1fr 1fr 1fr; }
-            .panel-right .stat-item-small { padding: 4px 2px; }
-            .panel-right .stat-item-small .number { font-size: 13px; }
-            .panel-right .stat-item-small .label { font-size: 7px; }
+            .panel-right { max-height: 180px; padding: 8px 10px; }
+            .panel-right .resumen-contratos { min-width: 120px; padding: 8px; }
+            .panel-right .resumen-contratos .item .numero { font-size: 14px; }
+            .panel-right .btn-reporte { font-size: 10px; padding: 6px; min-width: 80px; }
             .stats-grid-central { grid-template-columns: 1fr 1fr; gap: 6px; }
             .stat-card-central { padding: 8px 6px; }
             .stat-card-central .stat-number { font-size: 18px; }
             .stat-card-central .stat-label { font-size: 8px; }
             .stat-card-central .stat-icon-box { font-size: 18px; }
             .trabajadores-grid { grid-template-columns: 1fr; }
-            .user-menu {
-                right: -20px;
-                min-width: 150px;
-            }
+            .user-menu { right: -20px; min-width: 150px; }
             .user-menu .menu-item { font-size: 12px; padding: 8px 14px; }
             .modal-content { padding: 20px; }
         }
@@ -1034,8 +1041,6 @@
                     Cerrar sesión
                 </a>
             </div>
-
-            <a href="/logout" class="logout-btn" style="display:none;">Cerrar sesión</a>
         </div>
     </header>
 
@@ -1088,7 +1093,7 @@
         </div>
 
         <!-- ============================================
-        PANEL CENTRAL - CONTENEDOR DE MÓDULOS (Mejorado)
+        PANEL CENTRAL - CONTENEDOR DE MÓDULOS
         ============================================ -->
         <div class="panel-center" id="panelCenter">
 
@@ -1157,41 +1162,50 @@
         </div>
 
         <!-- ============================================
-        PANEL DERECHO - ESTADÍSTICAS MENSUALES (Compacto)
+        PANEL DERECHO - REPORTES Y ESTADÍSTICAS
         ============================================ -->
         <div class="panel-right">
 
-            <div class="stats-title">📊 Estadísticas del Mes</div>
-            <div class="stats-periodo" id="periodoMes">📅 Cargando mes...</div>
+            <div class="stats-title">📄 Reportes</div>
 
-            <div class="stats-grid">
-                <div class="stat-item-small">
-                    <span class="icon">💰</span>
-                    <span class="number" id="statVentasMes">0</span>
-                    <span class="label">Ventas</span>
+            <!-- Resumen de contratos -->
+            <div class="resumen-contratos">
+                <div class="titulo">📊 Resumen de Contratos</div>
+                <div class="grid">
+                    <div class="item">
+                        <div class="numero activos" id="contratosActivos">0</div>
+                        <div class="label">🟢 Activos</div>
+                    </div>
+                    <div class="item">
+                        <div class="numero vencidos" id="contratosVencidos">0</div>
+                        <div class="label">🔴 Vencidos</div>
+                    </div>
+                    <div class="item" style="grid-column: span 2;">
+                        <div class="numero total" id="contratosTotal">0</div>
+                        <div class="label">📄 Total contratos</div>
+                    </div>
                 </div>
-                <div class="stat-item-small">
-                    <span class="icon">👥</span>
-                    <span class="number" id="statClientesMes">0</span>
-                    <span class="label">Clientes</span>
-                </div>
-                <div class="stat-item-small">
-                    <span class="icon">💵</span>
-                    <span class="number" id="statIngresosMes">$0</span>
-                    <span class="label">Ingresos</span>
-                </div>
-                <div class="stat-item-small">
-                    <span class="icon">🧩</span>
-                    <span class="number" id="statModulosActivos">0</span>
-                    <span class="label">Módulos</span>
+                <div class="total-gastos">
+                    💰 Gastos totales: <strong id="gastosTotales">$0.00</strong>
                 </div>
             </div>
 
-            <!-- Reportes -->
-            <div class="reports-section">
-                <div class="reports-title">📄 Reportes</div>
-                <div id="reportesContainer">
-                    <div class="reports-empty">No hay reportes generados</div>
+            <!-- Botones de reportes -->
+            <button onclick="generarReporte('todos')" class="btn-reporte general" id="btnReporteTodos">
+                📄 Reporte General
+            </button>
+            <button onclick="generarReporte('activos')" class="btn-reporte activos" id="btnReporteActivos">
+                🟢 Reporte Activos
+            </button>
+            <button onclick="generarReporte('vencidos')" class="btn-reporte vencidos" id="btnReporteVencidos">
+                🔴 Reporte Vencidos
+            </button>
+
+            <!-- Últimos reportes generados -->
+            <div class="ultimos-reportes">
+                <div class="titulo">📋 Últimos reportes</div>
+                <div id="ultimosReportes">
+                    <div class="empty">No hay reportes generados</div>
                 </div>
             </div>
 
@@ -1229,35 +1243,13 @@
         }
 
         // ============================================
-        // CARGAR ESTADÍSTICAS MENSUALES
+        // OBTENER FECHA ACTUAL
         // ============================================
 
-        async function cargarEstadisticasMensuales() {
-            try {
-                const response = await fetch('/api/ventas');
-                if (!response.ok) throw new Error('Error al cargar ventas');
-                const ventas = await response.json();
-
-                const { inicio, fin } = obtenerInicioFinMes();
-                const ventasMes = ventas.filter(v => v.fecha >= inicio && v.fecha <= fin);
-
-                const totalVentasMes = ventasMes.length;
-                const clientesMes = new Set(ventasMes.map(v => v.cliente));
-                const ingresosMes = ventasMes.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
-
-                document.getElementById('statVentasMes').textContent = totalVentasMes;
-                document.getElementById('statClientesMes').textContent = clientesMes.size || 0;
-                document.getElementById('statIngresosMes').textContent = `$${ingresosMes.toFixed(2)}`;
-
-                // Estadísticas totales
-                const totalVentas = ventas.length;
-                const totalIngresos = ventas.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
-                document.getElementById('statTotalVentas').textContent = totalVentas;
-                document.getElementById('statIngresosTotales').textContent = `$${totalIngresos.toFixed(2)}`;
-
-            } catch (error) {
-                console.error('Error al cargar estadísticas mensuales:', error);
-            }
+        function obtenerFechaHoy() {
+            const hoy = new Date();
+            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            return hoy.toLocaleDateString('es-ES', opciones);
         }
 
         // ============================================
@@ -1375,16 +1367,6 @@
         }
 
         // ============================================
-        // OBTENER FECHA ACTUAL
-        // ============================================
-
-        function obtenerFechaHoy() {
-            const hoy = new Date();
-            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            return hoy.toLocaleDateString('es-ES', opciones);
-        }
-
-        // ============================================
         // CARGAR DATOS PRINCIPALES
         // ============================================
 
@@ -1404,10 +1386,9 @@
                     await cargarTrabajadores();
                     await cargarAlertasStock();
                     await cargarEstadisticasNegocio();
+                    await cargarResumenContratos();
                 }
 
-                // Actualizar periodo del mes
-                document.getElementById('periodoMes').textContent = `📅 ${obtenerNombreMes()}`;
                 document.getElementById('fechaActual').textContent = `📅 ${obtenerFechaHoy()}`;
 
                 if (intervaloActualizacion) clearInterval(intervaloActualizacion);
@@ -1487,8 +1468,6 @@
 
                 container.appendChild(div);
             });
-
-            document.getElementById('statModulosActivos').textContent = activos;
         }
 
         // ============================================
@@ -1541,10 +1520,39 @@
             cargarTrabajadores();
             cargarAlertasStock();
             cargarEstadisticasNegocio();
+            cargarResumenContratos();
 
             document.querySelectorAll('.modulo-item').forEach(item => {
                 item.classList.remove('active');
             });
+        }
+
+        // ============================================
+        // CARGAR ESTADÍSTICAS MENSUALES
+        // ============================================
+
+        async function cargarEstadisticasMensuales() {
+            try {
+                const response = await fetch('/api/ventas');
+                if (!response.ok) throw new Error('Error al cargar ventas');
+                const ventas = await response.json();
+
+                const { inicio, fin } = obtenerInicioFinMes();
+                const ventasMes = ventas.filter(v => v.fecha >= inicio && v.fecha <= fin);
+
+                const totalVentasMes = ventasMes.length;
+                const clientesMes = new Set(ventasMes.map(v => v.cliente));
+                const ingresosMes = ventasMes.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+
+                // Estadísticas totales
+                const totalVentas = ventas.length;
+                const totalIngresos = ventas.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+                document.getElementById('statTotalVentas').textContent = totalVentas;
+                document.getElementById('statIngresosTotales').textContent = `$${totalIngresos.toFixed(2)}`;
+
+            } catch (error) {
+                console.error('Error al cargar estadísticas mensuales:', error);
+            }
         }
 
         // ============================================
@@ -1572,13 +1580,14 @@
                     const estados = ['online', 'online', 'ocupado', 'online'];
                     const estado = estados[Math.floor(Math.random() * estados.length)];
                     const statusText = { online: '🟢 Conectado', ocupado: '🟡 Ocupado', offline: '⚪ Desconectado' }[estado] || '🟢 Conectado';
+                    const nombreCompleto = t.apellidos ? `${t.nombre} ${t.apellidos}` : t.nombre;
 
                     const div = document.createElement('div');
                     div.className = 'trabajador-card';
                     div.innerHTML = `
                         <div class="avatar">👤</div>
                         <div class="info">
-                            <div class="nombre">${t.nombre}</div>
+                            <div class="nombre">${nombreCompleto}</div>
                             <div class="cargo">${t.cargo || 'Trabajador'}</div>
                         </div>
                         <span class="status-dot ${estado}" title="${statusText}"></span>
@@ -1665,39 +1674,143 @@
         }
 
         // ============================================
-        // REPORTES
+        // CARGAR RESUMEN DE CONTRATOS
         // ============================================
 
-        function renderReportes() {
-            const container = document.getElementById('reportesContainer');
-            const reportes = [
-                { nombre: 'Ventas mensuales', fecha: new Date().toISOString().split('T')[0], icono: '📊' },
-                { nombre: 'Clientes nuevos', fecha: new Date().toISOString().split('T')[0], icono: '👥' },
-                { nombre: 'Inventario', fecha: new Date().toISOString().split('T')[0], icono: '📦' },
-                { nombre: 'Financiero', fecha: new Date().toISOString().split('T')[0], icono: '💰' },
-                { nombre: 'Contratos', fecha: new Date().toISOString().split('T')[0], icono: '📄' },
-            ];
+        async function cargarResumenContratos() {
+            try {
+                const response = await fetch('/api/reportes/contratos/resumen');
+                if (!response.ok) throw new Error('Error al cargar resumen');
+                const data = await response.json();
 
-            container.innerHTML = '';
-            reportes.forEach(report => {
-                const div = document.createElement('div');
-                div.className = 'report-item';
-                div.innerHTML = `
-                    <div class="report-info">
-                        <span class="report-name">${report.icono} ${report.nombre}</span>
-                        <span class="report-date">📅 ${report.fecha}</span>
-                    </div>
-                    <button class="report-download" onclick="alert('📥 Descargando ${report.nombre}...')">📥</button>
-                `;
-                container.appendChild(div);
-            });
+                document.getElementById('contratosActivos').textContent = data.activos || 0;
+                document.getElementById('contratosVencidos').textContent = data.vencidos || 0;
+                document.getElementById('contratosTotal').textContent = data.total || 0;
+                document.getElementById('gastosTotales').textContent = `$${(data.total_gastos || 0).toFixed(2)}`;
+
+                // Actualizar botones si no hay contratos
+                const botones = ['btnReporteTodos', 'btnReporteActivos', 'btnReporteVencidos'];
+                botones.forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (!data.tiene_contratos) {
+                        btn.disabled = true;
+                        btn.title = 'No hay contratos para generar reportes';
+                    } else {
+                        btn.disabled = false;
+                        btn.title = '';
+                    }
+                });
+
+            } catch (error) {
+                console.error('Error al cargar resumen de contratos:', error);
+            }
+        }
+
+        // ============================================
+        // GENERAR REPORTE PDF
+        // ============================================
+
+        function generarReporte(tipo) {
+            const boton = event.target;
+            const textoOriginal = boton.textContent;
+            
+            // Verificar que hay contratos
+            const total = parseInt(document.getElementById('contratosTotal').textContent) || 0;
+            if (total === 0) {
+                alert('⚠️ No hay contratos registrados para generar reportes.\n\nPrimero debes crear contratos en el módulo de Contratos.');
+                return;
+            }
+
+            // Mapeo de tipos
+            const tipos = {
+                'todos': 'General',
+                'activos': 'Activos',
+                'vencidos': 'Vencidos'
+            };
+            const nombreTipo = tipos[tipo] || 'General';
+
+            // Confirmar descarga
+            if (!confirm(`📄 ¿Generar reporte de contratos ${nombreTipo.toLowerCase()}?\n\nEl PDF se descargará automáticamente.`)) {
+                return;
+            }
+
+            // Mostrar loading
+            boton.textContent = '⏳ Generando...';
+            boton.disabled = true;
+
+            // Generar y descargar
+            fetch(`/api/reportes/contratos?tipo=${tipo}`)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Error al generar reporte');
+                        });
+                    }
+
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `reporte_contratos_${tipo}.pdf`;
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename=(.+)/);
+                        if (match) filename = match[1];
+                    }
+
+                    return response.blob().then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+
+                        // Registrar en historial
+                        agregarReporteHistorial(nombreTipo);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('❌ Error al generar el reporte: ' + error.message);
+                })
+                .finally(() => {
+                    boton.textContent = textoOriginal;
+                    boton.disabled = false;
+                });
+        }
+
+        // ============================================
+        // AGREGAR REPORTE AL HISTORIAL
+        // ============================================
+
+        function agregarReporteHistorial(tipo) {
+            const container = document.getElementById('ultimosReportes');
+            const fecha = new Date().toLocaleString();
+
+            // Eliminar mensaje vacío si existe
+            const empty = container.querySelector('.empty');
+            if (empty) {
+                container.innerHTML = '';
+            }
+
+            // Agregar nuevo reporte al principio
+            const div = document.createElement('div');
+            div.className = 'reporte-item';
+            div.innerHTML = `
+                <span>📄 ${tipo}</span>
+                <span class="fecha">${fecha}</span>
+            `;
+            container.insertBefore(div, container.firstChild);
+
+            // Limitar a 5 reportes
+            while (container.children.length > 5) {
+                container.removeChild(container.lastChild);
+            }
         }
 
         // ============================================
         // INICIO
         // ============================================
 
-        renderReportes();
         cargarDatos();
     </script>
 </body>
