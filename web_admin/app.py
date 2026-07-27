@@ -786,7 +786,7 @@ def api_asignar_permiso(user_id, modulo_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - NEGOCIO - TRABAJADORES
+# API - NEGOCIO - TRABAJADORES (ACTUALIZADO)
 # ============================================
 
 @app.route('/api/negocio/trabajadores')
@@ -798,26 +798,48 @@ def api_obtener_trabajadores():
     if not usuario or usuario['tipo'] != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
-    trabajadores = obtener_trabajadores_por_empresa(usuario['id'])
-    
-    result = []
-    for t in trabajadores:
-        datos = json.loads(t['datos_negocio']) if t['datos_negocio'] else {}
-        result.append({
-            'id': t['id'],
-            'nombre': t['nombre'] or t['username'],
-            'username': t['username'],
-            'email': t['email'],
-            'cargo': t['cargo'] or datos.get('cargo', ''),
-            'telefono': datos.get('telefono', ''),
-            'salario': t['salario'] or datos.get('salario', 0),
-            'activo': t['activo'],
-            'modulos': t['modulos'].split(',') if t['modulos'] else [],
-            'fecha_registro': t['fecha_registro'],
-            'fecha_contratacion': t['fecha_contratacion']
-        })
-    
-    return jsonify(result)
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+        SELECT u.id, u.username, u.email, u.nombre, u.activo, 
+               u.datos_negocio, u.fecha_registro
+        FROM trabajadores_negocio tn
+        JOIN usuarios u ON tn.trabajador_id = u.id
+        WHERE tn.negocio_id = %s AND tn.activo = 1
+        ORDER BY u.id DESC
+        ''', (usuario['id'],))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        resultado = []
+        for row in rows:
+            datos = json.loads(row[5]) if row[5] else {}
+            resultado.append({
+                'id': row[0],
+                'username': row[1],
+                'email': row[2] or '',
+                'nombre': datos.get('nombre', row[3] or ''),
+                'apellidos': datos.get('apellidos', ''),
+                'ci': datos.get('ci', ''),
+                'movil': datos.get('movil', ''),
+                'direccion': datos.get('direccion', ''),
+                'frecuencia': datos.get('frecuencia', 'diaria'),
+                'salario': datos.get('salario', 0),
+                'activo': row[4],
+                'fecha_registro': row[6]
+            })
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        print(f"❌ Error en api_obtener_trabajadores: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/negocio/trabajador/crear', methods=['POST'])
 @login_required
@@ -829,41 +851,68 @@ def api_crear_trabajador():
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
+    
+    # Datos personales
     nombre = data.get('nombre')
-    cargo = data.get('cargo')
-    email = data.get('email')
-    telefono = data.get('telefono')
-    salario = data.get('salario')
+    apellidos = data.get('apellidos')
+    ci = data.get('ci')
+    movil = data.get('movil', '')
+    direccion = data.get('direccion', '')
+    frecuencia = data.get('frecuencia', 'diaria')
+    salario = data.get('salario', 0)
+    email = data.get('email', '')
     username = data.get('usuario')
     password = data.get('password')
-    modulos = data.get('modulos', [])
+    modulos = data.get('modulos', ['inventario', 'tienda', 'servicios', 'ventas'])
     
-    if not nombre or not email or not username or not password:
-        return jsonify({'error': 'Todos los campos son requeridos'}), 400
+    # Validaciones
+    if not nombre:
+        return jsonify({'error': 'El nombre es obligatorio'}), 400
+    if not apellidos:
+        return jsonify({'error': 'Los apellidos son obligatorios'}), 400
+    if not ci:
+        return jsonify({'error': 'El carnet de identidad es obligatorio'}), 400
+    if not username:
+        return jsonify({'error': 'El nombre de usuario es obligatorio'}), 400
+    if not password:
+        return jsonify({'error': 'La contraseña es obligatoria'}), 400
+    if len(password) < 6:
+        return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
     
+    # Verificar usuario único
     if obtener_usuario_por_username(username):
         return jsonify({'error': 'El nombre de usuario ya está en uso'}), 400
     
+    # Preparar datos del negocio
+    datos_negocio = {
+        'nombre': nombre,
+        'apellidos': apellidos,
+        'ci': ci,
+        'movil': movil,
+        'direccion': direccion,
+        'frecuencia': frecuencia,
+        'salario': salario,
+        'empresa_id': usuario['id']
+    }
+    
+    # Crear usuario
     user_id = crear_usuario(
         username=username,
-        email=email,
+        email=email or f"{username}@trabajador.local",
         password=password,
-        nombre=nombre,
+        nombre=f"{nombre} {apellidos}",
         rol='trabajador',
         tipo='negocio',
-        datos_negocio={
-            'cargo': cargo,
-            'telefono': telefono,
-            'salario': salario,
-            'empresa_id': usuario['id']
-        }
+        datos_negocio=datos_negocio
     )
     
     if not user_id:
         return jsonify({'error': 'Error al crear el trabajador'}), 500
     
-    crear_trabajador_negocio(usuario['id'], user_id, cargo, salario)
+    # Asignar a la empresa
+    crear_trabajador_negocio(usuario['id'], user_id, 'Trabajador', salario)
     
+    # Asignar módulos
     for modulo_nombre in modulos:
         conn = get_db()
         cursor = conn.cursor()
@@ -873,7 +922,7 @@ def api_crear_trabajador():
         if mod:
             asignar_permiso_usuario(user_id, mod[0], 1)
     
-    registrar_log(usuario['id'], 'crear_trabajador', f'Creó trabajador: {username}')
+    registrar_log(usuario['id'], 'crear_trabajador', f'Creó trabajador: {nombre} {apellidos} (CI: {ci})')
     
     return jsonify({
         'success': True,
@@ -881,9 +930,10 @@ def api_crear_trabajador():
         'user_id': user_id
     })
 
-@app.route('/api/negocio/trabajador/<int:trabajador_id>/toggle', methods=['POST'])
+
+@app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['PUT'])
 @login_required
-def api_toggle_trabajador_negocio(trabajador_id):
+def api_actualizar_trabajador(trabajador_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -891,12 +941,65 @@ def api_toggle_trabajador_negocio(trabajador_id):
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
-    activo = data.get('activo', 1)
     
-    toggle_trabajador_negocio(usuario['id'], trabajador_id, activo)
-    registrar_log(usuario['id'], 'trabajador_toggle', f'Trabajador {trabajador_id} activo={activo}')
+    # Datos personales
+    nombre = data.get('nombre')
+    apellidos = data.get('apellidos')
+    ci = data.get('ci')
+    movil = data.get('movil', '')
+    direccion = data.get('direccion', '')
+    frecuencia = data.get('frecuencia', 'diaria')
+    salario = data.get('salario', 0)
+    email = data.get('email', '')
     
-    return jsonify({'success': True})
+    # Validaciones
+    if not nombre:
+        return jsonify({'error': 'El nombre es obligatorio'}), 400
+    if not apellidos:
+        return jsonify({'error': 'Los apellidos son obligatorios'}), 400
+    if not ci:
+        return jsonify({'error': 'El carnet de identidad es obligatorio'}), 400
+    
+    # Obtener trabajador actual
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (trabajador_id,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    if not result:
+        return jsonify({'error': 'Trabajador no encontrado'}), 404
+    
+    datos_actuales = json.loads(result[0]) if result[0] else {}
+    
+    # Actualizar datos
+    datos_actuales.update({
+        'nombre': nombre,
+        'apellidos': apellidos,
+        'ci': ci,
+        'movil': movil,
+        'direccion': direccion,
+        'frecuencia': frecuencia,
+        'salario': salario
+    })
+    
+    # Actualizar en la base de datos
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE usuarios 
+        SET nombre = %s, email = %s, datos_negocio = %s
+        WHERE id = %s
+    ''', (f"{nombre} {apellidos}", email, json.dumps(datos_actuales), trabajador_id))
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'actualizar_trabajador', f'Actualizó trabajador: {nombre} {apellidos} (ID: {trabajador_id})')
+    
+    return jsonify({
+        'success': True,
+        'message': 'Trabajador actualizado correctamente'
+    })
 
 # ============================================
 # API - PRODUCTOS
