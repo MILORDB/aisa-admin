@@ -43,7 +43,7 @@ def init_db():
         print(f"❌ Error de conexión: {e}")
         return
     
-    # TABLAS CON SERIAL (PostgreSQL) - NO AUTOINCREMENT
+    # TABLAS CON SERIAL (PostgreSQL)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -69,7 +69,7 @@ def init_db():
         fecha_creacion TEXT NOT NULL,
         fecha_expiracion TEXT NOT NULL,
         activo INTEGER DEFAULT 1,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+        FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
     )
     ''')
     
@@ -91,8 +91,8 @@ def init_db():
         activo INTEGER DEFAULT 1,
         fecha_solicitud TEXT,
         estado_solicitud TEXT DEFAULT 'aprobado',
-        FOREIGN KEY (usuario_id) REFERENCES usuarios (id),
-        FOREIGN KEY (modulo_id) REFERENCES modulos (id),
+        FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE,
+        FOREIGN KEY (modulo_id) REFERENCES modulos (id) ON DELETE CASCADE,
         UNIQUE(usuario_id, modulo_id)
     )
     ''')
@@ -104,7 +104,7 @@ def init_db():
         accion TEXT,
         detalle TEXT,
         fecha TEXT NOT NULL,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+        FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE SET NULL
     )
     ''')
     
@@ -121,7 +121,7 @@ def init_db():
         foto_public_id TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id)
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE
     )
     ''')
     
@@ -147,9 +147,9 @@ def init_db():
         transferencia_fecha TEXT,
         fecha TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id),
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id),
-        FOREIGN KEY (producto_id) REFERENCES productos(id)
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
     )
     ''')
     
@@ -166,8 +166,8 @@ def init_db():
         descripcion TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id),
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id)
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE SET NULL
     )
     ''')
     
@@ -180,8 +180,8 @@ def init_db():
         cargo TEXT,
         salario REAL DEFAULT 0,
         fecha_contratacion TEXT NOT NULL,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id),
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id),
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
         UNIQUE(negocio_id, trabajador_id)
     )
     ''')
@@ -201,8 +201,8 @@ def init_db():
         descripcion TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id),
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id)
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE SET NULL
     )
     ''')
     
@@ -213,8 +213,8 @@ def init_db():
         producto_id INTEGER NOT NULL,
         destacado INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id),
-        FOREIGN KEY (producto_id) REFERENCES productos(id)
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE
     )
     ''')
     
@@ -357,12 +357,30 @@ def obtener_negocios():
     return negocios
 
 def eliminar_usuario(user_id):
+    """Elimina un usuario y todos sus datos relacionados"""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM usuarios WHERE id = %s', (user_id,))
-    conn.commit()
-    conn.close()
-    return True
+    try:
+        # 1. Eliminar sesiones del usuario
+        cursor.execute('DELETE FROM sesiones WHERE usuario_id = %s', (user_id,))
+        
+        # 2. Eliminar permisos del usuario
+        cursor.execute('DELETE FROM permisos_usuario WHERE usuario_id = %s', (user_id,))
+        
+        # 3. Eliminar relación en trabajadores_negocio si existe
+        cursor.execute('DELETE FROM trabajadores_negocio WHERE trabajador_id = %s', (user_id,))
+        
+        # 4. Eliminar el usuario
+        cursor.execute('DELETE FROM usuarios WHERE id = %s', (user_id,))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error eliminando usuario {user_id}: {e}")
+        conn.rollback()
+        conn.close()
+        return False
 
 def actualizar_ultimo_acceso(user_id):
     conn = get_db()
@@ -581,6 +599,41 @@ def actualizar_producto(producto_id, nombre, categoria, precio, stock, stock_min
     conn.commit()
     conn.close()
 
+def actualizar_foto_producto(producto_id, foto_url, foto_public_id=None):
+    """Actualiza la URL y el ID público de la foto de un producto"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE productos 
+        SET foto_url = %s, foto_public_id = %s, updated_at = %s 
+        WHERE id = %s
+    ''', (foto_url, foto_public_id, datetime.now().isoformat(), producto_id))
+    conn.commit()
+    conn.close()
+
+def eliminar_foto_producto(producto_id):
+    """Elimina la referencia de la foto de un producto"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE productos 
+        SET foto_url = NULL, foto_public_id = NULL, updated_at = %s 
+        WHERE id = %s
+    ''', (datetime.now().isoformat(), producto_id))
+    conn.commit()
+    conn.close()
+
+def obtener_foto_producto(producto_id):
+    """Obtiene la información de la foto de un producto"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT foto_url, foto_public_id FROM productos WHERE id = %s', (producto_id,))
+    resultado = cursor.fetchone()
+    conn.close()
+    if resultado:
+        return {'url': resultado[0], 'public_id': resultado[1]}
+    return {'url': None, 'public_id': None}
+
 def eliminar_producto(producto_id):
     """Elimina un producto de la base de datos con manejo de errores mejorado"""
     conn = get_db()
@@ -599,7 +652,6 @@ def eliminar_producto(producto_id):
         print(f"🗑️ Eliminando producto: {producto[1]} (ID: {producto_id})")
         
         # 2. Verificar referencias en otras tablas antes de eliminar
-        # Verificar si está en productos_tienda
         cursor.execute('SELECT id FROM productos_tienda WHERE producto_id = %s', (producto_id,))
         tienda = cursor.fetchone()
         if tienda:
@@ -614,7 +666,7 @@ def eliminar_producto(producto_id):
             conn.close()
             return False
         
-        # 4. Eliminar el producto (ya no tiene referencias)
+        # 4. Eliminar el producto
         cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
         
         # 5. Verificar que se eliminó correctamente
@@ -650,22 +702,6 @@ def actualizar_stock_producto(producto_id, cantidad):
     conn.commit()
     conn.close()
     return filas > 0
-
-def actualizar_foto_producto(producto_id, foto_url, foto_public_id=None):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE productos SET foto_url = %s, foto_public_id = %s, updated_at = %s WHERE id = %s',
-                   (foto_url, foto_public_id, datetime.now().isoformat(), producto_id))
-    conn.commit()
-    conn.close()
-
-def eliminar_foto_producto(producto_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE productos SET foto_url = NULL, foto_public_id = NULL, updated_at = %s WHERE id = %s',
-                   (datetime.now().isoformat(), producto_id))
-    conn.commit()
-    conn.close()
 
 # ============================================
 # FUNCIONES PARA PRODUCTOS EN TIENDA
