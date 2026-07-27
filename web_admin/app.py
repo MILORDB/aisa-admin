@@ -1,10 +1,22 @@
+from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask_cors import CORS
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from datetime import datetime
-import bcrypt
+import sys
+import logging
 import json
-import urllib.parse
+import psycopg2
+import traceback
+import time
+
+# ============================================
+# CARGAR VARIABLES DE ENTORNO DESDE .env
+# ============================================
+from dotenv import load_dotenv
+load_dotenv()  # Carga las variables del archivo .env
+
+logging.basicConfig(level=logging.DEBUG)
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
