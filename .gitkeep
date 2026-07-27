@@ -1,0 +1,8 @@
+# Crear la carpeta y el archivo .gitkeep
+mkdir -p static/uploads/productos
+mkdir -p static/uploads/facturas
+touch static/uploads/.gitkeep
+touch static/uploads/productos/.gitkeep
+touch static/uploads/facturas/.gitkeep
+# Esta carpeta contendrá las imágenes y archivos subidos
+# No se suben a GitHub, pero esta carpeta debe existir
