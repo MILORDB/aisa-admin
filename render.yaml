@@ -9,7 +9,11 @@ services:
         value: 3.10.0
       - key: FLASK_ENV
         value: production
+      - key: SECRET_KEY
+        generateValue: true
       - key: DATABASE_URL
         fromDatabase:
           name: aisa-db
           property: connectionString
+      - key: TERABOX_COOKIE
+        value: Y2duleyteHuirBC6zt0pERO_yHb9GY1FCd6_J73n
