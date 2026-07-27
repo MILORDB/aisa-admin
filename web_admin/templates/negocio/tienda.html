@@ -359,13 +359,32 @@
 
             try {
                 const response = await fetch('/api/tienda/productos');
-                if (!response.ok) throw new Error('Error al cargar tienda');
-                productosTienda = await response.json();
+                
+                // Verificar si la respuesta es OK
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                    throw new Error(`Error ${response.status}: ${errorText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Productos en tienda:', data);
+                
+                // Asegurar que data es un array
+                productosTienda = Array.isArray(data) ? data : [];
                 renderTienda();
                 actualizarEstadisticas();
             } catch (error) {
-                console.error('Error:', error);
-                container.innerHTML = `<div class="empty">❌ Error al cargar productos de la tienda</div>`;
+                console.error('Error al cargar tienda:', error);
+                container.innerHTML = `
+                    <div class="empty">
+                        <div style="font-size:48px;margin-bottom:12px;">❌</div>
+                        <div style="font-size:16px;margin-bottom:8px;">Error al cargar productos</div>
+                        <div style="font-size:13px;color:#666;">${error.message}</div>
+                        <br>
+                        <button class="btn btn-primary" onclick="cargarTienda()">🔄 Reintentar</button>
+                    </div>
+                `;
             }
         }
 
@@ -377,10 +396,12 @@
             const container = document.getElementById('productosContainer');
             const filtroLower = filtro.toLowerCase();
             
-            let filtrados = productosTienda.filter(p => 
-                p.nombre.toLowerCase().includes(filtroLower) ||
-                (p.categoria && p.categoria.toLowerCase().includes(filtroLower))
-            );
+            // Filtrar productos
+            let filtrados = productosTienda.filter(p => {
+                const matchNombre = p.nombre ? p.nombre.toLowerCase().includes(filtroLower) : false;
+                const matchCategoria = p.categoria ? p.categoria.toLowerCase().includes(filtroLower) : false;
+                return matchNombre || matchCategoria;
+            });
 
             if (destacadoFiltro === 'destacados') {
                 filtrados = filtrados.filter(p => p.destacado === 1);
@@ -392,8 +413,8 @@
                 container.innerHTML = `
                     <div class="empty">
                         <div style="font-size:48px;margin-bottom:12px;">🛍️</div>
-                        <div style="font-size:16px;margin-bottom:8px;">No hay productos en tu tienda</div>
-                        <div style="font-size:13px;color:#666;">Agrega productos desde tu inventario</div>
+                        <div style="font-size:16px;margin-bottom:8px;">${productosTienda.length === 0 ? 'No hay productos en tu tienda' : 'No se encontraron productos'}</div>
+                        <div style="font-size:13px;color:#666;">${productosTienda.length === 0 ? 'Agrega productos desde tu inventario' : 'Prueba con otro filtro'}</div>
                         <br>
                         <button class="btn btn-primary" onclick="abrirModalAgregar()">+ Agregar producto</button>
                     </div>
@@ -407,7 +428,7 @@
                 const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
                 const fotoUrl = p.foto_url || null;
                 const fotoHtml = fotoUrl 
-                    ? `<img src="${fotoUrl}" alt="${p.nombre}" class="foto" onerror="this.src=''">`
+                    ? `<img src="${fotoUrl}" alt="${p.nombre}" class="foto" onerror="this.style.display='none'">`
                     : `<div class="foto-placeholder">📷</div>`;
                 const destacadoHtml = p.destacado ? '<span class="destacado-badge">⭐ Destacado</span>' : '';
                 
@@ -415,8 +436,8 @@
                     <div class="producto-card">
                         ${destacadoHtml}
                         ${fotoHtml}
-                        <div class="nombre">${p.nombre}</div>
-                        <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
+                        <div class="nombre">${p.nombre || 'Sin nombre'}</div>
+                        <div class="precio">$${parseFloat(p.precio || 0).toFixed(2)}</div>
                         <div class="stock ${stockClass}">${stockText}</div>
                         <div class="acciones">
                             <button class="btn btn-warning btn-sm" onclick="toggleDestacado(${p.id}, ${p.destacado ? 0 : 1})" title="${p.destacado ? 'Quitar destacado' : 'Destacar'}">
@@ -462,12 +483,20 @@
         async function abrirModalAgregar() {
             try {
                 // Cargar productos disponibles (los que no están en la tienda)
-                const response = await fetch('/api/productos/stock');
+                const response = await fetch('/api/productos');
                 if (!response.ok) throw new Error('Error al cargar productos');
                 const productos = await response.json();
                 
-                const idsEnTienda = productosTienda.map(p => p.producto_id);
+                console.log('Todos los productos:', productos);
+                console.log('Productos en tienda:', productosTienda);
+                
+                // Obtener IDs de productos que ya están en la tienda
+                const idsEnTienda = productosTienda.map(p => p.producto_id || p.id);
+                console.log('IDs en tienda:', idsEnTienda);
+                
+                // Filtrar productos que NO están en la tienda
                 productosDisponibles = productos.filter(p => !idsEnTienda.includes(p.id));
+                console.log('Productos disponibles:', productosDisponibles);
                 
                 const select = document.getElementById('selectProducto');
                 select.innerHTML = '<option value="">-- Seleccionar producto --</option>';
@@ -513,7 +542,7 @@
                 
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error al cargar productos disponibles', 'error');
+                mostrarMensaje('Error al cargar productos disponibles: ' + error.message, 'error');
             }
         }
 
@@ -547,7 +576,10 @@
                 const response = await fetch('/api/tienda/producto/agregar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ producto_id: parseInt(productoId), destacado })
+                    body: JSON.stringify({ 
+                        producto_id: parseInt(productoId), 
+                        destacado: destacado 
+                    })
                 });
                 
                 const data = await response.json();
@@ -575,7 +607,7 @@
                 const response = await fetch(`/api/tienda/producto/${tiendaId}/destacar`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ destacado })
+                    body: JSON.stringify({ destacado: destacado })
                 });
                 
                 const data = await response.json();
@@ -621,14 +653,6 @@
                 console.error('Error:', error);
                 mostrarMensaje('❌ Error de conexión: ' + error.message, 'error');
             }
-        }
-
-        // ============================================
-        // VISTA PREVIA DE LA TIENDA (Cliente)
-        // ============================================
-
-        function verTiendaPublica() {
-            window.open('/tienda/public', '_blank');
         }
 
         // ============================================
