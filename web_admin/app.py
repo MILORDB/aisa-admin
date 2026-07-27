@@ -77,8 +77,10 @@ def add_header(response):
 # CREAR CARPETAS PARA ARCHIVOS ESTÁTICOS
 # ============================================
 
-os.makedirs('static/uploads', exist_ok=True)
+os.makedirs('static/uploads/productos', exist_ok=True)
+os.makedirs('static/uploads/facturas', exist_ok=True)
 os.makedirs('static/img', exist_ok=True)
+print("📁 Carpetas de almacenamiento creadas/verificadas")
 
 # ============================================
 # INICIALIZAR BASE DE DATOS (DESACTIVADO)
