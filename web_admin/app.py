@@ -1222,20 +1222,41 @@ def api_tienda_productos():
     if not usuario or usuario['tipo'] != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT pt.id, pt.destacado, pt.created_at,
-           p.id as producto_id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url
-    FROM productos_tienda pt
-    JOIN productos p ON pt.producto_id = p.id
-    WHERE pt.negocio_id = %s
-    ORDER BY pt.destacado DESC, pt.created_at DESC
-    ''', (usuario['id'],))
-    productos = cursor.fetchall()
-    conn.close()
-    
-    return jsonify([dict(p) for p in productos])
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('''
+        SELECT pt.id, pt.destacado, pt.created_at,
+               p.id as producto_id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url
+        FROM productos_tienda pt
+        JOIN productos p ON pt.producto_id = p.id
+        WHERE pt.negocio_id = %s
+        ORDER BY pt.destacado DESC, pt.created_at DESC
+        ''', (usuario['id'],))
+        productos = cursor.fetchall()
+        conn.close()
+        
+        # Convertir a lista de diccionarios
+        resultado = []
+        for p in productos:
+            resultado.append({
+                'id': p['id'],
+                'producto_id': p['producto_id'],
+                'nombre': p['nombre'],
+                'categoria': p['categoria'] or '',
+                'precio': float(p['precio']),
+                'stock': p['stock'],
+                'foto_url': p['foto_url'],
+                'destacado': p['destacado'],
+                'created_at': p['created_at']
+            })
+        
+        return jsonify(resultado)
+    except Exception as e:
+        print(f"❌ Error en api_tienda_productos: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tienda/producto/agregar', methods=['POST'])
 @login_required
@@ -1253,32 +1274,41 @@ def api_tienda_agregar_producto():
     if not producto_id:
         return jsonify({'error': 'ID de producto requerido'}), 400
     
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT id FROM productos WHERE id = %s AND negocio_id = %s', (producto_id, usuario['id']))
-    producto = cursor.fetchone()
-    
-    if not producto:
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verificar que el producto existe y pertenece al negocio
+        cursor.execute('SELECT id, nombre FROM productos WHERE id = %s AND negocio_id = %s', (producto_id, usuario['id']))
+        producto = cursor.fetchone()
+        
+        if not producto:
+            conn.close()
+            return jsonify({'error': 'Producto no encontrado'}), 404
+        
+        # Verificar que no está ya en la tienda
+        cursor.execute('SELECT id FROM productos_tienda WHERE producto_id = %s AND negocio_id = %s', (producto_id, usuario['id']))
+        if cursor.fetchone():
+            conn.close()
+            return jsonify({'error': 'El producto ya está en la tienda'}), 400
+        
+        from datetime import datetime
+        fecha = datetime.now().isoformat()
+        cursor.execute('''
+        INSERT INTO productos_tienda (negocio_id, producto_id, destacado, created_at)
+        VALUES (%s, %s, %s, %s)
+        ''', (usuario['id'], producto_id, destacado, fecha))
+        conn.commit()
         conn.close()
-        return jsonify({'error': 'Producto no encontrado'}), 404
-    
-    cursor.execute('SELECT id FROM productos_tienda WHERE producto_id = %s AND negocio_id = %s', (producto_id, usuario['id']))
-    if cursor.fetchone():
-        conn.close()
-        return jsonify({'error': 'El producto ya está en la tienda'}), 400
-    
-    from datetime import datetime
-    fecha = datetime.now().isoformat()
-    cursor.execute('''
-    INSERT INTO productos_tienda (negocio_id, producto_id, destacado, created_at)
-    VALUES (%s, %s, %s, %s)
-    ''', (usuario['id'], producto_id, destacado, fecha))
-    conn.commit()
-    conn.close()
-    
-    registrar_log(usuario['id'], 'tienda_agregar', f'Producto {producto_id} agregado a la tienda')
-    
-    return jsonify({'success': True, 'message': 'Producto agregado a la tienda'})
+        
+        registrar_log(usuario['id'], 'tienda_agregar', f'Producto {producto_id} agregado a la tienda')
+        
+        return jsonify({'success': True, 'message': 'Producto agregado a la tienda'})
+    except Exception as e:
+        print(f"❌ Error en api_tienda_agregar_producto: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tienda/producto/<int:tienda_id>/destacar', methods=['POST'])
 @login_required
@@ -1292,18 +1322,22 @@ def api_tienda_destacar_producto(tienda_id):
     data = request.get_json()
     destacado = data.get('destacado', 1)
     
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-    UPDATE productos_tienda SET destacado = %s
-    WHERE id = %s AND negocio_id = %s
-    ''', (destacado, tienda_id, usuario['id']))
-    conn.commit()
-    conn.close()
-    
-    registrar_log(usuario['id'], 'tienda_destacar', f'Producto tienda {tienda_id} destacado={destacado}')
-    
-    return jsonify({'success': True})
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+        UPDATE productos_tienda SET destacado = %s
+        WHERE id = %s AND negocio_id = %s
+        ''', (destacado, tienda_id, usuario['id']))
+        conn.commit()
+        conn.close()
+        
+        registrar_log(usuario['id'], 'tienda_destacar', f'Producto tienda {tienda_id} destacado={destacado}')
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Error en api_tienda_destacar_producto: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/tienda/producto/<int:tienda_id>', methods=['DELETE'])
 @login_required
@@ -1314,15 +1348,19 @@ def api_tienda_eliminar_producto(tienda_id):
     if not usuario or usuario['tipo'] != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM productos_tienda WHERE id = %s AND negocio_id = %s', (tienda_id, usuario['id']))
-    conn.commit()
-    conn.close()
-    
-    registrar_log(usuario['id'], 'tienda_eliminar', f'Producto tienda {tienda_id} eliminado')
-    
-    return jsonify({'success': True})
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM productos_tienda WHERE id = %s AND negocio_id = %s', (tienda_id, usuario['id']))
+        conn.commit()
+        conn.close()
+        
+        registrar_log(usuario['id'], 'tienda_eliminar', f'Producto tienda {tienda_id} eliminado')
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Error en api_tienda_eliminar_producto: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # ============================================
 # API - TIENDA (CLIENTE)
