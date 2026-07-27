@@ -98,7 +98,7 @@
             flex: 1;
             min-width: 120px;
         }
-        .form-row input:focus, .form-row select:focus {
+        .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
             border-color: #6c3ce0;
             outline: none;
         }
@@ -112,6 +112,20 @@
         .form-row .campo-obligatorio label::after {
             content: " *";
             color: #ff6b6b;
+        }
+        .form-row .duracion-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .form-row .duracion-selector select {
+            flex: 0 0 80px;
+            min-width: 80px;
+        }
+        .form-row .duracion-selector span {
+            color: #888;
+            font-size: 13px;
         }
         .form-row .numero-contrato {
             background: #0a0a14;
@@ -195,17 +209,27 @@
             background: #1a1a2e;
             padding: 30px;
             border-radius: 12px;
-            max-width: 580px;
+            max-width: 620px;
             width: 95%;
             border: 1px solid #2a2a3e;
             max-height: 95vh;
             overflow-y: auto;
         }
-        .modal-content h3 { margin-bottom: 16px; }
+        .modal-content h3 { margin-bottom: 8px; }
         .modal-content .modal-subtitle {
             font-size: 12px;
             color: #888;
             margin-bottom: 16px;
+        }
+        .modal-content .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+            border-top: 1px solid #2a2a3e;
+            padding-top: 16px;
+        }
+        .modal-content .form-actions .btn {
+            flex: 1;
         }
         .info-header {
             display: flex;
@@ -232,9 +256,6 @@
             display: none;
         }
         .mensaje-error.show { display: block; }
-        .acciones-cell {
-            display: flex; gap: 4px; flex-wrap: wrap;
-        }
         .contrato-numero {
             font-weight: 700;
             color: #6c3ce0;
@@ -242,21 +263,40 @@
             font-size: 14px;
         }
         .info-fecha-fin {
-            font-size: 11px;
+            font-size: 12px;
             color: #888;
             margin-top: 4px;
         }
         .info-fecha-fin .activo { color: #6bff6b; }
         .info-fecha-fin .vencido { color: #ff6b6b; }
         .info-fecha-fin .proximo { color: #ffbb33; }
+        .acciones-cell {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .duracion-info {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+        }
+        .duracion-info .duracion-tag {
+            display: inline-block;
+            background: rgba(108, 60, 224, 0.15);
+            color: #6c3ce0;
+            padding: 0 8px;
+            border-radius: 10px;
+            font-size: 10px;
+        }
         @media (max-width: 600px) {
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .form-row { flex-direction: column; }
             .search-bar { flex-direction: column; }
             .acciones-cell { flex-direction: column; }
             .acciones-cell .btn-sm { width: 100%; text-align: center; }
-            .form-row .tipo-option { flex-wrap: wrap; }
-            .form-row .tipo-option label { flex: 1; min-width: 80px; justify-content: center; }
+            .modal-content { padding: 16px; }
+            .form-row .duracion-selector { flex-wrap: wrap; }
+            .form-row .duracion-selector select { flex: 1; min-width: 60px; }
         }
     </style>
 </head>
@@ -308,7 +348,7 @@
         </div>
     </div>
 
-    <!-- Modal Nuevo Contrato -->
+    <!-- Modal Nuevo/Editar Contrato -->
     <div class="modal-overlay" id="modalContrato">
         <div class="modal-content">
             <h3 id="modalTitle">📄 Nuevo Contrato</h3>
@@ -317,7 +357,7 @@
             <!-- 1. Nombre de Empresa o Negocio (OBLIGATORIO) -->
             <div class="form-row campo-obligatorio">
                 <div style="flex:1;">
-                    <label>🏢 Nombre de Empresa o Negocio</label>
+                    <label>🏢 Nombre de Empresa, TCP o MIPYME</label>
                     <input type="text" id="contratoEmpresa" placeholder="Ej: Mi Empresa S.A." required>
                 </div>
             </div>
@@ -336,14 +376,39 @@
                     <label>📅 Fecha de Inicio</label>
                     <input type="date" id="contratoFechaInicio" required>
                 </div>
+            </div>
+
+            <!-- 4. DURACIÓN DEL CONTRATO (NUEVO - 1 a 5 años) -->
+            <div class="form-row campo-obligatorio">
                 <div style="flex:1;">
-                    <label>📅 Fecha de Fin <span style="color:#666;">(automático - 1 año)</span></label>
-                    <input type="date" id="contratoFechaFin" readonly disabled style="background:#0a0a14;color:#888;">
-                    <div class="info-fecha-fin" id="infoFechaFin">📌 El contrato dura 1 año automáticamente</div>
+                    <label>⏳ Duración del Contrato</label>
+                    <div class="duracion-selector">
+                        <select id="contratoDuracion" onchange="calcularFechaFin()">
+                            <option value="1">1 año</option>
+                            <option value="2" selected>2 años</option>
+                            <option value="3">3 años</option>
+                            <option value="4">4 años</option>
+                            <option value="5">5 años</option>
+                        </select>
+                        <span>→</span>
+                        <span style="flex:1;font-weight:600;color:#6c3ce0;" id="textoFechaFin">Fecha Fin: -</span>
+                    </div>
+                    <div class="duracion-info">
+                        <span class="duracion-tag">📌 El contrato se renovará automáticamente al cumplir la duración seleccionada</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- 4. Tipo de contrato (OBLIGATORIO) -->
+            <!-- 5. Fecha Fin (AUTOMÁTICA - Solo lectura) -->
+            <div class="form-row">
+                <div style="flex:1;">
+                    <label>📅 Fecha de Fin <span style="color:#666;">(automática según duración)</span></label>
+                    <input type="date" id="contratoFechaFin" readonly disabled style="background:#0a0a14;color:#888;">
+                    <div class="info-fecha-fin" id="infoFechaFin">📌 La fecha de fin se calcula automáticamente según la duración seleccionada</div>
+                </div>
+            </div>
+
+            <!-- 6. Tipo de contrato (OBLIGATORIO) -->
             <div class="form-row campo-obligatorio">
                 <div style="flex:1;">
                     <label>📋 Tipo de Contrato</label>
@@ -361,7 +426,7 @@
                 </div>
             </div>
 
-            <!-- 5. Monto (opcional) -->
+            <!-- 7. Monto (opcional) -->
             <div class="form-row">
                 <div style="flex:1;">
                     <label>💰 Monto del Contrato <span style="color:#666;">(opcional)</span></label>
@@ -369,7 +434,7 @@
                 </div>
             </div>
 
-            <!-- 6. Descripción (opcional) -->
+            <!-- 8. Descripción (opcional) -->
             <div class="form-row">
                 <div style="flex:1;">
                     <label>📝 Descripción <span style="color:#666;">(opcional)</span></label>
@@ -379,9 +444,9 @@
 
             <input type="hidden" id="contratoId" value="">
 
-            <div style="display:flex;gap:10px;margin-top:16px;border-top:1px solid #2a2a3e;padding-top:16px;">
-                <button class="btn btn-success" onclick="guardarContrato()" style="flex:1;" id="btnGuardar">💾 Guardar Contrato</button>
-                <button class="btn btn-danger" onclick="cerrarModal()" style="flex:1;">✕ Cancelar</button>
+            <div class="form-actions">
+                <button class="btn btn-success" onclick="guardarContrato()" id="btnGuardar">💾 Guardar Contrato</button>
+                <button class="btn btn-danger" onclick="cerrarModal()">✕ Cancelar</button>
             </div>
         </div>
     </div>
@@ -442,23 +507,35 @@
         }
 
         // ============================================
-        // CALCULAR FECHA FIN (1 AÑO DESPUÉS)
+        // CALCULAR FECHA FIN SEGÚN DURACIÓN
         // ============================================
 
-        document.getElementById('contratoFechaInicio').addEventListener('change', function() {
-            const fechaInicio = new Date(this.value);
-            if (!isNaN(fechaInicio)) {
-                const fechaFin = new Date(fechaInicio);
-                fechaFin.setFullYear(fechaFin.getFullYear() + 1);
-                const fechaFinStr = fechaFin.toISOString().split('T')[0];
+        function calcularFechaFin() {
+            const fechaInicio = document.getElementById('contratoFechaInicio').value;
+            const duracion = parseInt(document.getElementById('contratoDuracion').value) || 1;
+            
+            if (fechaInicio) {
+                const fecha = new Date(fechaInicio);
+                fecha.setFullYear(fecha.getFullYear() + duracion);
+                const fechaFinStr = fecha.toISOString().split('T')[0];
                 document.getElementById('contratoFechaFin').value = fechaFinStr;
                 
                 const hoy = new Date();
-                const diasRestantes = Math.ceil((fechaFin - hoy) / (1000 * 60 * 60 * 24));
+                const diasRestantes = Math.ceil((fecha - hoy) / (1000 * 60 * 60 * 24));
+                
+                // Actualizar texto de duración
+                const textoDuracion = document.getElementById('textoFechaFin');
+                const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                              'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+                const fechaObj = new Date(fechaFinStr);
+                textoDuracion.textContent = `📅 ${fechaObj.getDate()} de ${meses[fechaObj.getMonth()]} de ${fechaObj.getFullYear()} (${duracion} año${duracion > 1 ? 's' : ''})`;
                 
                 let infoText = `📌 Finaliza: ${fechaFinStr} (`;
-                if (diasRestantes > 0) {
-                    infoText += `<span class="activo">${diasRestantes} días restantes</span>`;
+                if (diasRestantes > 30) {
+                    const mesesRestantes = Math.floor(diasRestantes / 30);
+                    infoText += `<span class="activo">${mesesRestantes} meses restantes</span>`;
+                } else if (diasRestantes > 0) {
+                    infoText += `<span class="proximo">${diasRestantes} días restantes</span>`;
                 } else if (diasRestantes === 0) {
                     infoText += `<span class="proximo">⏰ Finaliza hoy</span>`;
                 } else {
@@ -466,8 +543,12 @@
                 }
                 infoText += ')';
                 document.getElementById('infoFechaFin').innerHTML = infoText;
+            } else {
+                document.getElementById('contratoFechaFin').value = '';
+                document.getElementById('textoFechaFin').textContent = 'Fecha Fin: -';
+                document.getElementById('infoFechaFin').innerHTML = '📌 La fecha de fin se calcula automáticamente según la duración seleccionada';
             }
-        });
+        }
 
         // ============================================
         // GENERAR NÚMERO DE CONTRATO CONSECUTIVO
@@ -563,6 +644,7 @@
                                 <th>Empresa</th>
                                 <th>Inicio</th>
                                 <th>Fin</th>
+                                <th>Duración</th>
                                 <th>Tipo</th>
                                 <th>Monto</th>
                                 <th>Estado</th>
@@ -593,6 +675,24 @@
                     'ambos': '<span class="badge ambos">🔄 Ambas</span>'
                 };
                 
+                // Calcular duración en años
+                let duracion = '-';
+                if (c.fecha_inicio && c.fecha_fin) {
+                    const inicio = new Date(c.fecha_inicio);
+                    const fin = new Date(c.fecha_fin);
+                    const diffYears = fin.getFullYear() - inicio.getFullYear();
+                    if (diffYears > 0) {
+                        duracion = `${diffYears} año${diffYears > 1 ? 's' : ''}`;
+                    } else {
+                        const diffMonths = (fin.getMonth() - inicio.getMonth()) + (fin.getFullYear() - inicio.getFullYear()) * 12;
+                        if (diffMonths > 0) {
+                            duracion = `${diffMonths} mes${diffMonths > 1 ? 'es' : ''}`;
+                        } else {
+                            duracion = 'Menos de 1 mes';
+                        }
+                    }
+                }
+                
                 // Verificar si el contrato está vencido
                 const hoy = new Date();
                 const fechaFin = new Date(c.fecha_fin);
@@ -608,6 +708,7 @@
                         <td><strong>${c.empresa}</strong></td>
                         <td>${c.fecha_inicio}</td>
                         <td>${c.fecha_fin}</td>
+                        <td><span style="color:#6c3ce0;font-weight:600;">${duracion}</span></td>
                         <td>${tipos[c.tipo] || tipos['ventas']}</td>
                         <td>$${parseFloat(c.monto || 0).toFixed(2)}</td>
                         <td><span class="badge ${clases[estadoActual]}">${estados[estadoActual]}</span></td>
@@ -681,7 +782,9 @@
             document.getElementById('contratoFechaFin').value = '';
             document.getElementById('contratoMonto').value = '';
             document.getElementById('contratoDescripcion').value = '';
-            document.getElementById('infoFechaFin').innerHTML = '📌 El contrato dura 1 año automáticamente';
+            document.getElementById('contratoDuracion').value = '2';
+            document.getElementById('infoFechaFin').innerHTML = '📌 La fecha de fin se calcula automáticamente según la duración seleccionada';
+            document.getElementById('textoFechaFin').textContent = 'Fecha Fin: -';
             document.getElementById('btnGuardar').textContent = '💾 Guardar Contrato';
             
             // Resetear tipo
@@ -700,7 +803,7 @@
             // Poner fecha de hoy por defecto
             const hoy = new Date().toISOString().split('T')[0];
             document.getElementById('contratoFechaInicio').value = hoy;
-            document.getElementById('contratoFechaInicio').dispatchEvent(new Event('change'));
+            calcularFechaFin();
         }
 
         // ============================================
@@ -721,6 +824,22 @@
             document.getElementById('contratoMonto').value = c.monto || '';
             document.getElementById('contratoDescripcion').value = c.descripcion || '';
             document.getElementById('btnGuardar').textContent = '💾 Actualizar Contrato';
+            
+            // Calcular duración y establecer en el selector
+            if (c.fecha_inicio && c.fecha_fin) {
+                const inicio = new Date(c.fecha_inicio);
+                const fin = new Date(c.fecha_fin);
+                const diffYears = fin.getFullYear() - inicio.getFullYear();
+                if (diffYears >= 1 && diffYears <= 5) {
+                    document.getElementById('contratoDuracion').value = diffYears;
+                } else {
+                    // Si no coincide con los años exactos, dejar en 2 por defecto
+                    document.getElementById('contratoDuracion').value = '2';
+                }
+            }
+            
+            // Actualizar texto de fecha fin
+            calcularFechaFin();
             
             // Seleccionar tipo
             document.querySelectorAll('.tipo-option label').forEach(el => {
@@ -744,13 +863,15 @@
             
             editandoId = id;
             
-            const fechaInicio = new Date(c.fecha_inicio);
             const fechaFin = new Date(c.fecha_fin);
             const hoy = new Date();
             const diasRestantes = Math.ceil((fechaFin - hoy) / (1000 * 60 * 60 * 24));
             let infoText = `📌 Finaliza: ${c.fecha_fin} (`;
-            if (diasRestantes > 0) {
-                infoText += `<span class="activo">${diasRestantes} días restantes</span>`;
+            if (diasRestantes > 30) {
+                const mesesRestantes = Math.floor(diasRestantes / 30);
+                infoText += `<span class="activo">${mesesRestantes} meses restantes</span>`;
+            } else if (diasRestantes > 0) {
+                infoText += `<span class="proximo">${diasRestantes} días restantes</span>`;
             } else if (diasRestantes === 0) {
                 infoText += `<span class="proximo">⏰ Finaliza hoy</span>`;
             } else {
@@ -779,106 +900,99 @@
         // ============================================
 
         async function guardarContrato() {
-    const btn = document.getElementById('btnGuardar');
-    btn.disabled = true;
-    btn.textContent = '⏳ Guardando...';
+            const btn = document.getElementById('btnGuardar');
+            btn.disabled = true;
+            btn.textContent = '⏳ Guardando...';
 
-    try {
-        const empresa = document.getElementById('contratoEmpresa').value.trim();
-        const numero_contrato = document.getElementById('contratoNumero').value.trim();
-        const fecha_inicio = document.getElementById('contratoFechaInicio').value;
-        const fecha_fin = document.getElementById('contratoFechaFin').value;
-        const monto = parseFloat(document.getElementById('contratoMonto').value) || 0;
-        const descripcion = document.getElementById('contratoDescripcion').value.trim();
-        
-        const tipoSeleccionado = document.querySelector('input[name="tipoContrato"]:checked');
-        const tipo = tipoSeleccionado ? tipoSeleccionado.value : '';
+            try {
+                const empresa = document.getElementById('contratoEmpresa').value.trim();
+                const numero_contrato = document.getElementById('contratoNumero').value.trim();
+                const fecha_inicio = document.getElementById('contratoFechaInicio').value;
+                const fecha_fin = document.getElementById('contratoFechaFin').value;
+                const monto = parseFloat(document.getElementById('contratoMonto').value) || 0;
+                const descripcion = document.getElementById('contratoDescripcion').value.trim();
+                
+                const tipoSeleccionado = document.querySelector('input[name="tipoContrato"]:checked');
+                const tipo = tipoSeleccionado ? tipoSeleccionado.value : '';
 
-        if (!empresa) {
-            mostrarMensaje('❌ El nombre de la empresa es obligatorio', 'error');
-            document.getElementById('contratoEmpresa').focus();
-            btn.disabled = false;
-            btn.textContent = '💾 Guardar Contrato';
-            return;
-        }
+                if (!empresa) {
+                    mostrarMensaje('❌ El nombre de la empresa es obligatorio', 'error');
+                    document.getElementById('contratoEmpresa').focus();
+                    btn.disabled = false;
+                    btn.textContent = '💾 Guardar Contrato';
+                    return;
+                }
 
-        if (!fecha_inicio) {
-            mostrarMensaje('❌ La fecha de inicio es obligatoria', 'error');
-            document.getElementById('contratoFechaInicio').focus();
-            btn.disabled = false;
-            btn.textContent = '💾 Guardar Contrato';
-            return;
-        }
+                if (!fecha_inicio) {
+                    mostrarMensaje('❌ La fecha de inicio es obligatoria', 'error');
+                    document.getElementById('contratoFechaInicio').focus();
+                    btn.disabled = false;
+                    btn.textContent = '💾 Guardar Contrato';
+                    return;
+                }
 
-        if (!tipo) {
-            mostrarMensaje('❌ Selecciona el tipo de contrato', 'error');
-            btn.disabled = false;
-            btn.textContent = '💾 Guardar Contrato';
-            return;
-        }
+                if (!tipo) {
+                    mostrarMensaje('❌ Selecciona el tipo de contrato', 'error');
+                    btn.disabled = false;
+                    btn.textContent = '💾 Guardar Contrato';
+                    return;
+                }
 
-        const data = {
-            empresa: empresa,
-            numero_contrato: numero_contrato,
-            fecha_inicio: fecha_inicio,
-            fecha_fin: fecha_fin,
-            tipo: tipo,
-            monto: monto,
-            descripcion: descripcion,
-            estado: 'activo'
-        };
+                const data = {
+                    empresa: empresa,
+                    numero_contrato: numero_contrato,
+                    fecha_inicio: fecha_inicio,
+                    fecha_fin: fecha_fin,
+                    tipo: tipo,
+                    monto: monto,
+                    descripcion: descripcion,
+                    estado: 'activo'
+                };
 
-        console.log('📤 Enviando datos:', data);
+                console.log('📤 Enviando datos:', data);
 
-        const url = editandoId ? `/api/contrato/${editandoId}` : '/api/contratos';
-        const method = editandoId ? 'PUT' : 'POST';
+                const url = editandoId ? `/api/contrato/${editandoId}` : '/api/contratos';
+                const method = editandoId ? 'PUT' : 'POST';
 
-        const response = await fetch(url, {
-            method: method,
-            headers: { 
-                'Content-Type': 'application/json'
-            },
-            credentials: 'same-origin',
-            body: JSON.stringify(data)
-        });
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify(data)
+                });
 
-        console.log('📥 Respuesta status:', response.status);
-        console.log('📥 Content-Type:', response.headers.get('content-type'));
+                const textResponse = await response.text();
+                console.log('📥 Respuesta:', textResponse);
 
-        // Leer la respuesta como texto primero
-        const textResponse = await response.text();
-        console.log('📥 Respuesta texto:', textResponse);
+                let result;
+                try {
+                    result = JSON.parse(textResponse);
+                } catch (e) {
+                    console.error('Error al parsear JSON:', e);
+                    throw new Error('El servidor no devolvió un formato JSON válido');
+                }
 
-        // Intentar parsear como JSON
-        let result;
-        try {
-            result = JSON.parse(textResponse);
-        } catch (e) {
-            console.error('Error al parsear JSON:', e);
-            console.error('Respuesta recibida:', textResponse);
-            throw new Error('El servidor no devolvió un formato JSON válido. Respuesta: ' + textResponse.substring(0, 100));
-        }
-
-        console.log('📥 Resultado parseado:', result);
-
-        if (response.ok && result.success) {
-            mostrarMensaje(`✅ Contrato ${editandoId ? 'actualizado' : 'creado'} correctamente`, 'exito');
-            cerrarModal();
-            await cargarContratos();
-            if (!editandoId) {
-                await obtenerUltimoNumeroContrato();
+                if (response.ok && result.success) {
+                    mostrarMensaje(`✅ Contrato ${editandoId ? 'actualizado' : 'creado'} correctamente`, 'exito');
+                    cerrarModal();
+                    await cargarContratos();
+                    if (!editandoId) {
+                        await obtenerUltimoNumeroContrato();
+                    }
+                } else {
+                    mostrarMensaje(result.error || 'Error al guardar el contrato', 'error');
+                }
+            } catch (error) {
+                console.error('❌ Error:', error);
+                mostrarMensaje('❌ Error: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = editandoId ? '💾 Actualizar Contrato' : '💾 Guardar Contrato';
             }
-        } else {
-            mostrarMensaje(result.error || 'Error al guardar el contrato', 'error');
         }
-    } catch (error) {
-        console.error('❌ Error detallado:', error);
-        mostrarMensaje('Error: ' + error.message, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = editandoId ? '💾 Actualizar Contrato' : '💾 Guardar Contrato';
-    }
-}
+
         // ============================================
         // CAMBIAR ESTADO
         // ============================================
@@ -938,6 +1052,16 @@
                 mostrarMensaje('Error de conexión con el servidor', 'error');
             });
         }
+
+        // ============================================
+        // EVENTOS
+        // ============================================
+
+        // Al cambiar la fecha de inicio, recalcular fecha fin
+        document.getElementById('contratoFechaInicio').addEventListener('change', calcularFechaFin);
+
+        // Al cambiar la duración, recalcular fecha fin
+        document.getElementById('contratoDuracion').addEventListener('change', calcularFechaFin);
 
         // ============================================
         // INICIO
