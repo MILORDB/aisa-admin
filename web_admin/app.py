@@ -8,7 +8,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import traceback
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -852,7 +852,6 @@ def api_crear_trabajador():
     
     data = request.get_json()
     
-    # Datos personales
     nombre = data.get('nombre')
     apellidos = data.get('apellidos')
     ci = data.get('ci')
@@ -865,7 +864,6 @@ def api_crear_trabajador():
     password = data.get('password')
     modulos = data.get('modulos', ['inventario', 'tienda', 'servicios', 'ventas'])
     
-    # Validaciones
     if not nombre:
         return jsonify({'error': 'El nombre es obligatorio'}), 400
     if not apellidos:
@@ -879,11 +877,9 @@ def api_crear_trabajador():
     if len(password) < 6:
         return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
     
-    # Verificar usuario único
     if obtener_usuario_por_username(username):
         return jsonify({'error': 'El nombre de usuario ya está en uso'}), 400
     
-    # Preparar datos del negocio
     datos_negocio = {
         'nombre': nombre,
         'apellidos': apellidos,
@@ -895,7 +891,6 @@ def api_crear_trabajador():
         'empresa_id': usuario['id']
     }
     
-    # Crear usuario
     user_id = crear_usuario(
         username=username,
         email=email or f"{username}@trabajador.local",
@@ -909,10 +904,8 @@ def api_crear_trabajador():
     if not user_id:
         return jsonify({'error': 'Error al crear el trabajador'}), 500
     
-    # Asignar a la empresa
     crear_trabajador_negocio(usuario['id'], user_id, 'Trabajador', salario)
     
-    # Asignar módulos
     for modulo_nombre in modulos:
         conn = get_db()
         cursor = conn.cursor()
@@ -941,7 +934,6 @@ def api_actualizar_trabajador(trabajador_id):
     
     data = request.get_json()
     
-    # Datos personales
     nombre = data.get('nombre')
     apellidos = data.get('apellidos')
     ci = data.get('ci')
@@ -951,7 +943,6 @@ def api_actualizar_trabajador(trabajador_id):
     salario = data.get('salario', 0)
     email = data.get('email', '')
     
-    # Validaciones
     if not nombre:
         return jsonify({'error': 'El nombre es obligatorio'}), 400
     if not apellidos:
@@ -959,7 +950,6 @@ def api_actualizar_trabajador(trabajador_id):
     if not ci:
         return jsonify({'error': 'El carnet de identidad es obligatorio'}), 400
     
-    # Obtener trabajador actual
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (trabajador_id,))
@@ -971,7 +961,6 @@ def api_actualizar_trabajador(trabajador_id):
     
     datos_actuales = json.loads(result[0]) if result[0] else {}
     
-    # Actualizar datos
     datos_actuales.update({
         'nombre': nombre,
         'apellidos': apellidos,
@@ -982,7 +971,6 @@ def api_actualizar_trabajador(trabajador_id):
         'salario': salario
     })
     
-    # Actualizar en la base de datos
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1058,7 +1046,6 @@ def api_producto(producto_id):
     if not usuario or usuario['tipo'] != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
-    # DELETE - ELIMINAR PRODUCTO
     if request.method == 'DELETE':
         try:
             print(f"🗑️ Intentando eliminar producto ID: {producto_id}")
@@ -1100,7 +1087,6 @@ def api_producto(producto_id):
             traceback.print_exc()
             return jsonify({'error': str(e)}), 500
     
-    # PUT - ACTUALIZAR PRODUCTO
     try:
         data = request.get_json()
         if not data:
@@ -1772,10 +1758,8 @@ def api_reporte_contratos():
     tipo = request.args.get('tipo', 'todos')
     
     try:
-        # Obtener contratos del negocio
         contratos = obtener_contratos(usuario['id'])
         
-        # Obtener datos del negocio
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
@@ -1786,20 +1770,16 @@ def api_reporte_contratos():
         datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
         negocio_telefono = datos_negocio.get('telefono', '')
         
-        # Procesar contratos para el reporte
         hoy = datetime.now().date()
         contratos_procesados = []
         
         for c in contratos:
-            # Determinar estado real
             fecha_fin = datetime.fromisoformat(c['fecha_fin']).date() if c['fecha_fin'] else None
             estado = c['estado']
             
-            # Si está activo pero la fecha ya pasó, marcarlo como vencido
             if estado == 'activo' and fecha_fin and fecha_fin < hoy:
                 estado = 'vencido'
             
-            # Filtrar por tipo
             if tipo == 'activos' and estado != 'activo':
                 continue
             if tipo == 'vencidos' and estado != 'vencido':
@@ -1816,7 +1796,6 @@ def api_reporte_contratos():
                 'tipo': c['tipo']
             })
         
-        # Generar PDF
         generador = GeneradorReportes(
             negocio_id=usuario['id'],
             negocio_nombre=negocio_nombre,
@@ -1828,7 +1807,6 @@ def api_reporte_contratos():
             tipo_reporte=tipo
         )
         
-        # Crear respuesta con el PDF
         response = make_response(pdf_bytes)
         response.headers['Content-Type'] = 'application/pdf'
         response.headers['Content-Disposition'] = f'attachment; filename=reporte_contratos_{tipo}_{datetime.now().strftime("%Y%m%d")}.pdf'
@@ -1838,10 +1816,11 @@ def api_reporte_contratos():
         return response
         
     except Exception as e:
-        print(f"❌ Error generando reporte: {e}")
+        print(f"❌ Error generando reporte de contratos: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/reportes/contratos/resumen', methods=['GET'])
 @login_required
@@ -1886,6 +1865,210 @@ def api_resumen_contratos():
         
     except Exception as e:
         print(f"❌ Error en resumen de contratos: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reportes/ingresos', methods=['GET'])
+@login_required
+def api_reporte_ingresos():
+    """Genera un reporte PDF de ingresos"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    periodo = request.args.get('periodo', 'todos')
+    
+    try:
+        ventas = obtener_ventas(usuario['id'])
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
+        negocio = cursor.fetchone()
+        conn.close()
+        
+        negocio_nombre = negocio[0] or 'Mi Negocio'
+        datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
+        negocio_telefono = datos_negocio.get('telefono', '')
+        
+        ventas_filtradas = []
+        hoy = datetime.now().date()
+        
+        for v in ventas:
+            fecha_venta = datetime.fromisoformat(v['fecha']).date() if v['fecha'] else None
+            if not fecha_venta:
+                continue
+            
+            if periodo == 'hoy':
+                if fecha_venta == hoy:
+                    ventas_filtradas.append(v)
+            elif periodo == 'semana':
+                inicio_semana = hoy - timedelta(days=hoy.weekday())
+                if fecha_venta >= inicio_semana:
+                    ventas_filtradas.append(v)
+            elif periodo == 'mes':
+                if fecha_venta.month == hoy.month and fecha_venta.year == hoy.year:
+                    ventas_filtradas.append(v)
+            else:
+                ventas_filtradas.append(v)
+        
+        total_ingresos = sum(v.get('total', 0) for v in ventas_filtradas)
+        total_ventas = len(ventas_filtradas)
+        
+        periodos = {
+            'hoy': 'Hoy',
+            'semana': 'Esta semana',
+            'mes': 'Este mes',
+            'todos': 'Todos los períodos'
+        }
+        nombre_periodo = periodos.get(periodo, 'Todos los períodos')
+        
+        generador = GeneradorReportes(
+            negocio_id=usuario['id'],
+            negocio_nombre=negocio_nombre,
+            negocio_telefono=negocio_telefono
+        )
+        
+        pdf_bytes = generador.generar_reporte_ingresos(
+            ventas_filtradas,
+            total_ingresos,
+            total_ventas,
+            periodo=nombre_periodo
+        )
+        
+        response = make_response(pdf_bytes)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=reporte_ingresos_{periodo}_{datetime.now().strftime("%Y%m%d")}.pdf'
+        
+        registrar_log(usuario['id'], 'reporte_generado', f'Reporte de ingresos ({periodo})')
+        
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error generando reporte de ingresos: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reportes/ingresos/resumen', methods=['GET'])
+@login_required
+def api_resumen_ingresos():
+    """Obtiene un resumen de ingresos para el panel lateral"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    try:
+        ventas = obtener_ventas(usuario['id'])
+        
+        hoy = datetime.now().date()
+        inicio_semana = hoy - timedelta(days=hoy.weekday())
+        
+        total_ventas = len(ventas)
+        total_ingresos = sum(v.get('total', 0) for v in ventas)
+        
+        ventas_hoy = [v for v in ventas if v['fecha'] and datetime.fromisoformat(v['fecha']).date() == hoy]
+        ingresos_hoy = sum(v.get('total', 0) for v in ventas_hoy)
+        
+        ventas_semana = [v for v in ventas if v['fecha'] and datetime.fromisoformat(v['fecha']).date() >= inicio_semana]
+        ingresos_semana = sum(v.get('total', 0) for v in ventas_semana)
+        
+        ventas_mes = [v for v in ventas if v['fecha'] and datetime.fromisoformat(v['fecha']).month == hoy.month]
+        ingresos_mes = sum(v.get('total', 0) for v in ventas_mes)
+        
+        return jsonify({
+            'total_ventas': total_ventas,
+            'total_ingresos': total_ingresos,
+            'ingresos_hoy': ingresos_hoy,
+            'ingresos_semana': ingresos_semana,
+            'ingresos_mes': ingresos_mes,
+            'tiene_ventas': total_ventas > 0
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en resumen de ingresos: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reportes/productos', methods=['GET'])
+@login_required
+def api_reporte_productos():
+    """Genera un reporte PDF de productos en almacén"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    try:
+        productos = obtener_productos(usuario['id'])
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
+        negocio = cursor.fetchone()
+        conn.close()
+        
+        negocio_nombre = negocio[0] or 'Mi Negocio'
+        datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
+        negocio_telefono = datos_negocio.get('telefono', '')
+        
+        generador = GeneradorReportes(
+            negocio_id=usuario['id'],
+            negocio_nombre=negocio_nombre,
+            negocio_telefono=negocio_telefono
+        )
+        
+        pdf_bytes = generador.generar_reporte_productos(productos)
+        
+        response = make_response(pdf_bytes)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=reporte_productos_{datetime.now().strftime("%Y%m%d")}.pdf'
+        
+        registrar_log(usuario['id'], 'reporte_generado', 'Reporte de productos en almacén')
+        
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error generando reporte de productos: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reportes/productos/resumen', methods=['GET'])
+@login_required
+def api_resumen_productos():
+    """Obtiene un resumen de productos para el panel lateral"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    try:
+        productos = obtener_productos(usuario['id'])
+        
+        total = len(productos)
+        stock_bajo = len([p for p in productos if p.get('stock', 0) <= (p.get('stock_minimo', 3)) and p.get('stock', 0) > 0])
+        stock_agotado = len([p for p in productos if p.get('stock', 0) == 0])
+        valor_total = sum(p.get('precio', 0) * p.get('stock', 0) for p in productos)
+        
+        return jsonify({
+            'total': total,
+            'stock_bajo': stock_bajo,
+            'stock_agotado': stock_agotado,
+            'valor_total': valor_total,
+            'tiene_productos': total > 0
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en resumen de productos: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ============================================
