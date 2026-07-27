@@ -47,8 +47,11 @@
         .btn-primary { background: #6c3ce0; color: #fff; }
         .btn-primary:hover { background: #5a2ec0; }
         .btn-success { background: #4caf50; color: #fff; }
+        .btn-success:hover { background: #3d8b40; }
         .btn-danger { background: #f44336; color: #fff; }
+        .btn-danger:hover { background: #c62828; }
         .btn-warning { background: #ff9800; color: #fff; }
+        .btn-warning:hover { background: #e68900; }
         .btn-sm { padding: 4px 12px; font-size: 11px; }
         .tabla {
             width: 100%;
@@ -64,6 +67,7 @@
         .tabla td {
             padding: 8px 12px;
             border-bottom: 1px solid #1a1a2e;
+            vertical-align: middle;
         }
         .tabla .badge {
             padding: 2px 10px;
@@ -72,6 +76,8 @@
         }
         .tabla .badge.activo { background: #224422; color: #6bff6b; }
         .tabla .badge.inactivo { background: #442222; color: #ff6b6b; }
+        .tabla .badge.diaria { background: #1a237e; color: #fff; }
+        .tabla .badge.cada2dias { background: #ff9800; color: #000; }
         .form-row {
             display: flex;
             gap: 12px;
@@ -88,26 +94,31 @@
             flex: 1;
             min-width: 120px;
         }
-        .form-row input:focus { border-color: #6c3ce0; outline: none; }
-        .form-row select[multiple] {
-            min-height: 120px;
-            background: #0f0f1a;
-            color: #fff;
-            padding: 8px;
+        .form-row input:focus, .form-row select:focus {
+            border-color: #6c3ce0;
+            outline: none;
         }
-        .form-row select[multiple] option {
-            padding: 6px 10px;
-            cursor: pointer;
-            border-bottom: 1px solid #1a1a2e;
+        .form-row select option { background: #1a1a2e; }
+        .form-row label {
+            font-size: 12px;
+            color: #aaa;
+            display: block;
+            margin-bottom: 2px;
         }
-        .form-row select[multiple] option:checked {
-            background: #6c3ce0;
-            color: #fff;
+        .form-row .campo-obligatorio label::after {
+            content: " *";
+            color: #ff6b6b;
+        }
+        .form-row .help-text {
+            font-size: 11px;
+            color: #666;
+            margin-top: 2px;
         }
         .search-bar {
             display: flex;
             gap: 10px;
             margin-bottom: 16px;
+            flex-wrap: wrap;
         }
         .search-bar input {
             flex: 1;
@@ -116,15 +127,18 @@
             border-radius: 8px;
             background: #0f0f1a;
             color: #fff;
+            min-width: 150px;
         }
         .search-bar input:focus { border-color: #6c3ce0; outline: none; }
+        .search-bar select {
+            padding: 8px 14px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+        }
         .empty { text-align: center; color: #888; padding: 40px; }
         .loading { text-align: center; color: #888; padding: 20px; }
-        .help-text {
-            font-size: 11px;
-            color: #666;
-            margin-top: 4px;
-        }
         .mensaje-exito {
             background: #224422;
             color: #6bff6b;
@@ -143,18 +157,61 @@
             display: none;
         }
         .mensaje-error.show { display: block; }
-        .modulo-tag {
-            display: inline-block;
-            background: rgba(108, 60, 224, 0.2);
-            color: #6c3ce0;
-            padding: 2px 10px;
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-content {
+            background: #1a1a2e;
+            padding: 30px;
             border-radius: 12px;
-            font-size: 11px;
-            margin: 2px 4px 2px 0;
+            max-width: 580px;
+            width: 95%;
+            border: 1px solid #2a2a3e;
+            max-height: 95vh;
+            overflow-y: auto;
+        }
+        .modal-content h3 { margin-bottom: 8px; }
+        .modal-content .modal-subtitle {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 16px;
+        }
+        .modal-content .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .modal-content .form-actions .btn {
+            flex: 1;
+        }
+        .info-trabajador {
+            background: #0f0f1a;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid #2a2a3e;
+        }
+        .info-trabajador .label { color: #888; font-size: 11px; }
+        .info-trabajador .value { color: #fff; font-weight: 600; }
+        .acciones-cell {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
         }
         @media (max-width: 600px) {
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .form-row { flex-direction: column; }
+            .modal-content { padding: 16px; }
+            .acciones-cell { flex-direction: column; }
+            .acciones-cell .btn-sm { width: 100%; text-align: center; }
         }
     </style>
 </head>
@@ -191,35 +248,100 @@
     <div class="card">
         <div class="search-bar">
             <input type="text" id="searchInput" placeholder="🔍 Buscar trabajador..." oninput="filtrarTrabajadores()">
+            <select id="filtroEstado" onchange="filtrarTrabajadores()">
+                <option value="todos">Todos</option>
+                <option value="activo">🟢 Activos</option>
+                <option value="inactivo">🔴 Inactivos</option>
+            </select>
             <button class="btn btn-primary" onclick="mostrarFormulario()">+ Nuevo trabajador</button>
         </div>
 
         <div id="formTrabajador" style="display:none;border-top:1px solid #2a2a3e;padding-top:16px;margin-top:12px;">
-            <h3 style="margin-bottom:12px;">Nuevo Trabajador</h3>
-            <div class="form-row">
-                <input type="text" id="traNombre" placeholder="Nombre completo" required>
-                <input type="text" id="traCargo" placeholder="Cargo" required>
+            <h3 id="modalTitle">👤 Nuevo Trabajador</h3>
+            <div class="modal-subtitle">Complete los datos personales y laborales del trabajador</div>
+
+            <!-- DATOS PERSONALES -->
+            <div style="background:#0f0f1a;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #2a2a3e;">
+                <div style="font-size:13px;color:#6c3ce0;margin-bottom:8px;">📋 Datos Personales</div>
+                
+                <div class="form-row campo-obligatorio">
+                    <div style="flex:1;">
+                        <label>Nombre</label>
+                        <input type="text" id="traNombre" placeholder="Nombre del trabajador" required>
+                    </div>
+                    <div style="flex:1;">
+                        <label>Apellidos</label>
+                        <input type="text" id="traApellidos" placeholder="Apellidos del trabajador" required>
+                    </div>
+                </div>
+
+                <div class="form-row campo-obligatorio">
+                    <div style="flex:1;">
+                        <label>Carnet de Identidad (CI)</label>
+                        <input type="text" id="traCI" placeholder="Ej: 123456789" required>
+                    </div>
+                    <div style="flex:1;">
+                        <label>Teléfono / Móvil</label>
+                        <input type="text" id="traMovil" placeholder="Ej: 555-1234">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div style="flex:1;">
+                        <label>Dirección Particular</label>
+                        <input type="text" id="traDireccion" placeholder="Calle, número, ciudad">
+                    </div>
+                </div>
             </div>
-            <div class="form-row">
-                <input type="email" id="traEmail" placeholder="Email" required>
-                <input type="text" id="traTelefono" placeholder="Teléfono">
-                <input type="number" id="traSalario" placeholder="Salario" step="0.01">
+
+            <!-- DATOS LABORALES -->
+            <div style="background:#0f0f1a;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #2a2a3e;">
+                <div style="font-size:13px;color:#6c3ce0;margin-bottom:8px;">💼 Datos Laborales</div>
+                
+                <div class="form-row campo-obligatorio">
+                    <div style="flex:1;">
+                        <label>Frecuencia de trabajo</label>
+                        <select id="traFrecuencia" required>
+                            <option value="diaria">Diaria</option>
+                            <option value="cada_2_dias">Cada 2 días</option>
+                        </select>
+                        <div class="help-text">Selecciona la frecuencia con la que el trabajador presta servicios</div>
+                    </div>
+                    <div style="flex:1;">
+                        <label>Salario</label>
+                        <input type="number" id="traSalario" placeholder="Ej: 1500.00" step="0.01" required>
+                        <div class="help-text">Salario mensual en pesos</div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div style="flex:1;">
+                        <label>📧 Email (opcional)</label>
+                        <input type="email" id="traEmail" placeholder="trabajador@email.com">
+                    </div>
+                </div>
             </div>
-            <div class="form-row">
-                <input type="text" id="traUsuario" placeholder="Usuario para login" required>
-                <input type="password" id="traPassword" placeholder="Contraseña" required>
+
+            <!-- DATOS DE ACCESO -->
+            <div style="background:#0f0f1a;border-radius:8px;padding:12px;margin-bottom:12px;border:1px solid #2a2a3e;">
+                <div style="font-size:13px;color:#6c3ce0;margin-bottom:8px;">🔑 Datos de Acceso al Sistema</div>
+                <div class="form-row campo-obligatorio">
+                    <div style="flex:1;">
+                        <label>Usuario para login</label>
+                        <input type="text" id="traUsuario" placeholder="Nombre de usuario" required>
+                    </div>
+                    <div style="flex:1;">
+                        <label>Contraseña</label>
+                        <input type="password" id="traPassword" placeholder="Mínimo 6 caracteres" required>
+                    </div>
+                </div>
+                <div class="help-text">El trabajador usará estas credenciales para acceder al sistema</div>
             </div>
-            <div class="form-row">
-                <select id="traModulos" multiple>
-                    <option value="inventario">📦 Inventario</option>
-                    <option value="tienda">🛍️ Tienda</option>
-                    <option value="servicios">📋 Servicios</option>
-                    <option value="ventas">💰 Ventas</option>
-                </select>
-            </div>
-            <div class="help-text">Mantén presionado Ctrl para seleccionar múltiples módulos</div>
-            <div style="display:flex;gap:10px;margin-top:12px;">
-                <button class="btn btn-success" onclick="guardarTrabajador()">💾 Guardar</button>
+
+            <input type="hidden" id="traId" value="">
+
+            <div class="form-actions">
+                <button class="btn btn-success" onclick="guardarTrabajador()" id="btnGuardar">💾 Guardar trabajador</button>
                 <button class="btn btn-danger" onclick="cancelarFormulario()">✕ Cancelar</button>
             </div>
         </div>
@@ -279,15 +401,22 @@
         // RENDER TRABAJADORES
         // ============================================
 
-        function renderTrabajadores(filtro = '') {
+        function renderTrabajadores(filtro = '', estadoFiltro = 'todos') {
             const container = document.getElementById('trabajadoresContainer');
             const filtroLower = filtro.toLowerCase();
             
-            const filtrados = trabajadores.filter(t => 
+            let filtrados = trabajadores.filter(t => 
                 t.nombre.toLowerCase().includes(filtroLower) ||
-                (t.cargo && t.cargo.toLowerCase().includes(filtroLower)) ||
-                t.username.toLowerCase().includes(filtroLower)
+                (t.apellidos && t.apellidos.toLowerCase().includes(filtroLower)) ||
+                (t.ci && t.ci.includes(filtroLower)) ||
+                (t.movil && t.movil.includes(filtroLower))
             );
+
+            if (estadoFiltro === 'activo') {
+                filtrados = filtrados.filter(t => t.activo === 1 || t.activo === true);
+            } else if (estadoFiltro === 'inactivo') {
+                filtrados = filtrados.filter(t => t.activo === 0 || t.activo === false);
+            }
 
             if (filtrados.length === 0) {
                 container.innerHTML = `<div class="empty">No hay trabajadores registrados</div>`;
@@ -300,12 +429,11 @@
                         <thead>
                             <tr>
                                 <th>Nombre</th>
-                                <th>Cargo</th>
-                                <th>Email</th>
-                                <th>Teléfono</th>
+                                <th>CI</th>
+                                <th>Móvil</th>
+                                <th>Dirección</th>
+                                <th>Frecuencia</th>
                                 <th>Salario</th>
-                                <th>Usuario</th>
-                                <th>Módulos</th>
                                 <th>Estado</th>
                                 <th>Acciones</th>
                             </tr>
@@ -314,24 +442,28 @@
             `;
 
             filtrados.forEach(t => {
-                const modulosStr = t.modulos && t.modulos.length > 0 
-                    ? t.modulos.map(m => `<span class="modulo-tag">${m}</span>`).join('')
-                    : '<span style="color:#666;">Sin módulos</span>';
+                const nombreCompleto = t.apellidos ? `${t.nombre} ${t.apellidos}` : t.nombre;
+                const frecuenciaLabel = t.frecuencia === 'diaria' ? '🔄 Diaria' : '📅 Cada 2 días';
+                const frecuenciaClass = t.frecuencia === 'diaria' ? 'diaria' : 'cada2dias';
+                const estadoClass = t.activo ? 'activo' : 'inactivo';
+                const estadoLabel = t.activo ? '🟢 Activo' : '🔴 Inactivo';
                 
                 html += `
                     <tr>
-                        <td><strong>${t.nombre}</strong></td>
-                        <td>${t.cargo || '-'}</td>
-                        <td>${t.email}</td>
-                        <td>${t.telefono || '-'}</td>
+                        <td><strong>${nombreCompleto}</strong></td>
+                        <td>${t.ci || '-'}</td>
+                        <td>${t.movil || '-'}</td>
+                        <td>${t.direccion || '-'}</td>
+                        <td><span class="badge ${frecuenciaClass}">${frecuenciaLabel}</span></td>
                         <td>$${t.salario ? parseFloat(t.salario).toFixed(2) : '0.00'}</td>
-                        <td>${t.username}</td>
-                        <td>${modulosStr}</td>
-                        <td><span class="badge ${t.activo ? 'activo' : 'inactivo'}">${t.activo ? '🟢 Activo' : '🔴 Inactivo'}</span></td>
+                        <td><span class="badge ${estadoClass}">${estadoLabel}</span></td>
                         <td>
-                            <button class="btn btn-warning btn-sm" onclick="editarTrabajador(${t.id})">✏️</button>
-                            <button class="btn ${t.activo ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleTrabajador(${t.id}, ${t.activo ? 0 : 1})">${t.activo ? '🔴' : '🟢'}</button>
-                            <button class="btn btn-danger btn-sm" onclick="eliminarTrabajador(${t.id})">🗑️</button>
+                            <div class="acciones-cell">
+                                <button class="btn btn-warning btn-sm" onclick="editarTrabajador(${t.id})">✏️</button>
+                                <button class="btn ${t.activo ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleTrabajador(${t.id}, ${t.activo ? 0 : 1})">
+                                    ${t.activo ? '🔴' : '🟢'}
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;
@@ -352,7 +484,7 @@
 
         function actualizarEstadisticas() {
             const total = trabajadores.length;
-            const activos = trabajadores.filter(t => t.activo).length;
+            const activos = trabajadores.filter(t => t.activo === 1 || t.activo === true).length;
             const inactivos = total - activos;
             const nomina = trabajadores.reduce((sum, t) => sum + (parseFloat(t.salario) || 0), 0);
             
@@ -368,7 +500,8 @@
 
         function filtrarTrabajadores() {
             const filtro = document.getElementById('searchInput').value;
-            renderTrabajadores(filtro);
+            const estado = document.getElementById('filtroEstado').value;
+            renderTrabajadores(filtro, estado);
         }
 
         // ============================================
@@ -379,98 +512,170 @@
             document.getElementById('formTrabajador').style.display = 'block';
             document.getElementById('traNombre').focus();
             editandoId = null;
-            document.querySelector('#formTrabajador h3').textContent = '👤 Nuevo Trabajador';
-            document.querySelector('#formTrabajador .btn-success').textContent = '💾 Guardar';
+            document.getElementById('modalTitle').textContent = '👤 Nuevo Trabajador';
+            document.getElementById('btnGuardar').textContent = '💾 Guardar trabajador';
+            document.getElementById('btnGuardar').className = 'btn btn-success';
+            
+            // Resetear campos
+            document.getElementById('traNombre').value = '';
+            document.getElementById('traApellidos').value = '';
+            document.getElementById('traCI').value = '';
+            document.getElementById('traMovil').value = '';
+            document.getElementById('traDireccion').value = '';
+            document.getElementById('traFrecuencia').value = 'diaria';
+            document.getElementById('traSalario').value = '';
+            document.getElementById('traEmail').value = '';
+            document.getElementById('traUsuario').value = '';
+            document.getElementById('traPassword').value = '';
+            document.getElementById('traId').value = '';
+            
+            document.getElementById('formTrabajador').scrollIntoView({ behavior: 'smooth' });
         }
 
         function cancelarFormulario() {
             document.getElementById('formTrabajador').style.display = 'none';
             document.getElementById('traNombre').value = '';
-            document.getElementById('traCargo').value = '';
-            document.getElementById('traEmail').value = '';
-            document.getElementById('traTelefono').value = '';
+            document.getElementById('traApellidos').value = '';
+            document.getElementById('traCI').value = '';
+            document.getElementById('traMovil').value = '';
+            document.getElementById('traDireccion').value = '';
+            document.getElementById('traFrecuencia').value = 'diaria';
             document.getElementById('traSalario').value = '';
+            document.getElementById('traEmail').value = '';
             document.getElementById('traUsuario').value = '';
             document.getElementById('traPassword').value = '';
+            document.getElementById('traId').value = '';
             editandoId = null;
+        }
+
+        function editarTrabajador(id) {
+            const t = trabajadores.find(t => t.id === id);
+            if (!t) return;
+            
+            document.getElementById('formTrabajador').style.display = 'block';
+            document.getElementById('traNombre').value = t.nombre || '';
+            document.getElementById('traApellidos').value = t.apellidos || '';
+            document.getElementById('traCI').value = t.ci || '';
+            document.getElementById('traMovil').value = t.movil || '';
+            document.getElementById('traDireccion').value = t.direccion || '';
+            document.getElementById('traFrecuencia').value = t.frecuencia || 'diaria';
+            document.getElementById('traSalario').value = t.salario || '';
+            document.getElementById('traEmail').value = t.email || '';
+            document.getElementById('traUsuario').value = t.username || '';
+            document.getElementById('traPassword').value = '';
+            document.getElementById('traId').value = t.id;
+            
+            editandoId = id;
+            document.getElementById('modalTitle').textContent = '✏️ Editar Trabajador';
+            document.getElementById('btnGuardar').textContent = '💾 Actualizar trabajador';
+            document.getElementById('btnGuardar').className = 'btn btn-warning';
+            
+            document.getElementById('formTrabajador').scrollIntoView({ behavior: 'smooth' });
         }
 
         // ============================================
         // GUARDAR TRABAJADOR
         // ============================================
 
-        function guardarTrabajador() {
+        async function guardarTrabajador() {
             const nombre = document.getElementById('traNombre').value.trim();
-            const cargo = document.getElementById('traCargo').value.trim();
-            const email = document.getElementById('traEmail').value.trim();
-            const telefono = document.getElementById('traTelefono').value.trim();
+            const apellidos = document.getElementById('traApellidos').value.trim();
+            const ci = document.getElementById('traCI').value.trim();
+            const movil = document.getElementById('traMovil').value.trim();
+            const direccion = document.getElementById('traDireccion').value.trim();
+            const frecuencia = document.getElementById('traFrecuencia').value;
             const salario = parseFloat(document.getElementById('traSalario').value);
+            const email = document.getElementById('traEmail').value.trim();
             const usuario = document.getElementById('traUsuario').value.trim();
             const password = document.getElementById('traPassword').value.trim();
 
-            if (!nombre || !cargo || !email || !usuario || !password) {
-                mostrarMensaje('Completa todos los campos obligatorios', 'error');
+            // Validaciones
+            if (!nombre) {
+                mostrarMensaje('❌ El nombre es obligatorio', 'error');
+                document.getElementById('traNombre').focus();
                 return;
             }
 
-            if (isNaN(salario)) {
-                mostrarMensaje('El salario debe ser un número válido', 'error');
+            if (!apellidos) {
+                mostrarMensaje('❌ Los apellidos son obligatorios', 'error');
+                document.getElementById('traApellidos').focus();
                 return;
             }
 
-            const selectModulos = document.getElementById('traModulos');
-            const modulosSeleccionados = Array.from(selectModulos.selectedOptions).map(opt => opt.value);
+            if (!ci) {
+                mostrarMensaje('❌ El carnet de identidad es obligatorio', 'error');
+                document.getElementById('traCI').focus();
+                return;
+            }
 
+            if (isNaN(salario) || salario <= 0) {
+                mostrarMensaje('❌ El salario debe ser un número válido mayor que 0', 'error');
+                document.getElementById('traSalario').focus();
+                return;
+            }
+
+            if (!usuario) {
+                mostrarMensaje('❌ El nombre de usuario es obligatorio', 'error');
+                document.getElementById('traUsuario').focus();
+                return;
+            }
+
+            if (!editandoId && !password) {
+                mostrarMensaje('❌ La contraseña es obligatoria para nuevos trabajadores', 'error');
+                document.getElementById('traPassword').focus();
+                return;
+            }
+
+            if (password && password.length < 6) {
+                mostrarMensaje('❌ La contraseña debe tener al menos 6 caracteres', 'error');
+                document.getElementById('traPassword').focus();
+                return;
+            }
+
+            // Preparar datos para el backend
             const data = {
-                nombre,
-                cargo,
-                email,
-                telefono,
-                salario,
-                usuario,
-                password,
-                modulos: modulosSeleccionados
+                nombre: nombre,
+                apellidos: apellidos,
+                ci: ci,
+                movil: movil || '',
+                direccion: direccion || '',
+                frecuencia: frecuencia,
+                salario: salario,
+                email: email || '',
+                usuario: usuario,
+                password: password,
+                // Módulos por defecto (todos activos)
+                modulos: ['inventario', 'tienda', 'servicios', 'ventas']
             };
 
-            fetch('/api/negocio/trabajador/crear', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    mostrarMensaje(`✅ Trabajador "${nombre}" creado correctamente. Usuario: ${usuario}`, 'exito');
+            try {
+                const url = editandoId ? `/api/negocio/trabajador/${editandoId}` : '/api/negocio/trabajador/crear';
+                const method = editandoId ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    mostrarMensaje(`✅ ${editandoId ? 'Actualizado' : 'Creado'} trabajador "${nombre} ${apellidos}" correctamente`, 'exito');
                     cancelarFormulario();
-                    cargarTrabajadores();
+                    await cargarTrabajadores();
                 } else {
-                    mostrarMensaje(data.error || 'Error al crear el trabajador', 'error');
+                    mostrarMensaje(result.error || '❌ Error al guardar el trabajador', 'error');
                 }
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión con el servidor', 'error');
-            });
+                mostrarMensaje('❌ Error de conexión con el servidor', 'error');
+            }
         }
 
         // ============================================
-        // ACCIONES
+        // TOGGLE TRABAJADOR (ACTIVAR/DESACTIVAR)
         // ============================================
-
-        function editarTrabajador(id) {
-            const t = trabajadores.find(t => t.id === id);
-            if (!t) return;
-            mostrarFormulario();
-            document.getElementById('traNombre').value = t.nombre;
-            document.getElementById('traCargo').value = t.cargo || '';
-            document.getElementById('traEmail').value = t.email;
-            document.getElementById('traTelefono').value = t.telefono || '';
-            document.getElementById('traSalario').value = t.salario;
-            document.getElementById('traUsuario').value = t.username;
-            editandoId = id;
-            document.querySelector('#formTrabajador h3').textContent = '✏️ Editar Trabajador';
-            document.querySelector('#formTrabajador .btn-success').textContent = '💾 Actualizar';
-        }
 
         async function toggleTrabajador(id, activo) {
             try {
@@ -479,26 +684,16 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ activo })
                 });
+                
                 if (response.ok) {
-                    mostrarMensaje(`Trabajador ${activo ? 'activado' : 'desactivado'} correctamente`, 'exito');
-                    cargarTrabajadores();
+                    mostrarMensaje(`✅ Trabajador ${activo ? 'activado' : 'desactivado'} correctamente`, 'exito');
+                    await cargarTrabajadores();
                 } else {
-                    mostrarMensaje('Error al cambiar estado', 'error');
+                    mostrarMensaje('❌ Error al cambiar estado', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
-            }
-        }
-
-        function eliminarTrabajador(id) {
-            const t = trabajadores.find(t => t.id === id);
-            if (!t) return;
-            if (confirm(`¿Eliminar a "${t.nombre}"?`)) {
-                trabajadores = trabajadores.filter(t => t.id !== id);
-                renderTrabajadores();
-                actualizarEstadisticas();
-                mostrarMensaje(`Trabajador "${t.nombre}" eliminado`, 'exito');
+                mostrarMensaje('❌ Error de conexión', 'error');
             }
         }
 
