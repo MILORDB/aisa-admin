@@ -18,8 +18,28 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
         .header h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .header .user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .header .user .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .header .user .user-name {
+            font-size: 14px;
+        }
         .header .user a {
             color: #fff;
             text-decoration: none;
@@ -27,8 +47,21 @@
             padding: 4px 12px;
             border-radius: 12px;
             background: rgba(255,255,255,0.1);
+            transition: all 0.3s;
+            font-size: 13px;
         }
-        .header .user a:hover { opacity: 1; }
+        .header .user a:hover {
+            opacity: 1;
+            background: rgba(255,255,255,0.2);
+        }
+        .header .user .btn-perfil {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .header .user .btn-perfil:hover {
+            background: rgba(255,255,255,0.25);
+        }
+        
         .container { padding: 24px; max-width: 1200px; margin: 0 auto; }
         .card {
             background: #1a1a2e;
@@ -121,8 +154,31 @@
         .loading-productos { text-align: center; color: #888; padding: 40px; }
         .empty-productos { text-align: center; color: #888; padding: 40px; }
         
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .stat-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+        .stat-item .number { font-size: 24px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
+        
         @media (max-width: 600px) {
-            .productos-grid { grid-template-columns: 1fr 1fr; }
+            .container { padding: 16px; }
+            .productos-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+            .header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+            .header .user { width: 100%; justify-content: flex-end; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 400px) {
+            .productos-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -131,7 +187,9 @@
     <header class="header">
         <h1>🛍️ AIsa <span style="font-size:14px;font-weight:normal;opacity:0.7;">Modo Cliente</span></h1>
         <div class="user">
-            <span>👤 {{ usuario.nombre or usuario.username }}</span>
+            <div class="user-avatar">👤</div>
+            <span class="user-name">{{ usuario.nombre or usuario.username }}</span>
+            <a href="/perfil" class="btn-perfil">👤 Mi Perfil</a>
             <a href="/logout">Cerrar sesión</a>
         </div>
     </header>
@@ -140,6 +198,21 @@
         <div class="card">
             <div class="welcome">👋 ¡Bienvenido, {{ usuario.nombre or usuario.username }}!</div>
             <div class="subtitle">Explora productos disponibles en la tienda</div>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="number" id="totalProductos">0</span>
+                    <span class="label">📦 Productos</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="negociosActivos">0</span>
+                    <span class="label">🏢 Negocios</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="productosDestacados">0</span>
+                    <span class="label">⭐ Destacados</span>
+                </div>
+            </div>
         </div>
 
         <!-- Tienda -->
@@ -164,6 +237,15 @@
                 const response = await fetch('/api/tienda/public');
                 if (!response.ok) throw new Error('Error al cargar productos');
                 const productos = await response.json();
+                
+                // Actualizar estadísticas
+                const total = productos.length;
+                const destacados = productos.filter(p => p.destacado).length;
+                const negocios = new Set(productos.map(p => p.negocio_id)).size;
+                
+                document.getElementById('totalProductos').textContent = total;
+                document.getElementById('negociosActivos').textContent = negocios;
+                document.getElementById('productosDestacados').textContent = destacados;
                 
                 if (productos.length === 0) {
                     container.innerHTML = '<div class="empty-productos">No hay productos disponibles en la tienda</div>';
@@ -206,6 +288,7 @@
         
         function agregarCarrito(id, nombre, precio) {
             alert(`🛒 Producto "${nombre}" agregado al carrito\n💰 Precio: $${precio.toFixed(2)}`);
+            // Aquí se puede implementar la lógica del carrito
         }
 
         // ============================================
