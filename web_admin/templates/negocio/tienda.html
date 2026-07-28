@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Tienda - AIsa Negocio</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -11,22 +11,22 @@
             background: #0f0f1a;
             color: #fff;
             min-height: 100vh;
-            padding: 20px;
+            padding: 12px;
         }
         .card {
             background: #1a1a2e;
-            border-radius: 12px;
-            padding: 20px;
+            border-radius: 10px;
+            padding: 14px;
             border: 1px solid #2a2a3e;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
-        .card h2 { font-size: 18px; color: #6c3ce0; margin-bottom: 16px; }
+        .card h2 { font-size: 15px; color: #6c3ce0; margin-bottom: 12px; }
         .btn {
-            padding: 8px 18px;
+            padding: 6px 14px;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             transition: all 0.3s;
         }
         .btn-primary { background: #6c3ce0; color: #fff; }
@@ -37,225 +37,126 @@
         .btn-danger:hover { background: #c62828; }
         .btn-warning { background: #ff9800; color: #fff; }
         .btn-warning:hover { background: #e68900; }
-        .btn-sm { padding: 4px 12px; font-size: 11px; }
+        .btn-sm { padding: 3px 8px; font-size: 10px; }
         
         .productos-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 10px;
         }
         .producto-card {
             background: #0f0f1a;
             border: 1px solid #2a2a3e;
-            border-radius: 12px;
-            padding: 16px;
+            border-radius: 8px;
+            padding: 10px;
             text-align: center;
             transition: all 0.3s;
             position: relative;
         }
         .producto-card:hover {
             border-color: #6c3ce0;
-            transform: translateY(-4px);
-            box-shadow: 0 8px 25px rgba(108, 60, 224, 0.15);
-        }
-        .producto-card .foto {
-            width: 100%;
-            height: 150px;
-            object-fit: cover;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            background: #1a1a2e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(108,60,224,0.1);
         }
         .producto-card .foto-placeholder {
-            width: 100%;
-            height: 150px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            background: #1a1a2e;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 48px;
-            color: #444;
+            width: 100%; height: 100px;
+            border-radius: 6px; margin-bottom: 6px;
+            background: #1a1a2e; display: flex;
+            align-items: center; justify-content: center;
+            font-size: 32px; color: #444;
             border: 1px dashed #2a2a3e;
         }
-        .producto-card .nombre {
-            font-size: 14px;
-            font-weight: 600;
-        }
-        .producto-card .precio {
-            font-size: 16px;
-            color: #6c3ce0;
-            font-weight: 700;
-            margin: 4px 0;
-        }
-        .producto-card .stock {
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 8px;
-        }
+        .producto-card .nombre { font-size: 12px; font-weight: 600; }
+        .producto-card .precio { font-size: 14px; color: #6c3ce0; font-weight: 700; margin: 2px 0; }
+        .producto-card .stock { font-size: 10px; color: #888; margin-bottom: 4px; }
         .producto-card .stock.bajo { color: #ff6b6b; }
         .producto-card .destacado-badge {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: #ff9800;
-            color: #000;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 10px;
-            font-weight: 600;
+            position: absolute; top: 4px; right: 4px;
+            background: #ff9800; color: #000;
+            padding: 1px 8px; border-radius: 10px;
+            font-size: 8px; font-weight: 600;
         }
         .producto-card .acciones {
-            display: flex;
-            gap: 6px;
-            justify-content: center;
-            margin-top: 8px;
-            flex-wrap: wrap;
+            display: flex; gap: 4px; justify-content: center; margin-top: 6px; flex-wrap: wrap;
         }
         .search-bar {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
+            display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
         }
         .search-bar input {
-            flex: 1;
-            padding: 8px 14px;
-            border: 1px solid #2a2a3e;
-            border-radius: 8px;
-            background: #0f0f1a;
-            color: #fff;
-            min-width: 150px;
+            flex: 1; padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px;
+            background: #0f0f1a; color: #fff; font-size: 12px; min-width: 100px;
         }
         .search-bar input:focus { border-color: #6c3ce0; outline: none; }
         .search-bar select {
-            padding: 8px 14px;
-            border: 1px solid #2a2a3e;
-            border-radius: 8px;
-            background: #0f0f1a;
-            color: #fff;
+            padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px;
+            background: #0f0f1a; color: #fff; font-size: 12px;
         }
-        .empty { text-align: center; color: #888; padding: 40px; }
-        .loading { text-align: center; color: #888; padding: 20px; }
-        
+        .empty { text-align: center; color: #888; padding: 30px; font-size: 13px; }
+        .loading { text-align: center; color: #888; padding: 20px; font-size: 13px; }
         .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.7);
+            z-index: 1000; align-items: center; justify-content: center; padding: 16px;
         }
         .modal-overlay.show { display: flex; }
         .modal-content {
-            background: #1a1a2e;
-            padding: 30px;
-            border-radius: 12px;
-            max-width: 500px;
-            width: 90%;
-            border: 1px solid #2a2a3e;
-            max-height: 90vh;
-            overflow-y: auto;
+            background: #1a1a2e; padding: 20px; border-radius: 10px;
+            max-width: 400px; width: 100%; border: 1px solid #2a2a3e;
         }
-        .modal-content h3 { margin-bottom: 16px; }
-        .modal-content .form-row {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 12px;
-        }
-        .modal-content .form-row select {
-            flex: 1;
-            padding: 8px 14px;
-            border: 1px solid #2a2a3e;
-            border-radius: 8px;
-            background: #0f0f1a;
-            color: #fff;
-            min-width: 150px;
-        }
-        .modal-content .form-row label {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: #aaa;
-            font-size: 13px;
-        }
-        .modal-content .form-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 16px;
-        }
-        .modal-content .producto-info {
-            background: #0f0f1a;
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 12px;
-            border: 1px solid #2a2a3e;
-        }
-        .modal-content .producto-info .label { color: #888; font-size: 12px; }
-        .modal-content .producto-info .value { color: #fff; font-weight: 600; }
-        
+        .modal-content h3 { font-size: 16px; margin-bottom: 8px; }
+        .modal-content .form-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+        .modal-content .form-row select { flex: 1; padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px; background: #0f0f1a; color: #fff; font-size: 12px; min-width: 120px; }
+        .modal-content .form-row label { display: flex; align-items: center; gap: 6px; color: #aaa; font-size: 12px; }
+        .modal-content .form-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .modal-content .form-actions .btn { flex: 1; }
         .mensaje-exito {
-            background: #224422;
-            color: #6bff6b;
-            padding: 10px 14px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            display: none;
+            background: #224422; color: #6bff6b;
+            padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; display: none;
         }
         .mensaje-exito.show { display: block; }
         .mensaje-error {
-            background: #442222;
-            color: #ff6b6b;
-            padding: 10px 14px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            display: none;
+            background: #442222; color: #ff6b6b;
+            padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; display: none;
         }
         .mensaje-error.show { display: block; }
-        
         .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 12px;
-            margin-bottom: 16px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px;
         }
         .stat-item {
-            background: #0f0f1a;
-            border: 1px solid #2a2a3e;
-            border-radius: 8px;
-            padding: 16px;
-            text-align: center;
+            background: #0f0f1a; border: 1px solid #2a2a3e; border-radius: 6px; padding: 8px; text-align: center;
         }
-        .stat-item .number { font-size: 24px; font-weight: 700; color: #6c3ce0; }
-        .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
-        
+        .stat-item .number { font-size: 18px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 8px; color: #888; margin-top: 1px; }
         @media (max-width: 600px) {
-            .productos-grid { grid-template-columns: 1fr 1fr; }
-            .modal-content { padding: 20px; }
-            .stats-grid { grid-template-columns: 1fr 1fr; }
+            body { padding: 8px; }
+            .card { padding: 10px; }
+            .productos-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+            .producto-card { padding: 8px; }
+            .producto-card .foto-placeholder { height: 80px; font-size: 24px; }
             .search-bar { flex-direction: column; }
+            .modal-content { padding: 16px; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 400px) {
+            .productos-grid { grid-template-columns: 1fr; }
+            .producto-card .foto-placeholder { height: 100px; }
         }
     </style>
 </head>
 <body>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-        <h1 style="font-size:22px;display:flex;align-items:center;gap:10px;">🛍️ Mi Tienda <span style="font-size:14px;font-weight:normal;opacity:0.7;">Gestiona tus productos en venta</span></h1>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:6px;">
+        <h1 style="font-size:18px;display:flex;align-items:center;gap:8px;">🛍️ Mi Tienda <span style="font-size:12px;font-weight:normal;opacity:0.7;">Productos en venta</span></h1>
     </div>
 
     <div class="mensaje-error" id="mensajeError"></div>
     <div class="mensaje-exito" id="mensajeExito"></div>
 
-    <!-- Estadísticas -->
     <div class="card">
         <div class="stats-grid">
             <div class="stat-item">
                 <span class="number" id="totalProductos">0</span>
-                <span class="label">📦 Productos en tienda</span>
+                <span class="label">📦 Total</span>
             </div>
             <div class="stat-item">
                 <span class="number" id="productosDestacados">0</span>
@@ -263,58 +164,44 @@
             </div>
             <div class="stat-item">
                 <span class="number" id="productosDisponibles">0</span>
-                <span class="label">✅ Disponibles para vender</span>
+                <span class="label">✅ Disponibles</span>
             </div>
         </div>
     </div>
 
-    <!-- Barra de búsqueda y botón agregar -->
     <div class="card">
         <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="🔍 Buscar en mi tienda..." oninput="filtrarProductos()">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar..." oninput="filtrarProductos()">
             <select id="filtroDestacado" onchange="filtrarProductos()">
-                <option value="todos">Todos los productos</option>
+                <option value="todos">Todos</option>
                 <option value="destacados">⭐ Destacados</option>
                 <option value="normales">📦 Normales</option>
             </select>
-            <button class="btn btn-primary" onclick="abrirModalAgregar()">+ Agregar producto</button>
+            <button class="btn btn-primary" onclick="abrirModalAgregar()">+ Agregar</button>
         </div>
     </div>
 
-    <!-- Productos en tienda -->
     <div class="card">
         <div id="productosContainer">
-            <div class="loading">Cargando productos...</div>
+            <div class="loading">Cargando...</div>
         </div>
     </div>
 
-    <!-- Modal Agregar Producto -->
+    <!-- Modal Agregar -->
     <div class="modal-overlay" id="modalAgregar">
         <div class="modal-content">
-            <h3>➕ Agregar producto a la tienda</h3>
-            <p style="color:#888;font-size:13px;margin-bottom:16px;">Selecciona un producto de tu inventario para ponerlo a la venta</p>
-            
+            <h3>➕ Agregar a la tienda</h3>
+            <p style="color:#888;font-size:12px;margin-bottom:10px;">Selecciona un producto de tu inventario</p>
             <div class="form-row">
                 <select id="selectProducto">
-                    <option value="">-- Seleccionar producto --</option>
+                    <option value="">-- Seleccionar --</option>
                 </select>
             </div>
-            
-            <div id="productoInfo" class="producto-info" style="display:none;">
-                <div class="label">📊 Información del producto</div>
-                <div class="value" id="infoProductoNombre">-</div>
-                <div class="value" id="infoProductoPrecio">-</div>
-                <div class="value" id="infoProductoStock">-</div>
-            </div>
-            
             <div class="form-row">
-                <label>
-                    <input type="checkbox" id="checkDestacado"> ⭐ Destacar producto
-                </label>
+                <label><input type="checkbox" id="checkDestacado"> ⭐ Destacar</label>
             </div>
-            
             <div class="form-actions">
-                <button class="btn btn-success" onclick="agregarProductoTienda()">💾 Agregar a la tienda</button>
+                <button class="btn btn-success" onclick="agregarProductoTienda()">💾 Agregar</button>
                 <button class="btn btn-danger" onclick="cerrarModal()">✕ Cancelar</button>
             </div>
         </div>
@@ -323,7 +210,6 @@
     <script>
         let productosTienda = [];
         let productosDisponibles = [];
-        let productoSeleccionado = null;
 
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
@@ -340,59 +226,33 @@
             setTimeout(() => {
                 errorEl.classList.remove('show');
                 exitoEl.classList.remove('show');
-            }, 5000);
+            }, 4000);
         }
-
-        // ============================================
-        // CARGAR PRODUCTOS DE LA TIENDA
-        // ============================================
 
         async function cargarTienda() {
             const container = document.getElementById('productosContainer');
-            container.innerHTML = '<div class="loading">Cargando productos...</div>';
+            container.innerHTML = '<div class="loading">Cargando...</div>';
 
             try {
                 const response = await fetch('/api/tienda/productos');
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Error response:', errorText);
-                    throw new Error(`Error ${response.status}: ${errorText}`);
-                }
-                
-                const data = await response.json();
-                console.log('📦 Productos en tienda:', data);
-                
-                productosTienda = Array.isArray(data) ? data : [];
+                if (!response.ok) throw new Error('Error');
+                productosTienda = await response.json();
                 renderTienda();
                 actualizarEstadisticas();
             } catch (error) {
-                console.error('Error al cargar tienda:', error);
-                container.innerHTML = `
-                    <div class="empty">
-                        <div style="font-size:48px;margin-bottom:12px;">❌</div>
-                        <div style="font-size:16px;margin-bottom:8px;">Error al cargar productos</div>
-                        <div style="font-size:13px;color:#666;">${error.message}</div>
-                        <br>
-                        <button class="btn btn-primary" onclick="cargarTienda()">🔄 Reintentar</button>
-                    </div>
-                `;
+                console.error('Error:', error);
+                container.innerHTML = `<div class="empty">❌ Error al cargar</div>`;
             }
         }
-
-        // ============================================
-        // RENDER TIENDA
-        // ============================================
 
         function renderTienda(filtro = '', destacadoFiltro = 'todos') {
             const container = document.getElementById('productosContainer');
             const filtroLower = filtro.toLowerCase();
             
-            let filtrados = productosTienda.filter(p => {
-                const matchNombre = p.nombre ? p.nombre.toLowerCase().includes(filtroLower) : false;
-                const matchCategoria = p.categoria ? p.categoria.toLowerCase().includes(filtroLower) : false;
-                return matchNombre || matchCategoria;
-            });
+            let filtrados = productosTienda.filter(p => 
+                p.nombre.toLowerCase().includes(filtroLower) ||
+                (p.categoria && p.categoria.toLowerCase().includes(filtroLower))
+            );
 
             if (destacadoFiltro === 'destacados') {
                 filtrados = filtrados.filter(p => p.destacado === 1);
@@ -401,40 +261,26 @@
             }
 
             if (filtrados.length === 0) {
-                container.innerHTML = `
-                    <div class="empty">
-                        <div style="font-size:48px;margin-bottom:12px;">🛍️</div>
-                        <div style="font-size:16px;margin-bottom:8px;">${productosTienda.length === 0 ? 'No hay productos en tu tienda' : 'No se encontraron productos'}</div>
-                        <div style="font-size:13px;color:#666;">${productosTienda.length === 0 ? 'Agrega productos desde tu inventario' : 'Prueba con otro filtro'}</div>
-                        <br>
-                        <button class="btn btn-primary" onclick="abrirModalAgregar()">+ Agregar producto</button>
-                    </div>
-                `;
+                container.innerHTML = `<div class="empty">No hay productos</div>`;
                 return;
             }
 
             let html = '<div class="productos-grid">';
             filtrados.forEach(p => {
                 const stockClass = p.stock < 5 ? 'bajo' : '';
-                const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
-                const fotoUrl = p.foto_url || null;
-                const fotoHtml = fotoUrl 
-                    ? `<img src="${fotoUrl}" alt="${p.nombre}" class="foto" onerror="this.style.display='none'">`
-                    : `<div class="foto-placeholder">📷</div>`;
-                const destacadoHtml = p.destacado ? '<span class="destacado-badge">⭐ Destacado</span>' : '';
+                const stockText = p.stock > 0 ? `📦 ${p.stock}` : '🚫 Agotado';
+                const destacadoHtml = p.destacado ? '<span class="destacado-badge">⭐</span>' : '';
                 
                 html += `
                     <div class="producto-card">
                         ${destacadoHtml}
-                        ${fotoHtml}
-                        <div class="nombre">${p.nombre || 'Sin nombre'}</div>
-                        <div class="precio">$${parseFloat(p.precio || 0).toFixed(2)}</div>
+                        <div class="foto-placeholder">📷</div>
+                        <div class="nombre">${p.nombre}</div>
+                        <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
                         <div class="stock ${stockClass}">${stockText}</div>
                         <div class="acciones">
-                            <button class="btn btn-warning btn-sm" onclick="toggleDestacado(${p.id}, ${p.destacado ? 0 : 1})" title="${p.destacado ? 'Quitar destacado' : 'Destacar'}">
-                                ${p.destacado ? '⭐' : '☆'}
-                            </button>
-                            <button class="btn btn-danger btn-sm" onclick="eliminarDeTienda(${p.id})" title="Eliminar de la tienda">🗑️</button>
+                            <button class="btn btn-warning btn-sm" onclick="toggleDestacado(${p.id}, ${p.destacado ? 0 : 1})">${p.destacado ? '⭐' : '☆'}</button>
+                            <button class="btn btn-danger btn-sm" onclick="eliminarDeTienda(${p.id})">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -442,10 +288,6 @@
             html += '</div>';
             container.innerHTML = html;
         }
-
-        // ============================================
-        // ESTADÍSTICAS
-        // ============================================
 
         function actualizarEstadisticas() {
             const total = productosTienda.length;
@@ -457,104 +299,57 @@
             document.getElementById('productosDisponibles').textContent = disponibles;
         }
 
-        // ============================================
-        // FILTRAR
-        // ============================================
-
         function filtrarProductos() {
             const filtro = document.getElementById('searchInput').value;
             const destacado = document.getElementById('filtroDestacado').value;
             renderTienda(filtro, destacado);
         }
 
-        // ============================================
-        // MODAL AGREGAR PRODUCTO
-        // ============================================
-
         async function abrirModalAgregar() {
             try {
-                const response = await fetch('/api/productos');
-                if (!response.ok) throw new Error('Error al cargar productos');
+                const response = await fetch('/api/productos/stock');
+                if (!response.ok) throw new Error('Error');
                 const productos = await response.json();
                 
-                console.log('📦 Todos los productos:', productos);
-                console.log('📦 Productos en tienda:', productosTienda);
-                
-                const idsEnTienda = productosTienda.map(p => p.producto_id || p.id);
-                console.log('📦 IDs en tienda:', idsEnTienda);
-                
+                const idsEnTienda = productosTienda.map(p => p.producto_id);
                 productosDisponibles = productos.filter(p => !idsEnTienda.includes(p.id));
-                console.log('📦 Productos disponibles:', productosDisponibles);
                 
                 const select = document.getElementById('selectProducto');
-                select.innerHTML = '<option value="">-- Seleccionar producto --</option>';
+                select.innerHTML = '<option value="">-- Seleccionar --</option>';
                 
                 if (productosDisponibles.length === 0) {
-                    select.innerHTML = '<option value="">-- No hay productos disponibles --</option>';
-                    document.getElementById('productoInfo').style.display = 'none';
-                    mostrarMensaje('Todos tus productos ya están en la tienda', 'error');
+                    select.innerHTML = '<option value="">-- Sin productos --</option>';
                 } else {
                     productosDisponibles.forEach(p => {
                         const opt = document.createElement('option');
                         opt.value = p.id;
-                        opt.textContent = `${p.nombre} (Stock: ${p.stock})`;
-                        opt.dataset.precio = p.precio;
-                        opt.dataset.stock = p.stock;
-                        opt.dataset.nombre = p.nombre;
+                        opt.textContent = `${p.nombre} (${p.stock})`;
                         select.appendChild(opt);
                     });
                 }
                 
                 document.getElementById('checkDestacado').checked = false;
                 document.getElementById('modalAgregar').classList.add('show');
-                
-                select.onchange = function() {
-                    const selected = this.options[this.selectedIndex];
-                    if (selected && selected.value) {
-                        document.getElementById('productoInfo').style.display = 'block';
-                        document.getElementById('infoProductoNombre').textContent = selected.dataset.nombre || 'Sin nombre';
-                        document.getElementById('infoProductoPrecio').textContent = `💰 $${parseFloat(selected.dataset.precio || 0).toFixed(2)}`;
-                        document.getElementById('infoProductoStock').textContent = `📦 Stock: ${selected.dataset.stock || 0} unidades`;
-                        productoSeleccionado = {
-                            id: parseInt(selected.value),
-                            nombre: selected.dataset.nombre,
-                            precio: parseFloat(selected.dataset.precio),
-                            stock: parseInt(selected.dataset.stock)
-                        };
-                    } else {
-                        document.getElementById('productoInfo').style.display = 'none';
-                        productoSeleccionado = null;
-                    }
-                };
-                
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error al cargar productos disponibles: ' + error.message, 'error');
+                mostrarMensaje('Error al cargar productos', 'error');
             }
         }
 
         function cerrarModal() {
             document.getElementById('modalAgregar').classList.remove('show');
-            productoSeleccionado = null;
         }
 
         document.getElementById('modalAgregar').addEventListener('click', function(e) {
-            if (e.target === this) {
-                cerrarModal();
-            }
+            if (e.target === this) { cerrarModal(); }
         });
 
-        // ============================================
-        // AGREGAR PRODUCTO A LA TIENDA
-        // ============================================
-
         async function agregarProductoTienda() {
-            const select = document.getElementById('selectProducto');
-            const productoId = select.value;
+            const productoId = document.getElementById('selectProducto').value;
             const destacado = document.getElementById('checkDestacado').checked ? 1 : 0;
 
             if (!productoId) {
-                mostrarMensaje('❌ Selecciona un producto', 'error');
+                mostrarMensaje('Selecciona un producto', 'error');
                 return;
             }
 
@@ -562,88 +357,61 @@
                 const response = await fetch('/api/tienda/producto/agregar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        producto_id: parseInt(productoId), 
-                        destacado: destacado 
-                    })
+                    body: JSON.stringify({ producto_id: parseInt(productoId), destacado })
                 });
                 
                 const data = await response.json();
-
                 if (data.success) {
-                    const nombre = select.options[select.selectedIndex]?.text || 'Producto';
-                    mostrarMensaje(`✅ "${nombre}" agregado a la tienda${destacado ? ' como destacado' : ''}`, 'exito');
+                    mostrarMensaje('✅ Producto agregado', 'exito');
                     cerrarModal();
                     await cargarTienda();
                 } else {
-                    mostrarMensaje(data.error || '❌ Error al agregar a la tienda', 'error');
+                    mostrarMensaje(data.error || 'Error', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('❌ Error de conexión: ' + error.message, 'error');
+                mostrarMensaje('Error de conexión', 'error');
             }
         }
-
-        // ============================================
-        // TOGGLE DESTACADO
-        // ============================================
 
         async function toggleDestacado(tiendaId, destacado) {
             try {
                 const response = await fetch(`/api/tienda/producto/${tiendaId}/destacar`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ destacado: destacado })
+                    body: JSON.stringify({ destacado })
                 });
-                
                 const data = await response.json();
-
                 if (data.success) {
-                    mostrarMensaje(`✅ Producto ${destacado ? 'destacado' : 'no destacado'}`, 'exito');
                     await cargarTienda();
                 } else {
-                    mostrarMensaje(data.error || '❌ Error al cambiar estado', 'error');
+                    mostrarMensaje(data.error || 'Error', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('❌ Error de conexión: ' + error.message, 'error');
+                mostrarMensaje('Error de conexión', 'error');
             }
         }
 
-        // ============================================
-        // ELIMINAR DE LA TIENDA
-        // ============================================
-
         async function eliminarDeTienda(tiendaId) {
-            const producto = productosTienda.find(p => p.id === tiendaId);
-            if (!producto) return;
-            
-            if (!confirm(`⚠️ ¿Eliminar "${producto.nombre}" de la tienda?`)) {
-                return;
-            }
+            if (!confirm('¿Eliminar de la tienda?')) return;
 
             try {
                 const response = await fetch(`/api/tienda/producto/${tiendaId}`, {
                     method: 'DELETE'
                 });
-                
                 const data = await response.json();
-
                 if (data.success) {
-                    mostrarMensaje(`✅ "${producto.nombre}" eliminado de la tienda`, 'exito');
+                    mostrarMensaje('✅ Eliminado', 'exito');
                     await cargarTienda();
                 } else {
-                    mostrarMensaje(data.error || '❌ Error al eliminar de la tienda', 'error');
+                    mostrarMensaje(data.error || 'Error', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('❌ Error de conexión: ' + error.message, 'error');
+                mostrarMensaje('Error de conexión', 'error');
             }
         }
-
-        // ============================================
-        // INICIO
-        // ============================================
 
         cargarTienda();
         setInterval(cargarTienda, 30000);
