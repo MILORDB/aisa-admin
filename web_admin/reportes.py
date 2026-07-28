@@ -13,15 +13,16 @@ import json
 class GeneradorReportes:
     """Clase para generar reportes en PDF"""
     
-    def __init__(self, negocio_id, negocio_nombre, negocio_telefono, negocio_direccion=None):
+    def __init__(self, negocio_id, negocio_nombre, negocio_telefono, negocio_direccion=None, atendido_por=None):
         self.negocio_id = negocio_id
         self.negocio_nombre = negocio_nombre
         self.negocio_telefono = negocio_telefono
         self.negocio_direccion = negocio_direccion
+        self.atendido_por = atendido_por
         self.buffer = io.BytesIO()
     
-    def _crear_encabezado_factura(self, elementos, styles, titulo, numero_factura, fecha, cliente, empresa=None):
-        """Crea el encabezado para facturas"""
+    def _crear_encabezado_factura(self, elementos, styles, titulo, numero_factura, fecha, cliente, empresa=None, atendido_por=None):
+        """Crea el encabezado para facturas con fecha y atendido por"""
         
         estilo_nombre_negocio = ParagraphStyle(
             'NombreNegocio',
@@ -47,7 +48,7 @@ class GeneradorReportes:
             fontSize=16,
             textColor=colors.HexColor('#333333'),
             alignment=TA_CENTER,
-            spaceAfter=12
+            spaceAfter=8
         )
         
         estilo_datos_cliente = ParagraphStyle(
@@ -65,6 +66,19 @@ class GeneradorReportes:
             textColor=colors.HexColor('#cccccc'),
             alignment=TA_CENTER
         )
+        
+        estilo_info = ParagraphStyle(
+            'InfoFactura',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#333333'),
+            alignment=TA_CENTER,
+            spaceAfter=8
+        )
+        
+        # ============================================
+        # ENCABEZADO DE LA FACTURA
+        # ============================================
         
         # Nombre del negocio
         elementos.append(Paragraph(self.negocio_nombre, estilo_nombre_negocio))
@@ -84,15 +98,12 @@ class GeneradorReportes:
         # Título de factura y número
         elementos.append(Paragraph(f"{titulo}", estilo_titulo_factura))
         
-        estilo_info = ParagraphStyle(
-            'InfoFactura',
-            parent=styles['Normal'],
-            fontSize=10,
-            textColor=colors.HexColor('#333333'),
-            alignment=TA_CENTER,
-            spaceAfter=8
-        )
+        # Número de factura y fecha
         elementos.append(Paragraph(f"N° {numero_factura} | {fecha}", estilo_info))
+        
+        # Atendido por
+        if atendido_por:
+            elementos.append(Paragraph(f"👤 Atendido por: {atendido_por}", estilo_info))
         
         # Línea separadora
         elementos.append(Paragraph("─" * 60, estilo_separador))
@@ -132,12 +143,12 @@ class GeneradorReportes:
         return elementos
 
     # ============================================
-    # GENERAR FACTURA DE VENTA
+    # GENERAR FACTURA DE VENTA (CORREGIDO)
     # ============================================
     
     def generar_factura_venta(self, venta, items, es_oferta=False):
         """
-        Genera una factura de venta en PDF
+        Genera una factura de venta en PDF con todos los items
         
         Args:
             venta: Datos de la venta (dict)
@@ -161,16 +172,22 @@ class GeneradorReportes:
         fecha = venta.get('fecha', datetime.now().strftime("%Y-%m-%d %H:%M"))
         cliente = venta.get('cliente', 'Cliente')
         empresa = venta.get('empresa', '')
+        atendido_por = venta.get('atendido_por', self.atendido_por or 'Admin')
         
         elementos = self._crear_encabezado_factura(
-            elementos, styles, titulo, numero, fecha, cliente, empresa
+            elementos, styles, titulo, numero, fecha, cliente, empresa, atendido_por
         )
         
-        if items:
+        # ============================================
+        # TABLA DE ITEMS - MOSTRAR TODOS
+        # ============================================
+        
+        if items and len(items) > 0:
             tabla_datos = []
             headers = ["Cant.", "Descripción", "Precio Unit.", "Subtotal"]
             tabla_datos.append(headers)
             
+            # Mostrar todos los items
             for item in items:
                 cantidad = item.get('cantidad', 1)
                 descripcion = item.get('nombre', '-')
@@ -185,30 +202,59 @@ class GeneradorReportes:
                 ]
                 tabla_datos.append(fila)
             
-            tabla = Table(tabla_datos, colWidths=[2*cm, 8*cm, 3.5*cm, 3.5*cm])
-            tabla.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-                ('TOPPADDING', (0, 0), (-1, 0), 8),
-                
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 9),
-                ('ALIGN', (0, 1), (0, -1), 'CENTER'),
-                ('ALIGN', (2, 1), (3, -1), 'RIGHT'),
-                ('TOPPADDING', (0, 1), (-1, -1), 6),
-                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-                
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
-                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
-                
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
-            ]))
+            # Ajustar tamaño según cantidad de items
+            if len(tabla_datos) > 15:
+                tabla = Table(tabla_datos, colWidths=[1.5*cm, 8*cm, 3*cm, 3*cm])
+                tabla.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                    ('TOPPADDING', (0, 0), (-1, 0), 6),
+                    
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 1), (-1, -1), 8),
+                    ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+                    ('ALIGN', (2, 1), (3, -1), 'RIGHT'),
+                    ('TOPPADDING', (0, 1), (-1, -1), 4),
+                    ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+                    
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                    ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+                    
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
+                ]))
+            else:
+                tabla = Table(tabla_datos, colWidths=[2*cm, 8*cm, 3.5*cm, 3.5*cm])
+                tabla.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                    ('TOPPADDING', (0, 0), (-1, 0), 8),
+                    
+                    ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                    ('FONTSIZE', (0, 1), (-1, -1), 9),
+                    ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+                    ('ALIGN', (2, 1), (3, -1), 'RIGHT'),
+                    ('TOPPADDING', (0, 1), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                    
+                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                    ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+                    
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
+                ]))
             
             elementos.append(tabla)
+            
+            # ============================================
+            # TOTALES
+            # ============================================
             
             elementos.append(Spacer(1, 0.5*cm))
             
@@ -223,6 +269,15 @@ class GeneradorReportes:
                 spaceBefore=8
             )
             
+            estilo_items = ParagraphStyle(
+                'ItemsCount',
+                parent=styles['Normal'],
+                fontSize=9,
+                textColor=colors.HexColor('#888888'),
+                alignment=TA_RIGHT,
+                spaceBefore=2
+            )
+            
             estilo_observacion = ParagraphStyle(
                 'Observacion',
                 parent=styles['Normal'],
@@ -233,6 +288,7 @@ class GeneradorReportes:
             )
             
             elementos.append(Paragraph(f"<b>TOTAL: ${total:,.2f}</b>", estilo_total))
+            elementos.append(Paragraph(f"({len(items)} items)", estilo_items))
             
             if es_oferta:
                 elementos.append(Paragraph(
@@ -274,6 +330,7 @@ class GeneradorReportes:
             )
             elementos.append(Paragraph("No hay items en esta venta", estilo_vacio))
         
+        # Firma
         elementos.append(Spacer(1, 1*cm))
         
         estilo_firma = ParagraphStyle(
