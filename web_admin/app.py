@@ -1681,13 +1681,13 @@ def api_eliminar_venta(venta_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - FACTURAS Y OFERTAS
+# API - FACTURAS Y OFERTAS (CORREGIDO)
 # ============================================
 
 @app.route('/api/venta/<int:venta_id>/factura', methods=['GET'])
 @login_required
 def api_generar_factura(venta_id):
-    """Genera una factura PDF de una venta"""
+    """Genera una factura PDF de una venta con todos los items y atendido por"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1697,10 +1697,14 @@ def api_generar_factura(venta_id):
     es_oferta = request.args.get('oferta', 'false').lower() == 'true'
     
     try:
+        # Obtener datos de la venta
         conn = get_db()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute('''
-            SELECT * FROM ventas WHERE id = %s AND negocio_id = %s
+            SELECT v.*, u.nombre as atendido_por_nombre
+            FROM ventas v
+            LEFT JOIN usuarios u ON v.trabajador_id = u.id
+            WHERE v.id = %s AND v.negocio_id = %s
         ''', (venta_id, usuario['id']))
         venta = cursor.fetchone()
         conn.close()
@@ -1708,23 +1712,24 @@ def api_generar_factura(venta_id):
         if not venta:
             return jsonify({'error': 'Venta no encontrada'}), 404
         
+        # ============================================
+        # OBTENER TODOS LOS ITEMS DE LA VENTA
+        # ============================================
         items = []
         
-        if venta.get('producto_id'):
-            conn = get_db()
-            cursor = conn.cursor()
-            cursor.execute('SELECT nombre, precio FROM productos WHERE id = %s', (venta['producto_id'],))
-            producto = cursor.fetchone()
-            conn.close()
-            
-            if producto:
-                items.append({
-                    'nombre': producto[0] or venta['producto'],
-                    'cantidad': venta.get('cantidad', 1),
-                    'precio': venta.get('precio', 0),
-                    'subtotal': venta.get('total', 0)
-                })
+        # Si la venta tiene múltiples productos separados por coma
+        if ',' in venta['producto']:
+            productos_separados = [p.strip() for p in venta['producto'].split(',')]
+            if len(productos_separados) > 1:
+                for nombre in productos_separados:
+                    items.append({
+                        'nombre': nombre,
+                        'cantidad': 1,
+                        'precio': venta.get('precio', 0),
+                        'subtotal': venta.get('precio', 0)
+                    })
             else:
+                # Un solo producto
                 items.append({
                     'nombre': venta['producto'],
                     'cantidad': venta.get('cantidad', 1),
@@ -1732,6 +1737,7 @@ def api_generar_factura(venta_id):
                     'subtotal': venta.get('total', 0)
                 })
         else:
+            # Producto único
             items.append({
                 'nombre': venta['producto'],
                 'cantidad': venta.get('cantidad', 1),
@@ -1739,6 +1745,7 @@ def api_generar_factura(venta_id):
                 'subtotal': venta.get('total', 0)
             })
         
+        # Obtener datos del negocio
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
@@ -1750,6 +1757,9 @@ def api_generar_factura(venta_id):
         negocio_telefono = datos_negocio.get('telefono', '')
         negocio_direccion = datos_negocio.get('direccion', '')
         
+        # Obtener quien atendió (trabajador o el mismo negocio)
+        atendido_por = venta.get('atendido_por_nombre') or usuario['nombre'] or usuario['username'] or 'Admin'
+        
         venta_data = {
             'id': venta['id'],
             'factura': venta.get('factura', f"FAC-{venta['id']}"),
@@ -1757,14 +1767,17 @@ def api_generar_factura(venta_id):
             'cliente': venta['cliente'],
             'empresa': venta.get('empresa', ''),
             'estado': venta['estado'],
-            'total': venta['total']
+            'total': venta['total'],
+            'atendido_por': atendido_por
         }
         
+        # Generar PDF
         generador = GeneradorReportes(
             negocio_id=usuario['id'],
             negocio_nombre=negocio_nombre,
             negocio_telefono=negocio_telefono,
-            negocio_direccion=negocio_direccion
+            negocio_direccion=negocio_direccion,
+            atendido_por=atendido_por
         )
         
         pdf_bytes = generador.generar_factura_venta(
@@ -1786,58 +1799,6 @@ def api_generar_factura(venta_id):
         print(f"❌ Error generando factura: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/venta/<int:venta_id>/oferta', methods=['POST'])
-@login_required
-def api_crear_oferta(venta_id):
-    """Convierte una venta en oferta (no afecta stock)"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT id, producto_id, cantidad, estado FROM ventas 
-            WHERE id = %s AND negocio_id = %s
-        ''', (venta_id, usuario['id']))
-        venta = cursor.fetchone()
-        
-        if not venta:
-            conn.close()
-            return jsonify({'error': 'Venta no encontrada'}), 404
-        
-        if venta[3] == 'oferta':
-            conn.close()
-            return jsonify({'error': 'Esta venta ya es una oferta'}), 400
-        
-        if venta[3] in ['pagado', 'transferencia']:
-            conn.close()
-            return jsonify({'error': 'No se puede convertir una venta pagada en oferta'}), 400
-        
-        cursor.execute('''
-            UPDATE ventas SET estado = 'oferta' WHERE id = %s
-        ''', (venta_id,))
-        
-        conn.commit()
-        conn.close()
-        
-        registrar_log(usuario['id'], 'oferta_creada', f'Oferta #{venta_id}')
-        
-        return jsonify({
-            'success': True,
-            'message': 'Oferta creada correctamente. No se ha afectado el inventario.',
-            'venta_id': venta_id
-        })
-        
-    except Exception as e:
-        print(f"❌ Error creando oferta: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ============================================
