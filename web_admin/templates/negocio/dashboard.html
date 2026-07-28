@@ -47,7 +47,7 @@
         }
 
         /* Scrollbar */
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: var(--bg-primary); }
         ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
@@ -239,17 +239,18 @@
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
         /* ============================================
-           MAIN CONTAINER
+           MAIN CONTAINER - SCROLLABLE
            ============================================ */
         .main-container {
             display: flex;
             flex: 1;
             overflow: hidden;
             gap: 0;
+            min-height: 0;
         }
 
         /* ============================================
-           PANEL IZQUIERDO
+           PANEL IZQUIERDO - SCROLLABLE
            ============================================ */
         .panel-left {
             width: var(--panel-left-width);
@@ -261,6 +262,7 @@
             overflow: hidden;
             flex-shrink: 0;
             padding: 4px 0;
+            height: 100%;
         }
 
         .panel-left .panel-title {
@@ -288,6 +290,7 @@
             flex: 1;
             overflow-y: auto;
             padding: 3px 0;
+            min-height: 0;
         }
 
         .panel-left .modulo-item {
@@ -315,7 +318,7 @@
         .panel-left .empty-message { padding: 10px; text-align: center; color: var(--text-muted); font-size: 10px; }
 
         /* ============================================
-           PANEL CENTRAL
+           PANEL CENTRAL - SCROLLABLE
            ============================================ */
         .panel-center {
             flex: 1;
@@ -326,6 +329,7 @@
             position: relative;
             display: flex;
             flex-direction: column;
+            min-height: 0;
         }
 
         .panel-center .dashboard-content {
@@ -333,6 +337,7 @@
             overflow-y: auto;
             flex: 1;
             height: 100%;
+            min-height: 0;
         }
 
         .panel-center .dashboard-content.hidden { display: none; }
@@ -428,14 +433,14 @@
         .trabajador-card .status-dot.ocupado { background: var(--warning); box-shadow: 0 0 8px rgba(255,152,0,0.4); }
         .trabajador-empty { text-align: center; color: var(--text-muted); padding: 10px; font-size: 11px; }
 
-        /* ALERTAS STOCK */
+        /* ALERTAS STOCK - SCROLLABLE */
         .alertas-container {
             background: var(--bg-secondary);
             border-radius: var(--radius);
             padding: 8px 10px;
             border: 1px solid var(--border-color);
             margin-top: 2px;
-            max-height: 150px;
+            max-height: 130px;
             overflow-y: auto;
         }
 
@@ -467,6 +472,7 @@
             background: var(--bg-primary);
             display: none;
             flex: 1;
+            min-height: 0;
         }
         .panel-center .module-frame.visible { display: block; }
 
@@ -493,7 +499,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
 
         /* ============================================
-           PANEL DERECHO - ZONA DE REPORTES (LETRAS MÁS GRANDES)
+           PANEL DERECHO - SCROLLABLE
            ============================================ */
         .panel-right {
             width: var(--panel-right-width);
@@ -505,10 +511,12 @@
             overflow: hidden;
             flex-shrink: 0;
             padding: 12px 14px;
+            height: 100%;
+            min-height: 0;
         }
 
         .panel-right .stats-title {
-            font-size: 14px;  /* Aumentado */
+            font-size: 14px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -516,18 +524,20 @@
             margin-bottom: 10px;
             border-bottom: 2px solid #2a2a3e;
             padding-bottom: 6px;
+            flex-shrink: 0;
         }
 
-        /* Resumen de contratos - letras más grandes */
+        /* Resumen de contratos */
         .panel-right .resumen-contratos {
             background: #0f0f1a;
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 8px;
             border: 1px solid #2a2a3e;
+            flex-shrink: 0;
         }
         .panel-right .resumen-contratos .titulo {
-            font-size: 12px;  /* Aumentado */
+            font-size: 12px;
             color: #aaa;
             margin-bottom: 6px;
             font-weight: 600;
@@ -539,42 +549,58 @@
         }
         .panel-right .resumen-contratos .item { text-align: center; }
         .panel-right .resumen-contratos .item .numero {
-            font-size: 20px;  /* Aumentado */
+            font-size: 20px;
             font-weight: 700;
         }
         .panel-right .resumen-contratos .item .numero.activos { color: #6bff6b; }
         .panel-right .resumen-contratos .item .numero.vencidos { color: #ff6b6b; }
         .panel-right .resumen-contratos .item .numero.total { color: #6c3ce0; }
         .panel-right .resumen-contratos .item .label {
-            font-size: 10px;  /* Aumentado */
+            font-size: 10px;
             color: #888;
             font-weight: 500;
         }
         .panel-right .resumen-contratos .total-gastos {
             text-align: center;
             margin-top: 6px;
-            font-size: 12px;  /* Aumentado */
+            font-size: 12px;
             color: #888;
             padding-top: 6px;
             border-top: 1px solid #2a2a3e;
         }
         .panel-right .resumen-contratos .total-gastos strong {
             color: #6c3ce0;
-            font-size: 13px;  /* Aumentado */
+            font-size: 13px;
         }
 
-        /* Botones de reportes - letras más grandes */
+        /* Botones de reportes - scrollable area */
+        .panel-right .reportes-buttons {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 4px;
+            min-height: 0;
+        }
+
+        .panel-right .reportes-buttons::-webkit-scrollbar {
+            width: 3px;
+        }
+        .panel-right .reportes-buttons::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 2px;
+        }
+
         .panel-right .btn-reporte {
-            padding: 8px 12px;  /* Más padding */
+            padding: 8px 12px;
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 13px;  /* Aumentado de 9px a 13px */
-            font-weight: 600;  /* Aumentado */
+            font-size: 13px;
+            font-weight: 600;
             transition: all 0.3s;
             width: 100%;
             text-align: center;
             margin-bottom: 5px;
+            flex-shrink: 0;
         }
         .panel-right .btn-reporte:hover {
             transform: translateY(-2px);
@@ -603,40 +629,51 @@
         .panel-right .separador {
             border-top: 2px solid #2a2a3e;
             margin: 8px 0;
+            flex-shrink: 0;
         }
 
-        /* Últimos reportes - letras más grandes */
+        /* Últimos reportes - scrollable */
         .panel-right .ultimos-reportes {
             margin-top: 8px;
             border-top: 2px solid #2a2a3e;
             padding-top: 8px;
-            flex: 1;
+            max-height: 130px;
             overflow-y: auto;
-            max-height: 140px;
+            flex-shrink: 0;
         }
+
+        .panel-right .ultimos-reportes::-webkit-scrollbar {
+            width: 3px;
+        }
+        .panel-right .ultimos-reportes::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 2px;
+        }
+
         .panel-right .ultimos-reportes .titulo {
-            font-size: 12px;  /* Aumentado */
+            font-size: 12px;
             color: #888;
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 6px;
             font-weight: 600;
+            flex-shrink: 0;
         }
         .panel-right .ultimos-reportes .reporte-item {
-            padding: 6px 0;  /* Más padding */
+            padding: 6px 0;
             border-bottom: 1px solid #1a1a2e;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 12px;  /* Aumentado */
+            font-size: 12px;
             color: #888;
         }
         .panel-right .ultimos-reportes .reporte-item .fecha {
-            font-size: 10px;  /* Aumentado */
+            font-size: 10px;
             color: #666;
         }
         .panel-right .ultimos-reportes .empty {
-            font-size: 12px;  /* Aumentado */
+            font-size: 12px;
             color: #666;
             padding: 6px 0;
         }
@@ -777,7 +814,7 @@
             .trabajador-card .info .nombre { font-size: 10px; }
             .trabajador-card .info .cargo { font-size: 8px; }
 
-            .alertas-container { padding: 6px 8px; max-height: 120px; }
+            .alertas-container { padding: 6px 8px; max-height: 100px; }
             .alertas-container .alerta-item { padding: 3px 0; }
             .alertas-container .alerta-item .alerta-info .producto { font-size: 10px; }
             .alertas-container .alerta-item .alerta-info .detalle { font-size: 8px; }
@@ -795,7 +832,6 @@
 
             .panel-center .module-frame { height: 100%; }
 
-            /* Ajustes para reportes en móvil (se ven en el menú móvil) */
             .mobile-menu-panel .reportes-mobile .btn-reporte-mobile {
                 font-size: 13px;
                 padding: 10px 12px;
@@ -911,7 +947,7 @@
     </div>
 
     <!-- ============================================
-    MAIN CONTAINER
+    MAIN CONTAINER - SCROLLABLE
     ============================================ -->
     <div class="main-container">
 
@@ -985,7 +1021,7 @@
             </div>
         </div>
 
-        <!-- PANEL DERECHO - ZONA DE REPORTES CON LETRAS MÁS GRANDES -->
+        <!-- PANEL DERECHO - SCROLLABLE -->
         <div class="panel-right">
 
             <div class="stats-title">📄 Reportes</div>
@@ -1010,63 +1046,67 @@
                 <div class="total-gastos">💸 Gastos: <strong id="gastosTotales">$0</strong></div>
             </div>
 
-            <button onclick="generarReporte('contratos', 'todos')" class="btn-reporte general" id="btnReporteContratosTodos">📄 General</button>
-            <button onclick="generarReporte('contratos', 'activos')" class="btn-reporte activos" id="btnReporteContratosActivos">🟢 Activos</button>
-            <button onclick="generarReporte('contratos', 'vencidos')" class="btn-reporte vencidos" id="btnReporteContratosVencidos">🔴 Vencidos</button>
+            <!-- Botones de reportes (scrollable) -->
+            <div class="reportes-buttons">
+                <button onclick="generarReporte('contratos', 'todos')" class="btn-reporte general" id="btnReporteContratosTodos">📄 General Contratos</button>
+                <button onclick="generarReporte('contratos', 'activos')" class="btn-reporte activos" id="btnReporteContratosActivos">🟢 Activos</button>
+                <button onclick="generarReporte('contratos', 'vencidos')" class="btn-reporte vencidos" id="btnReporteContratosVencidos">🔴 Vencidos</button>
 
-            <div class="separador"></div>
+                <div class="separador"></div>
 
-            <!-- INGRESOS -->
-            <div class="resumen-contratos">
-                <div class="titulo">💰 Ingresos</div>
-                <div class="grid">
-                    <div class="item">
-                        <div class="numero" style="color:#6bff6b;" id="ingresosHoy">$0</div>
-                        <div class="label">📅 Hoy</div>
+                <!-- INGRESOS -->
+                <div class="resumen-contratos">
+                    <div class="titulo">💰 Ingresos</div>
+                    <div class="grid">
+                        <div class="item">
+                            <div class="numero" style="color:#6bff6b;" id="ingresosHoy">$0</div>
+                            <div class="label">📅 Hoy</div>
+                        </div>
+                        <div class="item">
+                            <div class="numero" style="color:#ffbb33;" id="ingresosSemana">$0</div>
+                            <div class="label">📅 Semana</div>
+                        </div>
+                        <div class="item" style="grid-column: span 2;">
+                            <div class="numero total" id="ingresosMes">$0</div>
+                            <div class="label">📅 Mes</div>
+                        </div>
                     </div>
-                    <div class="item">
-                        <div class="numero" style="color:#ffbb33;" id="ingresosSemana">$0</div>
-                        <div class="label">📅 Semana</div>
-                    </div>
-                    <div class="item" style="grid-column: span 2;">
-                        <div class="numero total" id="ingresosMes">$0</div>
-                        <div class="label">📅 Mes</div>
-                    </div>
+                    <div class="total-gastos">💵 Total: <strong id="totalIngresos">$0</strong></div>
                 </div>
-                <div class="total-gastos">💵 Total: <strong id="totalIngresos">$0</strong></div>
+
+                <button onclick="generarReporte('ingresos', 'hoy')" class="btn-reporte general" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:#fff;">📅 Hoy</button>
+                <button onclick="generarReporte('ingresos', 'semana')" class="btn-reporte general" style="background:linear-gradient(135deg,#ff9800,#e68900);color:#fff;">📅 Semana</button>
+                <button onclick="generarReporte('ingresos', 'mes')" class="btn-reporte general" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;">📅 Mes</button>
+                <button onclick="generarReporte('ingresos', 'todos')" class="btn-reporte general" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:#fff;">📊 Todos</button>
+
+                <div class="separador"></div>
+
+                <!-- PRODUCTOS -->
+                <div class="resumen-contratos">
+                    <div class="titulo">📦 Inventario</div>
+                    <div class="grid">
+                        <div class="item">
+                            <div class="numero" style="color:#ff6b6b;" id="productosAgotados">0</div>
+                            <div class="label">🚫 Agotados</div>
+                        </div>
+                        <div class="item">
+                            <div class="numero" style="color:#ffbb33;" id="productosBajoStock">0</div>
+                            <div class="label">⚠️ Bajo</div>
+                        </div>
+                        <div class="item" style="grid-column: span 2;">
+                            <div class="numero total" id="productosTotal">0</div>
+                            <div class="label">📦 Total</div>
+                        </div>
+                    </div>
+                    <div class="total-gastos">💲 Valor: <strong id="valorInventario">$0</strong></div>
+                </div>
+
+                <button onclick="generarReporte('productos')" class="btn-reporte general" style="background:linear-gradient(135deg,#607d8b,#37474f);color:#fff;">📦 Inventario</button>
             </div>
 
-            <button onclick="generarReporte('ingresos', 'hoy')" class="btn-reporte general" style="background:linear-gradient(135deg,#2196f3,#1565c0);color:#fff;">📅 Hoy</button>
-            <button onclick="generarReporte('ingresos', 'semana')" class="btn-reporte general" style="background:linear-gradient(135deg,#ff9800,#e68900);color:#fff;">📅 Semana</button>
-            <button onclick="generarReporte('ingresos', 'mes')" class="btn-reporte general" style="background:linear-gradient(135deg,#4caf50,#2e7d32);color:#fff;">📅 Mes</button>
-            <button onclick="generarReporte('ingresos', 'todos')" class="btn-reporte general" style="background:linear-gradient(135deg,#9c27b0,#6a1b9a);color:#fff;">📊 Todos</button>
-
             <div class="separador"></div>
 
-            <!-- PRODUCTOS -->
-            <div class="resumen-contratos">
-                <div class="titulo">📦 Inventario</div>
-                <div class="grid">
-                    <div class="item">
-                        <div class="numero" style="color:#ff6b6b;" id="productosAgotados">0</div>
-                        <div class="label">🚫 Agotados</div>
-                    </div>
-                    <div class="item">
-                        <div class="numero" style="color:#ffbb33;" id="productosBajoStock">0</div>
-                        <div class="label">⚠️ Bajo</div>
-                    </div>
-                    <div class="item" style="grid-column: span 2;">
-                        <div class="numero total" id="productosTotal">0</div>
-                        <div class="label">📦 Total</div>
-                    </div>
-                </div>
-                <div class="total-gastos">💲 Valor: <strong id="valorInventario">$0</strong></div>
-            </div>
-
-            <button onclick="generarReporte('productos')" class="btn-reporte general" style="background:linear-gradient(135deg,#607d8b,#37474f);color:#fff;">📦 Inventario</button>
-
-            <div class="separador"></div>
-
+            <!-- Últimos reportes -->
             <div class="ultimos-reportes">
                 <div class="titulo">📋 Últimos</div>
                 <div id="ultimosReportes">
@@ -1367,7 +1407,7 @@
         }
 
         // ============================================
-        // RENDER REPORTES - MENÚ MÓVIL (letras más grandes)
+        // RENDER REPORTES - MENÚ MÓVIL
         // ============================================
 
         function renderReportesMobile() {
