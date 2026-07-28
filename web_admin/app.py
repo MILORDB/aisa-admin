@@ -1984,7 +1984,7 @@ def api_eliminar_contrato(contrato_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - REPORTES
+# API - REPORTES (CORREGIDO)
 # ============================================
 
 @app.route('/api/reportes/contratos', methods=['GET'])
@@ -2195,7 +2195,7 @@ def api_reporte_ingresos():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/reportes/ingresos/resumen', methods(['GET'])
+@app.route('/api/reportes/ingresos/resumen', methods=['GET'])  # <--- LÍNEA CORREGIDA
 @login_required
 def api_resumen_ingresos():
     """Obtiene un resumen de ingresos para el panel lateral"""
