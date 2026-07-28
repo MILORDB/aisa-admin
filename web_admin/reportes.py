@@ -143,12 +143,12 @@ class GeneradorReportes:
         return elementos
 
     # ============================================
-    # GENERAR FACTURA DE VENTA (CORREGIDO)
+    # GENERAR FACTURA DE VENTA (CON ITEMS UNO DEBAJO DEL OTRO)
     # ============================================
     
     def generar_factura_venta(self, venta, items, es_oferta=False):
         """
-        Genera una factura de venta en PDF con todos los items
+        Genera una factura de venta en PDF con todos los items uno debajo del otro
         
         Args:
             venta: Datos de la venta (dict)
@@ -179,7 +179,7 @@ class GeneradorReportes:
         )
         
         # ============================================
-        # TABLA DE ITEMS - MOSTRAR TODOS
+        # TABLA DE ITEMS - UNO DEBAJO DEL OTRO
         # ============================================
         
         if items and len(items) > 0:
@@ -187,23 +187,29 @@ class GeneradorReportes:
             headers = ["Cant.", "Descripción", "Precio Unit.", "Subtotal"]
             tabla_datos.append(headers)
             
-            # Mostrar todos los items
+            # Mostrar todos los items uno debajo del otro
             for item in items:
                 cantidad = item.get('cantidad', 1)
                 descripcion = item.get('nombre', '-')
                 precio = item.get('precio', 0)
                 subtotal = item.get('subtotal', precio * cantidad)
                 
-                # Ajustar descripción si es muy larga
-                if len(descripcion) > 40:
-                    descripcion = descripcion[:37] + "..."
-                
-                fila = [
-                    Paragraph(str(cantidad), styles['Normal']),
-                    Paragraph(descripcion, styles['Normal']),
-                    Paragraph(f"${precio:,.2f}", styles['Normal']),
-                    Paragraph(f"${subtotal:,.2f}", styles['Normal'])
-                ]
+                # Si es un solo producto con cantidad > 1, mostrarlo como tal
+                if len(items) == 1:
+                    fila = [
+                        Paragraph(str(cantidad), styles['Normal']),
+                        Paragraph(descripcion, styles['Normal']),
+                        Paragraph(f"${precio:,.2f}", styles['Normal']),
+                        Paragraph(f"${subtotal:,.2f}", styles['Normal'])
+                    ]
+                else:
+                    # Múltiples productos: cada uno con su cantidad y precio
+                    fila = [
+                        Paragraph(str(cantidad), styles['Normal']),
+                        Paragraph(descripcion, styles['Normal']),
+                        Paragraph(f"${precio:,.2f}", styles['Normal']),
+                        Paragraph(f"${subtotal:,.2f}", styles['Normal'])
+                    ]
                 tabla_datos.append(fila)
             
             # Ajustar tamaño según cantidad de items
@@ -368,7 +374,7 @@ class GeneradorReportes:
         return pdf_bytes
 
     # ============================================
-    # REPORTE DE CONTRATOS (CON TEXTO CUADRADO)
+    # REPORTE DE CONTRATOS
     # ============================================
     
     def generar_reporte_contratos(self, contratos, tipo_reporte='todos'):
@@ -518,7 +524,7 @@ class GeneradorReportes:
         return pdf_bytes
 
     # ============================================
-    # REPORTE DE INGRESOS (CON TEXTO CUADRADO)
+    # REPORTE DE INGRESOS
     # ============================================
     
     def generar_reporte_ingresos(self, ventas, total_ingresos, total_ventas, periodo=None):
@@ -654,7 +660,7 @@ class GeneradorReportes:
         return pdf_bytes
 
     # ============================================
-    # REPORTE DE PRODUCTOS (CON TEXTO CUADRADO)
+    # REPORTE DE PRODUCTOS
     # ============================================
     
     def generar_reporte_productos(self, productos):
