@@ -22,8 +22,12 @@
         }
         .card h2 { font-size: 15px; color: #6c3ce0; margin-bottom: 12px; }
         .btn {
-            padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer;
-            font-size: 12px; transition: all 0.3s;
+            padding: 6px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
         }
         .btn-primary { background: #6c3ce0; color: #fff; }
         .btn-primary:hover { background: #5a2ec0; }
@@ -243,19 +247,25 @@
         </div>
     </div>
 
-    <!-- Modal Nueva Venta (simplificado) -->
+    <!-- Modal Nueva Venta -->
     <div class="modal-overlay" id="modalVenta">
         <div class="modal-content">
             <h3>💰 Nueva Venta</h3>
             <div class="modal-subtitle">Complete los datos de la venta</div>
 
+            <!-- ========================================== -->
+            <!-- CAMPO EMPRESA CON SELECT DE CONTRATOS      -->
+            <!-- ========================================== -->
             <div class="form-row campo-opcional">
                 <div style="flex:2;">
-                    <label>🏢 Empresa <span style="color:#666;">(opcional)</span></label>
-                    <input type="text" id="ventaEmpresa" placeholder="Nombre de la empresa" oninput="generarNumeroFactura()">
+                    <label>🏢 Empresa / TCP / MIPYME <span style="color:#888;">(selecciona de contratos activos)</span></label>
+                    <select id="ventaEmpresa" onchange="seleccionarEmpresa()">
+                        <option value="">-- Seleccionar empresa con contrato activo --</option>
+                    </select>
                     <div style="font-size:10px;color:#888;margin-top:2px;">
-                        <span id="infoContrato">📄 </span>
-                        <a href="#" class="contrato-link" onclick="buscarContrato()">Buscar contrato</a>
+                        <span id="infoContrato">📄 Cargando contratos...</span>
+                        <a href="#" class="contrato-link" onclick="buscarContratoManual()">Buscar contrato</a>
+                        <span id="empresaInfo" style="display:none;color:#6c3ce0;margin-left:8px;"></span>
                     </div>
                 </div>
                 <div style="flex:1;">
@@ -264,6 +274,7 @@
                 </div>
             </div>
 
+            <!-- Productos -->
             <div class="seccion-items">
                 <div class="seccion-titulo"><span>📦 Productos</span><span class="badge-count" id="countProductos">0</span></div>
                 <div id="productosContainer"></div>
@@ -272,6 +283,7 @@
                 </div>
             </div>
 
+            <!-- Servicios -->
             <div class="seccion-items">
                 <div class="seccion-titulo"><span>📋 Servicios</span><span class="badge-count" id="countServicios">0</span></div>
                 <div id="serviciosContainer"></div>
@@ -280,6 +292,7 @@
                 </div>
             </div>
 
+            <!-- Estado de pago -->
             <div class="form-row">
                 <div style="flex:1;">
                     <label>📌 Estado</label>
@@ -293,6 +306,7 @@
                 </div>
             </div>
 
+            <!-- Campos Transferencia -->
             <div class="campo-transferencia" id="camposTransferencia">
                 <div class="form-row">
                     <input type="text" id="transferenciaId" placeholder="ID Transferencia">
@@ -304,6 +318,7 @@
                 </div>
             </div>
 
+            <!-- Factura Preview -->
             <div class="factura-preview" id="facturaPreview">
                 <div class="factura-titulo">🧾 FACTURA</div>
                 <div class="factura-fila"><span class="label">📄 N°</span><span class="value" id="facturaNumero">-</span></div>
@@ -322,6 +337,7 @@
         </div>
     </div>
 
+    <!-- Tabla de ventas -->
     <div class="card">
         <div class="table-wrapper">
             <div id="ventasContainer">
@@ -362,6 +378,92 @@
             }, 4000);
         }
 
+        // ============================================
+        // FUNCIONES DE EMPRESAS CON CONTRATOS
+        // ============================================
+
+        async function cargarEmpresasConContratos() {
+            const select = document.getElementById('ventaEmpresa');
+            select.innerHTML = '<option value="">-- Seleccionar empresa con contrato activo --</option>';
+            
+            try {
+                const response = await fetch('/api/contratos/empresas');
+                if (!response.ok) throw new Error('Error al cargar empresas');
+                const empresas = await response.json();
+                
+                if (empresas.length === 0) {
+                    select.innerHTML = '<option value="">-- No hay contratos activos --</option>';
+                    document.getElementById('infoContrato').textContent = '📄 Sin contratos activos';
+                    return;
+                }
+                
+                empresas.forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = e.empresa;
+                    opt.dataset.numero = e.numero_contrato;
+                    opt.dataset.tipo = e.tipo;
+                    opt.dataset.fecha_fin = e.fecha_fin;
+                    opt.textContent = `${e.empresa} (${e.numero_contrato})`;
+                    select.appendChild(opt);
+                });
+                
+                document.getElementById('infoContrato').textContent = `📄 ${empresas.length} contratos activos disponibles`;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                select.innerHTML = '<option value="">-- Error al cargar empresas --</option>';
+                document.getElementById('infoContrato').textContent = '📄 Error al cargar contratos';
+            }
+        }
+
+        function seleccionarEmpresa() {
+            const select = document.getElementById('ventaEmpresa');
+            const selected = select.options[select.selectedIndex];
+            const infoSpan = document.getElementById('empresaInfo');
+            
+            if (selected && selected.value) {
+                const numero = selected.dataset.numero || '';
+                const tipo = selected.dataset.tipo || '';
+                const fechaFin = selected.dataset.fecha_fin || '';
+                
+                infoSpan.style.display = 'inline';
+                infoSpan.innerHTML = `📌 ${numero} | ${tipo} | Fin: ${fechaFin}`;
+                
+                generarNumeroFactura();
+                
+                document.getElementById('infoContrato').textContent = `📄 Contrato: ${numero} (${tipo})`;
+            } else {
+                infoSpan.style.display = 'none';
+                document.getElementById('ventaFactura').value = '';
+                document.getElementById('facturaNumero').textContent = '-';
+                document.getElementById('infoContrato').textContent = '📄 Selecciona una empresa';
+            }
+            
+            actualizarFactura();
+        }
+
+        async function buscarContratoManual() {
+            const select = document.getElementById('ventaEmpresa');
+            const selected = select.options[select.selectedIndex];
+            
+            if (!selected || !selected.value) {
+                mostrarMensaje('⚠️ Selecciona una empresa primero', 'error');
+                return;
+            }
+            
+            const empresa = selected.value;
+            const numero = selected.dataset.numero || '';
+            const tipo = selected.dataset.tipo || '';
+            const fechaFin = selected.dataset.fecha_fin || '';
+            
+            const msg = `📄 Contrato encontrado:\n\n🏢 Empresa: ${empresa}\n📌 N° Contrato: ${numero}\n📋 Tipo: ${tipo}\n📅 Fecha Fin: ${fechaFin}`;
+            alert(msg);
+        }
+
+        // ============================================
+        // FUNCIONES DE FACTURA
+        // ============================================
+
         function generarNumeroFactura() {
             const empresa = document.getElementById('ventaEmpresa').value.trim();
             const input = document.getElementById('ventaFactura');
@@ -384,24 +486,9 @@
             actualizarFactura();
         }
 
-        async function buscarContrato() {
-            const empresa = document.getElementById('ventaEmpresa').value.trim();
-            if (!empresa) { mostrarMensaje('Ingresa el nombre de la empresa', 'error'); return; }
-            try {
-                const response = await fetch('/api/contratos');
-                const todos = await response.json();
-                const encontrados = todos.filter(c => c.empresa && c.empresa.toLowerCase().includes(empresa.toLowerCase()) && c.estado === 'activo');
-                if (encontrados.length === 0) {
-                    mostrarMensaje('Sin contratos activos', 'error');
-                    document.getElementById('infoContrato').textContent = '📄 Sin contratos';
-                } else {
-                    let msg = '📄 Contratos: ';
-                    encontrados.forEach((c,i) => { msg += `${c.numero_contrato} (${c.tipo})${i < encontrados.length-1 ? ', ' : ''}`; });
-                    document.getElementById('infoContrato').textContent = msg;
-                    mostrarMensaje(`${encontrados.length} contrato(s) encontrado(s)`, 'exito');
-                }
-            } catch (error) { mostrarMensaje('Error al buscar', 'error'); }
-        }
+        // ============================================
+        // FUNCIONES DE PRODUCTOS Y SERVICIOS
+        // ============================================
 
         async function cargarProductos() {
             try {
@@ -583,8 +670,12 @@
             document.getElementById('facturaEstado').textContent = estados[estado] || estado;
         }
 
-        document.getElementById('ventaEmpresa').addEventListener('input', actualizarFactura);
+        document.getElementById('ventaEmpresa').addEventListener('change', actualizarFactura);
         document.getElementById('ventaEstado').addEventListener('change', actualizarFactura);
+
+        // ============================================
+        // CARGAR VENTAS
+        // ============================================
 
         async function cargarVentas() {
             const container = document.getElementById('ventasContainer');
@@ -662,9 +753,15 @@
             renderVentas(filtro, estado);
         }
 
+        // ============================================
+        // NUEVA VENTA
+        // ============================================
+
         async function nuevaVenta() {
             const btn = document.querySelector('.btn-primary');
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Cargando...'; }
+            
+            // Limpiar campos
             document.getElementById('ventaEmpresa').value = '';
             document.getElementById('ventaFactura').value = '';
             document.getElementById('ventaEstado').value = 'pagado';
@@ -673,27 +770,45 @@
             document.getElementById('transferenciaBanco').value = '';
             document.getElementById('transferenciaFecha').value = '';
             document.getElementById('camposTransferencia').classList.remove('show');
-            document.getElementById('infoContrato').textContent = '📄 ';
+            document.getElementById('infoContrato').textContent = '📄 Cargando contratos...';
+            document.getElementById('empresaInfo').style.display = 'none';
+            
+            // Limpiar productos y servicios
             document.getElementById('productosContainer').innerHTML = '';
             document.getElementById('serviciosContainer').innerHTML = '';
-            lineasProductos = []; lineasServicios = []; nextId = 1;
+            lineasProductos = [];
+            lineasServicios = [];
             document.getElementById('countProductos').textContent = '0';
             document.getElementById('countServicios').textContent = '0';
-            await cargarProductos(); await cargarServicios();
+            nextId = 1;
+            
+            // Cargar productos, servicios y empresas
+            await cargarProductos();
+            await cargarServicios();
+            await cargarEmpresasConContratos();
+            
             agregarLineaProducto();
             actualizarFactura();
+            
             document.getElementById('modalVenta').classList.add('show');
             document.getElementById('ventaEmpresa').focus();
+            
             if (btn) { btn.disabled = false; btn.textContent = '+ Nueva'; }
         }
 
         function cerrarModal() { document.getElementById('modalVenta').classList.remove('show'); }
         document.getElementById('modalVenta').addEventListener('click', function(e) { if (e.target === this) cerrarModal(); });
 
+        // ============================================
+        // GUARDAR VENTA (CON EMPRESA DEL SELECT)
+        // ============================================
+
         function guardarVenta() {
-            const empresa = document.getElementById('ventaEmpresa').value.trim();
+            const selectEmpresa = document.getElementById('ventaEmpresa');
+            const empresa = selectEmpresa.value.trim();
             const estado = document.getElementById('ventaEstado').value;
             const factura = document.getElementById('ventaFactura').value.trim();
+            
             let items = [];
             document.querySelectorAll('#productosContainer .item-line').forEach(line => {
                 const select = line.querySelector('.select-producto');
@@ -712,6 +827,13 @@
                 }
             });
             if (items.length === 0) { mostrarMensaje('Agrega un producto o servicio', 'error'); return; }
+            
+            // Validar que se haya seleccionado una empresa para transferencia
+            if (estado === 'transferencia' && !empresa) {
+                mostrarMensaje('❌ Para transferencia, selecciona una empresa con contrato', 'error');
+                return;
+            }
+            
             const total = items.reduce((s,i) => s + i.subtotal, 0);
             const cliente = empresa || 'Cliente sin empresa';
             const nombres = items.map(i => `${i.cantidad}x ${i.nombre}`).join(', ');
@@ -724,13 +846,21 @@
                 transFecha = document.getElementById('transferenciaFecha').value || null;
             }
             const data = {
-                cliente, producto: nombres, producto_id: primerItem.id,
-                cantidad: items.reduce((s,i) => s + i.cantidad, 0), precio: total, total,
-                empresa: empresa || null, factura: factura || null,
+                cliente: cliente,
+                producto: nombres,
+                producto_id: primerItem.id,
+                cantidad: items.reduce((s,i) => s + i.cantidad, 0),
+                precio: total,
+                total: total,
+                empresa: empresa || null,
+                factura: factura || null,
                 tipo: items.length === 1 && items[0].tipo === 'servicio' ? 'servicio' : 'producto',
-                trabajador_id: trabajadorId || null, estado,
-                transferencia_id: transId, transferencia_cedula: transCedula,
-                transferencia_banco: transBanco, transferencia_fecha: transFecha
+                trabajador_id: trabajadorId || null,
+                estado: estado,
+                transferencia_id: transId,
+                transferencia_cedula: transCedula,
+                transferencia_banco: transBanco,
+                transferencia_fecha: transFecha
             };
             fetch('/api/ventas', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) })
                 .then(r => r.json()).then(data => {
@@ -740,6 +870,10 @@
                     } else { mostrarMensaje(data.error || 'Error', 'error'); }
                 }).catch(error => { console.error(error); mostrarMensaje('Error de conexión', 'error'); });
         }
+
+        // ============================================
+        // CAMBIAR ESTADO DE VENTA
+        // ============================================
 
         function cambiarEstadoVenta(id, estado) {
             const v = ventas.find(v => v.id === id);
@@ -753,20 +887,78 @@
                 }).catch(error => { console.error(error); mostrarMensaje('Error de conexión', 'error'); cargarVentas(); });
         }
 
+        // ============================================
+        // ELIMINAR VENTA (CORREGIDO)
+        // ============================================
+
         async function eliminarVenta(id) {
-            const v = ventas.find(v => v.id === id);
-            if (!v) return;
-            const estados = { 'pagado':'✅ Pagado','pendiente':'⏳ Pendiente','cancelado':'❌ Cancelado','transferencia':'💳 Transferencia','oferta':'📄 Oferta' };
-            if (!confirm(`⚠️ ¿Eliminar venta #${id}?`)) return;
+            const venta = ventas.find(v => v.id === id);
+            if (!venta) {
+                mostrarMensaje('❌ Venta no encontrada', 'error');
+                return;
+            }
+            
+            const estados = {
+                'pagado': '✅ Pagado',
+                'pendiente': '⏳ Pendiente',
+                'cancelado': '❌ Cancelado',
+                'transferencia': '💳 Transferencia',
+                'oferta': '📄 Oferta'
+            };
+            
+            const mensajeConfirmacion = venta.estado === 'oferta' ?
+                `⚠️ ¿Estás seguro de eliminar esta OFERTA?\n\n📋 Cliente: ${venta.cliente}\n📦 Producto: ${venta.producto}\n💰 Total: $${parseFloat(venta.total).toFixed(2)}\n📌 Estado: ${estados[venta.estado]}\n\n📌 La oferta NO afecta el inventario.` :
+                `⚠️ ¿Estás seguro de eliminar esta venta?\n\n📋 Cliente: ${venta.cliente}\n📦 Producto: ${venta.producto}\n💰 Total: $${parseFloat(venta.total).toFixed(2)}\n📌 Estado: ${estados[venta.estado]}\n\n📌 El stock será reintegrado.`;
+            
+            if (!confirm(mensajeConfirmacion)) {
+                return;
+            }
+            
+            if (!confirm(`⚠️ Confirmación final: ¿Eliminar la venta #${id} definitivamente?\n\nEsta acción no se puede deshacer.`)) {
+                return;
+            }
+            
+            const boton = event?.target;
+            const textoOriginal = boton ? boton.textContent : '🗑️';
+            if (boton) {
+                boton.textContent = '⏳ Eliminando...';
+                boton.disabled = true;
+            }
+            
             try {
-                const response = await fetch(`/api/venta/${id}`, { method:'DELETE' });
+                const response = await fetch(`/api/venta/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
                 const data = await response.json();
+                
                 if (data.success) {
-                    mostrarMensaje(v.estado === 'oferta' ? '✅ Oferta eliminada' : '✅ Venta eliminada', 'exito');
-                    await cargarVentas(); await cargarProductos();
-                } else { mostrarMensaje(data.error || 'Error', 'error'); }
-            } catch (error) { console.error(error); mostrarMensaje('Error de conexión', 'error'); }
+                    const mensaje = venta.estado === 'oferta' ? 
+                        '✅ Oferta eliminada correctamente' : 
+                        '✅ Venta eliminada. Stock reintegrado.';
+                    mostrarMensaje(mensaje, 'exito');
+                    await cargarVentas();
+                    await cargarProductos();
+                } else {
+                    mostrarMensaje(`❌ Error: ${data.error || 'Error desconocido'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
+            } finally {
+                if (boton) {
+                    boton.textContent = textoOriginal;
+                    boton.disabled = false;
+                }
+            }
         }
+
+        // ============================================
+        // GENERAR FACTURA Y OFERTA PDF
+        // ============================================
 
         function generarFactura(id) {
             const v = ventas.find(v => v.id === id);
@@ -824,11 +1016,22 @@
                 .finally(() => { if (btn) { btn.textContent = orig; btn.disabled = false; } });
         }
 
+        // ============================================
+        // INICIO
+        // ============================================
+
         mostrarInfoTrabajador();
         cargarVentas();
         cargarProductos();
         cargarServicios();
-        setInterval(() => { cargarProductos(); cargarServicios(); cargarVentas(); }, 30000);
+        cargarEmpresasConContratos();
+        
+        setInterval(() => { 
+            cargarProductos(); 
+            cargarServicios(); 
+            cargarVentas();
+            cargarEmpresasConContratos();
+        }, 30000);
     </script>
 </body>
 </html>
