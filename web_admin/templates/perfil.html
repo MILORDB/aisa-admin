@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Perfil - AIsa</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .header h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .header .nav a {
+            color: #fff;
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+            font-size: 13px;
+            transition: background 0.3s;
+            margin-left: 8px;
+        }
+        .header .nav a:hover { background: rgba(255,255,255,0.2); }
+        .container { padding: 24px; max-width: 600px; margin: 0 auto; flex: 1; }
+        .card {
+            background: #1a1a2e;
+            border-radius: 16px;
+            padding: 30px;
+            border: 1px solid #2a2a3e;
+        }
+        .card h2 { font-size: 22px; color: #6c3ce0; margin-bottom: 4px; }
+        .card .subtitle { font-size: 14px; color: #888; margin-bottom: 24px; }
+        .avatar {
+            width: 80px; height: 80px; border-radius: 50%; background: #6c3ce0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 32px; margin: 0 auto 16px;
+        }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; margin-bottom: 6px; font-size: 13px; color: #aaa; }
+        .form-group label .required { color: #ff6b6b; margin-left: 2px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: #6c3ce0;
+        }
+        .form-group select option { background: #1a1a2e; }
+        .form-group input:disabled { opacity: 0.5; cursor: not-allowed; }
+        .form-group .help-text {
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+            display: block;
+        }
+        .form-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .form-row .form-group {
+            flex: 1;
+            min-width: 150px;
+        }
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; width: 100%; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-success:hover { background: #3d8b40; }
+        .mensaje {
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: none;
+        }
+        .mensaje.exito { background: #224422; color: #6bff6b; display: block; }
+        .mensaje.error { background: #442222; color: #ff6b6b; display: block; }
+        .info-box {
+            background: rgba(108, 60, 224, 0.08);
+            border: 1px solid rgba(108, 60, 224, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .info-box strong { color: #6c3ce0; }
+        .negocio-fields {
+            border-top: 1px solid #2a2a3e;
+            padding-top: 16px;
+            margin-top: 16px;
+        }
+        .negocio-fields.hidden { display: none; }
+        .loading { text-align: center; color: #888; padding: 40px; }
+        @media (max-width: 600px) {
+            .container { padding: 16px; }
+            .card { padding: 20px; }
+            .form-row { flex-direction: column; }
+            .form-row .form-group { min-width: unset; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1>👤 Mi Perfil</h1>
+        <div class="nav">
+            <a href="/dashboard">← Volver al Panel</a>
+            <a href="/logout">Cerrar sesión</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <div class="avatar" id="avatarIcon">👤</div>
+            <h2 id="perfilTitulo">Mi Perfil</h2>
+            <div class="subtitle" id="perfilSubtitulo">Cargando información...</div>
+
+            <div id="mensaje" class="mensaje"></div>
+
+            <form id="perfilForm">
+                <!-- Datos personales -->
+                <div class="form-group">
+                    <label>Nombre completo <span class="required">*</span></label>
+                    <input type="text" id="perfilNombre" placeholder="Tu nombre completo" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="perfilEmail" placeholder="tu@email.com" disabled>
+                    <span class="help-text">El email no se puede modificar</span>
+                </div>
+
+                <div class="form-group">
+                    <label>Usuario</label>
+                    <input type="text" id="perfilUsername" disabled>
+                    <span class="help-text">El nombre de usuario no se puede modificar</span>
+                </div>
+
+                <!-- Ubicación y contacto -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Provincia <span class="required">*</span></label>
+                        <select id="perfilProvincia" onchange="cargarMunicipiosPerfil()" required>
+                            <option value="">-- Seleccionar provincia --</option>
+                            <option value="La Habana">La Habana</option>
+                            <option value="Artemisa">Artemisa</option>
+                            <option value="Mayabeque">Mayabeque</option>
+                            <option value="Matanzas">Matanzas</option>
+                            <option value="Villa Clara">Villa Clara</option>
+                            <option value="Cienfuegos">Cienfuegos</option>
+                            <option value="Sancti Spíritus">Sancti Spíritus</option>
+                            <option value="Ciego de Ávila">Ciego de Ávila</option>
+                            <option value="Camagüey">Camagüey</option>
+                            <option value="Las Tunas">Las Tunas</option>
+                            <option value="Granma">Granma</option>
+                            <option value="Holguín">Holguín</option>
+                            <option value="Santiago de Cuba">Santiago de Cuba</option>
+                            <option value="Guantánamo">Guantánamo</option>
+                            <option value="Pinar del Río">Pinar del Río</option>
+                            <option value="Isla de la Juventud">Isla de la Juventud</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Municipio <span class="required">*</span></label>
+                        <select id="perfilMunicipio" required>
+                            <option value="">-- Seleccionar municipio --</option>
+                        </select>
+                        <span class="help-text" id="perfilMunicipioHelp">Selecciona primero una provincia</span>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Teléfono <span class="required">*</span></label>
+                        <input type="text" id="perfilTelefono" placeholder="+53 5555-5555" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Dirección</label>
+                        <input type="text" id="perfilDireccion" placeholder="Tu dirección">
+                    </div>
+                </div>
+
+                <!-- Campos de negocio (ocultos para clientes) -->
+                <div class="negocio-fields hidden" id="negocioFieldsPerfil">
+                    <div class="info-box">
+                        <strong>🏢 Datos del Negocio</strong><br>
+                        Estos datos son específicos para tu negocio.
+                    </div>
+
+                    <div class="form-group">
+                        <label>Nombre del negocio</label>
+                        <input type="text" id="perfilNombreNegocio" placeholder="Nombre de tu negocio">
+                    </div>
+
+                    <div class="form-group">
+                        <label>RUC / NIT</label>
+                        <input type="text" id="perfilRuc" placeholder="Número de identificación tributaria">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Descripción del negocio</label>
+                        <textarea id="perfilDescripcion" rows="2" placeholder="Breve descripción de tu negocio"></textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" id="btnGuardarPerfil">
+                    💾 Guardar cambios
+                </button>
+            </form>
+
+            <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #2a2a3e; text-align: center;">
+                <a href="/logout" style="color: #ff6b6b; text-decoration: none; font-size: 14px;">
+                    🚪 Cerrar sesión
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // DATOS DE MUNICIPIOS POR PROVINCIA (CUBA)
+        // ============================================
+        const municipiosPorProvincia = {
+            'La Habana': ['La Habana Vieja', 'Centro Habana', 'Cerro', 'Marianao', 'Playa', 'Plaza de la Revolución', 'Diez de Octubre', 'Arroyo Naranjo', 'Boyeros', 'La Lisa', 'San Miguel del Padrón', 'Cotorro', 'Regla', 'Guanabacoa', 'Habana del Este'],
+            'Artemisa': ['Artemisa', 'Bahía Honda', 'Caimito', 'Candelaria', 'Guanajay', 'Güira de Melena', 'Mariel', 'San Antonio de los Baños', 'San Cristóbal', 'Alquízar', 'Bauta', 'Surgidero de Batabanó'],
+            'Mayabeque': ['San José de las Lajas', 'Bejucal', 'Jaruco', 'Madruga', 'Melena del Sur', 'Nueva Paz', 'Quivicán', 'Santa Cruz del Norte', 'Güines', 'Batabanó', 'San Nicolás de Bari'],
+            'Matanzas': ['Matanzas', 'Cárdenas', 'Colón', 'Jovellanos', 'Jagüey Grande', 'Unión de Reyes', 'Pedro Betancourt', 'Perico', 'Bolívar', 'Calimete', 'Los Arabos', 'Martí', 'Varadero', 'Ciénaga de Zapata', 'Limónar'],
+            'Villa Clara': ['Santa Clara', 'Placetas', 'Remedios', 'Sagua la Grande', 'Camajuaní', 'Caibarién', 'Encrucijada', 'Manicaragua', 'Quemado de Güines', 'Ranchuelo', 'Santo Domingo', 'Cifuentes', 'Corralillo', 'Zulueta'],
+            'Cienfuegos': ['Cienfuegos', 'Abreus', 'Palmira', 'Cruces', 'Cumanayagua', 'Lajas', 'Aguada de Pasajeros', 'Rodas', 'Santa Isabel de las Lajas'],
+            'Sancti Spíritus': ['Sancti Spíritus', 'Cabaiguán', 'Fomento', 'Jatibonico', 'La Sierpe', 'Taguasco', 'Trinidad', 'Yaguajay', 'Zaza del Medio', 'Guayos'],
+            'Ciego de Ávila': ['Ciego de Ávila', 'Morón', 'Venezuela', 'Baraguá', 'Bolivia', 'Chambas', 'Ciro Redondo', 'Florencia', 'Majagua', 'Primero de Enero'],
+            'Camagüey': ['Camagüey', 'Florida', 'Nuevitas', 'Esmeralda', 'Minas', 'Sibanicú', 'Guáimaro', 'Santa Cruz del Sur', 'Vertientes', 'Jimaguayú', 'Céspedes', 'Sierra de Cubitas'],
+            'Las Tunas': ['Las Tunas', 'Jobabo', 'Colombia', 'Manatí', 'Puerto Padre', 'Amancio', 'Majibacoa', 'Jesús Menéndez'],
+            'Granma': ['Bayamo', 'Manzanillo', 'Jiguaní', 'Yara', 'Buey Arriba', 'Cauto Cristo', 'Guisa', 'Pilón', 'Río Cauto', 'Media Luna', 'Niquero', 'Campechuela', 'Bartolomé Masó'],
+            'Holguín': ['Holguín', 'Banes', 'Antilla', 'Mayarí', 'Moa', 'Sagua de Tánamo', 'Frank País', 'Gibara', 'Cacocum', 'Calix', 'Cueto', 'Rafael Freyre', 'Urbano Noris', 'Báguanos'],
+            'Santiago de Cuba': ['Santiago de Cuba', 'Palma Soriano', 'Contramaestre', 'San Luis', 'Mella', 'Segundo Frente', 'Tercer Frente', 'Guamá', 'Songo-La Maya'],
+            'Guantánamo': ['Guantánamo', 'Baracoa', 'Maisí', 'Imías', 'San Antonio del Sur', 'Caimanera', 'Niceto Pérez', 'Manuel Tames', 'Yateras', 'El Salvador'],
+            'Pinar del Río': ['Pinar del Río', 'San Juan y Martínez', 'San Luis', 'Consolación del Sur', 'Viñales', 'Los Palacios', 'La Palma', 'Mantua', 'Minas de Matahambre', 'Guane', 'Sandino'],
+            'Isla de la Juventud': ['Nueva Gerona', 'Santa Fe', 'La Demajagua', 'Cocodrilo', 'La Victoria', 'San Juan']
+        };
+
+        let tipoUsuario = 'cliente';
+
+        // ============================================
+        // FUNCIÓN PARA CARGAR MUNICIPIOS EN PERFIL
+        // ============================================
+        function cargarMunicipiosPerfil() {
+            const provinciaSelect = document.getElementById('perfilProvincia');
+            const municipioSelect = document.getElementById('perfilMunicipio');
+            const municipioHelp = document.getElementById('perfilMunicipioHelp');
+            const provincia = provinciaSelect.value;
+
+            municipioSelect.innerHTML = '<option value="">-- Seleccionar municipio --</option>';
+
+            if (provincia && municipiosPorProvincia[provincia]) {
+                const municipios = municipiosPorProvincia[provincia];
+                municipios.sort();
+                municipios.forEach(municipio => {
+                    const option = document.createElement('option');
+                    option.value = municipio;
+                    option.textContent = municipio;
+                    municipioSelect.appendChild(option);
+                });
+                municipioHelp.textContent = `📌 ${municipios.length} municipios disponibles`;
+                municipioHelp.style.color = '#6c3ce0';
+            } else {
+                municipioHelp.textContent = 'Selecciona primero una provincia';
+                municipioHelp.style.color = '#666';
+            }
+        }
+
+        // ============================================
+        // MOSTRAR MENSAJE
+        // ============================================
+        function mostrarMensaje(texto, tipo) {
+            const el = document.getElementById('mensaje');
+            el.textContent = texto;
+            el.className = `mensaje ${tipo}`;
+            setTimeout(() => {
+                el.className = 'mensaje';
+            }, 5000);
+        }
+
+        // ============================================
+        // CARGAR PERFIL
+        // ============================================
+        async function cargarPerfil() {
+            try {
+                const response = await fetch('/api/usuario/perfil');
+                const data = await response.json();
+
+                if (data.success) {
+                    const u = data.usuario;
+                    
+                    // Datos personales
+                    document.getElementById('perfilNombre').value = u.nombre || '';
+                    document.getElementById('perfilEmail').value = u.email || '';
+                    document.getElementById('perfilUsername').value = u.username || '';
+                    
+                    // Ubicación y contacto
+                    document.getElementById('perfilTelefono').value = u.telefono || '';
+                    document.getElementById('perfilDireccion').value = u.direccion || '';
+                    
+                    // Provincia y municipio
+                    const provinciaSelect = document.getElementById('perfilProvincia');
+                    if (u.provincia) {
+                        provinciaSelect.value = u.provincia;
+                        cargarMunicipiosPerfil();
+                        setTimeout(() => {
+                            document.getElementById('perfilMunicipio').value = u.municipio || '';
+                        }, 100);
+                    }
+
+                    // Tipo de usuario
+                    tipoUsuario = u.tipo || 'cliente';
+                    document.getElementById('perfilSubtitulo').textContent = 
+                        `${u.tipo === 'negocio' ? '🏢' : '👤'} ${u.tipo === 'negocio' ? 'Negocio' : 'Cliente'} - ${u.rol || 'usuario'}`;
+                    
+                    // Avatar
+                    document.getElementById('avatarIcon').textContent = u.tipo === 'negocio' ? '🏢' : '👤';
+
+                    // Mostrar campos de negocio si es necesario
+                    const negocioFields = document.getElementById('negocioFieldsPerfil');
+                    if (u.tipo === 'negocio') {
+                        negocioFields.classList.remove('hidden');
+                        document.getElementById('perfilNombreNegocio').value = u.nombre_negocio || '';
+                        document.getElementById('perfilRuc').value = u.ruc || '';
+                        document.getElementById('perfilDescripcion').value = u.descripcion || '';
+                        document.getElementById('perfilTitulo').textContent = '🏢 Mi Negocio';
+                    } else {
+                        negocioFields.classList.add('hidden');
+                        document.getElementById('perfilTitulo').textContent = '👤 Mi Perfil';
+                    }
+                } else {
+                    mostrarMensaje('Error al cargar perfil', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión', 'error');
+            }
+        }
+
+        // ============================================
+        // GUARDAR PERFIL
+        // ============================================
+        document.getElementById('perfilForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const btn = document.getElementById('btnGuardarPerfil');
+            btn.disabled = true;
+            btn.textContent = '⏳ Guardando...';
+
+            const datos = {
+                nombre: document.getElementById('perfilNombre').value.trim(),
+                email: document.getElementById('perfilEmail').value,
+                telefono: document.getElementById('perfilTelefono').value.trim(),
+                provincia: document.getElementById('perfilProvincia').value,
+                municipio: document.getElementById('perfilMunicipio').value,
+                direccion: document.getElementById('perfilDireccion').value.trim()
+            };
+
+            // Validaciones
+            if (!datos.nombre) {
+                mostrarMensaje('El nombre es obligatorio', 'error');
+                btn.disabled = false;
+                btn.textContent = '💾 Guardar cambios';
+                return;
+            }
+
+            if (!datos.telefono) {
+                mostrarMensaje('El teléfono es obligatorio', 'error');
+                btn.disabled = false;
+                btn.textContent = '💾 Guardar cambios';
+                return;
+            }
+
+            if (!datos.provincia || !datos.municipio) {
+                mostrarMensaje('Provincia y municipio son obligatorios', 'error');
+                btn.disabled = false;
+                btn.textContent = '💾 Guardar cambios';
+                return;
+            }
+
+            // Si es negocio, agregar campos de negocio
+            if (tipoUsuario === 'negocio') {
+                datos.nombre_negocio = document.getElementById('perfilNombreNegocio').value.trim();
+                datos.ruc = document.getElementById('perfilRuc').value.trim();
+                datos.descripcion = document.getElementById('perfilDescripcion').value.trim();
+            }
+
+            try {
+                const response = await fetch('/api/usuario/perfil', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datos)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    mostrarMensaje('✅ Perfil actualizado correctamente', 'exito');
+                    // Recargar perfil para mostrar cambios
+                    setTimeout(cargarPerfil, 500);
+                } else {
+                    mostrarMensaje(data.error || 'Error al actualizar', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '💾 Guardar cambios';
+            }
+        });
+
+        // ============================================
+        // INICIO
+        // ============================================
+        cargarPerfil();
+    </script>
+</body>
+</html>
