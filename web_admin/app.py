@@ -78,7 +78,6 @@ CORS(app)
 
 @app.after_request
 def add_header(response):
-    """Agrega headers para evitar caché en el navegador"""
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '-1'
@@ -256,19 +255,6 @@ def admin_required(f):
         usuario = obtener_usuario_sesion(token)
         if not usuario or usuario['rol'] != 'admin':
             return jsonify({'error': 'Acceso denegado'}), 403
-        return f(*args, **kwargs)
-    return decorated_function
-
-def negocio_required(f):
-    from functools import wraps
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.cookies.get('token')
-        if not token:
-            return redirect(url_for('login'))
-        usuario = obtener_usuario_sesion(token)
-        if not usuario or usuario['tipo'] != 'negocio':
-            return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -694,7 +680,6 @@ def api_eliminar_usuario(user_id):
     if not user:
         return jsonify({'error': 'Usuario no encontrado'}), 404
     
-    # Usar la función mejorada que elimina sesiones y permisos primero
     exito = eliminar_usuario(user_id)
     
     if not exito:
@@ -847,7 +832,6 @@ def api_obtener_trabajadores():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/negocio/trabajador/crear', methods=['POST'])
 @login_required
 def api_crear_trabajador():
@@ -931,7 +915,6 @@ def api_crear_trabajador():
         'user_id': user_id
     })
 
-
 @app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['PUT'])
 @login_required
 def api_actualizar_trabajador(trabajador_id):
@@ -982,17 +965,14 @@ def api_actualizar_trabajador(trabajador_id):
         'modulos': modulos
     })
     
-    # Actualizar módulos (eliminar permisos anteriores y asignar nuevos)
     conn = get_db()
     cursor = conn.cursor()
     
-    # Eliminar permisos antiguos
     cursor.execute('''
         DELETE FROM permisos_usuario 
         WHERE usuario_id = %s
     ''', (trabajador_id,))
     
-    # Asignar nuevos permisos
     for modulo_nombre in modulos:
         cursor.execute("SELECT id FROM modulos WHERE nombre = %s", (modulo_nombre,))
         mod = cursor.fetchone()
@@ -1002,7 +982,6 @@ def api_actualizar_trabajador(trabajador_id):
             VALUES (%s, %s, 1, 'aprobado')
             ''', (trabajador_id, mod[0]))
     
-    # Actualizar datos del usuario
     cursor.execute('''
         UPDATE usuarios 
         SET nombre = %s, email = %s, datos_negocio = %s
@@ -1019,7 +998,6 @@ def api_actualizar_trabajador(trabajador_id):
         'message': 'Trabajador actualizado correctamente'
     })
 
-
 @app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['DELETE'])
 @login_required
 def api_eliminar_trabajador(trabajador_id):
@@ -1034,7 +1012,6 @@ def api_eliminar_trabajador(trabajador_id):
         conn = get_db()
         cursor = conn.cursor()
         
-        # 1. Verificar que el trabajador existe y pertenece al negocio
         cursor.execute('''
             SELECT u.id, u.username, u.nombre, u.datos_negocio
             FROM trabajadores_negocio tn
@@ -1048,22 +1025,8 @@ def api_eliminar_trabajador(trabajador_id):
             conn.close()
             return jsonify({'error': 'Trabajador no encontrado o no pertenece a tu negocio'}), 404
         
-        # 2. Obtener nombre para el log
         nombre_trabajador = trabajador[2] or trabajador[1] or 'Desconocido'
         
-        # 3. ELIMINAR SESIONES DEL TRABAJADOR (PRIMERO - importante)
-        cursor.execute('DELETE FROM sesiones WHERE usuario_id = %s', (trabajador_id,))
-        
-        # 4. Eliminar permisos del trabajador
-        cursor.execute('DELETE FROM permisos_usuario WHERE usuario_id = %s', (trabajador_id,))
-        
-        # 5. Eliminar la relación en trabajadores_negocio
-        cursor.execute('''
-            DELETE FROM trabajadores_negocio 
-            WHERE negocio_id = %s AND trabajador_id = %s
-        ''', (usuario['id'], trabajador_id))
-        
-        # 6. Eliminar el usuario (ya no tiene sesiones ni permisos)
         cursor.execute('DELETE FROM usuarios WHERE id = %s', (trabajador_id,))
         
         conn.commit()
@@ -1087,7 +1050,6 @@ def api_eliminar_trabajador(trabajador_id):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/api/negocio/trabajador/<int:trabajador_id>/toggle', methods=['POST'])
 @login_required
@@ -1582,13 +1544,13 @@ def api_ventas():
         transferencia_banco, transferencia_fecha
     )
     
-    if tipo == 'producto' and producto_id:
+    if tipo == 'producto' and producto_id and estado != 'oferta':
         actualizar_stock_producto(producto_id, cantidad)
     
     registrar_log(usuario['id'], 'venta_creada', 
                   f'Venta: {producto} - Cliente: {cliente} - Cantidad: {cantidad} - Estado: {estado}')
     
-    return jsonify({'success': True, 'id': venta_id, 'stock_actualizado': True})
+    return jsonify({'success': True, 'id': venta_id, 'stock_actualizado': tipo == 'producto' and estado != 'oferta'})
 
 @app.route('/api/ventas/estadisticas')
 @login_required
@@ -1619,7 +1581,7 @@ def api_actualizar_estado_venta(venta_id):
     data = request.get_json()
     estado = data.get('estado')
     
-    if estado not in ['pagado', 'pendiente', 'cancelado', 'transferencia']:
+    if estado not in ['pagado', 'pendiente', 'cancelado', 'transferencia', 'oferta']:
         return jsonify({'error': 'Estado inválido'}), 400
     
     exito = actualizar_estado_venta(venta_id, usuario['id'], estado)
@@ -1640,6 +1602,26 @@ def api_eliminar_venta(venta_id):
     if not usuario or usuario['tipo'] != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Verificar si es una oferta (no afecta stock)
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT estado FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
+    venta = cursor.fetchone()
+    conn.close()
+    
+    if venta and venta[0] == 'oferta':
+        # Eliminar oferta sin reintegro de stock
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
+        conn.commit()
+        conn.close()
+        registrar_log(usuario['id'], 'oferta_eliminada', f'Oferta #{venta_id} eliminada')
+        return jsonify({
+            'success': True,
+            'message': 'Oferta eliminada correctamente'
+        })
+    
     exito, resultado = eliminar_venta_con_reintegro(venta_id, usuario['id'])
     
     if not exito:
@@ -1656,6 +1638,166 @@ def api_eliminar_venta(venta_id):
         'cliente': resultado['cliente'],
         'total': resultado['total']
     })
+
+# ============================================
+# API - FACTURAS Y OFERTAS
+# ============================================
+
+@app.route('/api/venta/<int:venta_id>/factura', methods=['GET'])
+@login_required
+def api_generar_factura(venta_id):
+    """Genera una factura PDF de una venta"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    es_oferta = request.args.get('oferta', 'false').lower() == 'true'
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('''
+            SELECT * FROM ventas WHERE id = %s AND negocio_id = %s
+        ''', (venta_id, usuario['id']))
+        venta = cursor.fetchone()
+        conn.close()
+        
+        if not venta:
+            return jsonify({'error': 'Venta no encontrada'}), 404
+        
+        items = []
+        
+        if venta.get('producto_id'):
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute('SELECT nombre, precio FROM productos WHERE id = %s', (venta['producto_id'],))
+            producto = cursor.fetchone()
+            conn.close()
+            
+            if producto:
+                items.append({
+                    'nombre': producto[0] or venta['producto'],
+                    'cantidad': venta.get('cantidad', 1),
+                    'precio': venta.get('precio', 0),
+                    'subtotal': venta.get('total', 0)
+                })
+            else:
+                items.append({
+                    'nombre': venta['producto'],
+                    'cantidad': venta.get('cantidad', 1),
+                    'precio': venta.get('precio', 0),
+                    'subtotal': venta.get('total', 0)
+                })
+        else:
+            items.append({
+                'nombre': venta['producto'],
+                'cantidad': venta.get('cantidad', 1),
+                'precio': venta.get('precio', 0),
+                'subtotal': venta.get('total', 0)
+            })
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
+        negocio = cursor.fetchone()
+        conn.close()
+        
+        negocio_nombre = negocio[0] or 'Mi Negocio'
+        datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
+        negocio_telefono = datos_negocio.get('telefono', '')
+        negocio_direccion = datos_negocio.get('direccion', '')
+        
+        venta_data = {
+            'id': venta['id'],
+            'factura': venta.get('factura', f"FAC-{venta['id']}"),
+            'fecha': venta['fecha'],
+            'cliente': venta['cliente'],
+            'empresa': venta.get('empresa', ''),
+            'estado': venta['estado'],
+            'total': venta['total']
+        }
+        
+        generador = GeneradorReportes(
+            negocio_id=usuario['id'],
+            negocio_nombre=negocio_nombre,
+            negocio_telefono=negocio_telefono,
+            negocio_direccion=negocio_direccion
+        )
+        
+        pdf_bytes = generador.generar_factura_venta(
+            venta_data,
+            items,
+            es_oferta=es_oferta
+        )
+        
+        tipo = 'oferta' if es_oferta else 'factura'
+        response = make_response(pdf_bytes)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename={tipo}_{venta_id}_{datetime.now().strftime("%Y%m%d")}.pdf'
+        
+        registrar_log(usuario['id'], 'factura_generada', f'Factura {tipo} #{venta_id}')
+        
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error generando factura: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/venta/<int:venta_id>/oferta', methods=['POST'])
+@login_required
+def api_crear_oferta(venta_id):
+    """Convierte una venta en oferta (no afecta stock)"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, producto_id, cantidad, estado FROM ventas 
+            WHERE id = %s AND negocio_id = %s
+        ''', (venta_id, usuario['id']))
+        venta = cursor.fetchone()
+        
+        if not venta:
+            conn.close()
+            return jsonify({'error': 'Venta no encontrada'}), 404
+        
+        if venta[3] == 'oferta':
+            conn.close()
+            return jsonify({'error': 'Esta venta ya es una oferta'}), 400
+        
+        if venta[3] in ['pagado', 'transferencia']:
+            conn.close()
+            return jsonify({'error': 'No se puede convertir una venta pagada en oferta'}), 400
+        
+        cursor.execute('''
+            UPDATE ventas SET estado = 'oferta' WHERE id = %s
+        ''', (venta_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        registrar_log(usuario['id'], 'oferta_creada', f'Oferta #{venta_id}')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Oferta creada correctamente. No se ha afectado el inventario.',
+            'venta_id': venta_id
+        })
+        
+    except Exception as e:
+        print(f"❌ Error creando oferta: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # ============================================
 # API - SERVICIOS
@@ -2244,7 +2386,7 @@ def api_trabajadores_pendientes():
     trabajadores = obtener_trabajadores_pendientes()
     return jsonify([dict(t) for t in trabajadores])
 
-@app.route('/api/trabajador/<int:user_id>/aprobar', methods(['POST'])
+@app.route('/api/trabajador/<int:user_id>/aprobar', methods=['POST'])
 @admin_required
 def api_aprobar_trabajador(user_id):
     aprobar_trabajador(user_id)
