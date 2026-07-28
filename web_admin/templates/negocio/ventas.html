@@ -40,6 +40,8 @@
         .btn-danger:hover { background: #c62828; }
         .btn-warning { background: #ff9800; color: #fff; }
         .btn-warning:hover { background: #e68900; }
+        .btn-info { background: #2196f3; color: #fff; }
+        .btn-info:hover { background: #1976d2; }
         .btn-sm { padding: 4px 12px; font-size: 11px; }
         .btn-add { 
             background: rgba(108, 60, 224, 0.2); 
@@ -105,6 +107,7 @@
         .tabla .badge.pendiente { background: #443322; color: #ffbb33; }
         .tabla .badge.cancelado { background: #442222; color: #ff6b6b; }
         .tabla .badge.transferencia { background: #1a237e; color: #fff; }
+        .tabla .badge.oferta { background: #ff9800; color: #000; font-weight: bold; }
         .form-row {
             display: flex;
             gap: 12px;
@@ -360,7 +363,9 @@
             font-weight: 600;
         }
         .acciones-cell {
-            display: flex; gap: 4px; flex-wrap: wrap;
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
         }
         .estado-select {
             background: #1a1a2e;
@@ -401,6 +406,7 @@
         .stats-resumen .stat-box .number.pagado { color: #6bff6b; }
         .stats-resumen .stat-box .number.pendiente { color: #ffbb33; }
         .stats-resumen .stat-box .number.cancelado { color: #ff6b6b; }
+        .stats-resumen .stat-box .number.oferta { color: #ff9800; }
         @media (max-width: 600px) {
             .form-row { flex-direction: column; }
             .search-bar { flex-direction: column; }
@@ -443,6 +449,10 @@
                 <div class="number cancelado" id="totalCancelado">0</div>
                 <div class="label">❌ Canceladas</div>
             </div>
+            <div class="stat-box">
+                <div class="number oferta" id="totalOfertas">0</div>
+                <div class="label">📄 Ofertas</div>
+            </div>
         </div>
     </div>
 
@@ -455,6 +465,7 @@
                 <option value="pendiente">⏳ Pendiente</option>
                 <option value="cancelado">❌ Cancelado</option>
                 <option value="transferencia">💳 Transferencia</option>
+                <option value="oferta">📄 Oferta</option>
             </select>
             <button class="btn btn-primary" onclick="nuevaVenta()">+ Nueva venta</button>
         </div>
@@ -519,6 +530,7 @@
                         <option value="pendiente">⏳ Pendiente</option>
                         <option value="cancelado">❌ Cancelado</option>
                         <option value="transferencia">💳 Transferencia</option>
+                        <option value="oferta">📄 Oferta (no afecta stock)</option>
                     </select>
                 </div>
             </div>
@@ -1037,7 +1049,8 @@
                 'pagado': '✅ Pagado (Efectivo)',
                 'pendiente': '⏳ Pendiente',
                 'cancelado': '❌ Cancelado',
-                'transferencia': '💳 Transferencia'
+                'transferencia': '💳 Transferencia',
+                'oferta': '📄 Oferta'
             };
             document.getElementById('facturaEstado').textContent = estados[estado] || estado;
             
@@ -1133,13 +1146,15 @@
                     'pagado': '✅ Pagado', 
                     'pendiente': '⏳ Pendiente', 
                     'cancelado': '❌ Cancelado',
-                    'transferencia': '💳 Transferencia'
+                    'transferencia': '💳 Transferencia',
+                    'oferta': '📄 Oferta'
                 };
                 const clases = { 
                     'pagado': 'pagado', 
                     'pendiente': 'pendiente', 
                     'cancelado': 'cancelado',
-                    'transferencia': 'transferencia'
+                    'transferencia': 'transferencia',
+                    'oferta': 'oferta'
                 };
                 const factura = v.factura || '-';
                 
@@ -1160,7 +1175,11 @@
                                     <option value="pendiente" ${v.estado === 'pendiente' ? 'selected' : ''}>⏳ Pendiente</option>
                                     <option value="cancelado" ${v.estado === 'cancelado' ? 'selected' : ''}>❌ Cancelado</option>
                                     <option value="transferencia" ${v.estado === 'transferencia' ? 'selected' : ''}>💳 Transferencia</option>
+                                    <option value="oferta" ${v.estado === 'oferta' ? 'selected' : ''}>📄 Oferta</option>
                                 </select>
+                                <button class="btn btn-info btn-sm" onclick="generarFactura(${v.id})" title="Generar factura PDF">📄 Factura</button>
+                                <button class="btn btn-warning btn-sm" onclick="generarOferta(${v.id})" title="Generar oferta PDF">📄 Oferta</button>
+                                ${v.estado !== 'oferta' ? `<button class="btn btn-sm" style="background:#ff9800;color:#fff;" onclick="convertirAOferta(${v.id})" title="Convertir en oferta">📄 Hacer oferta</button>` : ''}
                                 <button class="btn btn-danger btn-sm" onclick="eliminarVenta(${v.id})">🗑️</button>
                             </div>
                         </td>
@@ -1186,13 +1205,13 @@
             const pagado = ventas.filter(v => v.estado === 'pagado' || v.estado === 'transferencia').length;
             const pendiente = ventas.filter(v => v.estado === 'pendiente').length;
             const cancelado = ventas.filter(v => v.estado === 'cancelado').length;
+            const oferta = ventas.filter(v => v.estado === 'oferta').length;
             
             document.getElementById('totalVentas').textContent = total;
             document.getElementById('totalPagado').textContent = pagado;
             document.getElementById('totalPendiente').textContent = pendiente;
             document.getElementById('totalCancelado').textContent = cancelado;
-            
-            console.log('📊 Resumen actualizado:', { total, pagado, pendiente, cancelado });
+            document.getElementById('totalOfertas').textContent = oferta;
         }
 
         // ============================================
@@ -1349,7 +1368,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    mostrarMensaje(`✅ Venta registrada correctamente`, 'exito');
+                    mostrarMensaje(`✅ Venta registrada correctamente${estado === 'oferta' ? ' (Oferta - no afecta stock)' : ''}`, 'exito');
                     cerrarModal();
                     cargarVentas();
                     cargarProductos();
@@ -1377,7 +1396,8 @@
                 'pagado': '✅ Pagado',
                 'pendiente': '⏳ Pendiente',
                 'cancelado': '❌ Cancelado',
-                'transferencia': '💳 Transferencia'
+                'transferencia': '💳 Transferencia',
+                'oferta': '📄 Oferta'
             };
             
             if (!confirm(`¿Cambiar el estado de la venta #${id} de "${estados[venta.estado]}" a "${estados[estado]}"?`)) {
@@ -1419,7 +1439,8 @@
                 'pagado': '✅ Pagado',
                 'pendiente': '⏳ Pendiente',
                 'cancelado': '❌ Cancelado',
-                'transferencia': '💳 Transferencia'
+                'transferencia': '💳 Transferencia',
+                'oferta': '📄 Oferta'
             };
             
             if (!confirm(`⚠️ ¿Estás seguro de eliminar esta venta?\n\n📋 Cliente: ${venta.cliente}\n📦 Producto: ${venta.producto}\n💰 Total: $${parseFloat(venta.total).toFixed(2)}\n📌 Estado: ${estados[venta.estado]}`)) {
@@ -1434,7 +1455,10 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    mostrarMensaje(`✅ Venta #${id} eliminada. Stock reintegrado.`, 'exito');
+                    const mensaje = venta.estado === 'oferta' ? 
+                        '✅ Oferta eliminada correctamente' : 
+                        '✅ Venta eliminada. Stock reintegrado.';
+                    mostrarMensaje(mensaje, 'exito');
                     await cargarVentas();
                     await cargarProductos();
                 } else {
@@ -1444,6 +1468,187 @@
                 console.error('Error:', error);
                 mostrarMensaje('❌ Error de conexión', 'error');
             }
+        }
+
+        // ============================================
+        // GENERAR FACTURA PDF
+        // ============================================
+
+        function generarFactura(id) {
+            const venta = ventas.find(v => v.id === id);
+            if (!venta) {
+                mostrarMensaje('❌ Venta no encontrada', 'error');
+                return;
+            }
+            
+            if (!confirm(`📄 ¿Generar factura para la venta #${id}?\n\nCliente: ${venta.cliente}\nTotal: $${parseFloat(venta.total).toFixed(2)}`)) {
+                return;
+            }
+            
+            const boton = event?.target;
+            const textoOriginal = boton ? boton.textContent : '📄 Factura';
+            if (boton) {
+                boton.textContent = '⏳ Generando...';
+                boton.disabled = true;
+            }
+            
+            fetch(`/api/venta/${id}/factura`)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Error al generar factura');
+                        });
+                    }
+                    
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `factura_${id}.pdf`;
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename=(.+)/);
+                        if (match) filename = match[1];
+                    }
+                    
+                    return response.blob().then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        
+                        mostrarMensaje(`✅ Factura #${id} descargada correctamente`, 'exito');
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    mostrarMensaje('❌ Error al generar factura: ' + error.message, 'error');
+                })
+                .finally(() => {
+                    if (boton) {
+                        boton.textContent = textoOriginal;
+                        boton.disabled = false;
+                    }
+                });
+        }
+
+        // ============================================
+        // GENERAR OFERTA PDF
+        // ============================================
+
+        function generarOferta(id) {
+            const venta = ventas.find(v => v.id === id);
+            if (!venta) {
+                mostrarMensaje('❌ Venta no encontrada', 'error');
+                return;
+            }
+            
+            if (!confirm(`📄 ¿Generar oferta de venta para la venta #${id}?\n\nCliente: ${venta.cliente}\nTotal: $${parseFloat(venta.total).toFixed(2)}\n\n📌 La oferta NO afecta el inventario.`)) {
+                return;
+            }
+            
+            const boton = event?.target;
+            const textoOriginal = boton ? boton.textContent : '📄 Oferta';
+            if (boton) {
+                boton.textContent = '⏳ Generando...';
+                boton.disabled = true;
+            }
+            
+            fetch(`/api/venta/${id}/factura?oferta=true`)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Error al generar oferta');
+                        });
+                    }
+                    
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = `oferta_${id}.pdf`;
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename=(.+)/);
+                        if (match) filename = match[1];
+                    }
+                    
+                    return response.blob().then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                        
+                        mostrarMensaje(`✅ Oferta #${id} descargada correctamente`, 'exito');
+                    });
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    mostrarMensaje('❌ Error al generar oferta: ' + error.message, 'error');
+                })
+                .finally(() => {
+                    if (boton) {
+                        boton.textContent = textoOriginal;
+                        boton.disabled = false;
+                    }
+                });
+        }
+
+        // ============================================
+        // CONVERTIR VENTA EN OFERTA (NO AFECTA STOCK)
+        // ============================================
+
+        function convertirAOferta(id) {
+            const venta = ventas.find(v => v.id === id);
+            if (!venta) {
+                mostrarMensaje('❌ Venta no encontrada', 'error');
+                return;
+            }
+            
+            if (venta.estado === 'oferta') {
+                mostrarMensaje('⚠️ Esta venta ya es una oferta', 'error');
+                return;
+            }
+            
+            if (venta.estado === 'pagado' || venta.estado === 'transferencia') {
+                mostrarMensaje('❌ No se puede convertir una venta pagada en oferta', 'error');
+                return;
+            }
+            
+            if (!confirm(`📄 ¿Convertir la venta #${id} en oferta?\n\nCliente: ${venta.cliente}\nTotal: $${parseFloat(venta.total).toFixed(2)}\n\n📌 La oferta NO afecta el inventario.\n📌 El stock NO se reducirá.`)) {
+                return;
+            }
+            
+            const boton = event?.target;
+            const textoOriginal = boton ? boton.textContent : '📄 Hacer oferta';
+            if (boton) {
+                boton.textContent = '⏳ Procesando...';
+                boton.disabled = true;
+            }
+            
+            fetch(`/api/venta/${id}/oferta`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    mostrarMensaje('✅ Oferta creada correctamente. El stock no fue afectado.', 'exito');
+                    cargarVentas();
+                } else {
+                    mostrarMensaje(data.error || '❌ Error al crear oferta', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                mostrarMensaje('❌ Error de conexión: ' + error.message, 'error');
+            })
+            .finally(() => {
+                if (boton) {
+                    boton.textContent = textoOriginal;
+                    boton.disabled = false;
+                }
+            });
         }
 
         // ============================================
