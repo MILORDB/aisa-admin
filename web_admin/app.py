@@ -54,7 +54,7 @@ try:
         actualizar_foto_producto, eliminar_foto_producto,
         crear_contrato, obtener_contratos, obtener_todos_contratos, 
         actualizar_contrato, actualizar_estado_contrato, eliminar_contrato,
-        obtener_ultimo_numero_contrato
+        obtener_ultimo_numero_contrato, obtener_datos_negocio
     )
     from web_admin.auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
     from web_admin.storage import get_storage_manager
@@ -385,6 +385,18 @@ def dashboard():
     else:
         return render_template('cliente/dashboard.html', usuario=usuario)
 
+@app.route('/perfil')
+@login_required
+def perfil_usuario():
+    """Página de perfil del usuario"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return redirect(url_for('login'))
+    
+    return render_template('perfil.html', usuario=usuario)
+
 @app.route('/logout')
 def logout():
     response = redirect(url_for('login'))
@@ -415,8 +427,125 @@ def admin_trabajadores_pendientes():
     return render_template('admin/trabajadores_pendientes.html')
 
 # ============================================
-# API - PERFIL
+# API - PERFIL DE USUARIO
 # ============================================
+
+@app.route('/api/usuario/perfil', methods=['GET'])
+@login_required
+def api_obtener_perfil_usuario():
+    """Obtiene el perfil completo del usuario actual"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    # Obtener datos de negocio si existen
+    datos_negocio = {}
+    if usuario.get('datos_negocio'):
+        try:
+            datos_negocio = json.loads(usuario['datos_negocio']) if isinstance(usuario['datos_negocio'], str) else usuario['datos_negocio']
+        except:
+            datos_negocio = {}
+    
+    return jsonify({
+        'success': True,
+        'usuario': {
+            'id': usuario['id'],
+            'username': usuario['username'],
+            'email': usuario['email'],
+            'nombre': usuario['nombre'],
+            'rol': usuario['rol'],
+            'tipo': usuario['tipo'],
+            'fecha_registro': usuario['fecha_registro'],
+            'telefono': datos_negocio.get('telefono', ''),
+            'provincia': datos_negocio.get('provincia', ''),
+            'municipio': datos_negocio.get('municipio', ''),
+            'direccion': datos_negocio.get('direccion', ''),
+            'nombre_negocio': datos_negocio.get('nombre_negocio', ''),
+            'ruc': datos_negocio.get('ruc', ''),
+            'descripcion': datos_negocio.get('descripcion', '')
+        }
+    })
+
+@app.route('/api/usuario/perfil', methods=['PUT'])
+@login_required
+def api_actualizar_perfil_usuario():
+    """Actualiza el perfil del usuario actual"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    
+    # Campos que se pueden actualizar
+    nombre = data.get('nombre')
+    email = data.get('email')
+    telefono = data.get('telefono')
+    provincia = data.get('provincia')
+    municipio = data.get('municipio')
+    direccion = data.get('direccion')
+    nombre_negocio = data.get('nombre_negocio')
+    ruc = data.get('ruc')
+    descripcion = data.get('descripcion')
+    
+    # Validaciones básicas
+    if not nombre:
+        return jsonify({'error': 'El nombre es obligatorio'}), 400
+    
+    if not telefono:
+        return jsonify({'error': 'El teléfono es obligatorio'}), 400
+    
+    if not provincia or not municipio:
+        return jsonify({'error': 'Provincia y municipio son obligatorios'}), 400
+    
+    # Obtener datos de negocio actuales
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
+    result = cursor.fetchone()
+    
+    datos_negocio = {}
+    if result and result[0]:
+        try:
+            datos_negocio = json.loads(result[0]) if isinstance(result[0], str) else result[0]
+        except:
+            datos_negocio = {}
+    
+    # Actualizar datos
+    datos_negocio.update({
+        'telefono': telefono,
+        'provincia': provincia,
+        'municipio': municipio,
+        'direccion': direccion or ''
+    })
+    
+    # Si es negocio, actualizar campos de negocio
+    if usuario['tipo'] == 'negocio':
+        datos_negocio.update({
+            'nombre_negocio': nombre_negocio or datos_negocio.get('nombre_negocio', ''),
+            'ruc': ruc or datos_negocio.get('ruc', ''),
+            'descripcion': descripcion or datos_negocio.get('descripcion', '')
+        })
+    
+    # Actualizar en la base de datos
+    cursor.execute('''
+        UPDATE usuarios 
+        SET nombre = %s, email = %s, datos_negocio = %s
+        WHERE id = %s
+    ''', (nombre, email, json.dumps(datos_negocio, ensure_ascii=False), usuario['id']))
+    
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'perfil_actualizado', 'Perfil de usuario actualizado')
+    
+    return jsonify({
+        'success': True,
+        'message': 'Perfil actualizado correctamente'
+    })
 
 @app.route('/api/perfil')
 @admin_required
