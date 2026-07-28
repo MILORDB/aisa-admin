@@ -66,6 +66,7 @@
             z-index: 10;
             height: var(--header-height);
             min-height: var(--header-height);
+            position: relative;
         }
 
         .header-left {
@@ -91,6 +92,7 @@
             align-items: center;
             gap: 8px;
             flex-shrink: 0;
+            position: relative;
         }
 
         .header-right .user-info {
@@ -99,14 +101,21 @@
             gap: 6px;
             font-size: 12px;
             cursor: pointer;
-            padding: 4px 8px;
+            padding: 4px 10px;
             border-radius: 30px;
             transition: background 0.3s;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
         }
-        .header-right .user-info:hover { background: rgba(255,255,255,0.05); }
+        .header-right .user-info:hover { 
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.2);
+        }
 
         .header-right .user-info .avatar {
-            width: 28px; height: 28px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             background: rgba(255,255,255,0.2);
             display: flex;
@@ -121,6 +130,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            font-weight: 500;
         }
 
         .header-right .user-info .role-badge {
@@ -132,10 +142,17 @@
             display: none;
         }
 
-        .header-right .user-info .arrow { font-size: 10px; opacity: 0.5; }
+        .header-right .user-info .arrow { 
+            font-size: 10px; 
+            opacity: 0.6;
+            transition: transform 0.3s ease;
+        }
+        .header-right .user-info:hover .arrow {
+            transform: rotate(180deg);
+        }
 
         /* ============================================
-           MENÚ USUARIO
+           MENÚ DESPLEGABLE DEL USUARIO (CORREGIDO)
            ============================================ */
         .user-menu {
             position: absolute;
@@ -144,37 +161,65 @@
             background: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: var(--radius);
-            min-width: 170px;
+            min-width: 190px;
             padding: 6px 0;
-            box-shadow: var(--shadow);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
             opacity: 0;
             visibility: hidden;
-            transform: translateY(-8px);
+            transform: translateY(-10px) scale(0.95);
             transition: all 0.25s ease;
-            z-index: 100;
+            z-index: 1000;
         }
-        .user-menu.open { opacity: 1; visibility: visible; transform: translateY(0); }
+
+        .user-menu.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0) scale(1);
+        }
 
         .user-menu .menu-item {
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 7px 14px;
+            padding: 8px 16px;
             color: var(--text-secondary);
             text-decoration: none;
             font-size: 12px;
-            transition: background 0.2s;
+            transition: background 0.2s, color 0.2s;
             cursor: pointer;
             border: none;
             background: none;
             width: 100%;
             text-align: left;
+            border-radius: 0;
         }
-        .user-menu .menu-item:hover { background: var(--bg-hover); color: var(--text-primary); }
-        .user-menu .menu-item .menu-icon { font-size: 14px; width: 20px; text-align: center; }
-        .user-menu .menu-divider { height: 1px; background: var(--border-color); margin: 4px 10px; }
-        .user-menu .menu-item.danger { color: var(--danger); }
-        .user-menu .menu-item.danger:hover { background: rgba(244,67,54,0.1); }
+
+        .user-menu .menu-item:hover { 
+            background: var(--bg-hover); 
+            color: var(--text-primary);
+        }
+
+        .user-menu .menu-item .menu-icon { 
+            font-size: 15px; 
+            width: 22px; 
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .user-menu .menu-divider { 
+            height: 1px; 
+            background: var(--border-color); 
+            margin: 4px 12px;
+        }
+
+        .user-menu .menu-item.danger { 
+            color: var(--danger);
+        }
+
+        .user-menu .menu-item.danger:hover { 
+            background: rgba(244, 67, 54, 0.1);
+            color: var(--danger);
+        }
 
         /* ============================================
            MODAL
@@ -185,7 +230,7 @@
             top: 0; left: 0;
             width: 100%; height: 100%;
             background: rgba(0,0,0,0.7);
-            z-index: 1000;
+            z-index: 2000;
             align-items: center;
             justify-content: center;
             padding: 16px;
@@ -194,43 +239,43 @@
 
         .modal-content {
             background: var(--bg-secondary);
-            padding: 20px;
+            padding: 24px;
             border-radius: var(--radius);
-            max-width: 380px;
+            max-width: 400px;
             width: 100%;
             border: 1px solid var(--border-color);
             animation: fadeIn 0.3s ease;
         }
-        .modal-content h3 { font-size: 17px; color: var(--accent); margin-bottom: 4px; }
-        .modal-content .subtitle { font-size: 11px; color: var(--text-muted); margin-bottom: 14px; }
-        .modal-content .form-group { margin-bottom: 10px; }
-        .modal-content .form-group label { display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 3px; }
+        .modal-content h3 { font-size: 18px; color: var(--accent); margin-bottom: 4px; }
+        .modal-content .subtitle { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+        .modal-content .form-group { margin-bottom: 12px; }
+        .modal-content .form-group label { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
         .modal-content .form-group input {
             width: 100%;
-            padding: 7px 10px;
+            padding: 8px 12px;
             border: 1px solid var(--border-color);
             border-radius: 6px;
             background: var(--bg-primary);
             color: var(--text-primary);
-            font-size: 12px;
+            font-size: 13px;
             outline: none;
             transition: border-color 0.3s;
         }
         .modal-content .form-group input:focus { border-color: var(--accent); }
-        .modal-content .form-actions { display: flex; gap: 8px; margin-top: 14px; }
+        .modal-content .form-actions { display: flex; gap: 10px; margin-top: 16px; }
         .modal-content .form-actions .btn {
-            flex: 1; padding: 7px; border: none; border-radius: 6px;
-            font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.3s;
+            flex: 1; padding: 8px; border: none; border-radius: 6px;
+            font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.3s;
         }
         .modal-content .form-actions .btn-primary { background: var(--accent); color: #fff; }
         .modal-content .form-actions .btn-primary:hover { background: var(--accent-hover); }
         .modal-content .form-actions .btn-secondary { background: var(--bg-hover); color: var(--text-secondary); }
         .modal-content .form-actions .btn-secondary:hover { background: var(--border-color); }
         .modal-content .mensaje {
-            padding: 6px 10px;
+            padding: 8px 12px;
             border-radius: 6px;
-            margin-bottom: 10px;
-            font-size: 11px;
+            margin-bottom: 12px;
+            font-size: 12px;
             display: none;
         }
         .modal-content .mensaje.exito { background: rgba(76,175,80,0.15); color: var(--success); display: block; }
@@ -934,8 +979,12 @@
             .section-title { font-size: 11px; margin-bottom: 4px; }
             .section-title .badge-count { font-size: 8px; padding: 0 5px; }
 
-            .user-menu { right: -10px; min-width: 140px; }
-            .user-menu .menu-item { font-size: 11px; padding: 5px 10px; }
+            .user-menu { 
+                right: -10px; 
+                min-width: 150px;
+                top: calc(100% + 4px);
+            }
+            .user-menu .menu-item { font-size: 11px; padding: 6px 12px; }
 
             .modal-content { padding: 14px; }
             .modal-content h3 { font-size: 15px; }
@@ -954,7 +1003,7 @@
             .header-left .logo { font-size: 12px; }
             .header-left .logo span { font-size: 14px; }
             .header-right .user-info .username { max-width: 40px; font-size: 10px; }
-            .header-right .user-info { padding: 2px 4px; }
+            .header-right .user-info { padding: 2px 6px; }
             .header-right .user-info .avatar { width: 20px; height: 20px; font-size: 9px; }
 
             .panel-center .dashboard-content { padding: 6px 6px; }
@@ -975,7 +1024,7 @@
             .mobile-menu-panel .modulo-item-mobile { padding: 6px 8px; font-size: 11px; }
             .mobile-menu-panel .reportes-mobile .btn-reporte-mobile { font-size: 12px; padding: 8px 10px; }
 
-            .user-menu { right: -20px; min-width: 120px; }
+            .user-menu { right: -20px; min-width: 130px; }
             .user-menu .menu-item { font-size: 10px; padding: 4px 8px; }
 
             .modal-content { padding: 12px; }
@@ -986,7 +1035,7 @@
 <body>
 
     <!-- ============================================
-    HEADER
+    HEADER CON MENÚ DE USUARIO
     ============================================ -->
     <header class="header">
         <div class="header-left">
@@ -998,19 +1047,24 @@
             </div>
         </div>
         <div class="header-right">
+            <!-- Botón de usuario que abre el menú -->
             <div class="user-info" id="userMenuToggle">
                 <div class="avatar">👤</div>
                 <span class="username">{{ usuario.nombre or usuario.username }}</span>
                 <span class="role-badge">{{ usuario.rol }}</span>
                 <span class="arrow">▼</span>
             </div>
+
+            <!-- Menú desplegable del usuario -->
             <div class="user-menu" id="userMenu">
                 <button class="menu-item" onclick="abrirModalPassword()">
-                    <span class="menu-icon">🔑</span> Cambiar contraseña
+                    <span class="menu-icon">🔑</span>
+                    Cambiar contraseña
                 </button>
                 <div class="menu-divider"></div>
                 <a href="/logout" class="menu-item danger">
-                    <span class="menu-icon">🚪</span> Cerrar sesión
+                    <span class="menu-icon">🚪</span>
+                    Cerrar sesión
                 </a>
             </div>
         </div>
@@ -1132,16 +1186,14 @@
             </div>
         </div>
 
-        <!-- PANEL DERECHO - ACORDEÓN CON TODAS LAS CATEGORÍAS -->
+        <!-- PANEL DERECHO - ACORDEÓN -->
         <div class="panel-right">
 
             <div class="stats-title">📄 Reportes</div>
 
             <div class="accordion" id="accordionReportes">
 
-                <!-- ======================================== -->
                 <!-- SECCIÓN 1: CONTRATOS -->
-                <!-- ======================================== -->
                 <div class="accordion-item open" id="accordionContratos">
                     <div class="accordion-header" onclick="toggleAccordion('accordionContratos')">
                         <div class="header-left">
@@ -1177,9 +1229,7 @@
                     </div>
                 </div>
 
-                <!-- ======================================== -->
                 <!-- SECCIÓN 2: INGRESOS -->
-                <!-- ======================================== -->
                 <div class="accordion-item" id="accordionIngresos">
                     <div class="accordion-header" onclick="toggleAccordion('accordionIngresos')">
                         <div class="header-left">
@@ -1216,9 +1266,7 @@
                     </div>
                 </div>
 
-                <!-- ======================================== -->
                 <!-- SECCIÓN 3: INVENTARIO -->
-                <!-- ======================================== -->
                 <div class="accordion-item" id="accordionInventario">
                     <div class="accordion-header" onclick="toggleAccordion('accordionInventario')">
                         <div class="header-left">
@@ -1250,7 +1298,6 @@
 
                         <button onclick="generarReporte('productos')" class="btn-reporte inventario">📦 Reporte</button>
 
-                        <!-- Últimos reportes dentro de inventario -->
                         <div class="ultimos-reportes">
                             <div class="titulo">📋 Últimos reportes</div>
                             <div id="ultimosReportes">
@@ -1292,32 +1339,51 @@
             const item = document.getElementById(id);
             if (!item) return;
 
-            // Si el item ya está abierto, lo cerramos
             if (item.classList.contains('open')) {
                 item.classList.remove('open');
                 return;
             }
 
-            // Cerramos todos los items
             document.querySelectorAll('.accordion-item').forEach(el => {
                 el.classList.remove('open');
             });
 
-            // Abrimos el item seleccionado
             item.classList.add('open');
         }
 
         // ============================================
-        // MENÚ DESPLEGABLE USUARIO
+        // MENÚ DESPLEGABLE DEL USUARIO (CORREGIDO)
         // ============================================
 
+        // Abrir/cerrar menú al hacer clic en el botón de usuario
         document.getElementById('userMenuToggle').addEventListener('click', function(e) {
             e.stopPropagation();
-            document.getElementById('userMenu').classList.toggle('open');
+            const menu = document.getElementById('userMenu');
+            menu.classList.toggle('open');
         });
 
-        document.addEventListener('click', function() {
-            document.getElementById('userMenu').classList.remove('open');
+        // Cerrar menú al hacer clic fuera
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('userMenu');
+            const toggle = document.getElementById('userMenuToggle');
+            
+            // Si el clic no fue en el menú ni en el botón, cerrar
+            if (!menu.contains(e.target) && !toggle.contains(e.target)) {
+                menu.classList.remove('open');
+            }
+        });
+
+        // Cerrar menú al hacer clic en una opción (excepto en el botón de cerrar sesión que redirige)
+        document.querySelectorAll('.user-menu .menu-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                // No cerrar si es el enlace de cerrar sesión (para que redirija)
+                if (!this.getAttribute('href') || this.getAttribute('href') !== '/logout') {
+                    // Cerrar menú después de un breve retraso para que se vea el clic
+                    setTimeout(() => {
+                        document.getElementById('userMenu').classList.remove('open');
+                    }, 200);
+                }
+            });
         });
 
         // ============================================
@@ -1356,6 +1422,7 @@
             document.getElementById('confirmPassword').value = '';
             document.getElementById('mensajePassword').className = 'mensaje';
             document.getElementById('mensajePassword').textContent = '';
+            // Cerrar menú al abrir modal
             document.getElementById('userMenu').classList.remove('open');
         }
 
