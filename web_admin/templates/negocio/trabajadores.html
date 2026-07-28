@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Trabajadores - AIsa Negocio</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -11,38 +11,19 @@
             background: #0f0f1a;
             color: #fff;
             min-height: 100vh;
-            padding: 20px;
+            padding: 12px;
         }
         .card {
             background: #1a1a2e;
-            border-radius: 12px;
-            padding: 20px;
+            border-radius: 10px;
+            padding: 14px;
             border: 1px solid #2a2a3e;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
-        .card h2 { font-size: 18px; color: #6c3ce0; margin-bottom: 16px; }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-        .stat-item {
-            background: #0f0f1a;
-            border: 1px solid #2a2a3e;
-            border-radius: 8px;
-            padding: 16px;
-            text-align: center;
-        }
-        .stat-item .number { font-size: 24px; font-weight: 700; color: #6c3ce0; }
-        .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
+        .card h2 { font-size: 15px; color: #6c3ce0; margin-bottom: 12px; }
         .btn {
-            padding: 8px 18px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            transition: all 0.3s;
+            padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer;
+            font-size: 12px; transition: all 0.3s;
         }
         .btn-primary { background: #6c3ce0; color: #fff; }
         .btn-primary:hover { background: #5a2ec0; }
@@ -52,301 +33,146 @@
         .btn-danger:hover { background: #c62828; }
         .btn-warning { background: #ff9800; color: #fff; }
         .btn-warning:hover { background: #e68900; }
-        .btn-sm { padding: 4px 12px; font-size: 11px; }
+        .btn-sm { padding: 3px 8px; font-size: 10px; }
         .btn-eliminar { background: #d32f2f; color: #fff; }
         .btn-eliminar:hover { background: #b71c1c; }
+        
         .tabla {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
+            width: 100%; border-collapse: collapse; font-size: 12px;
         }
         .tabla th {
-            text-align: left;
-            padding: 8px 12px;
-            color: #888;
-            border-bottom: 1px solid #2a2a3e;
+            text-align: left; padding: 6px 8px; color: #888;
+            border-bottom: 1px solid #2a2a3e; font-size: 10px; text-transform: uppercase;
         }
-        .tabla td {
-            padding: 8px 12px;
-            border-bottom: 1px solid #1a1a2e;
-            vertical-align: middle;
-        }
+        .tabla td { padding: 6px 8px; border-bottom: 1px solid #1a1a2e; vertical-align: middle; }
         .tabla .badge {
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 10px;
+            padding: 1px 8px; border-radius: 10px; font-size: 9px;
         }
         .tabla .badge.activo { background: #224422; color: #6bff6b; }
         .tabla .badge.inactivo { background: #442222; color: #ff6b6b; }
         .tabla .badge.diaria { background: #1a237e; color: #fff; }
         .tabla .badge.cada2dias { background: #ff9800; color: #000; }
-        .tabla .badge.modulo { 
-            background: rgba(108, 60, 224, 0.2); 
-            color: #6c3ce0; 
-            font-size: 9px;
-            padding: 1px 8px;
-            margin: 1px 2px;
-            display: inline-block;
-        }
+        
         .form-row {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 12px;
+            display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;
         }
-        .form-row input, .form-row select, .form-row textarea {
-            padding: 8px 14px;
-            border: 1px solid #2a2a3e;
-            border-radius: 8px;
-            background: #0f0f1a;
-            color: #fff;
-            font-size: 13px;
-            flex: 1;
-            min-width: 120px;
+        .form-row input, .form-row select {
+            padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px;
+            background: #0f0f1a; color: #fff; font-size: 12px;
+            flex: 1; min-width: 100px;
         }
-        .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
-            border-color: #6c3ce0;
-            outline: none;
-        }
-        .form-row select option { background: #1a1a2e; }
-        .form-row label {
-            font-size: 12px;
-            color: #aaa;
-            display: block;
-            margin-bottom: 2px;
-        }
-        .form-row .campo-obligatorio label::after {
-            content: " *";
-            color: #ff6b6b;
-        }
-        .form-row .help-text {
-            font-size: 11px;
-            color: #666;
-            margin-top: 2px;
-        }
+        .form-row input:focus, .form-row select:focus { border-color: #6c3ce0; outline: none; }
+        .form-row label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
+        .form-row .help-text { font-size: 10px; color: #666; margin-top: 2px; }
         .form-row .modulos-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 8px;
-            width: 100%;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; width: 100%;
         }
         .form-row .modulos-grid .modulo-check {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: #0f0f1a;
-            padding: 8px 12px;
-            border-radius: 8px;
-            border: 1px solid #2a2a3e;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-        .form-row .modulos-grid .modulo-check:hover {
-            border-color: #6c3ce0;
+            display: flex; align-items: center; gap: 6px;
+            background: #0f0f1a; padding: 4px 8px; border-radius: 6px;
+            border: 1px solid #2a2a3e; cursor: pointer; font-size: 11px;
         }
         .form-row .modulos-grid .modulo-check.checked {
-            border-color: #6c3ce0;
-            background: rgba(108, 60, 224, 0.1);
+            border-color: #6c3ce0; background: rgba(108,60,224,0.1);
         }
         .form-row .modulos-grid .modulo-check input[type="checkbox"] {
-            width: auto;
-            min-width: auto;
-            flex: none;
-            accent-color: #6c3ce0;
-            cursor: pointer;
-        }
-        .form-row .modulos-grid .modulo-check .modulo-icon {
-            font-size: 16px;
-        }
-        .form-row .modulos-grid .modulo-check .modulo-label {
-            font-size: 12px;
-            flex: 1;
+            width: auto; accent-color: #6c3ce0; cursor: pointer;
         }
         .search-bar {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
+            display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
         }
         .search-bar input {
-            flex: 1;
-            padding: 8px 14px;
-            border: 1px solid #2a2a3e;
-            border-radius: 8px;
-            background: #0f0f1a;
-            color: #fff;
-            min-width: 150px;
+            flex: 1; padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px;
+            background: #0f0f1a; color: #fff; font-size: 12px; min-width: 100px;
         }
         .search-bar input:focus { border-color: #6c3ce0; outline: none; }
         .search-bar select {
-            padding: 8px 14px;
-            border: 1px solid #2a2a3e;
-            border-radius: 8px;
-            background: #0f0f1a;
-            color: #fff;
+            padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px;
+            background: #0f0f1a; color: #fff; font-size: 12px;
         }
-        .empty { text-align: center; color: #888; padding: 40px; }
-        .loading { text-align: center; color: #888; padding: 20px; }
+        .empty { text-align: center; color: #888; padding: 30px; font-size: 13px; }
+        .loading { text-align: center; color: #888; padding: 20px; font-size: 13px; }
         .mensaje-exito {
-            background: #224422;
-            color: #6bff6b;
-            padding: 10px 14px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            display: none;
+            background: #224422; color: #6bff6b;
+            padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; display: none;
         }
         .mensaje-exito.show { display: block; }
         .mensaje-error {
-            background: #442222;
-            color: #ff6b6b;
-            padding: 10px 14px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            display: none;
+            background: #442222; color: #ff6b6b;
+            padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; display: none;
         }
         .mensaje-error.show { display: block; }
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
+        
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px;
         }
-        .modal-overlay.show { display: flex; }
-        .modal-content {
-            background: #1a1a2e;
-            padding: 30px;
-            border-radius: 12px;
-            max-width: 650px;
-            width: 95%;
-            border: 1px solid #2a2a3e;
-            max-height: 95vh;
-            overflow-y: auto;
+        .stat-item {
+            background: #0f0f1a; border: 1px solid #2a2a3e; border-radius: 6px; padding: 8px; text-align: center;
         }
-        .modal-content h3 { margin-bottom: 8px; }
-        .modal-content .modal-subtitle {
-            font-size: 12px;
-            color: #888;
-            margin-bottom: 16px;
-        }
-        .modal-content .form-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 16px;
-            border-top: 1px solid #2a2a3e;
-            padding-top: 16px;
-        }
-        .modal-content .form-actions .btn {
-            flex: 1;
-        }
-        .modal-content .seccion-datos {
-            background: #0f0f1a;
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 12px;
-            border: 1px solid #2a2a3e;
-        }
-        .modal-content .seccion-datos .seccion-titulo {
-            font-size: 13px;
-            color: #6c3ce0;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .acciones-cell {
-            display: flex;
-            gap: 4px;
-            flex-wrap: wrap;
-        }
-        .modulos-asignados {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 2px;
-        }
-        .modulos-asignados .modulo-tag {
-            display: inline-block;
-            background: rgba(108, 60, 224, 0.15);
-            color: #6c3ce0;
-            padding: 1px 8px;
-            border-radius: 10px;
-            font-size: 9px;
-            margin: 1px;
-        }
-        /* Modal de confirmación de eliminación */
-        .modal-confirm {
-            max-width: 450px;
-        }
-        .modal-confirm .icono-eliminar {
-            font-size: 48px;
-            text-align: center;
-            margin-bottom: 12px;
-        }
-        .modal-confirm .mensaje-eliminar {
-            text-align: center;
-            font-size: 14px;
-            color: #aaa;
-            margin-bottom: 8px;
-        }
-        .modal-confirm .nombre-eliminar {
-            text-align: center;
-            font-size: 18px;
-            font-weight: 700;
-            color: #ff6b6b;
-            margin-bottom: 16px;
-        }
+        .stat-item .number { font-size: 18px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 8px; color: #888; margin-top: 1px; }
+        
+        .acciones-cell { display: flex; gap: 4px; flex-wrap: wrap; }
+        .modal-confirm { max-width: 400px; }
+        .modal-confirm .nombre-eliminar { text-align: center; font-size: 16px; font-weight: 700; color: #ff6b6b; margin-bottom: 10px; }
         .modal-confirm .detalles-eliminar {
-            background: #0f0f1a;
-            border-radius: 8px;
-            padding: 12px;
-            margin-bottom: 16px;
-            border: 1px solid #2a2a3e;
-            font-size: 12px;
+            background: #0f0f1a; border-radius: 6px; padding: 10px; margin-bottom: 12px;
+            border: 1px solid #2a2a3e; font-size: 11px;
         }
-        .modal-confirm .detalles-eliminar .fila {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            border-bottom: 1px solid #1a1a2e;
-        }
-        .modal-confirm .detalles-eliminar .fila:last-child {
-            border-bottom: none;
-        }
-        .modal-confirm .detalles-eliminar .label {
-            color: #888;
-        }
-        .modal-confirm .detalles-eliminar .value {
-            color: #fff;
-            font-weight: 600;
-        }
-        .modal-confirm .form-actions {
-            display: flex;
-            gap: 10px;
-        }
-        .modal-confirm .form-actions .btn {
-            flex: 1;
-        }
+        .modal-confirm .detalles-eliminar .fila { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #1a1a2e; }
+        .modal-confirm .detalles-eliminar .fila:last-child { border-bottom: none; }
+        .modal-confirm .detalles-eliminar .label { color: #888; }
+        .modal-confirm .detalles-eliminar .value { color: #fff; font-weight: 600; }
         .btn-peligro { background: #d32f2f; color: #fff; }
         .btn-peligro:hover { background: #b71c1c; }
         .btn-secondary { background: #2a2a3e; color: #fff; }
         .btn-secondary:hover { background: #3a3a4e; }
+        
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.7);
+            z-index: 1000; align-items: center; justify-content: center; padding: 16px;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-content {
+            background: #1a1a2e; padding: 20px; border-radius: 10px;
+            max-width: 500px; width: 100%; border: 1px solid #2a2a3e; max-height: 90vh; overflow-y: auto;
+        }
+        .modal-content h3 { font-size: 16px; margin-bottom: 6px; }
+        .modal-content .modal-subtitle { font-size: 11px; color: #888; margin-bottom: 12px; }
+        .modal-content .form-actions { display: flex; gap: 8px; margin-top: 12px; border-top: 1px solid #2a2a3e; padding-top: 12px; }
+        .modal-content .seccion-datos {
+            background: #0f0f1a; border-radius: 6px; padding: 10px; margin-bottom: 10px; border: 1px solid #2a2a3e;
+        }
+        .modal-content .seccion-datos .seccion-titulo { font-size: 12px; color: #6c3ce0; margin-bottom: 6px; }
+        
+        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
+        .table-wrapper table { min-width: 700px; }
+
         @media (max-width: 600px) {
+            body { padding: 8px; }
+            .card { padding: 10px; }
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .form-row { flex-direction: column; }
-            .modal-content { padding: 16px; }
-            .acciones-cell { flex-direction: column; }
-            .acciones-cell .btn-sm { width: 100%; text-align: center; }
             .form-row .modulos-grid { grid-template-columns: 1fr 1fr; }
+            .search-bar { flex-direction: column; }
+            .acciones-cell { flex-direction: row; flex-wrap: wrap; }
+            .acciones-cell .btn-sm { flex: 1; text-align: center; min-width: 50px; font-size: 9px; }
+            .modal-content { padding: 14px; }
+            .tabla { font-size: 11px; }
+            .tabla th, .tabla td { padding: 4px 6px; }
+        }
+        @media (max-width: 400px) {
+            .tabla { font-size: 10px; }
+            .tabla th, .tabla td { padding: 3px 4px; }
+            .form-row .modulos-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-        <h1 style="font-size:22px;display:flex;align-items:center;gap:10px;">👥 Trabajadores <span style="font-size:14px;font-weight:normal;opacity:0.7;">Gestión de empleados</span></h1>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:6px;">
+        <h1 style="font-size:18px;display:flex;align-items:center;gap:8px;">👥 Trabajadores <span style="font-size:12px;font-weight:normal;opacity:0.7;">Gestión de empleados</span></h1>
     </div>
 
     <div class="mensaje-error" id="mensajeError"></div>
@@ -356,7 +182,7 @@
         <div class="stats-grid">
             <div class="stat-item">
                 <span class="number" id="totalTrabajadores">0</span>
-                <span class="label">👥 Total empleados</span>
+                <span class="label">👥 Total</span>
             </div>
             <div class="stat-item">
                 <span class="number" id="trabajadoresActivos">0</span>
@@ -368,175 +194,103 @@
             </div>
             <div class="stat-item">
                 <span class="number" id="nominaTotal">$0</span>
-                <span class="label">💰 Nómina total</span>
+                <span class="label">💰 Nómina</span>
             </div>
         </div>
     </div>
 
     <div class="card">
         <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="🔍 Buscar trabajador..." oninput="filtrarTrabajadores()">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar..." oninput="filtrarTrabajadores()">
             <select id="filtroEstado" onchange="filtrarTrabajadores()">
                 <option value="todos">Todos</option>
                 <option value="activo">🟢 Activos</option>
                 <option value="inactivo">🔴 Inactivos</option>
             </select>
-            <button class="btn btn-primary" onclick="mostrarFormulario()">+ Nuevo trabajador</button>
+            <button class="btn btn-primary" onclick="mostrarFormulario()">+ Nuevo</button>
         </div>
 
-        <div id="formTrabajador" style="display:none;border-top:1px solid #2a2a3e;padding-top:16px;margin-top:12px;">
+        <div id="formTrabajador" style="display:none;border-top:1px solid #2a2a3e;padding-top:12px;margin-top:8px;">
             <h3 id="modalTitle">👤 Nuevo Trabajador</h3>
-            <div class="modal-subtitle">Complete los datos personales, laborales y seleccione los módulos a los que tendrá acceso</div>
+            <div class="modal-subtitle">Datos personales y módulos de acceso</div>
 
-            <!-- DATOS PERSONALES -->
             <div class="seccion-datos">
                 <div class="seccion-titulo">📋 Datos Personales</div>
-                
-                <div class="form-row campo-obligatorio">
-                    <div style="flex:1;">
-                        <label>Nombre</label>
-                        <input type="text" id="traNombre" placeholder="Nombre del trabajador" required>
-                    </div>
-                    <div style="flex:1;">
-                        <label>Apellidos</label>
-                        <input type="text" id="traApellidos" placeholder="Apellidos del trabajador" required>
-                    </div>
-                </div>
-
-                <div class="form-row campo-obligatorio">
-                    <div style="flex:1;">
-                        <label>Carnet de Identidad (CI)</label>
-                        <input type="text" id="traCI" placeholder="Ej: 123456789" required>
-                    </div>
-                    <div style="flex:1;">
-                        <label>Teléfono / Móvil</label>
-                        <input type="text" id="traMovil" placeholder="Ej: 555-1234">
-                    </div>
-                </div>
-
                 <div class="form-row">
-                    <div style="flex:1;">
-                        <label>Dirección Particular</label>
-                        <input type="text" id="traDireccion" placeholder="Calle, número, ciudad">
-                    </div>
+                    <input type="text" id="traNombre" placeholder="Nombre" required>
+                    <input type="text" id="traApellidos" placeholder="Apellidos" required>
+                </div>
+                <div class="form-row">
+                    <input type="text" id="traCI" placeholder="CI" required>
+                    <input type="text" id="traMovil" placeholder="Móvil">
+                </div>
+                <div class="form-row">
+                    <input type="text" id="traDireccion" placeholder="Dirección">
                 </div>
             </div>
 
-            <!-- DATOS LABORALES -->
             <div class="seccion-datos">
                 <div class="seccion-titulo">💼 Datos Laborales</div>
-                
-                <div class="form-row campo-obligatorio">
-                    <div style="flex:1;">
-                        <label>Frecuencia de trabajo</label>
-                        <select id="traFrecuencia" required>
-                            <option value="diaria">Diaria</option>
-                            <option value="cada_2_dias">Cada 2 días</option>
-                        </select>
-                        <div class="help-text">Selecciona la frecuencia con la que el trabajador presta servicios</div>
-                    </div>
-                    <div style="flex:1;">
-                        <label>Salario</label>
-                        <input type="number" id="traSalario" placeholder="Ej: 1500.00" step="0.01" required>
-                        <div class="help-text">Salario mensual en pesos</div>
-                    </div>
-                </div>
-
                 <div class="form-row">
-                    <div style="flex:1;">
-                        <label>📧 Email (opcional)</label>
-                        <input type="email" id="traEmail" placeholder="trabajador@email.com">
-                    </div>
+                    <select id="traFrecuencia">
+                        <option value="diaria">Diaria</option>
+                        <option value="cada_2_dias">Cada 2 días</option>
+                    </select>
+                    <input type="number" id="traSalario" placeholder="Salario" step="0.01" required>
+                </div>
+                <div class="form-row">
+                    <input type="email" id="traEmail" placeholder="Email (opcional)">
                 </div>
             </div>
 
-            <!-- MÓDULOS A ASIGNAR -->
             <div class="seccion-datos">
-                <div class="seccion-titulo">🧩 Módulos a Asignar</div>
-                <div class="help-text" style="margin-bottom:8px;">Selecciona los módulos a los que el trabajador tendrá acceso. <strong>Selecciona al menos uno.</strong></div>
-                
+                <div class="seccion-titulo">🧩 Módulos</div>
+                <div class="help-text" style="margin-bottom:6px;">Selecciona los módulos para el trabajador</div>
                 <div class="form-row">
-                    <div class="modulos-grid" id="modulosGrid">
-                        <!-- Los módulos se cargarán dinámicamente con JavaScript -->
-                    </div>
+                    <div class="modulos-grid" id="modulosGrid"></div>
                 </div>
-                <div class="help-text" id="modulosSeleccionados" style="margin-top:4px;color:#6c3ce0;">
-                    📌 Módulos seleccionados: <span id="modulosCount">0</span>
-                </div>
+                <div class="help-text" style="margin-top:4px;color:#6c3ce0;">📌 Seleccionados: <span id="modulosCount">0</span></div>
             </div>
 
-            <!-- DATOS DE ACCESO -->
             <div class="seccion-datos">
-                <div class="seccion-titulo">🔑 Datos de Acceso al Sistema</div>
-                <div class="form-row campo-obligatorio">
-                    <div style="flex:1;">
-                        <label>Usuario para login</label>
-                        <input type="text" id="traUsuario" placeholder="Nombre de usuario" required>
-                    </div>
-                    <div style="flex:1;">
-                        <label>Contraseña</label>
-                        <input type="password" id="traPassword" placeholder="Mínimo 6 caracteres" required>
-                    </div>
+                <div class="seccion-titulo">🔑 Acceso</div>
+                <div class="form-row">
+                    <input type="text" id="traUsuario" placeholder="Usuario" required>
+                    <input type="password" id="traPassword" placeholder="Contraseña">
                 </div>
-                <div class="help-text">El trabajador usará estas credenciales para acceder al sistema</div>
             </div>
 
             <input type="hidden" id="traId" value="">
-
             <div class="form-actions">
-                <button class="btn btn-success" onclick="guardarTrabajador()" id="btnGuardar">💾 Guardar trabajador</button>
+                <button class="btn btn-success" onclick="guardarTrabajador()" id="btnGuardar">💾 Guardar</button>
                 <button class="btn btn-danger" onclick="cancelarFormulario()">✕ Cancelar</button>
             </div>
         </div>
     </div>
 
     <div class="card">
-        <div id="trabajadoresContainer">
-            <div class="loading">Cargando trabajadores...</div>
+        <div class="table-wrapper">
+            <div id="trabajadoresContainer">
+                <div class="loading">Cargando...</div>
+            </div>
         </div>
     </div>
 
-    <!-- Modal de Confirmación para Eliminar -->
+    <!-- Modal Eliminar -->
     <div class="modal-overlay" id="modalEliminar">
         <div class="modal-content modal-confirm">
-            <div class="icono-eliminar">🗑️</div>
-            <h3 style="text-align:center;color:#ff6b6b;">Eliminar Trabajador</h3>
-            <div class="mensaje-eliminar">¿Estás seguro de que deseas eliminar este trabajador?</div>
+            <h3 style="text-align:center;color:#ff6b6b;">🗑️ Eliminar</h3>
             <div class="nombre-eliminar" id="nombreEliminar">-</div>
-            
             <div class="detalles-eliminar" id="detallesEliminar">
-                <div class="fila">
-                    <span class="label">👤 Nombre completo</span>
-                    <span class="value" id="detalleNombre">-</span>
-                </div>
-                <div class="fila">
-                    <span class="label">🪪 Carnet de Identidad</span>
-                    <span class="value" id="detalleCI">-</span>
-                </div>
-                <div class="fila">
-                    <span class="label">📱 Móvil</span>
-                    <span class="value" id="detalleMovil">-</span>
-                </div>
-                <div class="fila">
-                    <span class="label">💰 Salario</span>
-                    <span class="value" id="detalleSalario">-</span>
-                </div>
-                <div class="fila">
-                    <span class="label">📌 Estado</span>
-                    <span class="value" id="detalleEstado">-</span>
-                </div>
-                <div class="fila">
-                    <span class="label">🧩 Módulos</span>
-                    <span class="value" id="detalleModulos">-</span>
-                </div>
+                <div class="fila"><span class="label">👤 Nombre</span><span class="value" id="detalleNombre">-</span></div>
+                <div class="fila"><span class="label">🪪 CI</span><span class="value" id="detalleCI">-</span></div>
+                <div class="fila"><span class="label">📱 Móvil</span><span class="value" id="detalleMovil">-</span></div>
+                <div class="fila"><span class="label">💰 Salario</span><span class="value" id="detalleSalario">-</span></div>
+                <div class="fila"><span class="label">📌 Estado</span><span class="value" id="detalleEstado">-</span></div>
             </div>
-
-            <div style="color:#888;font-size:12px;text-align:center;margin-bottom:16px;">
-                ⚠️ Esta acción eliminará todos los datos del trabajador y no se puede deshacer.
-            </div>
-
+            <div style="color:#888;font-size:11px;text-align:center;margin-bottom:12px;">⚠️ Esta acción no se puede deshacer</div>
             <div class="form-actions">
-                <button class="btn btn-peligro" onclick="confirmarEliminar()" id="btnConfirmarEliminar">🗑️ Eliminar definitivamente</button>
+                <button class="btn btn-peligro" onclick="confirmarEliminar()" id="btnConfirmarEliminar">🗑️ Eliminar</button>
                 <button class="btn btn-secondary" onclick="cerrarModalEliminar()">✕ Cancelar</button>
             </div>
         </div>
@@ -547,10 +301,6 @@
         let editandoId = null;
         let modulosDisponibles = [];
         let trabajadorAEliminar = null;
-
-        // ============================================
-        // FUNCIONES DE MENSAJES
-        // ============================================
 
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
@@ -567,142 +317,72 @@
             setTimeout(() => {
                 errorEl.classList.remove('show');
                 exitoEl.classList.remove('show');
-            }, 5000);
+            }, 4000);
         }
-
-        // ============================================
-        // CARGAR MÓDULOS DISPONIBLES
-        // ============================================
 
         async function cargarModulosDisponibles() {
             try {
                 const response = await fetch('/api/modulos');
-                if (!response.ok) throw new Error('Error al cargar módulos');
+                if (!response.ok) throw new Error('Error');
                 const data = await response.json();
-                
                 const nombresNegocio = ['inventario', 'tienda', 'trabajadores', 'servicios', 'ventas', 'contratos'];
-                modulosDisponibles = data.filter(m => 
-                    nombresNegocio.includes(m.nombre.toLowerCase())
-                );
-                
-                console.log('📦 Módulos disponibles:', modulosDisponibles);
+                modulosDisponibles = data.filter(m => nombresNegocio.includes(m.nombre.toLowerCase()));
                 renderModulosCheckboxes();
             } catch (error) {
-                console.error('Error al cargar módulos:', error);
+                console.error('Error:', error);
             }
         }
 
-        // ============================================
-        // RENDER MÓDULOS CHECKBOXES
-        // ============================================
-
-        function renderModulosCheckboxes(modulosSeleccionadosPredefinidos = null) {
+        function renderModulosCheckboxes(modulosPredefinidos = null) {
             const container = document.getElementById('modulosGrid');
             container.innerHTML = '';
-            
-            const iconos = {
-                'inventario': '📦',
-                'tienda': '🛍️',
-                'trabajadores': '👥',
-                'servicios': '📋',
-                'ventas': '💰',
-                'contratos': '📄'
-            };
-            
-            const nombresMostrar = {
-                'inventario': 'Inventario',
-                'tienda': 'Tienda',
-                'trabajadores': 'Trabajadores',
-                'servicios': 'Servicios',
-                'ventas': 'Ventas',
-                'contratos': 'Contratos'
-            };
+            const iconos = { 'inventario': '📦', 'tienda': '🛍️', 'trabajadores': '👥', 'servicios': '📋', 'ventas': '💰', 'contratos': '📄' };
+            const nombres = { 'inventario': 'Inventario', 'tienda': 'Tienda', 'trabajadores': 'Trabajadores', 'servicios': 'Servicios', 'ventas': 'Ventas', 'contratos': 'Contratos' };
 
             modulosDisponibles.forEach(mod => {
                 const div = document.createElement('div');
                 div.className = 'modulo-check';
-                div.dataset.moduloId = mod.id;
-                div.dataset.moduloNombre = mod.nombre;
-                
-                let checked = false;
-                if (modulosSeleccionadosPredefinidos) {
-                    checked = modulosSeleccionadosPredefinidos.includes(mod.nombre);
-                }
-                
-                const icono = iconos[mod.nombre] || '📦';
-                const nombreMostrar = nombresMostrar[mod.nombre] || mod.nombre;
-                
+                const checked = modulosPredefinidos ? modulosPredefinidos.includes(mod.nombre) : false;
                 div.innerHTML = `
-                    <input type="checkbox" class="modulo-checkbox" value="${mod.nombre}" data-id="${mod.id}" ${checked ? 'checked' : ''}>
-                    <span class="modulo-icon">${icono}</span>
-                    <span class="modulo-label">${nombreMostrar}</span>
+                    <input type="checkbox" class="modulo-checkbox" value="${mod.nombre}" ${checked ? 'checked' : ''}>
+                    <span>${iconos[mod.nombre] || '📦'}</span>
+                    <span style="font-size:11px;">${nombres[mod.nombre] || mod.nombre}</span>
                 `;
-                
                 const checkbox = div.querySelector('.modulo-checkbox');
                 checkbox.addEventListener('change', function() {
-                    if (this.checked) {
-                        div.classList.add('checked');
-                    } else {
-                        div.classList.remove('checked');
-                    }
+                    div.classList.toggle('checked');
                     actualizarContadorModulos();
                 });
-                
-                if (checked) {
-                    div.classList.add('checked');
-                }
-                
+                if (checked) div.classList.add('checked');
                 container.appendChild(div);
             });
-            
             actualizarContadorModulos();
         }
 
-        // ============================================
-        // ACTUALIZAR CONTADOR DE MÓDULOS
-        // ============================================
-
         function actualizarContadorModulos() {
-            const checkboxes = document.querySelectorAll('.modulo-checkbox:checked');
-            const count = checkboxes.length;
+            const count = document.querySelectorAll('.modulo-checkbox:checked').length;
             document.getElementById('modulosCount').textContent = count;
         }
 
-        // ============================================
-        // OBTENER MÓDULOS SELECCIONADOS
-        // ============================================
-
         function getModulosSeleccionados() {
-            const checkboxes = document.querySelectorAll('.modulo-checkbox:checked');
-            return Array.from(checkboxes).map(cb => cb.value);
+            return Array.from(document.querySelectorAll('.modulo-checkbox:checked')).map(cb => cb.value);
         }
-
-        // ============================================
-        // CARGAR TRABAJADORES DESDE EL SERVIDOR
-        // ============================================
 
         async function cargarTrabajadores() {
             const container = document.getElementById('trabajadoresContainer');
-            container.innerHTML = '<div class="loading">Cargando trabajadores...</div>';
+            container.innerHTML = '<div class="loading">Cargando...</div>';
 
             try {
                 const response = await fetch('/api/negocio/trabajadores');
-                if (!response.ok) {
-                    throw new Error('Error al cargar trabajadores');
-                }
+                if (!response.ok) throw new Error('Error');
                 trabajadores = await response.json();
-                console.log('👥 Trabajadores cargados:', trabajadores);
                 renderTrabajadores();
                 actualizarEstadisticas();
             } catch (error) {
                 console.error('Error:', error);
-                container.innerHTML = `<div class="empty">❌ Error al cargar trabajadores</div>`;
+                container.innerHTML = `<div class="empty">❌ Error al cargar</div>`;
             }
         }
-
-        // ============================================
-        // RENDER TRABAJADORES
-        // ============================================
 
         function renderTrabajadores(filtro = '', estadoFiltro = 'todos') {
             const container = document.getElementById('trabajadoresContainer');
@@ -711,8 +391,7 @@
             let filtrados = trabajadores.filter(t => 
                 t.nombre.toLowerCase().includes(filtroLower) ||
                 (t.apellidos && t.apellidos.toLowerCase().includes(filtroLower)) ||
-                (t.ci && t.ci.includes(filtroLower)) ||
-                (t.movil && t.movil.includes(filtroLower))
+                (t.ci && t.ci.includes(filtroLower))
             );
 
             if (estadoFiltro === 'activo') {
@@ -722,28 +401,14 @@
             }
 
             if (filtrados.length === 0) {
-                container.innerHTML = `<div class="empty">No hay trabajadores registrados</div>`;
+                container.innerHTML = `<div class="empty">No hay trabajadores</div>`;
                 return;
             }
 
-            let html = `
-                <div style="overflow-x:auto;">
-                    <table class="tabla">
-                        <thead>
-                            <tr>
-                                <th>Nombre</th>
-                                <th>CI</th>
-                                <th>Móvil</th>
-                                <th>Dirección</th>
-                                <th>Frecuencia</th>
-                                <th>Salario</th>
-                                <th>Módulos</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
+            let html = `<table class="tabla">
+                <thead><tr>
+                    <th>Nombre</th><th>CI</th><th>Frecuencia</th><th>Salario</th><th>Módulos</th><th>Estado</th><th>Acciones</th>
+                </tr></thead><tbody>`;
 
             filtrados.forEach(t => {
                 const nombreCompleto = t.apellidos ? `${t.nombre} ${t.apellidos}` : t.nombre;
@@ -758,48 +423,35 @@
                     modulosList.forEach(mod => {
                         const nombreMod = mod.trim();
                         if (nombreMod) {
-                            modulosHtml += `<span class="modulo-tag">${nombreMod}</span>`;
+                            modulosHtml += `<span class="badge" style="background:rgba(108,60,224,0.15);color:#6c3ce0;font-size:8px;margin:1px;">${nombreMod}</span>`;
                         }
                     });
                 } else {
-                    modulosHtml = '<span style="color:#666;font-size:11px;">Sin módulos</span>';
+                    modulosHtml = '<span style="color:#666;font-size:9px;">Sin módulos</span>';
                 }
                 
                 html += `
                     <tr>
                         <td><strong>${nombreCompleto}</strong></td>
                         <td>${t.ci || '-'}</td>
-                        <td>${t.movil || '-'}</td>
-                        <td>${t.direccion || '-'}</td>
                         <td><span class="badge ${frecuenciaClass}">${frecuenciaLabel}</span></td>
                         <td>$${t.salario ? parseFloat(t.salario).toFixed(2) : '0.00'}</td>
-                        <td><div class="modulos-asignados">${modulosHtml}</div></td>
+                        <td>${modulosHtml}</td>
                         <td><span class="badge ${estadoClass}">${estadoLabel}</span></td>
                         <td>
                             <div class="acciones-cell">
-                                <button class="btn btn-warning btn-sm" onclick="editarTrabajador(${t.id})" title="Editar">✏️</button>
-                                <button class="btn ${t.activo ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleTrabajador(${t.id}, ${t.activo ? 0 : 1})" title="${t.activo ? 'Desactivar' : 'Activar'}">
-                                    ${t.activo ? '🔴' : '🟢'}
-                                </button>
-                                <button class="btn btn-eliminar btn-sm" onclick="abrirModalEliminar(${t.id})" title="Eliminar trabajador">🗑️</button>
+                                <button class="btn btn-warning btn-sm" onclick="editarTrabajador(${t.id})">✏️</button>
+                                <button class="btn ${t.activo ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleTrabajador(${t.id}, ${t.activo ? 0 : 1})">${t.activo ? '🔴' : '🟢'}</button>
+                                <button class="btn btn-eliminar btn-sm" onclick="abrirModalEliminar(${t.id})">🗑️</button>
                             </div>
                         </td>
                     </tr>
                 `;
             });
 
-            html += `
-                        </tbody>
-                    </table>
-                </div>
-            `;
-
+            html += `</tbody></table>`;
             container.innerHTML = html;
         }
-
-        // ============================================
-        // ESTADÍSTICAS
-        // ============================================
 
         function actualizarEstadisticas() {
             const total = trabajadores.length;
@@ -813,26 +465,18 @@
             document.getElementById('nominaTotal').textContent = `$${nomina.toFixed(2)}`;
         }
 
-        // ============================================
-        // FILTRAR
-        // ============================================
-
         function filtrarTrabajadores() {
             const filtro = document.getElementById('searchInput').value;
             const estado = document.getElementById('filtroEstado').value;
             renderTrabajadores(filtro, estado);
         }
 
-        // ============================================
-        // FORMULARIO - NUEVO TRABAJADOR
-        // ============================================
-
-        async function mostrarFormulario() {
+        function mostrarFormulario() {
             document.getElementById('formTrabajador').style.display = 'block';
             document.getElementById('traNombre').focus();
             editandoId = null;
             document.getElementById('modalTitle').textContent = '👤 Nuevo Trabajador';
-            document.getElementById('btnGuardar').textContent = '💾 Guardar trabajador';
+            document.getElementById('btnGuardar').textContent = '💾 Guardar';
             document.getElementById('btnGuardar').className = 'btn btn-success';
             document.getElementById('traId').value = '';
             
@@ -847,20 +491,16 @@
             document.getElementById('traUsuario').value = '';
             document.getElementById('traPassword').value = '';
             
-            if (modulosDisponibles.length === 0) {
-                await cargarModulosDisponibles();
-            } else {
-                renderModulosCheckboxes();
-            }
-            
-            document.getElementById('formTrabajador').scrollIntoView({ behavior: 'smooth' });
+            if (modulosDisponibles.length === 0) { cargarModulosDisponibles(); }
+            else { renderModulosCheckboxes(); }
         }
 
-        // ============================================
-        // FORMULARIO - EDITAR TRABAJADOR
-        // ============================================
+        function cancelarFormulario() {
+            document.getElementById('formTrabajador').style.display = 'none';
+            editandoId = null;
+        }
 
-        async function editarTrabajador(id) {
+        function editarTrabajador(id) {
             const t = trabajadores.find(t => t.id === id);
             if (!t) return;
             
@@ -879,42 +519,12 @@
             
             editandoId = id;
             document.getElementById('modalTitle').textContent = '✏️ Editar Trabajador';
-            document.getElementById('btnGuardar').textContent = '💾 Actualizar trabajador';
+            document.getElementById('btnGuardar').textContent = '💾 Actualizar';
             document.getElementById('btnGuardar').className = 'btn btn-warning';
             
-            if (modulosDisponibles.length === 0) {
-                await cargarModulosDisponibles();
-            }
-            
-            const modulosDelTrabajador = t.modulos || [];
-            renderModulosCheckboxes(modulosDelTrabajador);
-            
-            document.getElementById('formTrabajador').scrollIntoView({ behavior: 'smooth' });
+            if (modulosDisponibles.length === 0) { cargarModulosDisponibles(); }
+            renderModulosCheckboxes(t.modulos || []);
         }
-
-        // ============================================
-        // CANCELAR FORMULARIO
-        // ============================================
-
-        function cancelarFormulario() {
-            document.getElementById('formTrabajador').style.display = 'none';
-            document.getElementById('traNombre').value = '';
-            document.getElementById('traApellidos').value = '';
-            document.getElementById('traCI').value = '';
-            document.getElementById('traMovil').value = '';
-            document.getElementById('traDireccion').value = '';
-            document.getElementById('traFrecuencia').value = 'diaria';
-            document.getElementById('traSalario').value = '';
-            document.getElementById('traEmail').value = '';
-            document.getElementById('traUsuario').value = '';
-            document.getElementById('traPassword').value = '';
-            document.getElementById('traId').value = '';
-            editandoId = null;
-        }
-
-        // ============================================
-        // GUARDAR TRABAJADOR
-        // ============================================
 
         async function guardarTrabajador() {
             const nombre = document.getElementById('traNombre').value.trim();
@@ -927,67 +537,28 @@
             const email = document.getElementById('traEmail').value.trim();
             const usuario = document.getElementById('traUsuario').value.trim();
             const password = document.getElementById('traPassword').value.trim();
-            
             const modulosSeleccionados = getModulosSeleccionados();
 
-            if (!nombre) {
-                mostrarMensaje('❌ El nombre es obligatorio', 'error');
-                document.getElementById('traNombre').focus();
+            if (!nombre || !apellidos || !ci || isNaN(salario) || !usuario) {
+                mostrarMensaje('Completa todos los campos obligatorios', 'error');
                 return;
             }
-
-            if (!apellidos) {
-                mostrarMensaje('❌ Los apellidos son obligatorios', 'error');
-                document.getElementById('traApellidos').focus();
-                return;
-            }
-
-            if (!ci) {
-                mostrarMensaje('❌ El carnet de identidad es obligatorio', 'error');
-                document.getElementById('traCI').focus();
-                return;
-            }
-
-            if (isNaN(salario) || salario <= 0) {
-                mostrarMensaje('❌ El salario debe ser un número válido mayor que 0', 'error');
-                document.getElementById('traSalario').focus();
-                return;
-            }
-
-            if (!usuario) {
-                mostrarMensaje('❌ El nombre de usuario es obligatorio', 'error');
-                document.getElementById('traUsuario').focus();
-                return;
-            }
-
             if (!editandoId && !password) {
-                mostrarMensaje('❌ La contraseña es obligatoria para nuevos trabajadores', 'error');
-                document.getElementById('traPassword').focus();
+                mostrarMensaje('Contraseña obligatoria', 'error');
                 return;
             }
-
             if (password && password.length < 6) {
-                mostrarMensaje('❌ La contraseña debe tener al menos 6 caracteres', 'error');
-                document.getElementById('traPassword').focus();
+                mostrarMensaje('Mínimo 6 caracteres', 'error');
                 return;
             }
-
             if (modulosSeleccionados.length === 0) {
-                mostrarMensaje('❌ Debes seleccionar al menos un módulo para el trabajador', 'error');
+                mostrarMensaje('Selecciona al menos un módulo', 'error');
                 return;
             }
 
             const data = {
-                nombre: nombre,
-                apellidos: apellidos,
-                ci: ci,
-                movil: movil || '',
-                direccion: direccion || '',
-                frecuencia: frecuencia,
-                salario: salario,
-                email: email || '',
-                usuario: usuario,
-                password: password,
+                nombre, apellidos, ci, movil, direccion, frecuencia,
+                salario, email, usuario, password,
                 modulos: modulosSeleccionados
             };
 
@@ -1000,25 +571,20 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-
                 const result = await response.json();
 
                 if (result.success) {
-                    mostrarMensaje(`✅ ${editandoId ? 'Actualizado' : 'Creado'} trabajador "${nombre} ${apellidos}" correctamente`, 'exito');
+                    mostrarMensaje(`✅ ${editandoId ? 'Actualizado' : 'Creado'} "${nombre} ${apellidos}"`, 'exito');
                     cancelarFormulario();
                     await cargarTrabajadores();
                 } else {
-                    mostrarMensaje(result.error || '❌ Error al guardar el trabajador', 'error');
+                    mostrarMensaje(result.error || 'Error', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('❌ Error de conexión con el servidor', 'error');
+                mostrarMensaje('Error de conexión', 'error');
             }
         }
-
-        // ============================================
-        // TOGGLE TRABAJADOR (ACTIVAR/DESACTIVAR)
-        // ============================================
 
         async function toggleTrabajador(id, activo) {
             try {
@@ -1027,44 +593,29 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ activo })
                 });
-                
                 if (response.ok) {
-                    mostrarMensaje(`✅ Trabajador ${activo ? 'activado' : 'desactivado'} correctamente`, 'exito');
+                    mostrarMensaje(`✅ ${activo ? 'Activado' : 'Desactivado'}`, 'exito');
                     await cargarTrabajadores();
                 } else {
-                    mostrarMensaje('❌ Error al cambiar estado', 'error');
+                    mostrarMensaje('Error', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('❌ Error de conexión', 'error');
+                mostrarMensaje('Error de conexión', 'error');
             }
         }
-
-        // ============================================
-        // MODAL - ELIMINAR TRABAJADOR
-        // ============================================
 
         function abrirModalEliminar(id) {
             const t = trabajadores.find(t => t.id === id);
             if (!t) return;
-            
             trabajadorAEliminar = t;
-            
             const nombreCompleto = t.apellidos ? `${t.nombre} ${t.apellidos}` : t.nombre;
             document.getElementById('nombreEliminar').textContent = nombreCompleto;
             document.getElementById('detalleNombre').textContent = nombreCompleto;
-            document.getElementById('detalleCI').textContent = t.ci || 'No registrado';
-            document.getElementById('detalleMovil').textContent = t.movil || 'No registrado';
+            document.getElementById('detalleCI').textContent = t.ci || '-';
+            document.getElementById('detalleMovil').textContent = t.movil || '-';
             document.getElementById('detalleSalario').textContent = `$${t.salario ? parseFloat(t.salario).toFixed(2) : '0.00'}`;
             document.getElementById('detalleEstado').textContent = t.activo ? '🟢 Activo' : '🔴 Inactivo';
-            
-            let modulosText = 'Sin módulos';
-            if (t.modulos && t.modulos.length > 0) {
-                const modulosList = Array.isArray(t.modulos) ? t.modulos : t.modulos.split(',');
-                modulosText = modulosList.map(m => m.trim()).join(', ');
-            }
-            document.getElementById('detalleModulos').textContent = modulosText;
-            
             document.getElementById('modalEliminar').classList.add('show');
         }
 
@@ -1073,62 +624,42 @@
             trabajadorAEliminar = null;
         }
 
-        // Cerrar modal al hacer clic fuera
         document.getElementById('modalEliminar').addEventListener('click', function(e) {
-            if (e.target === this) {
-                cerrarModalEliminar();
-            }
+            if (e.target === this) { cerrarModalEliminar(); }
         });
-
-        // ============================================
-        // CONFIRMAR ELIMINAR TRABAJADOR
-        // ============================================
 
         async function confirmarEliminar() {
             if (!trabajadorAEliminar) return;
-            
             const btn = document.getElementById('btnConfirmarEliminar');
             btn.disabled = true;
             btn.textContent = '⏳ Eliminando...';
-            
             try {
-                // Usar el nuevo endpoint específico para eliminar trabajadores
                 const response = await fetch(`/api/negocio/trabajador/${trabajadorAEliminar.id}`, {
                     method: 'DELETE'
                 });
-                
                 const data = await response.json();
-                
                 if (data.success) {
                     const nombre = trabajadorAEliminar.apellidos ? 
                         `${trabajadorAEliminar.nombre} ${trabajadorAEliminar.apellidos}` : 
                         trabajadorAEliminar.nombre;
-                    mostrarMensaje(`✅ Trabajador "${nombre}" eliminado correctamente`, 'exito');
+                    mostrarMensaje(`✅ "${nombre}" eliminado`, 'exito');
                     cerrarModalEliminar();
                     await cargarTrabajadores();
                 } else {
-                    mostrarMensaje(data.error || '❌ Error al eliminar el trabajador', 'error');
+                    mostrarMensaje(data.error || 'Error', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('❌ Error de conexión con el servidor', 'error');
+                mostrarMensaje('Error de conexión', 'error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '🗑️ Eliminar definitivamente';
+                btn.textContent = '🗑️ Eliminar';
             }
         }
 
-        // ============================================
-        // INICIO
-        // ============================================
-
         cargarModulosDisponibles();
         cargarTrabajadores();
-        
-        setInterval(() => {
-            cargarTrabajadores();
-            cargarModulosDisponibles();
-        }, 30000);
+        setInterval(cargarTrabajadores, 30000);
     </script>
 </body>
 </html>
