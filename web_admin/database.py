@@ -278,6 +278,22 @@ def verify_password(password, password_hash):
     return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
 
 def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='cliente', datos_negocio=None):
+    """
+    Crea un nuevo usuario en la base de datos
+    
+    Args:
+        username (str): Nombre de usuario único
+        email (str): Email único
+        password (str): Contraseña (se hashea automáticamente)
+        nombre (str, optional): Nombre completo del usuario
+        rol (str, optional): Rol del usuario (usuario, admin, trabajador)
+        tipo (str, optional): Tipo de usuario (cliente, negocio)
+        datos_negocio (dict, optional): Datos del negocio si tipo='negocio'
+            Debe contener: nombre_negocio, ruc, provincia, municipio, telefono, direccion, descripcion
+    
+    Returns:
+        int: ID del usuario creado o None si hay error
+    """
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -285,7 +301,22 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         fecha = datetime.now().isoformat()
         
         if datos_negocio and isinstance(datos_negocio, dict):
-            datos_negocio = json.dumps(datos_negocio)
+            # Asegurar que los campos de provincia y municipio estén presentes
+            if 'provincia' not in datos_negocio:
+                datos_negocio['provincia'] = ''
+            if 'municipio' not in datos_negocio:
+                datos_negocio['municipio'] = ''
+            if 'nombre_negocio' not in datos_negocio:
+                datos_negocio['nombre_negocio'] = ''
+            if 'ruc' not in datos_negocio:
+                datos_negocio['ruc'] = ''
+            if 'telefono' not in datos_negocio:
+                datos_negocio['telefono'] = ''
+            if 'direccion' not in datos_negocio:
+                datos_negocio['direccion'] = ''
+            if 'descripcion' not in datos_negocio:
+                datos_negocio['descripcion'] = ''
+            datos_negocio = json.dumps(datos_negocio, ensure_ascii=False)
         elif datos_negocio and isinstance(datos_negocio, str):
             pass
         else:
@@ -299,10 +330,13 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         
         user_id = cursor.fetchone()[0]
         
+        # Asignar módulos según el tipo de usuario
         if rol != 'trabajador':
             if tipo == 'negocio':
+                # Para negocios, asignar módulos de negocio
                 cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'negocio'))
             else:
+                # Para clientes, asignar módulos de cliente
                 cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'cliente'))
             
             for mod in cursor.fetchall():
@@ -312,7 +346,7 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
                 ''', (user_id, mod[0]))
         
         conn.commit()
-        print(f"✅ Usuario creado: {username} (ID: {user_id})")
+        print(f"✅ Usuario creado: {username} (ID: {user_id}) - Tipo: {tipo}")
         return user_id
         
     except Exception as e:
@@ -351,7 +385,7 @@ def obtener_todos_usuarios():
 def obtener_negocios():
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT id, username, email, nombre, activo, fecha_registro FROM usuarios WHERE tipo = %s', ('negocio',))
+    cursor.execute('SELECT id, username, email, nombre, activo, fecha_registro, datos_negocio FROM usuarios WHERE tipo = %s', ('negocio',))
     negocios = cursor.fetchall()
     conn.close()
     return negocios
@@ -401,11 +435,30 @@ def actualizar_tipo_usuario(user_id, tipo):
     conn.close()
 
 def actualizar_datos_negocio(user_id, datos):
+    """
+    Actualiza los datos de negocio de un usuario
+    
+    Args:
+        user_id (int): ID del usuario
+        datos (dict): Diccionario con los datos del negocio
+            Incluye: nombre_negocio, ruc, provincia, municipio, telefono, direccion, descripcion
+    """
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET datos_negocio = %s WHERE id = %s', (json.dumps(datos), user_id))
+    cursor.execute('UPDATE usuarios SET datos_negocio = %s WHERE id = %s', (json.dumps(datos, ensure_ascii=False), user_id))
     conn.commit()
     conn.close()
+
+def obtener_datos_negocio(user_id):
+    """Obtiene los datos de negocio de un usuario"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+    if result and result[0]:
+        return json.loads(result[0])
+    return {}
 
 # ============================================
 # FUNCIONES DE MÓDULOS
