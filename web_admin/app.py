@@ -1681,13 +1681,13 @@ def api_eliminar_venta(venta_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - FACTURAS Y OFERTAS (CORREGIDO)
+# API - FACTURAS Y OFERTAS (VERSIÓN MEJORADA)
 # ============================================
 
 @app.route('/api/venta/<int:venta_id>/factura', methods=['GET'])
 @login_required
 def api_generar_factura(venta_id):
-    """Genera una factura PDF de una venta con todos los items y atendido por"""
+    """Genera una factura PDF de una venta con todos los items uno debajo del otro"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1717,33 +1717,70 @@ def api_generar_factura(venta_id):
         # ============================================
         items = []
         
-        # Si la venta tiene múltiples productos separados por coma
-        if ',' in venta['producto']:
-            productos_separados = [p.strip() for p in venta['producto'].split(',')]
+        # Verificar si la venta tiene múltiples productos separados por coma
+        producto_str = venta['producto']
+        
+        # Intentar separar por comas si hay múltiples productos
+        if ',' in producto_str:
+            productos_separados = [p.strip() for p in producto_str.split(',')]
+            # Si hay más de un producto, crear items separados
             if len(productos_separados) > 1:
                 for nombre in productos_separados:
+                    # Buscar precio del producto en la base de datos
+                    conn = get_db()
+                    cursor2 = conn.cursor()
+                    cursor2.execute('SELECT precio FROM productos WHERE nombre = %s AND negocio_id = %s', 
+                                   (nombre, usuario['id']))
+                    prod = cursor2.fetchone()
+                    conn.close()
+                    
+                    precio = prod[0] if prod else venta.get('precio', 0)
+                    
                     items.append({
                         'nombre': nombre,
                         'cantidad': 1,
-                        'precio': venta.get('precio', 0),
-                        'subtotal': venta.get('precio', 0)
+                        'precio': precio,
+                        'subtotal': precio
                     })
             else:
                 # Un solo producto
                 items.append({
-                    'nombre': venta['producto'],
+                    'nombre': producto_str,
                     'cantidad': venta.get('cantidad', 1),
                     'precio': venta.get('precio', 0),
                     'subtotal': venta.get('total', 0)
                 })
         else:
-            # Producto único
-            items.append({
-                'nombre': venta['producto'],
-                'cantidad': venta.get('cantidad', 1),
-                'precio': venta.get('precio', 0),
-                'subtotal': venta.get('total', 0)
-            })
+            # Producto único (sin comas)
+            # Verificar si el producto tiene ID
+            if venta.get('producto_id'):
+                conn = get_db()
+                cursor2 = conn.cursor()
+                cursor2.execute('SELECT nombre, precio FROM productos WHERE id = %s', (venta['producto_id'],))
+                prod = cursor2.fetchone()
+                conn.close()
+                
+                if prod:
+                    items.append({
+                        'nombre': prod[0] or producto_str,
+                        'cantidad': venta.get('cantidad', 1),
+                        'precio': prod[1] or venta.get('precio', 0),
+                        'subtotal': venta.get('total', 0)
+                    })
+                else:
+                    items.append({
+                        'nombre': producto_str,
+                        'cantidad': venta.get('cantidad', 1),
+                        'precio': venta.get('precio', 0),
+                        'subtotal': venta.get('total', 0)
+                    })
+            else:
+                items.append({
+                    'nombre': producto_str,
+                    'cantidad': venta.get('cantidad', 1),
+                    'precio': venta.get('precio', 0),
+                    'subtotal': venta.get('total', 0)
+                })
         
         # Obtener datos del negocio
         conn = get_db()
