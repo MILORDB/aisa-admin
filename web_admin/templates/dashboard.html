@@ -21,11 +21,29 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
         .header h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .header .user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
         .header .user a {
             color: #fff; text-decoration: none; opacity: 0.7;
             padding: 4px 12px; border-radius: 12px; background: rgba(255,255,255,0.1);
         }
         .header .user a:hover { opacity: 1; background: rgba(255,255,255,0.2); }
+        .header .user .user-name {
+            font-size: 14px;
+        }
+        .header .user .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
         
         .container { display: flex; gap: 24px; padding: 24px; max-width: 1400px; margin: 0 auto; flex-wrap: wrap; }
         .card {
@@ -109,6 +127,14 @@
         .btn-danger { background: #f44336; color: #fff; }
         .btn-danger:hover { background: #c62828; }
         .btn-sm { padding: 4px 12px; font-size: 11px; }
+        .btn-perfil {
+            background: rgba(108,60,224,0.2);
+            color: #6c3ce0;
+            border: 1px solid #6c3ce0;
+        }
+        .btn-perfil:hover {
+            background: rgba(108,60,224,0.4);
+        }
         
         .admin-actions {
             display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px;
@@ -130,12 +156,81 @@
         .stats-mini .stat .num { font-size: 22px; font-weight: 700; color: #6c3ce0; }
         .stats-mini .stat .label { font-size: 10px; color: #888; }
         
+        .user-menu {
+            position: relative;
+            display: inline-block;
+        }
+        .user-menu .dropdown {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background: #1a1a2e;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            min-width: 180px;
+            padding: 8px 0;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .user-menu .dropdown.show { display: block; }
+        .user-menu .dropdown a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            color: #aaa;
+            text-decoration: none;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+        .user-menu .dropdown a:hover {
+            background: #2a2a3e;
+            color: #fff;
+        }
+        .user-menu .dropdown .divider {
+            height: 1px;
+            background: #2a2a3e;
+            margin: 4px 12px;
+        }
+        .user-menu .dropdown .danger {
+            color: #ff6b6b;
+        }
+        .user-menu .dropdown .danger:hover {
+            background: rgba(244,67,54,0.1);
+        }
+        .user-menu .user-toggle {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: background 0.3s;
+        }
+        .user-menu .user-toggle:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        .user-menu .user-toggle .arrow {
+            font-size: 10px;
+            opacity: 0.6;
+            transition: transform 0.3s;
+        }
+        .user-menu .user-toggle:hover .arrow {
+            transform: rotate(180deg);
+        }
+        
         @media (max-width: 768px) {
             .container { padding: 16px; }
             .card { min-width: 100%; }
             .tabla { font-size: 11px; }
             .acciones-cell { flex-direction: column; gap: 2px; }
             .acciones-cell .btn-sm { width: 100%; text-align: center; }
+            .header { flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
+            .header .user { flex-wrap: wrap; }
+            .user-menu .dropdown { right: -10px; }
         }
     </style>
 </head>
@@ -144,8 +239,28 @@
     <header class="header">
         <h1>🤖 AIsa <span style="font-size:14px;font-weight:normal;opacity:0.7;">Panel de Administración</span></h1>
         <div class="user">
-            <span>👤 {{ usuario.nombre or usuario.username }} ({{ usuario.rol }})</span>
-            <a href="/logout">Cerrar sesión</a>
+            <div class="user-avatar">👑</div>
+            <span class="user-name">{{ usuario.nombre or usuario.username }}</span>
+            <span class="badge admin">{{ usuario.rol }}</span>
+            
+            <!-- Menú de usuario -->
+            <div class="user-menu" id="userMenu">
+                <div class="user-toggle" onclick="toggleUserMenu()">
+                    <span class="arrow">▼</span>
+                </div>
+                <div class="dropdown" id="userDropdown">
+                    <a href="/perfil">
+                        <span>👤</span> Mi Perfil
+                    </a>
+                    <a href="/admin/db">
+                        <span>🗄️</span> Gestor BD
+                    </a>
+                    <div class="divider"></div>
+                    <a href="/logout" class="danger">
+                        <span>🚪</span> Cerrar sesión
+                    </a>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -156,7 +271,7 @@
             <h2>⚡ Acciones Rápidas</h2>
             <div class="admin-actions">
                 <a href="/admin/db" class="btn btn-primary">🗄️ Gestor de Base de Datos</a>
-                <a href="/admin/perfil" class="btn btn-warning">👤 Mi Perfil</a>
+                <a href="/perfil" class="btn btn-perfil">👤 Mi Perfil</a>
                 <a href="/admin/trabajadores/pendientes" class="btn btn-success">📋 Trabajadores Pendientes</a>
             </div>
 
@@ -199,6 +314,22 @@
 
     <script>
         let modulosGlobales = [];
+
+        // ============================================
+        // MENÚ DE USUARIO
+        // ============================================
+        function toggleUserMenu() {
+            const dropdown = document.getElementById('userDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        // Cerrar menú al hacer clic fuera
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('userMenu');
+            if (!menu.contains(e.target)) {
+                document.getElementById('userDropdown').classList.remove('show');
+            }
+        });
 
         // ============================================
         // CARGAR DATOS
