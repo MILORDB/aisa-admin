@@ -63,7 +63,6 @@
             padding: 6px 8px;
             color: #888;
             border-bottom: 1px solid #2a2a3e;
-            font-weight: 600;
             font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -155,7 +154,6 @@
             gap: 4px;
             flex-wrap: wrap;
         }
-        /* Tabla responsive */
         .table-wrapper {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
@@ -228,15 +226,67 @@
             <div class="form-row">
                 <input type="text" id="prodNombre" placeholder="Nombre">
                 <select id="prodCategoria">
-                    <option value="">-- Categoría --</option>
-                    <option value="electronica">💻 Electrónica</option>
-                    <option value="ropa">👕 Ropa</option>
-                    <option value="hogar">🏠 Hogar</option>
-                    <option value="alimentos">🍎 Alimentos</option>
-                    <option value="belleza">💄 Belleza</option>
-                    <option value="deporte">🏋️ Deporte</option>
-                    <option value="juguetes">🧸 Juguetes</option>
-                    <option value="otros">📦 Otros</option>
+                    <option value="">-- Seleccionar categoría --</option>
+                    <!-- ======================================== -->
+                    <!-- CATEGORÍAS COMPLETAS -->
+                    <!-- ======================================== -->
+                    <optgroup label="👗 Moda y Ropa">
+                        <option value="ropa_mujer">Ropa de Mujer</option>
+                        <option value="ropa_hombre">Ropa de Hombre</option>
+                        <option value="ropa_niños">Ropa de Niños y Bebés</option>
+                    </optgroup>
+                    <optgroup label="👟 Calzado y Accesorios">
+                        <option value="calzado_mujer">Calzado de Mujer</option>
+                        <option value="calzado_hombre">Calzado de Hombre</option>
+                        <option value="calzado_niños">Calzado de Niños</option>
+                        <option value="joyas">Joyas y Accesorios</option>
+                    </optgroup>
+                    <optgroup label="💻 Electrónica y Tecnología">
+                        <option value="electronica">Electrónica de Consumo</option>
+                        <option value="videojuegos">Videojuegos</option>
+                        <option value="audio">Audio</option>
+                    </optgroup>
+                    <optgroup label="🏠 Hogar y Cocina">
+                        <option value="hogar">Muebles y Hogar</option>
+                        <option value="decoracion">Decoración del Hogar</option>
+                        <option value="cocina">Cocina y Utensilios</option>
+                        <option value="almacenamiento">Almacenamiento y Organización</option>
+                        <option value="mejoras_hogar">Mejoras para el Hogar</option>
+                    </optgroup>
+                    <optgroup label="🌿 Jardín y Bricolaje">
+                        <option value="jardin">Jardín y Bricolaje</option>
+                    </optgroup>
+                    <optgroup label="💄 Belleza y Salud">
+                        <option value="belleza">Belleza y Salud</option>
+                    </optgroup>
+                    <optgroup label="🏋️ Deporte y Aire Libre">
+                        <option value="deporte">Deporte y Aire Libre</option>
+                    </optgroup>
+                    <optgroup label="🧸 Juguetes y Entretenimiento">
+                        <option value="juguetes">Juguetes y Entretenimiento</option>
+                    </optgroup>
+                    <optgroup label="🐾 Mascotas">
+                        <option value="mascotas">Mascotas</option>
+                    </optgroup>
+                    <optgroup label="📚 Oficina y Escuela">
+                        <option value="oficina">Oficina y Escuela</option>
+                    </optgroup>
+                    <optgroup label="🚗 Automotriz">
+                        <option value="automotriz">Automotriz</option>
+                    </optgroup>
+                    <optgroup label="👶 Bebé y Maternidad">
+                        <option value="bebe">Bebé y Maternidad</option>
+                    </optgroup>
+                    <optgroup label="🎵 Música e Instrumentos">
+                        <option value="musica">Música e Instrumentos</option>
+                    </optgroup>
+                    <optgroup label="🛍️ Otras Categorías">
+                        <option value="bolsas">Bolsas y Equipaje</option>
+                        <option value="manualidades">Manualidades y Arte</option>
+                        <option value="industrial">Suministros Industriales</option>
+                        <option value="coleccionables">Coleccionables</option>
+                        <option value="musica_fisica">CDs y Discos de Vinilo</option>
+                    </optgroup>
                 </select>
             </div>
             <div class="form-row">
@@ -262,6 +312,41 @@
     <script>
         let productos = [];
         let editandoId = null;
+
+        // ============================================
+        // MAPA DE CATEGORÍAS PARA MOSTRAR CON ICONOS
+        // ============================================
+        const categoriasMap = {
+            'ropa_mujer': '👗 Ropa de Mujer',
+            'ropa_hombre': '👔 Ropa de Hombre',
+            'ropa_niños': '👕 Ropa de Niños',
+            'calzado_mujer': '👠 Calzado de Mujer',
+            'calzado_hombre': '👞 Calzado de Hombre',
+            'calzado_niños': '👟 Calzado de Niños',
+            'joyas': '💍 Joyas y Accesorios',
+            'electronica': '💻 Electrónica',
+            'videojuegos': '🎮 Videojuegos',
+            'audio': '🎧 Audio',
+            'hogar': '🏠 Hogar',
+            'decoracion': '🖼️ Decoración',
+            'cocina': '🍳 Cocina',
+            'almacenamiento': '📦 Almacenamiento',
+            'mejoras_hogar': '🔧 Mejoras Hogar',
+            'jardin': '🌿 Jardín',
+            'belleza': '💄 Belleza',
+            'deporte': '🏋️ Deporte',
+            'juguetes': '🧸 Juguetes',
+            'mascotas': '🐾 Mascotas',
+            'oficina': '📚 Oficina',
+            'automotriz': '🚗 Automotriz',
+            'bebe': '👶 Bebé',
+            'musica': '🎵 Música',
+            'bolsas': '🛍️ Bolsas',
+            'manualidades': '🎨 Manualidades',
+            'industrial': '🏭 Industrial',
+            'coleccionables': '🌟 Coleccionables',
+            'musica_fisica': '💿 CDs/Vinilos'
+        };
 
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
@@ -303,6 +388,7 @@
             
             const filtrados = productos.filter(p => 
                 p.nombre.toLowerCase().includes(filtroLower) ||
+                (p.categoria && categoriasMap[p.categoria] && categoriasMap[p.categoria].toLowerCase().includes(filtroLower)) ||
                 (p.categoria && p.categoria.toLowerCase().includes(filtroLower))
             );
 
@@ -327,10 +413,12 @@
                 else if (p.stock <= (p.stock_minimo || 3)) { estado = '⚠️ Bajo'; clase = 'bajo'; }
                 else { estado = '✅ Normal'; clase = 'alto'; }
                 
+                const categoriaDisplay = categoriasMap[p.categoria] || p.categoria || '-';
+                
                 html += `
                     <tr>
                         <td><strong>${p.nombre}</strong></td>
-                        <td><span class="categoria-tag">${p.categoria || '-'}</span></td>
+                        <td><span class="categoria-tag">${categoriaDisplay}</span></td>
                         <td>$${parseFloat(p.precio).toFixed(2)}</td>
                         <td>${p.stock}</td>
                         <td><span class="badge ${clase}">${estado}</span></td>
