@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Inventario - AIsa Negocio</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -11,37 +11,37 @@
             background: #0f0f1a;
             color: #fff;
             min-height: 100vh;
-            padding: 20px;
+            padding: 12px;
         }
         .card {
             background: #1a1a2e;
-            border-radius: 12px;
-            padding: 20px;
+            border-radius: 10px;
+            padding: 14px;
             border: 1px solid #2a2a3e;
-            margin-bottom: 20px;
+            margin-bottom: 12px;
         }
-        .card h2 { font-size: 18px; color: #6c3ce0; margin-bottom: 16px; }
+        .card h2 { font-size: 15px; color: #6c3ce0; margin-bottom: 12px; }
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 12px;
-            margin-bottom: 16px;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
         }
         .stat-item {
             background: #0f0f1a;
             border: 1px solid #2a2a3e;
             border-radius: 8px;
-            padding: 16px;
+            padding: 10px;
             text-align: center;
         }
-        .stat-item .number { font-size: 24px; font-weight: 700; color: #6c3ce0; }
-        .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
+        .stat-item .number { font-size: 20px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 9px; color: #888; margin-top: 2px; }
         .btn {
-            padding: 8px 18px;
+            padding: 6px 14px;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             transition: all 0.3s;
         }
         .btn-primary { background: #6c3ce0; color: #fff; }
@@ -52,27 +52,31 @@
         .btn-danger:hover { background: #c62828; }
         .btn-warning { background: #ff9800; color: #fff; }
         .btn-warning:hover { background: #e68900; }
-        .btn-sm { padding: 4px 12px; font-size: 11px; }
+        .btn-sm { padding: 3px 8px; font-size: 10px; }
         .tabla {
             width: 100%;
             border-collapse: collapse;
-            font-size: 13px;
+            font-size: 12px;
         }
         .tabla th {
             text-align: left;
-            padding: 8px 12px;
+            padding: 6px 8px;
             color: #888;
             border-bottom: 1px solid #2a2a3e;
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .tabla td {
-            padding: 8px 12px;
+            padding: 6px 8px;
             border-bottom: 1px solid #1a1a2e;
             vertical-align: middle;
         }
         .tabla .badge {
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 10px;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 9px;
         }
         .tabla .badge.bajo { background: #442222; color: #ff6b6b; }
         .tabla .badge.medio { background: #443322; color: #ffbb33; }
@@ -80,19 +84,19 @@
         .tabla .badge.agotado { background: #442222; color: #ff6b6b; font-weight: bold; }
         .form-row {
             display: flex;
-            gap: 12px;
+            gap: 8px;
             flex-wrap: wrap;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
         }
         .form-row input, .form-row select {
-            padding: 8px 14px;
+            padding: 6px 10px;
             border: 1px solid #2a2a3e;
-            border-radius: 8px;
+            border-radius: 6px;
             background: #0f0f1a;
             color: #fff;
-            font-size: 13px;
+            font-size: 12px;
             flex: 1;
-            min-width: 120px;
+            min-width: 100px;
         }
         .form-row input:focus, .form-row select:focus {
             border-color: #6c3ce0;
@@ -101,37 +105,40 @@
         .form-row select option { background: #1a1a2e; }
         .search-bar {
             display: flex;
-            gap: 10px;
-            margin-bottom: 16px;
+            gap: 8px;
+            margin-bottom: 12px;
             flex-wrap: wrap;
         }
         .search-bar input {
             flex: 1;
-            padding: 8px 14px;
+            padding: 6px 10px;
             border: 1px solid #2a2a3e;
-            border-radius: 8px;
+            border-radius: 6px;
             background: #0f0f1a;
             color: #fff;
-            min-width: 150px;
+            font-size: 12px;
+            min-width: 120px;
         }
         .search-bar input:focus { border-color: #6c3ce0; outline: none; }
-        .empty { text-align: center; color: #888; padding: 40px; }
-        .loading { text-align: center; color: #888; padding: 20px; }
+        .empty { text-align: center; color: #888; padding: 30px; font-size: 13px; }
+        .loading { text-align: center; color: #888; padding: 20px; font-size: 13px; }
         .mensaje-exito {
             background: #224422;
             color: #6bff6b;
-            padding: 10px 14px;
-            border-radius: 8px;
-            margin-bottom: 16px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-size: 12px;
             display: none;
         }
         .mensaje-exito.show { display: block; }
         .mensaje-error {
             background: #442222;
             color: #ff6b6b;
-            padding: 10px 14px;
-            border-radius: 8px;
-            margin-bottom: 16px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-size: 12px;
             display: none;
         }
         .mensaje-error.show { display: block; }
@@ -139,67 +146,51 @@
             display: inline-block;
             background: rgba(108, 60, 224, 0.2);
             color: #6c3ce0;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-        }
-        /* Foto deshabilitada - oculta */
-        .foto-disabled {
-            display: none !important;
-        }
-        /* Placeholder para imagen */
-        .foto-placeholder {
-            width: 60px;
-            height: 60px;
-            background: #1a1a2e;
-            border-radius: 8px;
-            border: 1px solid #2a2a3e;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            color: #444;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 10px;
         }
         .acciones-cell {
             display: flex;
             gap: 4px;
             flex-wrap: wrap;
         }
-        .aviso-fotos {
-            background: #1a1a2e;
-            border: 1px solid #ff9800;
-            border-radius: 8px;
-            padding: 10px 16px;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 13px;
-            color: #ffbb33;
+        /* Tabla responsive */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 0 -4px;
         }
-        .aviso-fotos .icono { font-size: 24px; }
-        .aviso-fotos .texto { flex: 1; }
+        .table-wrapper table {
+            min-width: 600px;
+        }
         @media (max-width: 600px) {
-            .stats-grid { grid-template-columns: 1fr 1fr; }
+            body { padding: 8px; }
+            .card { padding: 10px; }
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 4px; }
+            .stat-item { padding: 6px; }
+            .stat-item .number { font-size: 16px; }
             .form-row { flex-direction: column; }
-            .acciones-cell { flex-direction: column; }
-            .acciones-cell .btn-sm { width: 100%; text-align: center; }
+            .form-row input, .form-row select { min-width: unset; }
+            .search-bar { flex-direction: column; }
+            .search-bar input { min-width: unset; }
+            .acciones-cell { flex-direction: row; flex-wrap: wrap; }
+            .acciones-cell .btn-sm { flex: 1; text-align: center; min-width: 60px; }
+            .tabla { font-size: 11px; }
+            .tabla th, .tabla td { padding: 4px 6px; }
+        }
+        @media (max-width: 400px) {
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .tabla { font-size: 10px; }
+            .tabla th, .tabla td { padding: 3px 4px; }
+            .acciones-cell .btn-sm { font-size: 9px; padding: 2px 6px; min-width: 45px; }
         }
     </style>
 </head>
 <body>
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-        <h1 style="font-size:22px;display:flex;align-items:center;gap:10px;">📦 Inventario <span style="font-size:14px;font-weight:normal;opacity:0.7;">Gestión de productos</span></h1>
-    </div>
-
-    <!-- Aviso: Fotos deshabilitadas temporalmente -->
-    <div class="aviso-fotos">
-        <span class="icono">🛠️</span>
-        <span class="texto">
-            <strong>Fotos temporalmente deshabilitadas</strong><br>
-            <span style="font-size:12px;color:#888;">Estamos trabajando en la integración con TeraBox. Próximamente disponible.</span>
-        </span>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:6px;">
+        <h1 style="font-size:18px;display:flex;align-items:center;gap:8px;">📦 Inventario <span style="font-size:12px;font-weight:normal;opacity:0.7;">Gestión de productos</span></h1>
     </div>
 
     <div class="mensaje-error" id="mensajeError"></div>
@@ -209,11 +200,11 @@
         <div class="stats-grid">
             <div class="stat-item">
                 <span class="number" id="totalProductos">0</span>
-                <span class="label">📦 Total productos</span>
+                <span class="label">📦 Total</span>
             </div>
             <div class="stat-item">
                 <span class="number" id="productosBajo">0</span>
-                <span class="label">⚠️ Stock bajo</span>
+                <span class="label">⚠️ Bajo stock</span>
             </div>
             <div class="stat-item">
                 <span class="number" id="productosAgotados">0</span>
@@ -221,7 +212,7 @@
             </div>
             <div class="stat-item">
                 <span class="number" id="valorInventario">$0</span>
-                <span class="label">💰 Valor total</span>
+                <span class="label">💰 Valor</span>
             </div>
         </div>
     </div>
@@ -229,93 +220,31 @@
     <div class="card">
         <div class="search-bar">
             <input type="text" id="searchInput" placeholder="🔍 Buscar producto..." oninput="filtrarProductos()">
-            <button class="btn btn-primary" onclick="mostrarFormulario()">+ Nuevo producto</button>
+            <button class="btn btn-primary" onclick="mostrarFormulario()">+ Nuevo</button>
         </div>
 
-        <div id="formProducto" style="display:none;border-top:1px solid #2a2a3e;padding-top:16px;margin-top:12px;">
-            <h3 style="margin-bottom:12px;" id="formTitle">📦 Nuevo Producto</h3>
+        <div id="formProducto" style="display:none;border-top:1px solid #2a2a3e;padding-top:12px;margin-top:8px;">
+            <h3 style="font-size:14px;margin-bottom:8px;" id="formTitle">📦 Nuevo Producto</h3>
             <div class="form-row">
-                <input type="text" id="prodNombre" placeholder="Nombre del producto">
-                <select id="prodCategoria" required>
-                    <option value="">-- Seleccionar categoría --</option>
-                    <optgroup label="👗 Moda y Ropa">
-                        <option value="ropa_mujer">Ropa de Mujer</option>
-                        <option value="ropa_hombre">Ropa de Hombre</option>
-                        <option value="ropa_niños">Ropa de Niños y Bebés</option>
-                    </optgroup>
-                    <optgroup label="👟 Calzado y Accesorios">
-                        <option value="calzado_mujer">Calzado de Mujer</option>
-                        <option value="calzado_hombre">Calzado de Hombre</option>
-                        <option value="calzado_niños">Calzado de Niños</option>
-                        <option value="joyas">Joyas y Accesorios</option>
-                    </optgroup>
-                    <optgroup label="💻 Electrónica y Tecnología">
-                        <option value="electronica">Electrónica de Consumo</option>
-                        <option value="videojuegos">Videojuegos</option>
-                        <option value="audio">Audio</option>
-                    </optgroup>
-                    <optgroup label="🏠 Hogar y Cocina">
-                        <option value="hogar">Muebles y Hogar</option>
-                        <option value="decoracion">Decoración del Hogar</option>
-                        <option value="cocina">Cocina y Utensilios</option>
-                        <option value="almacenamiento">Almacenamiento y Organización</option>
-                        <option value="mejoras_hogar">Mejoras para el Hogar</option>
-                    </optgroup>
-                    <optgroup label="🌿 Jardín y Bricolaje">
-                        <option value="jardin">Jardín y Bricolaje</option>
-                    </optgroup>
-                    <optgroup label="💄 Belleza y Salud">
-                        <option value="belleza">Belleza y Salud</option>
-                    </optgroup>
-                    <optgroup label="🏋️ Deporte y Aire Libre">
-                        <option value="deporte">Deporte y Aire Libre</option>
-                    </optgroup>
-                    <optgroup label="🧸 Juguetes y Entretenimiento">
-                        <option value="juguetes">Juguetes y Entretenimiento</option>
-                    </optgroup>
-                    <optgroup label="🐾 Mascotas">
-                        <option value="mascotas">Mascotas</option>
-                    </optgroup>
-                    <optgroup label="📚 Oficina y Escuela">
-                        <option value="oficina">Oficina y Escuela</option>
-                    </optgroup>
-                    <optgroup label="🚗 Automotriz">
-                        <option value="automotriz">Automotriz</option>
-                    </optgroup>
-                    <optgroup label="👶 Bebé y Maternidad">
-                        <option value="bebe">Bebé y Maternidad</option>
-                    </optgroup>
-                    <optgroup label="🎵 Música e Instrumentos">
-                        <option value="musica">Música e Instrumentos</option>
-                    </optgroup>
-                    <optgroup label="🛍️ Otras Categorías">
-                        <option value="bolsas">Bolsas y Equipaje</option>
-                        <option value="manualidades">Manualidades y Arte</option>
-                        <option value="industrial">Suministros Industriales</option>
-                        <option value="coleccionables">Coleccionables</option>
-                        <option value="musica_fisica">CDs y Discos de Vinilo</option>
-                    </optgroup>
+                <input type="text" id="prodNombre" placeholder="Nombre">
+                <select id="prodCategoria">
+                    <option value="">-- Categoría --</option>
+                    <option value="electronica">💻 Electrónica</option>
+                    <option value="ropa">👕 Ropa</option>
+                    <option value="hogar">🏠 Hogar</option>
+                    <option value="alimentos">🍎 Alimentos</option>
+                    <option value="belleza">💄 Belleza</option>
+                    <option value="deporte">🏋️ Deporte</option>
+                    <option value="juguetes">🧸 Juguetes</option>
+                    <option value="otros">📦 Otros</option>
                 </select>
             </div>
             <div class="form-row">
                 <input type="number" id="prodPrecio" placeholder="Precio" step="0.01">
                 <input type="number" id="prodStock" placeholder="Stock">
-                <input type="number" id="prodMinimo" placeholder="Stock mínimo">
+                <input type="number" id="prodMinimo" placeholder="Mínimo">
             </div>
-            
-            <!-- SECCIÓN DE FOTO DESHABILITADA (oculta) -->
-            <div class="form-row foto-disabled" id="fotoSection">
-                <div style="flex:1;">
-                    <label>📷 Foto del producto <span style="color:#888;font-size:11px;">(próximamente)</span></label>
-                    <input type="file" id="prodFoto" accept="image/*" disabled>
-                    <div id="previewFoto" style="margin-top:8px;">
-                        <img id="previewImage" src="" style="max-width:150px;display:none;border-radius:8px;border:2px solid #2a2a3e;">
-                        <div id="uploadStatus" style="font-size:12px;color:#888;margin-top:4px;">🛠️ Fotos deshabilitadas temporalmente</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div style="display:flex;gap:10px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <button class="btn btn-success" onclick="guardarProducto()" id="btnGuardar">💾 Guardar</button>
                 <button class="btn btn-danger" onclick="cancelarFormulario()">✕ Cancelar</button>
             </div>
@@ -323,46 +252,16 @@
     </div>
 
     <div class="card">
-        <div id="productosContainer">
-            <div class="loading">Cargando productos...</div>
+        <div class="table-wrapper">
+            <div id="productosContainer">
+                <div class="loading">Cargando productos...</div>
+            </div>
         </div>
     </div>
 
     <script>
         let productos = [];
         let editandoId = null;
-
-        const categoriasMap = {
-            'ropa_mujer': '👗 Ropa de Mujer',
-            'ropa_hombre': '👔 Ropa de Hombre',
-            'ropa_niños': '👕 Ropa de Niños',
-            'calzado_mujer': '👠 Calzado de Mujer',
-            'calzado_hombre': '👞 Calzado de Hombre',
-            'calzado_niños': '👟 Calzado de Niños',
-            'joyas': '💍 Joyas y Accesorios',
-            'electronica': '💻 Electrónica',
-            'videojuegos': '🎮 Videojuegos',
-            'audio': '🎧 Audio',
-            'hogar': '🏠 Hogar',
-            'decoracion': '🖼️ Decoración',
-            'cocina': '🍳 Cocina',
-            'almacenamiento': '📦 Almacenamiento',
-            'mejoras_hogar': '🔧 Mejoras Hogar',
-            'jardin': '🌿 Jardín',
-            'belleza': '💄 Belleza',
-            'deporte': '🏋️ Deporte',
-            'juguetes': '🧸 Juguetes',
-            'mascotas': '🐾 Mascotas',
-            'oficina': '📚 Oficina',
-            'automotriz': '🚗 Automotriz',
-            'bebe': '👶 Bebé',
-            'musica': '🎵 Música',
-            'bolsas': '🛍️ Bolsas',
-            'manualidades': '🎨 Manualidades',
-            'industrial': '🏭 Industrial',
-            'coleccionables': '🌟 Coleccionables',
-            'musica_fisica': '💿 CDs/Vinilos'
-        };
 
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
@@ -379,22 +278,22 @@
             setTimeout(() => {
                 errorEl.classList.remove('show');
                 exitoEl.classList.remove('show');
-            }, 5000);
+            }, 4000);
         }
 
         async function cargarProductos() {
             const container = document.getElementById('productosContainer');
-            container.innerHTML = '<div class="loading">Cargando productos...</div>';
+            container.innerHTML = '<div class="loading">Cargando...</div>';
 
             try {
                 const response = await fetch('/api/productos');
-                if (!response.ok) throw new Error('Error al cargar productos');
+                if (!response.ok) throw new Error('Error');
                 productos = await response.json();
                 renderProductos();
                 actualizarEstadisticas();
             } catch (error) {
                 console.error('Error:', error);
-                container.innerHTML = `<div class="empty">❌ Error al cargar productos</div>`;
+                container.innerHTML = `<div class="empty">❌ Error al cargar</div>`;
             }
         }
 
@@ -408,52 +307,32 @@
             );
 
             if (filtrados.length === 0) {
-                container.innerHTML = `<div class="empty">No hay productos registrados</div>`;
+                container.innerHTML = `<div class="empty">No hay productos</div>`;
                 return;
             }
 
-            let html = `
-                <div style="overflow-x:auto;">
-                    <table class="tabla">
-                        <thead>
-                            <tr>
-                                <th style="width:50px;">📷</th>
-                                <th>Producto</th>
-                                <th>Categoría</th>
-                                <th>Precio</th>
-                                <th>Stock</th>
-                                <th>Stock Mínimo</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            `;
+            let html = `<table class="tabla">
+                <thead><tr>
+                    <th>Producto</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th>Stock</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr></thead><tbody>`;
 
             filtrados.forEach(p => {
                 let estado, clase;
-                if (p.stock === 0) {
-                    estado = '🚫 Agotado';
-                    clase = 'agotado';
-                } else if (p.stock <= (p.stock_minimo || 3)) {
-                    estado = '⚠️ Bajo stock';
-                    clase = 'bajo';
-                } else {
-                    estado = '✅ Normal';
-                    clase = 'alto';
-                }
-                const categoriaDisplay = categoriasMap[p.categoria] || p.categoria || '-';
+                if (p.stock === 0) { estado = '🚫 Agotado'; clase = 'agotado'; }
+                else if (p.stock <= (p.stock_minimo || 3)) { estado = '⚠️ Bajo'; clase = 'bajo'; }
+                else { estado = '✅ Normal'; clase = 'alto'; }
                 
                 html += `
                     <tr>
-                        <td>
-                            <div class="foto-placeholder">📷</div>
-                        </td>
                         <td><strong>${p.nombre}</strong></td>
-                        <td><span class="categoria-tag">${categoriaDisplay}</span></td>
+                        <td><span class="categoria-tag">${p.categoria || '-'}</span></td>
                         <td>$${parseFloat(p.precio).toFixed(2)}</td>
                         <td>${p.stock}</td>
-                        <td>${p.stock_minimo || 3}</td>
                         <td><span class="badge ${clase}">${estado}</span></td>
                         <td>
                             <div class="acciones-cell">
@@ -465,12 +344,7 @@
                 `;
             });
 
-            html += `
-                        </tbody>
-                    </table>
-                </div>
-            `;
-
+            html += `</tbody></table>`;
             container.innerHTML = html;
         }
 
@@ -487,8 +361,7 @@
         }
 
         function filtrarProductos() {
-            const filtro = document.getElementById('searchInput').value;
-            renderProductos(filtro);
+            renderProductos(document.getElementById('searchInput').value);
         }
 
         function mostrarFormulario() {
@@ -498,8 +371,6 @@
             document.getElementById('formTitle').textContent = '📦 Nuevo Producto';
             document.getElementById('btnGuardar').textContent = '💾 Guardar';
             document.getElementById('btnGuardar').className = 'btn btn-success';
-            
-            // Resetear campos
             document.getElementById('prodNombre').value = '';
             document.getElementById('prodCategoria').value = '';
             document.getElementById('prodPrecio').value = '';
@@ -509,11 +380,6 @@
 
         function cancelarFormulario() {
             document.getElementById('formProducto').style.display = 'none';
-            document.getElementById('prodNombre').value = '';
-            document.getElementById('prodCategoria').value = '';
-            document.getElementById('prodPrecio').value = '';
-            document.getElementById('prodStock').value = '';
-            document.getElementById('prodMinimo').value = '';
             editandoId = null;
         }
 
@@ -536,10 +402,6 @@
             document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
-        // ============================================
-        // GUARDAR PRODUCTO (SIN FOTOS)
-        // ============================================
-
         async function guardarProducto() {
             const nombre = document.getElementById('prodNombre').value.trim();
             const categoria = document.getElementById('prodCategoria').value;
@@ -548,16 +410,14 @@
             const stock_minimo = parseInt(document.getElementById('prodMinimo').value) || 3;
 
             if (!nombre || !categoria || isNaN(precio)) {
-                mostrarMensaje('❌ Nombre, categoría y precio son obligatorios', 'error');
+                mostrarMensaje('Nombre, categoría y precio son obligatorios', 'error');
                 return;
             }
 
             const data = { nombre, categoria, precio, stock, stock_minimo };
 
             try {
-                let response;
-                let result;
-
+                let response, result;
                 if (editandoId) {
                     response = await fetch(`/api/producto/${editandoId}`, {
                         method: 'PUT',
@@ -565,11 +425,10 @@
                         body: JSON.stringify(data)
                     });
                     result = await response.json();
-                    
                     if (result.success) {
-                        mostrarMensaje(`✅ Producto "${nombre}" actualizado correctamente`, 'exito');
+                        mostrarMensaje(`✅ "${nombre}" actualizado`, 'exito');
                     } else {
-                        mostrarMensaje(result.error || '❌ Error al actualizar producto', 'error');
+                        mostrarMensaje(result.error || 'Error', 'error');
                         return;
                     }
                 } else {
@@ -579,89 +438,42 @@
                         body: JSON.stringify(data)
                     });
                     result = await response.json();
-                    
                     if (result.success) {
-                        mostrarMensaje(`✅ Producto "${nombre}" creado correctamente`, 'exito');
+                        mostrarMensaje(`✅ "${nombre}" creado`, 'exito');
                     } else {
-                        mostrarMensaje(result.error || '❌ Error al crear producto', 'error');
+                        mostrarMensaje(result.error || 'Error', 'error');
                         return;
                     }
                 }
-
                 cancelarFormulario();
                 await cargarProductos();
-                
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('❌ Error de conexión: ' + error.message, 'error');
+                mostrarMensaje('Error de conexión', 'error');
             }
         }
 
-        // ============================================
-        // ELIMINAR PRODUCTO
-        // ============================================
-
         async function eliminarProducto(id, nombre) {
-            const producto = productos.find(p => p.id === id);
-            if (!producto) {
-                mostrarMensaje('❌ Producto no encontrado', 'error');
-                return;
-            }
-            
-            const confirmMsg = `⚠️ ¿Estás seguro de eliminar el producto "${nombre}"?\n\n` +
-                              `📦 ID: ${id}\n` +
-                              `💰 Precio: $${parseFloat(producto.precio).toFixed(2)}\n` +
-                              `📊 Stock: ${producto.stock} unidades\n` +
-                              `📂 Categoría: ${producto.categoria || 'Sin categoría'}\n\n` +
-                              `❗ Esta acción NO se puede deshacer.`;
-            
-            if (!confirm(confirmMsg)) {
-                return;
-            }
-            
-            if (!confirm(`⚠️ Confirmación final: ¿Eliminar "${nombre}" definitivamente?`)) {
-                return;
-            }
-            
-            mostrarMensaje('⏳ Eliminando producto...', 'exito');
+            if (!confirm(`⚠️ ¿Eliminar "${nombre}"?`)) return;
+            if (!confirm(`Confirmación final: ¿Eliminar "${nombre}"?`)) return;
             
             try {
                 const response = await fetch(`/api/producto/${id}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' }
                 });
-                
-                const textResponse = await response.text();
-                
-                if (!textResponse || textResponse.trim() === '') {
-                    mostrarMensaje('❌ El servidor devolvió una respuesta vacía', 'error');
-                    return;
-                }
-                
-                let data;
-                try {
-                    data = JSON.parse(textResponse);
-                } catch (e) {
-                    mostrarMensaje('❌ Error: El servidor no devolvió una respuesta JSON válida', 'error');
-                    return;
-                }
-                
+                const data = await response.json();
                 if (data.success) {
-                    mostrarMensaje(`✅ Producto "${nombre}" eliminado correctamente`, 'exito');
+                    mostrarMensaje(`✅ "${nombre}" eliminado`, 'exito');
                     await cargarProductos();
-                    actualizarEstadisticas();
                 } else {
-                    mostrarMensaje(`❌ ${data.error || 'Error al eliminar el producto'}`, 'error');
+                    mostrarMensaje(data.error || 'Error', 'error');
                 }
             } catch (error) {
-                console.error('❌ Error:', error);
-                mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión', 'error');
             }
         }
-
-        // ============================================
-        // INICIO
-        // ============================================
 
         cargarProductos();
         setInterval(cargarProductos, 30000);
