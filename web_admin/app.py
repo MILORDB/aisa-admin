@@ -998,6 +998,10 @@ def api_actualizar_trabajador(trabajador_id):
         'message': 'Trabajador actualizado correctamente'
     })
 
+# ============================================
+# API - NEGOCIO - ELIMINAR TRABAJADOR (CORREGIDO)
+# ============================================
+
 @app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['DELETE'])
 @login_required
 def api_eliminar_trabajador(trabajador_id):
@@ -1012,11 +1016,12 @@ def api_eliminar_trabajador(trabajador_id):
         conn = get_db()
         cursor = conn.cursor()
         
+        # 1. Verificar que el trabajador existe y pertenece al negocio
         cursor.execute('''
             SELECT u.id, u.username, u.nombre, u.datos_negocio
             FROM trabajadores_negocio tn
             JOIN usuarios u ON tn.trabajador_id = u.id
-            WHERE tn.negocio_id = %s AND tn.trabajador_id = %s AND tn.activo = 1
+            WHERE tn.negocio_id = %s AND tn.trabajador_id = %s
         ''', (usuario['id'], trabajador_id))
         
         trabajador = cursor.fetchone()
@@ -1025,8 +1030,25 @@ def api_eliminar_trabajador(trabajador_id):
             conn.close()
             return jsonify({'error': 'Trabajador no encontrado o no pertenece a tu negocio'}), 404
         
+        # 2. Obtener nombre para el log
         nombre_trabajador = trabajador[2] or trabajador[1] or 'Desconocido'
         
+        # 3. Eliminar primero las sesiones del trabajador (para evitar conflictos de foreign key)
+        cursor.execute('DELETE FROM sesiones WHERE usuario_id = %s', (trabajador_id,))
+        
+        # 4. Eliminar permisos del trabajador
+        cursor.execute('DELETE FROM permisos_usuario WHERE usuario_id = %s', (trabajador_id,))
+        
+        # 5. Eliminar la relación en trabajadores_negocio
+        cursor.execute('''
+            DELETE FROM trabajadores_negocio 
+            WHERE negocio_id = %s AND trabajador_id = %s
+        ''', (usuario['id'], trabajador_id))
+        
+        # 6. Eliminar logs del trabajador
+        cursor.execute('DELETE FROM logs WHERE usuario_id = %s', (trabajador_id,))
+        
+        # 7. Finalmente eliminar el usuario
         cursor.execute('DELETE FROM usuarios WHERE id = %s', (trabajador_id,))
         
         conn.commit()
