@@ -1615,51 +1615,70 @@ def api_actualizar_estado_venta(venta_id):
     
     return jsonify({'success': True})
 
+# ============================================
+# API - ELIMINAR VENTA (CORREGIDO)
+# ============================================
+
 @app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
 @login_required
 def api_eliminar_venta(venta_id):
+    """Elimina una venta y reintegra el stock"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
     if not usuario or usuario['tipo'] != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
-    # Verificar si es una oferta (no afecta stock)
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT estado FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
-    venta = cursor.fetchone()
-    conn.close()
-    
-    if venta and venta[0] == 'oferta':
-        # Eliminar oferta sin reintegro de stock
+    try:
+        # Verificar si es una oferta (no afecta stock)
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
-        conn.commit()
+        cursor.execute('SELECT estado, producto_id FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
+        venta = cursor.fetchone()
         conn.close()
-        registrar_log(usuario['id'], 'oferta_eliminada', f'Oferta #{venta_id} eliminada')
+        
+        if not venta:
+            return jsonify({'error': 'Venta no encontrada'}), 404
+        
+        # Si es oferta, eliminar sin reintegro
+        if venta[0] == 'oferta':
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
+            conn.commit()
+            conn.close()
+            registrar_log(usuario['id'], 'oferta_eliminada', f'Oferta #{venta_id} eliminada')
+            return jsonify({
+                'success': True,
+                'message': 'Oferta eliminada correctamente'
+            })
+        
+        # Eliminar venta con reintegro de stock
+        exito, resultado = eliminar_venta_con_reintegro(venta_id, usuario['id'])
+        
+        if not exito:
+            return jsonify({'error': resultado}), 400
+        
+        registrar_log(usuario['id'], 'venta_eliminada', 
+                      f'Venta #{venta_id} eliminada. Producto: {resultado["producto"]} - Cantidad: {resultado["cantidad"]}')
+        
         return jsonify({
             'success': True,
-            'message': 'Oferta eliminada correctamente'
+            'message': 'Venta eliminada y stock reintegrado correctamente',
+            'producto': resultado['producto'],
+            'cantidad': resultado['cantidad'],
+            'cliente': resultado['cliente'],
+            'total': resultado['total']
         })
-    
-    exito, resultado = eliminar_venta_con_reintegro(venta_id, usuario['id'])
-    
-    if not exito:
-        return jsonify({'error': resultado}), 404
-    
-    registrar_log(usuario['id'], 'venta_eliminada', 
-                  f'Venta #{venta_id} eliminada. Producto: {resultado["producto"]} - Cantidad: {resultado["cantidad"]}')
-    
-    return jsonify({
-        'success': True,
-        'message': 'Venta eliminada y stock reintegrado correctamente',
-        'producto': resultado['producto'],
-        'cantidad': resultado['cantidad'],
-        'cliente': resultado['cliente'],
-        'total': resultado['total']
-    })
+        
+    except psycopg2.Error as e:
+        print(f"❌ Error SQL eliminando venta: {e}")
+        return jsonify({'error': f'Error de base de datos: {str(e)}'}), 500
+    except Exception as e:
+        print(f"❌ Error eliminando venta: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 # ============================================
 # API - FACTURAS Y OFERTAS
