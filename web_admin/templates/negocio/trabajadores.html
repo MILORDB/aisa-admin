@@ -22,8 +22,12 @@
         }
         .card h2 { font-size: 15px; color: #6c3ce0; margin-bottom: 12px; }
         .btn {
-            padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer;
-            font-size: 12px; transition: all 0.3s;
+            padding: 6px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
         }
         .btn-primary { background: #6c3ce0; color: #fff; }
         .btn-primary:hover { background: #5a2ec0; }
@@ -279,7 +283,7 @@
     <!-- Modal Eliminar -->
     <div class="modal-overlay" id="modalEliminar">
         <div class="modal-content modal-confirm">
-            <h3 style="text-align:center;color:#ff6b6b;">🗑️ Eliminar</h3>
+            <h3 style="text-align:center;color:#ff6b6b;">🗑️ Eliminar Trabajador</h3>
             <div class="nombre-eliminar" id="nombreEliminar">-</div>
             <div class="detalles-eliminar" id="detallesEliminar">
                 <div class="fila"><span class="label">👤 Nombre</span><span class="value" id="detalleNombre">-</span></div>
@@ -605,9 +609,16 @@
             }
         }
 
+        // ============================================
+        // ELIMINAR TRABAJADOR (CORREGIDO)
+        // ============================================
+
         function abrirModalEliminar(id) {
             const t = trabajadores.find(t => t.id === id);
-            if (!t) return;
+            if (!t) {
+                mostrarMensaje('Trabajador no encontrado', 'error');
+                return;
+            }
             trabajadorAEliminar = t;
             const nombreCompleto = t.apellidos ? `${t.nombre} ${t.apellidos}` : t.nombre;
             document.getElementById('nombreEliminar').textContent = nombreCompleto;
@@ -629,33 +640,45 @@
         });
 
         async function confirmarEliminar() {
-            if (!trabajadorAEliminar) return;
+            if (!trabajadorAEliminar) {
+                mostrarMensaje('No hay trabajador seleccionado', 'error');
+                return;
+            }
+            
             const btn = document.getElementById('btnConfirmarEliminar');
+            const textoOriginal = btn.textContent;
             btn.disabled = true;
             btn.textContent = '⏳ Eliminando...';
+            
             try {
                 const response = await fetch(`/api/negocio/trabajador/${trabajadorAEliminar.id}`, {
                     method: 'DELETE'
                 });
+                
                 const data = await response.json();
+                
                 if (data.success) {
                     const nombre = trabajadorAEliminar.apellidos ? 
                         `${trabajadorAEliminar.nombre} ${trabajadorAEliminar.apellidos}` : 
                         trabajadorAEliminar.nombre;
-                    mostrarMensaje(`✅ "${nombre}" eliminado`, 'exito');
+                    mostrarMensaje(`✅ "${nombre}" eliminado correctamente`, 'exito');
                     cerrarModalEliminar();
                     await cargarTrabajadores();
                 } else {
-                    mostrarMensaje(data.error || 'Error', 'error');
+                    mostrarMensaje(data.error || 'Error al eliminar el trabajador', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
+                mostrarMensaje('Error de conexión con el servidor: ' + error.message, 'error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '🗑️ Eliminar';
+                btn.textContent = textoOriginal;
             }
         }
+
+        // ============================================
+        // INICIO
+        // ============================================
 
         cargarModulosDisponibles();
         cargarTrabajadores();
