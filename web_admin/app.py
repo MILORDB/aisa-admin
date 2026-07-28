@@ -1749,7 +1749,8 @@ def api_generar_factura(venta_id):
 
 
 @app.route('/api/venta/<int:venta_id>/oferta', methods=['POST'])
-@login_requireddef api_crear_oferta(venta_id):
+@login_required
+def api_crear_oferta(venta_id):
     """Convierte una venta en oferta (no afecta stock)"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
@@ -1984,7 +1985,7 @@ def api_eliminar_contrato(contrato_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - REPORTES (CORREGIDO)
+# API - REPORTES
 # ============================================
 
 @app.route('/api/reportes/contratos', methods=['GET'])
@@ -2195,7 +2196,7 @@ def api_reporte_ingresos():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/reportes/ingresos/resumen', methods=['GET'])  # <--- LÍNEA CORREGIDA
+@app.route('/api/reportes/ingresos/resumen', methods=['GET'])
 @login_required
 def api_resumen_ingresos():
     """Obtiene un resumen de ingresos para el panel lateral"""
