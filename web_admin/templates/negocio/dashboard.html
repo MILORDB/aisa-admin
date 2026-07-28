@@ -33,7 +33,7 @@
             --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
             --header-height: 56px;
             --panel-left-width: 170px;
-            --panel-right-width: 260px;
+            --panel-right-width: 280px;
         }
 
         body {
@@ -315,7 +315,7 @@
         .panel-left .empty-message { padding: 10px; text-align: center; color: var(--text-muted); font-size: 10px; }
 
         /* ============================================
-           PANEL CENTRAL - OPTIMIZADO
+           PANEL CENTRAL
            ============================================ */
         .panel-center {
             flex: 1;
@@ -348,7 +348,7 @@
             margin-bottom: 10px;
         }
 
-        /* ESTADÍSTICAS CENTRALES - GRID OPTIMIZADO */
+        /* ESTADÍSTICAS CENTRALES */
         .stats-grid-central {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
@@ -373,7 +373,7 @@
         .stat-card-central .stat-number { font-size: 20px; font-weight: 700; color: var(--accent); display: block; line-height: 1.2; }
         .stat-card-central .stat-label { font-size: 8px; color: var(--text-muted); display: block; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
 
-        /* TRABAJADORES - OPTIMIZADO */
+        /* TRABAJADORES */
         .section-title {
             font-size: 12px;
             font-weight: 600;
@@ -428,7 +428,7 @@
         .trabajador-card .status-dot.ocupado { background: var(--warning); box-shadow: 0 0 8px rgba(255,152,0,0.4); }
         .trabajador-empty { text-align: center; color: var(--text-muted); padding: 10px; font-size: 11px; }
 
-        /* ALERTAS STOCK - OPTIMIZADO */
+        /* ALERTAS STOCK */
         .alertas-container {
             background: var(--bg-secondary);
             border-radius: var(--radius);
@@ -493,7 +493,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
 
         /* ============================================
-           PANEL DERECHO - OPTIMIZADO
+           PANEL DERECHO - ZONA DE REPORTES (LETRAS MÁS GRANDES)
            ============================================ */
         .panel-right {
             width: var(--panel-right-width);
@@ -504,88 +504,142 @@
             flex-direction: column;
             overflow: hidden;
             flex-shrink: 0;
-            padding: 10px 12px;
+            padding: 12px 14px;
         }
 
         .panel-right .stats-title {
-            font-size: 10px;
-            font-weight: 600;
+            font-size: 14px;  /* Aumentado */
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 1px;
-            color: #666680;
-            margin-bottom: 6px;
-            border-bottom: 1px solid #2a2a3e;
-            padding-bottom: 4px;
+            color: #8a8aa0;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #2a2a3e;
+            padding-bottom: 6px;
         }
 
-        /* Resumen de contratos - más compacto */
+        /* Resumen de contratos - letras más grandes */
         .panel-right .resumen-contratos {
             background: #0f0f1a;
-            border-radius: 6px;
-            padding: 8px;
-            margin-bottom: 6px;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
             border: 1px solid #2a2a3e;
         }
-        .panel-right .resumen-contratos .titulo { font-size: 9px; color: #888; margin-bottom: 4px; }
-        .panel-right .resumen-contratos .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+        .panel-right .resumen-contratos .titulo {
+            font-size: 12px;  /* Aumentado */
+            color: #aaa;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+        .panel-right .resumen-contratos .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+        }
         .panel-right .resumen-contratos .item { text-align: center; }
-        .panel-right .resumen-contratos .item .numero { font-size: 14px; font-weight: 700; }
+        .panel-right .resumen-contratos .item .numero {
+            font-size: 20px;  /* Aumentado */
+            font-weight: 700;
+        }
         .panel-right .resumen-contratos .item .numero.activos { color: #6bff6b; }
         .panel-right .resumen-contratos .item .numero.vencidos { color: #ff6b6b; }
         .panel-right .resumen-contratos .item .numero.total { color: #6c3ce0; }
-        .panel-right .resumen-contratos .item .label { font-size: 7px; color: #888; }
-        .panel-right .resumen-contratos .total-gastos {
-            text-align: center; margin-top: 4px; font-size: 9px; color: #666;
-            padding-top: 4px; border-top: 1px solid #2a2a3e;
+        .panel-right .resumen-contratos .item .label {
+            font-size: 10px;  /* Aumentado */
+            color: #888;
+            font-weight: 500;
         }
-        .panel-right .resumen-contratos .total-gastos strong { color: #6c3ce0; }
+        .panel-right .resumen-contratos .total-gastos {
+            text-align: center;
+            margin-top: 6px;
+            font-size: 12px;  /* Aumentado */
+            color: #888;
+            padding-top: 6px;
+            border-top: 1px solid #2a2a3e;
+        }
+        .panel-right .resumen-contratos .total-gastos strong {
+            color: #6c3ce0;
+            font-size: 13px;  /* Aumentado */
+        }
 
-        /* Botones de reportes - compactos */
+        /* Botones de reportes - letras más grandes */
         .panel-right .btn-reporte {
-            padding: 4px 8px;
+            padding: 8px 12px;  /* Más padding */
             border: none;
-            border-radius: 5px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 9px;
+            font-size: 13px;  /* Aumentado de 9px a 13px */
+            font-weight: 600;  /* Aumentado */
             transition: all 0.3s;
             width: 100%;
             text-align: center;
-            margin-bottom: 3px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            margin-bottom: 5px;
         }
-        .panel-right .btn-reporte:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-        .panel-right .btn-reporte:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
-        .panel-right .btn-reporte.general { background: linear-gradient(135deg, #6c3ce0, #4a1a9e); color: #fff; }
-        .panel-right .btn-reporte.activos { background: #224422; color: #6bff6b; border: 1px solid #6bff6b; }
-        .panel-right .btn-reporte.vencidos { background: #442222; color: #ff6b6b; border: 1px solid #ff6b6b; }
+        .panel-right .btn-reporte:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+        .panel-right .btn-reporte:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        .panel-right .btn-reporte.general {
+            background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
+            color: #fff;
+        }
+        .panel-right .btn-reporte.activos {
+            background: #1a3a1a;
+            color: #6bff6b;
+            border: 1px solid #6bff6b;
+        }
+        .panel-right .btn-reporte.vencidos {
+            background: #3a1a1a;
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+        }
 
         .panel-right .separador {
-            border-top: 1px solid #2a2a3e;
-            margin: 4px 0;
+            border-top: 2px solid #2a2a3e;
+            margin: 8px 0;
         }
 
+        /* Últimos reportes - letras más grandes */
         .panel-right .ultimos-reportes {
-            margin-top: 6px;
-            border-top: 1px solid #2a2a3e;
-            padding-top: 6px;
+            margin-top: 8px;
+            border-top: 2px solid #2a2a3e;
+            padding-top: 8px;
             flex: 1;
             overflow-y: auto;
-            max-height: 120px;
+            max-height: 140px;
         }
-        .panel-right .ultimos-reportes .titulo { font-size: 8px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+        .panel-right .ultimos-reportes .titulo {
+            font-size: 12px;  /* Aumentado */
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
         .panel-right .ultimos-reportes .reporte-item {
-            padding: 2px 0;
+            padding: 6px 0;  /* Más padding */
             border-bottom: 1px solid #1a1a2e;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 9px;
+            font-size: 12px;  /* Aumentado */
+            color: #888;
+        }
+        .panel-right .ultimos-reportes .reporte-item .fecha {
+            font-size: 10px;  /* Aumentado */
             color: #666;
         }
-        .panel-right .ultimos-reportes .reporte-item .fecha { font-size: 7px; color: #444; }
-        .panel-right .ultimos-reportes .empty { font-size: 9px; color: #666; padding: 3px 0; }
+        .panel-right .ultimos-reportes .empty {
+            font-size: 12px;  /* Aumentado */
+            color: #666;
+            padding: 6px 0;
+        }
 
         /* ============================================
            MENÚ MÓVIL
@@ -643,37 +697,39 @@
         .mobile-menu-panel .menu-title { font-size: 13px; font-weight: 600; color: var(--accent); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border-color); }
         .mobile-menu-panel .reportes-mobile { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color); }
         .mobile-menu-panel .reportes-mobile .btn-reporte-mobile {
-            width: 100%; padding: 6px 10px; margin-bottom: 3px; border: none;
-            border-radius: 5px; cursor: pointer; font-size: 10px; transition: all 0.3s;
-            text-align: left; color: #fff;
+            width: 100%; padding: 8px 10px; margin-bottom: 4px; border: none;
+            border-radius: 5px; cursor: pointer; font-size: 12px; transition: all 0.3s;
+            text-align: left; color: #fff; font-weight: 500;
         }
         .mobile-menu-panel .reportes-mobile .btn-reporte-mobile:hover { transform: scale(1.02); }
 
         /* ============================================
-           RESPONSIVE - TABLETS Y MÓVILES
+           RESPONSIVE
            ============================================ */
 
         @media (max-width: 1200px) {
             :root {
                 --panel-left-width: 150px;
-                --panel-right-width: 230px;
+                --panel-right-width: 240px;
             }
             .header-left .subtitle { display: inline; }
+            .panel-right .btn-reporte { font-size: 12px; padding: 6px 10px; }
+            .panel-right .resumen-contratos .item .numero { font-size: 18px; }
         }
 
         @media (max-width: 992px) {
             :root {
                 --panel-left-width: 130px;
-                --panel-right-width: 200px;
+                --panel-right-width: 220px;
             }
             .panel-left .modulo-item .modulo-name { font-size: 9px; }
             .panel-left .modulo-item .modulo-icon { font-size: 10px; width: 16px; }
-            .panel-right .btn-reporte { font-size: 8px; padding: 3px 6px; }
+            .panel-right .btn-reporte { font-size: 11px; padding: 5px 8px; }
+            .panel-right .resumen-contratos .item .numero { font-size: 16px; }
             .stats-grid-central { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
             .stat-card-central .stat-number { font-size: 17px; }
         }
 
-        /* MÓVILES - DISEÑO COMPLETAMENTE ADAPTADO */
         @media (max-width: 768px) {
             :root {
                 --header-height: 48px;
@@ -737,8 +793,13 @@
             .modal-content h3 { font-size: 15px; }
             .modal-content .form-group input { font-size: 11px; padding: 5px 8px; }
 
-            /* Ajuste para el iframe en móviles */
             .panel-center .module-frame { height: 100%; }
+
+            /* Ajustes para reportes en móvil (se ven en el menú móvil) */
+            .mobile-menu-panel .reportes-mobile .btn-reporte-mobile {
+                font-size: 13px;
+                padding: 10px 12px;
+            }
         }
 
         @media (max-width: 480px) {
@@ -765,28 +826,13 @@
 
             .mobile-menu-panel { width: 220px; left: -220px; padding: 10px; }
             .mobile-menu-panel .modulo-item-mobile { padding: 6px 8px; font-size: 11px; }
+            .mobile-menu-panel .reportes-mobile .btn-reporte-mobile { font-size: 12px; padding: 8px 10px; }
 
             .user-menu { right: -20px; min-width: 120px; }
             .user-menu .menu-item { font-size: 10px; padding: 4px 8px; }
 
             .modal-content { padding: 12px; }
             .modal-content .form-actions .btn { font-size: 11px; padding: 5px; }
-        }
-
-        /* Estilos para el scroll horizontal en tablas móviles */
-        .table-wrapper {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        /* Mejora de legibilidad en móviles */
-        @media (max-width: 768px) {
-            .panel-center .dashboard-content {
-                font-size: 12px;
-            }
-            .panel-center .dashboard-content .stat-number {
-                font-size: 16px;
-            }
         }
     </style>
 </head>
@@ -832,7 +878,7 @@
         <div class="menu-title">🧩 Módulos</div>
         <div id="modulosMobileList"></div>
         <div class="reportes-mobile">
-            <div class="menu-title" style="font-size:11px;margin-top:2px;">📄 Reportes</div>
+            <div class="menu-title" style="font-size:12px;margin-top:4px;">📄 Reportes</div>
             <div id="reportesMobileList"></div>
         </div>
     </div>
@@ -939,7 +985,7 @@
             </div>
         </div>
 
-        <!-- PANEL DERECHO -->
+        <!-- PANEL DERECHO - ZONA DE REPORTES CON LETRAS MÁS GRANDES -->
         <div class="panel-right">
 
             <div class="stats-title">📄 Reportes</div>
@@ -1321,7 +1367,7 @@
         }
 
         // ============================================
-        // RENDER REPORTES - MENÚ MÓVIL
+        // RENDER REPORTES - MENÚ MÓVIL (letras más grandes)
         // ============================================
 
         function renderReportesMobile() {
@@ -1330,13 +1376,13 @@
 
             const reportes = [
                 { tipo: 'contratos', filtro: 'todos', label: '📄 General Contratos', color: '#6c3ce0' },
-                { tipo: 'contratos', filtro: 'activos', label: '🟢 Activos', color: '#4caf50' },
-                { tipo: 'contratos', filtro: 'vencidos', label: '🔴 Vencidos', color: '#f44336' },
-                { tipo: 'ingresos', filtro: 'hoy', label: '💰 Hoy', color: '#2196f3' },
-                { tipo: 'ingresos', filtro: 'semana', label: '💰 Semana', color: '#ff9800' },
-                { tipo: 'ingresos', filtro: 'mes', label: '💰 Mes', color: '#4caf50' },
-                { tipo: 'ingresos', filtro: 'todos', label: '💰 Todos', color: '#9c27b0' },
-                { tipo: 'productos', filtro: null, label: '📦 Inventario', color: '#607d8b' },
+                { tipo: 'contratos', filtro: 'activos', label: '🟢 Contratos Activos', color: '#4caf50' },
+                { tipo: 'contratos', filtro: 'vencidos', label: '🔴 Contratos Vencidos', color: '#f44336' },
+                { tipo: 'ingresos', filtro: 'hoy', label: '💰 Ingresos Hoy', color: '#2196f3' },
+                { tipo: 'ingresos', filtro: 'semana', label: '💰 Ingresos Semana', color: '#ff9800' },
+                { tipo: 'ingresos', filtro: 'mes', label: '💰 Ingresos Mes', color: '#4caf50' },
+                { tipo: 'ingresos', filtro: 'todos', label: '💰 Todos los Ingresos', color: '#9c27b0' },
+                { tipo: 'productos', filtro: null, label: '📦 Reporte Inventario', color: '#607d8b' },
             ];
 
             reportes.forEach(r => {
@@ -1344,6 +1390,9 @@
                 btn.className = 'btn-reporte-mobile';
                 btn.style.background = r.color;
                 btn.style.color = '#fff';
+                btn.style.fontSize = '13px';
+                btn.style.fontWeight = '600';
+                btn.style.padding = '10px 12px';
                 btn.textContent = r.label;
                 btn.addEventListener('click', () => {
                     toggleMobileMenu(false);
