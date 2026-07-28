@@ -43,7 +43,7 @@ def init_db():
         print(f"❌ Error de conexión: {e}")
         return
     
-    # TABLAS CON SERIAL (PostgreSQL)
+    # TABLAS CON SERIAL (PostgreSQL) - CON ON DELETE CASCADE
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -69,7 +69,7 @@ def init_db():
         fecha_creacion TEXT NOT NULL,
         fecha_expiracion TEXT NOT NULL,
         activo INTEGER DEFAULT 1,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
     )
     ''')
     
@@ -91,8 +91,8 @@ def init_db():
         activo INTEGER DEFAULT 1,
         fecha_solicitud TEXT,
         estado_solicitud TEXT DEFAULT 'aprobado',
-        FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE CASCADE,
-        FOREIGN KEY (modulo_id) REFERENCES modulos (id) ON DELETE CASCADE,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (modulo_id) REFERENCES modulos(id) ON DELETE CASCADE,
         UNIQUE(usuario_id, modulo_id)
     )
     ''')
@@ -104,7 +104,7 @@ def init_db():
         accion TEXT,
         detalle TEXT,
         fecha TEXT NOT NULL,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios (id) ON DELETE SET NULL
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
     )
     ''')
     
@@ -357,22 +357,11 @@ def obtener_negocios():
     return negocios
 
 def eliminar_usuario(user_id):
-    """Elimina un usuario y todos sus datos relacionados"""
+    """Elimina un usuario y todos sus datos relacionados (ON DELETE CASCADE lo hará automáticamente)"""
     conn = get_db()
     cursor = conn.cursor()
     try:
-        # 1. Eliminar sesiones del usuario
-        cursor.execute('DELETE FROM sesiones WHERE usuario_id = %s', (user_id,))
-        
-        # 2. Eliminar permisos del usuario
-        cursor.execute('DELETE FROM permisos_usuario WHERE usuario_id = %s', (user_id,))
-        
-        # 3. Eliminar relación en trabajadores_negocio si existe
-        cursor.execute('DELETE FROM trabajadores_negocio WHERE trabajador_id = %s', (user_id,))
-        
-        # 4. Eliminar el usuario
         cursor.execute('DELETE FROM usuarios WHERE id = %s', (user_id,))
-        
         conn.commit()
         conn.close()
         return True
@@ -600,7 +589,6 @@ def actualizar_producto(producto_id, nombre, categoria, precio, stock, stock_min
     conn.close()
 
 def actualizar_foto_producto(producto_id, foto_url, foto_public_id=None):
-    """Actualiza la URL y el ID público de la foto de un producto"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -612,7 +600,6 @@ def actualizar_foto_producto(producto_id, foto_url, foto_public_id=None):
     conn.close()
 
 def eliminar_foto_producto(producto_id):
-    """Elimina la referencia de la foto de un producto"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -624,7 +611,6 @@ def eliminar_foto_producto(producto_id):
     conn.close()
 
 def obtener_foto_producto(producto_id):
-    """Obtiene la información de la foto de un producto"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT foto_url, foto_public_id FROM productos WHERE id = %s', (producto_id,))
@@ -635,12 +621,10 @@ def obtener_foto_producto(producto_id):
     return {'url': None, 'public_id': None}
 
 def eliminar_producto(producto_id):
-    """Elimina un producto de la base de datos con manejo de errores mejorado"""
     conn = get_db()
     cursor = conn.cursor()
     
     try:
-        # 1. Verificar si el producto existe
         cursor.execute('SELECT id, nombre, negocio_id FROM productos WHERE id = %s', (producto_id,))
         producto = cursor.fetchone()
         
@@ -651,14 +635,12 @@ def eliminar_producto(producto_id):
         
         print(f"🗑️ Eliminando producto: {producto[1]} (ID: {producto_id})")
         
-        # 2. Verificar referencias en otras tablas antes de eliminar
         cursor.execute('SELECT id FROM productos_tienda WHERE producto_id = %s', (producto_id,))
         tienda = cursor.fetchone()
         if tienda:
             print(f"⚠️ Eliminando referencia en productos_tienda para producto {producto_id}")
             cursor.execute('DELETE FROM productos_tienda WHERE producto_id = %s', (producto_id,))
         
-        # 3. Verificar si tiene ventas asociadas
         cursor.execute('SELECT id FROM ventas WHERE producto_id = %s LIMIT 1', (producto_id,))
         venta = cursor.fetchone()
         if venta:
@@ -666,10 +648,8 @@ def eliminar_producto(producto_id):
             conn.close()
             return False
         
-        # 4. Eliminar el producto
         cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
         
-        # 5. Verificar que se eliminó correctamente
         if cursor.rowcount > 0:
             conn.commit()
             print(f"✅ Producto {producto_id} eliminado correctamente")
@@ -924,7 +904,6 @@ def obtener_estadisticas_ventas(negocio_id, trabajador_id=None):
     return stats
 
 def actualizar_estado_venta(venta_id, negocio_id, estado):
-    """Actualiza el estado de una venta"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -940,25 +919,70 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
     """Elimina una venta y reintegra el stock del producto"""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-    SELECT producto_id, cantidad, total, cliente, producto, fecha, empresa, tipo, factura_url,
-           factura, transferencia_id, transferencia_cedula, transferencia_banco, transferencia_fecha
-    FROM ventas WHERE id = %s AND negocio_id = %s
-    ''', (venta_id, negocio_id))
-    venta = cursor.fetchone()
-    if not venta:
+    try:
+        # 1. Obtener datos de la venta
+        cursor.execute('''
+            SELECT producto_id, cantidad, total, cliente, producto, fecha, empresa, tipo, 
+                   factura_url, factura, transferencia_id, transferencia_cedula, 
+                   transferencia_banco, transferencia_fecha
+            FROM ventas 
+            WHERE id = %s AND negocio_id = %s
+        ''', (venta_id, negocio_id))
+        
+        venta = cursor.fetchone()
+        
+        if not venta:
+            conn.close()
+            return False, "Venta no encontrada"
+        
+        producto_id = venta[0]
+        cantidad = venta[1]
+        
+        # 2. Si tiene producto, reintegrar stock
+        if producto_id:
+            cursor.execute('''
+                UPDATE productos 
+                SET stock = stock + %s, updated_at = %s 
+                WHERE id = %s
+            ''', (cantidad, datetime.now().isoformat(), producto_id))
+            
+            # Verificar que se actualizó el stock
+            if cursor.rowcount == 0:
+                conn.rollback()
+                conn.close()
+                return False, "Error al actualizar el stock del producto"
+        
+        # 3. Eliminar la venta
+        cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, negocio_id))
+        
+        # Verificar que se eliminó
+        if cursor.rowcount == 0:
+            conn.rollback()
+            conn.close()
+            return False, "Error al eliminar la venta"
+        
+        conn.commit()
         conn.close()
-        return False, "Venta no encontrada"
-    producto_id = venta[0]
-    cantidad = venta[1]
-    if producto_id:
-        cursor.execute('UPDATE productos SET stock = stock + %s, updated_at = %s WHERE id = %s',
-                       (cantidad, datetime.now().isoformat(), producto_id))
-    cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, negocio_id))
-    conn.commit()
-    conn.close()
-    return True, {'producto_id': producto_id, 'cantidad': cantidad, 'cliente': venta[3],
-                  'producto': venta[4], 'total': venta[7], 'fecha': venta[17]}
+        
+        return True, {
+            'producto_id': producto_id, 
+            'cantidad': cantidad, 
+            'cliente': venta[3],
+            'producto': venta[4], 
+            'total': venta[2], 
+            'fecha': venta[5]
+        }
+        
+    except psycopg2.Error as e:
+        print(f"❌ Error SQL eliminando venta: {e}")
+        conn.rollback()
+        conn.close()
+        return False, f"Error de base de datos: {str(e)}"
+    except Exception as e:
+        print(f"❌ Error eliminando venta: {e}")
+        conn.rollback()
+        conn.close()
+        return False, f"Error: {str(e)}"
 
 # ============================================
 # FUNCIONES PARA SERVICIOS
