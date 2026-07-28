@@ -20,7 +20,7 @@
             padding: 40px;
             border-radius: 16px;
             width: 100%;
-            max-width: 450px;
+            max-width: 500px;
             box-shadow: 0 8px 30px rgba(0,0,0,0.5);
         }
         .logo { text-align: center; margin-bottom: 30px; }
@@ -105,6 +105,20 @@
             color: #aaa;
         }
         .info-box strong { color: #6c3ce0; }
+        .form-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .form-row .form-group {
+            flex: 1;
+            min-width: 150px;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 24px; }
+            .form-row { flex-direction: column; }
+            .form-row .form-group { min-width: unset; }
+        }
     </style>
 </head>
 <body>
@@ -161,14 +175,53 @@
                     <label>Nombre del negocio</label>
                     <input type="text" id="nombreNegocio" placeholder="Nombre de tu negocio">
                 </div>
-                <div class="form-group">
-                    <label>RUC / NIT</label>
-                    <input type="text" id="ruc" placeholder="Número de identificación tributaria">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>RUC / NIT</label>
+                        <input type="text" id="ruc" placeholder="Número de identificación tributaria">
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono de contacto</label>
+                        <input type="text" id="telefono" placeholder="Teléfono de contacto">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Teléfono de contacto</label>
-                    <input type="text" id="telefono" placeholder="Teléfono de contacto">
+
+                <!-- ============================================ -->
+                <!-- PROVINCIA Y MUNICIPIO                       -->
+                <!-- ============================================ -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Provincia</label>
+                        <select id="provincia" onchange="cargarMunicipios()">
+                            <option value="">-- Seleccionar provincia --</option>
+                            <option value="La Habana">La Habana</option>
+                            <option value="Artemisa">Artemisa</option>
+                            <option value="Mayabeque">Mayabeque</option>
+                            <option value="Matanzas">Matanzas</option>
+                            <option value="Villa Clara">Villa Clara</option>
+                            <option value="Cienfuegos">Cienfuegos</option>
+                            <option value="Sancti Spíritus">Sancti Spíritus</option>
+                            <option value="Ciego de Ávila">Ciego de Ávila</option>
+                            <option value="Camagüey">Camagüey</option>
+                            <option value="Las Tunas">Las Tunas</option>
+                            <option value="Granma">Granma</option>
+                            <option value="Holguín">Holguín</option>
+                            <option value="Santiago de Cuba">Santiago de Cuba</option>
+                            <option value="Guantánamo">Guantánamo</option>
+                            <option value="Pinar del Río">Pinar del Río</option>
+                            <option value="Isla de la Juventud">Isla de la Juventud</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Municipio</label>
+                        <select id="municipio">
+                            <option value="">-- Seleccionar municipio --</option>
+                        </select>
+                        <span class="help-text" id="municipioHelp">Selecciona primero una provincia</span>
+                    </div>
                 </div>
+
                 <div class="form-group">
                     <label>Dirección</label>
                     <input type="text" id="direccion" placeholder="Dirección del negocio">
@@ -188,6 +241,57 @@
     </div>
 
     <script>
+        // ============================================
+        // DATOS DE MUNICIPIOS POR PROVINCIA (CUBA)
+        // ============================================
+        const municipiosPorProvincia = {
+            'La Habana': ['La Habana Vieja', 'Centro Habana', 'Cerro', 'Marianao', 'Playa', 'Plaza de la Revolución', 'Diez de Octubre', 'Arroyo Naranjo', 'Boyeros', 'La Lisa', 'San Miguel del Padrón', 'Cotorro', 'Regla', 'Guanabacoa', 'Habana del Este'],
+            'Artemisa': ['Artemisa', 'Bahía Honda', 'Caimito', 'Candelaria', 'Guanajay', 'Güira de Melena', 'Mariel', 'San Antonio de los Baños', 'San Cristóbal', 'Alquízar', 'Bauta', 'Surgidero de Batabanó'],
+            'Mayabeque': ['San José de las Lajas', 'Bejucal', 'Jaruco', 'Madruga', 'Melena del Sur', 'Nueva Paz', 'Quivicán', 'Santa Cruz del Norte', 'Güines', 'Batabanó', 'San Nicolás de Bari'],
+            'Matanzas': ['Matanzas', 'Cárdenas', 'Colón', 'Jovellanos', 'Jagüey Grande', 'Unión de Reyes', 'Pedro Betancourt', 'Perico', 'Bolívar', 'Calimete', 'Los Arabos', 'Martí', 'Varadero', 'Ciénaga de Zapata', 'Limónar'],
+            'Villa Clara': ['Santa Clara', 'Placetas', 'Remedios', 'Sagua la Grande', 'Camajuaní', 'Caibarién', 'Encrucijada', 'Manicaragua', 'Quemado de Güines', 'Ranchuelo', 'Santo Domingo', 'Cifuentes', 'Corralillo', 'Zulueta'],
+            'Cienfuegos': ['Cienfuegos', 'Abreus', 'Palmira', 'Cruces', 'Cumanayagua', 'Lajas', 'Aguada de Pasajeros', 'Rodas', 'Santa Isabel de las Lajas'],
+            'Sancti Spíritus': ['Sancti Spíritus', 'Cabaiguán', 'Fomento', 'Jatibonico', 'La Sierpe', 'Taguasco', 'Trinidad', 'Yaguajay', 'Zaza del Medio', 'Guayos'],
+            'Ciego de Ávila': ['Ciego de Ávila', 'Morón', 'Venezuela', 'Baraguá', 'Bolivia', 'Chambas', 'Ciro Redondo', 'Florencia', 'Majagua', 'Primero de Enero'],
+            'Camagüey': ['Camagüey', 'Florida', 'Nuevitas', 'Esmeralda', 'Minas', 'Sibanicú', 'Guáimaro', 'Santa Cruz del Sur', 'Vertientes', 'Jimaguayú', 'Céspedes', 'Sierra de Cubitas'],
+            'Las Tunas': ['Las Tunas', 'Jobabo', 'Colombia', 'Manatí', 'Puerto Padre', 'Amancio', 'Majibacoa', 'Jesús Menéndez'],
+            'Granma': ['Bayamo', 'Manzanillo', 'Jiguaní', 'Yara', 'Buey Arriba', 'Cauto Cristo', 'Guisa', 'Pilón', 'Río Cauto', 'Media Luna', 'Niquero', 'Campechuela', 'Bartolomé Masó'],
+            'Holguín': ['Holguín', 'Banes', 'Antilla', 'Mayarí', 'Moa', 'Sagua de Tánamo', 'Frank País', 'Gibara', 'Cacocum', 'Calix', 'Cueto', 'Rafael Freyre', 'Urbano Noris', 'Báguanos'],
+            'Santiago de Cuba': ['Santiago de Cuba', 'Palma Soriano', 'Contramaestre', 'San Luis', 'Mella', 'Segundo Frente', 'Tercer Frente', 'Guamá', 'Songo-La Maya'],
+            'Guantánamo': ['Guantánamo', 'Baracoa', 'Maisí', 'Imías', 'San Antonio del Sur', 'Caimanera', 'Niceto Pérez', 'Manuel Tames', 'Yateras', 'El Salvador'],
+            'Pinar del Río': ['Pinar del Río', 'San Juan y Martínez', 'San Luis', 'Consolación del Sur', 'Viñales', 'Los Palacios', 'La Palma', 'Mantua', 'Minas de Matahambre', 'Guane', 'Sandino'],
+            'Isla de la Juventud': ['Nueva Gerona', 'Santa Fe', 'La Demajagua', 'Cocodrilo', 'La Victoria', 'San Juan']
+        };
+
+        // ============================================
+        // FUNCIÓN PARA CARGAR MUNICIPIOS
+        // ============================================
+        function cargarMunicipios() {
+            const provinciaSelect = document.getElementById('provincia');
+            const municipioSelect = document.getElementById('municipio');
+            const municipioHelp = document.getElementById('municipioHelp');
+            const provincia = provinciaSelect.value;
+            
+            // Limpiar municipios
+            municipioSelect.innerHTML = '<option value="">-- Seleccionar municipio --</option>';
+            
+            if (provincia && municipiosPorProvincia[provincia]) {
+                const municipios = municipiosPorProvincia[provincia];
+                municipios.sort(); // Ordenar alfabéticamente
+                municipios.forEach(municipio => {
+                    const option = document.createElement('option');
+                    option.value = municipio;
+                    option.textContent = municipio;
+                    municipioSelect.appendChild(option);
+                });
+                municipioHelp.textContent = `📌 ${municipios.length} municipios disponibles`;
+                municipioHelp.style.color = '#6c3ce0';
+            } else {
+                municipioHelp.textContent = 'Selecciona primero una provincia';
+                municipioHelp.style.color = '#666';
+            }
+        }
+
         // ============================================
         // MOSTRAR/OCULTAR CAMPOS DE NEGOCIO
         // ============================================
@@ -232,13 +336,25 @@
             // Datos adicionales para negocio
             let datosNegocio = null;
             if (tipo === 'negocio') {
+                const provincia = document.getElementById('provincia').value;
+                const municipio = document.getElementById('municipio').value;
+                
                 datosNegocio = {
                     nombre_negocio: document.getElementById('nombreNegocio').value.trim(),
                     ruc: document.getElementById('ruc').value.trim(),
+                    provincia: provincia,
+                    municipio: municipio,
                     telefono: document.getElementById('telefono').value.trim(),
                     direccion: document.getElementById('direccion').value.trim(),
                     descripcion: document.getElementById('descripcionNegocio').value.trim()
                 };
+                
+                // Validar que provincia y municipio estén seleccionados
+                if (!provincia || !municipio) {
+                    errorEl.textContent = 'Por favor, selecciona provincia y municipio';
+                    errorEl.classList.add('show');
+                    return;
+                }
             }
 
             btn.disabled = true;
