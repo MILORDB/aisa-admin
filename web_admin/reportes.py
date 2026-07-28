@@ -194,18 +194,23 @@ class GeneradorReportes:
                 precio = item.get('precio', 0)
                 subtotal = item.get('subtotal', precio * cantidad)
                 
+                # Ajustar descripción si es muy larga
+                if len(descripcion) > 40:
+                    descripcion = descripcion[:37] + "..."
+                
                 fila = [
-                    str(cantidad),
-                    descripcion,
-                    f"${precio:,.2f}",
-                    f"${subtotal:,.2f}"
+                    Paragraph(str(cantidad), styles['Normal']),
+                    Paragraph(descripcion, styles['Normal']),
+                    Paragraph(f"${precio:,.2f}", styles['Normal']),
+                    Paragraph(f"${subtotal:,.2f}", styles['Normal'])
                 ]
                 tabla_datos.append(fila)
             
             # Ajustar tamaño según cantidad de items
             if len(tabla_datos) > 15:
-                tabla = Table(tabla_datos, colWidths=[1.5*cm, 8*cm, 3*cm, 3*cm])
+                tabla = Table(tabla_datos, colWidths=[1.2*cm, 7.5*cm, 2.8*cm, 2.8*cm])
                 tabla.setStyle(TableStyle([
+                    # Encabezados
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                     ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
@@ -214,21 +219,26 @@ class GeneradorReportes:
                     ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
                     ('TOPPADDING', (0, 0), (-1, 0), 6),
                     
+                    # Filas de datos
                     ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                     ('FONTSIZE', (0, 1), (-1, -1), 8),
                     ('ALIGN', (0, 1), (0, -1), 'CENTER'),
                     ('ALIGN', (2, 1), (3, -1), 'RIGHT'),
                     ('TOPPADDING', (0, 1), (-1, -1), 4),
                     ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     
+                    # Bordes
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
                     ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
                     
+                    # Filas alternadas
                     ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
                 ]))
             else:
-                tabla = Table(tabla_datos, colWidths=[2*cm, 8*cm, 3.5*cm, 3.5*cm])
+                tabla = Table(tabla_datos, colWidths=[1.5*cm, 8*cm, 3*cm, 3*cm])
                 tabla.setStyle(TableStyle([
+                    # Encabezados
                     ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
                     ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                     ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
@@ -237,16 +247,20 @@ class GeneradorReportes:
                     ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
                     ('TOPPADDING', (0, 0), (-1, 0), 8),
                     
+                    # Filas de datos
                     ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
                     ('FONTSIZE', (0, 1), (-1, -1), 9),
                     ('ALIGN', (0, 1), (0, -1), 'CENTER'),
                     ('ALIGN', (2, 1), (3, -1), 'RIGHT'),
                     ('TOPPADDING', (0, 1), (-1, -1), 6),
                     ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                     
+                    # Bordes
                     ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
                     ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
                     
+                    # Filas alternadas
                     ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
                 ]))
             
@@ -354,11 +368,11 @@ class GeneradorReportes:
         return pdf_bytes
 
     # ============================================
-    # REPORTE DE CONTRATOS
+    # REPORTE DE CONTRATOS (CON TEXTO CUADRADO)
     # ============================================
     
     def generar_reporte_contratos(self, contratos, tipo_reporte='todos'):
-        """Genera un reporte PDF de contratos"""
+        """Genera un reporte PDF de contratos con texto cuadrado en celdas"""
         doc = SimpleDocTemplate(
             self.buffer,
             pagesize=A4,
@@ -400,18 +414,50 @@ class GeneradorReportes:
                 else:
                     estado_display = '⚪ ' + estado.capitalize()
                 
+                # Ajustar texto para que quepa en la celda
+                empresa_text = c.get('empresa', '-')
+                if len(empresa_text) > 25:
+                    empresa_text = empresa_text[:22] + "..."
+                
                 fila = [
-                    c.get('numero_contrato', '-'),
-                    c.get('empresa', '-'),
-                    c.get('fecha_inicio', '-'),
-                    c.get('fecha_fin', '-'),
-                    f"${gastos:,.2f}",
-                    estado_display
+                    Paragraph(c.get('numero_contrato', '-'), styles['Normal']),
+                    Paragraph(empresa_text, styles['Normal']),
+                    Paragraph(c.get('fecha_inicio', '-'), styles['Normal']),
+                    Paragraph(c.get('fecha_fin', '-'), styles['Normal']),
+                    Paragraph(f"${gastos:,.2f}", styles['Normal']),
+                    Paragraph(estado_display, styles['Normal'])
                 ]
                 tabla_datos.append(fila)
             
-            tabla = Table(tabla_datos, colWidths=[2.2*cm, 5*cm, 2.5*cm, 2.5*cm, 2.5*cm, 2.8*cm])
-            tabla.setStyle(self._estilo_tabla())
+            tabla = Table(tabla_datos, colWidths=[2.2*cm, 4.5*cm, 2.5*cm, 2.5*cm, 2.5*cm, 2.8*cm])
+            tabla.setStyle(TableStyle([
+                # Encabezados
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                ('TOPPADDING', (0, 0), (-1, 0), 8),
+                
+                # Filas de datos
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+                ('ALIGN', (4, 1), (4, -1), 'RIGHT'),
+                ('ALIGN', (5, 1), (5, -1), 'CENTER'),
+                ('TOPPADDING', (0, 1), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                
+                # Bordes
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+                
+                # Filas alternadas
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
+            ]))
+            
             elementos.append(tabla)
             
             elementos.append(Spacer(1, 0.5*cm))
@@ -472,11 +518,11 @@ class GeneradorReportes:
         return pdf_bytes
 
     # ============================================
-    # REPORTE DE INGRESOS
+    # REPORTE DE INGRESOS (CON TEXTO CUADRADO)
     # ============================================
     
     def generar_reporte_ingresos(self, ventas, total_ingresos, total_ventas, periodo=None):
-        """Genera un reporte PDF de ingresos"""
+        """Genera un reporte PDF de ingresos con texto cuadrado en celdas"""
         doc = SimpleDocTemplate(
             self.buffer,
             pagesize=landscape(A4),
@@ -498,7 +544,7 @@ class GeneradorReportes:
         
         if ventas:
             tabla_datos = []
-            headers = ["# Venta", "Cliente", "Producto/Servicio", "Empresa", "Cantidad", "Total ($)", "Fecha", "Estado"]
+            headers = ["# Venta", "Cliente", "Producto/Servicio", "Empresa", "Cant.", "Total ($)", "Fecha", "Estado"]
             tabla_datos.append(headers)
             
             for v in ventas[:50]:
@@ -514,20 +560,55 @@ class GeneradorReportes:
                 else:
                     estado_display = '❌ Cancelado'
                 
+                # Ajustar textos largos
+                producto_text = v.get('producto', '-')
+                if len(producto_text) > 20:
+                    producto_text = producto_text[:17] + "..."
+                
+                cliente_text = v.get('cliente', '-')
+                if len(cliente_text) > 15:
+                    cliente_text = cliente_text[:12] + "..."
+                
                 fila = [
-                    f"#{v.get('id', '')}",
-                    v.get('cliente', '-'),
-                    v.get('producto', '-'),
-                    v.get('empresa', '-') or '-',
-                    str(v.get('cantidad', 1)),
-                    f"${v.get('total', 0):,.2f}",
-                    v.get('fecha', '-'),
-                    estado_display
+                    Paragraph(f"#{v.get('id', '')}", styles['Normal']),
+                    Paragraph(cliente_text, styles['Normal']),
+                    Paragraph(producto_text, styles['Normal']),
+                    Paragraph(v.get('empresa', '-') or '-', styles['Normal']),
+                    Paragraph(str(v.get('cantidad', 1)), styles['Normal']),
+                    Paragraph(f"${v.get('total', 0):,.2f}", styles['Normal']),
+                    Paragraph(v.get('fecha', '-'), styles['Normal']),
+                    Paragraph(estado_display, styles['Normal'])
                 ]
                 tabla_datos.append(fila)
             
-            tabla = Table(tabla_datos, colWidths=[1.5*cm, 3.5*cm, 4*cm, 3*cm, 1.5*cm, 2.5*cm, 2.5*cm, 2.5*cm])
-            tabla.setStyle(self._estilo_tabla())
+            tabla = Table(tabla_datos, colWidths=[1.5*cm, 3*cm, 4*cm, 2.8*cm, 1.5*cm, 2.5*cm, 2.5*cm, 2.5*cm])
+            tabla.setStyle(TableStyle([
+                # Encabezados
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                ('TOPPADDING', (0, 0), (-1, 0), 6),
+                
+                # Filas de datos
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+                ('ALIGN', (5, 1), (5, -1), 'RIGHT'),
+                ('TOPPADDING', (0, 1), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                
+                # Bordes
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+                
+                # Filas alternadas
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
+            ]))
+            
             elementos.append(tabla)
             
             elementos.append(Spacer(1, 0.5*cm))
@@ -573,11 +654,11 @@ class GeneradorReportes:
         return pdf_bytes
 
     # ============================================
-    # REPORTE DE PRODUCTOS
+    # REPORTE DE PRODUCTOS (CON TEXTO CUADRADO)
     # ============================================
     
     def generar_reporte_productos(self, productos):
-        """Genera un reporte PDF de productos en almacén"""
+        """Genera un reporte PDF de productos en almacén con texto cuadrado en celdas"""
         doc = SimpleDocTemplate(
             self.buffer,
             pagesize=landscape(A4),
@@ -628,20 +709,56 @@ class GeneradorReportes:
                 
                 valor = stock * p.get('precio', 0)
                 
+                # Ajustar textos largos
+                nombre_text = p.get('nombre', '-')
+                if len(nombre_text) > 20:
+                    nombre_text = nombre_text[:17] + "..."
+                
+                categoria_text = p.get('categoria', '-') or '-'
+                if len(categoria_text) > 15:
+                    categoria_text = categoria_text[:12] + "..."
+                
                 fila = [
-                    str(p.get('id', '')),
-                    p.get('nombre', '-'),
-                    p.get('categoria', '-') or '-',
-                    f"${p.get('precio', 0):,.2f}",
-                    str(stock),
-                    str(stock_minimo),
-                    estado,
-                    f"${valor:,.2f}"
+                    Paragraph(str(p.get('id', '')), styles['Normal']),
+                    Paragraph(nombre_text, styles['Normal']),
+                    Paragraph(categoria_text, styles['Normal']),
+                    Paragraph(f"${p.get('precio', 0):,.2f}", styles['Normal']),
+                    Paragraph(str(stock), styles['Normal']),
+                    Paragraph(str(stock_minimo), styles['Normal']),
+                    Paragraph(estado, styles['Normal']),
+                    Paragraph(f"${valor:,.2f}", styles['Normal'])
                 ]
                 tabla_datos.append(fila)
             
-            tabla = Table(tabla_datos, colWidths=[1.5*cm, 4*cm, 3.5*cm, 2.5*cm, 2*cm, 2.5*cm, 3*cm, 2.5*cm])
-            tabla.setStyle(self._estilo_tabla())
+            tabla = Table(tabla_datos, colWidths=[1.5*cm, 3.5*cm, 3*cm, 2.5*cm, 2*cm, 2.5*cm, 3*cm, 2.5*cm])
+            tabla.setStyle(TableStyle([
+                # Encabezados
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                ('TOPPADDING', (0, 0), (-1, 0), 6),
+                
+                # Filas de datos
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('ALIGN', (0, 1), (0, -1), 'CENTER'),
+                ('ALIGN', (3, 1), (3, -1), 'RIGHT'),
+                ('ALIGN', (7, 1), (7, -1), 'RIGHT'),
+                ('TOPPADDING', (0, 1), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                
+                # Bordes
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+                
+                # Filas alternadas
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
+            ]))
+            
             elementos.append(tabla)
             
             elementos.append(Spacer(1, 0.5*cm))
@@ -791,6 +908,7 @@ class GeneradorReportes:
             ('FONTSIZE', (0, 1), (-1, -1), 9),
             ('TOPPADDING', (0, 1), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
             
             ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
             ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
