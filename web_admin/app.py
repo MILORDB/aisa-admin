@@ -1311,7 +1311,7 @@ def api_toggle_trabajador_negocio(trabajador_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - PRODUCTOS
+# API - PRODUCTOS (CON COSTO)
 # ============================================
 
 @app.route('/api/productos', methods=['GET', 'POST'])
@@ -1331,14 +1331,15 @@ def api_productos():
     nombre = data.get('nombre')
     categoria = data.get('categoria')
     precio = data.get('precio')
+    costo = data.get('costo', 0)
     stock = data.get('stock', 0)
     stock_minimo = data.get('stock_minimo', 3)
     
     if not nombre or precio is None:
         return jsonify({'error': 'Nombre y precio son requeridos'}), 400
     
-    producto_id = crear_producto(usuario['id'], nombre, categoria, precio, stock, stock_minimo)
-    registrar_log(usuario['id'], 'producto_creado', f'Producto: {nombre}')
+    producto_id = crear_producto(usuario['id'], nombre, categoria, precio, costo, stock, stock_minimo)
+    registrar_log(usuario['id'], 'producto_creado', f'Producto: {nombre} (Costo: ${costo})')
     
     return jsonify({'success': True, 'id': producto_id})
 
@@ -1400,6 +1401,7 @@ def api_producto(producto_id):
         nombre = data.get('nombre')
         categoria = data.get('categoria')
         precio = data.get('precio')
+        costo = data.get('costo', 0)
         stock = data.get('stock', 0)
         stock_minimo = data.get('stock_minimo', 3)
         
@@ -1415,8 +1417,8 @@ def api_producto(producto_id):
         if not producto or producto[0] != usuario['id']:
             return jsonify({'error': 'Producto no encontrado'}), 404
         
-        actualizar_producto(producto_id, nombre, categoria, precio, stock, stock_minimo)
-        registrar_log(usuario['id'], 'producto_actualizado', f'ID: {producto_id}')
+        actualizar_producto(producto_id, nombre, categoria, precio, costo, stock, stock_minimo)
+        registrar_log(usuario['id'], 'producto_actualizado', f'ID: {producto_id} (Costo: ${costo})')
         return jsonify({'success': True})
         
     except Exception as e:
