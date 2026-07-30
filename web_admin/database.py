@@ -338,9 +338,6 @@ def verify_password(password, password_hash):
     return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
 
 def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='cliente', datos_negocio=None):
-    """
-    Crea un nuevo usuario en la base de datos
-    """
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -499,6 +496,24 @@ def obtener_datos_negocio(user_id):
     return {}
 
 # ============================================
+# NUEVA FUNCIÓN PARA OBTENER NEGOCIO DE TRABAJADOR
+# ============================================
+
+def obtener_negocio_de_trabajador(trabajador_id):
+    """Obtiene el negocio_id al que pertenece un trabajador"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT negocio_id FROM trabajadores_negocio 
+        WHERE trabajador_id = %s AND activo = 1
+    ''', (trabajador_id,))
+    resultado = cursor.fetchone()
+    conn.close()
+    if resultado:
+        return resultado[0]
+    return None
+
+# ============================================
 # FUNCIONES DE MÓDULOS
 # ============================================
 
@@ -614,13 +629,10 @@ def obtener_logs(limit=50):
     return logs
 
 # ============================================
-# FUNCIONES PARA PRODUCTOS (CON COSTO Y COMISION)
+# FUNCIONES PARA PRODUCTOS
 # ============================================
 
 def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, stock=0, stock_minimo=3):
-    """
-    Crea un nuevo producto en la base de datos
-    """
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -639,7 +651,6 @@ def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, s
         return None
 
 def obtener_productos(negocio_id):
-    """Obtiene todos los productos de un negocio"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('SELECT * FROM productos WHERE negocio_id = %s ORDER BY id DESC', (negocio_id,))
@@ -648,7 +659,6 @@ def obtener_productos(negocio_id):
     return productos
 
 def obtener_todos_productos():
-    """Obtiene todos los productos de todos los negocios (para admin)"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -660,7 +670,6 @@ def obtener_todos_productos():
     return productos
 
 def obtener_productos_con_stock(negocio_id):
-    """Obtiene productos con stock disponible"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('SELECT id, nombre, precio, costo, comision, stock FROM productos WHERE negocio_id = %s AND stock > 0 ORDER BY nombre',
@@ -670,7 +679,6 @@ def obtener_productos_con_stock(negocio_id):
     return productos
 
 def obtener_productos_tienda():
-    """Obtiene productos disponibles para la tienda pública"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -683,9 +691,6 @@ def obtener_productos_tienda():
     return productos
 
 def actualizar_producto(producto_id, nombre, categoria, precio, costo, comision, stock, stock_minimo):
-    """
-    Actualiza un producto existente
-    """
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -737,7 +742,6 @@ def obtener_foto_producto(producto_id):
     return {'url': None, 'public_id': None}
 
 def eliminar_producto(producto_id):
-    """Elimina un producto y verifica que no tenga ventas asociadas"""
     conn = get_db()
     cursor = conn.cursor()
     
@@ -752,14 +756,12 @@ def eliminar_producto(producto_id):
         
         print(f"🗑️ Eliminando producto: {producto[1]} (ID: {producto_id})")
         
-        # Verificar si está en la tienda
         cursor.execute('SELECT id FROM productos_tienda WHERE producto_id = %s', (producto_id,))
         tienda = cursor.fetchone()
         if tienda:
             print(f"⚠️ Eliminando referencia en productos_tienda para producto {producto_id}")
             cursor.execute('DELETE FROM productos_tienda WHERE producto_id = %s', (producto_id,))
         
-        # Verificar si tiene ventas asociadas
         cursor.execute('SELECT id FROM ventas WHERE producto_id = %s LIMIT 1', (producto_id,))
         venta = cursor.fetchone()
         if venta:
@@ -767,7 +769,6 @@ def eliminar_producto(producto_id):
             conn.close()
             return False
         
-        # Eliminar el producto
         cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
         
         if cursor.rowcount > 0:
@@ -793,7 +794,6 @@ def eliminar_producto(producto_id):
         return False
 
 def actualizar_stock_producto(producto_id, cantidad):
-    """Actualiza el stock de un producto (resta la cantidad vendida)"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -805,33 +805,24 @@ def actualizar_stock_producto(producto_id, cantidad):
     return filas > 0
 
 def obtener_estadisticas_productos(negocio_id):
-    """
-    Obtiene estadísticas de productos para un negocio
-    """
     conn = get_db()
     cursor = conn.cursor()
     
-    # Total de productos
     cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s', (negocio_id,))
     total = cursor.fetchone()[0]
     
-    # Productos con stock bajo
     cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock > 0 AND stock <= stock_minimo', (negocio_id,))
     stock_bajo = cursor.fetchone()[0]
     
-    # Productos agotados
     cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock = 0', (negocio_id,))
     agotados = cursor.fetchone()[0]
     
-    # Valor total del inventario (precio de venta)
     cursor.execute('SELECT COALESCE(SUM(precio * stock), 0) FROM productos WHERE negocio_id = %s', (negocio_id,))
     valor_total = cursor.fetchone()[0]
     
-    # Costo total del inventario
     cursor.execute('SELECT COALESCE(SUM(costo * stock), 0) FROM productos WHERE negocio_id = %s', (negocio_id,))
     costo_total = cursor.fetchone()[0]
     
-    # Ganancia potencial
     ganancia_potencial = valor_total - costo_total
     
     conn.close()
@@ -1078,7 +1069,6 @@ def actualizar_estado_venta(venta_id, negocio_id, estado):
     return filas > 0
 
 def eliminar_venta_con_reintegro(venta_id, negocio_id):
-    """Elimina una venta y reintegra el stock del producto"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1318,7 +1308,6 @@ def eliminar_contrato(contrato_id):
 # ============================================
 
 def registrar_asistencia(trabajador_id, negocio_id, fecha, presente=1, horas=8):
-    """Registra la asistencia de un trabajador"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1339,7 +1328,6 @@ def registrar_asistencia(trabajador_id, negocio_id, fecha, presente=1, horas=8):
         return False
 
 def obtener_asistencia_mes(trabajador_id, mes, ano):
-    """Obtiene la asistencia de un trabajador en un mes específico"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -1354,7 +1342,6 @@ def obtener_asistencia_mes(trabajador_id, mes, ano):
     return asistencias
 
 def obtener_dias_trabajados_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días trabajados en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1369,7 +1356,6 @@ def obtener_dias_trabajados_mes(trabajador_id, mes, ano):
     return dias
 
 def obtener_dias_ausencia_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días de ausencia en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1384,7 +1370,6 @@ def obtener_dias_ausencia_mes(trabajador_id, mes, ano):
     return dias
 
 def obtener_dias_extras_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días extras trabajados en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1399,7 +1384,6 @@ def obtener_dias_extras_mes(trabajador_id, mes, ano):
     return dias
 
 def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
-    """Registra una comisión generada por una venta"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1417,7 +1401,6 @@ def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
         return False
 
 def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
-    """Obtiene las comisiones de un trabajador en un mes específico"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -1435,7 +1418,6 @@ def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
     return comisiones
 
 def obtener_total_comisiones_mes(trabajador_id, mes, ano):
-    """Obtiene el total de comisiones de un trabajador en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -1449,7 +1431,6 @@ def obtener_total_comisiones_mes(trabajador_id, mes, ano):
     return total
 
 def obtener_comisiones_negocio_mes(negocio_id, mes, ano):
-    """Obtiene todas las comisiones de un negocio en un mes"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -1468,7 +1449,6 @@ def obtener_comisiones_negocio_mes(negocio_id, mes, ano):
     return comisiones
 
 def calcular_nomina(negocio_id, trabajador_id, mes, ano):
-    """Calcula la nómina de un trabajador para un mes específico"""
     _, dias_mes = monthrange(ano, mes)
     
     conn = get_db()
@@ -1537,7 +1517,6 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
     }
 
 def obtener_nomina_mes(negocio_id, mes, ano):
-    """Obtiene la nómina de todos los trabajadores para un mes específico"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -1552,7 +1531,6 @@ def obtener_nomina_mes(negocio_id, mes, ano):
     return nomina
 
 def obtener_nomina_trabajador(trabajador_id, mes, ano):
-    """Obtiene la nómina de un trabajador específico para un mes"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -1566,7 +1544,6 @@ def obtener_nomina_trabajador(trabajador_id, mes, ano):
     return nomina
 
 def obtener_resumen_nomina(negocio_id, mes, ano):
-    """Obtiene un resumen de la nómina de un negocio para un mes"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
