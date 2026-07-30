@@ -85,6 +85,19 @@
         .header-right .logout-btn:hover {
             background: rgba(255, 255, 255, 0.2);
         }
+        .header-right .perfil-btn {
+            color: #fff;
+            text-decoration: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.15);
+            font-size: 13px;
+            transition: background 0.3s;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .header-right .perfil-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
 
         .main-container {
             display: flex;
@@ -249,7 +262,7 @@
                 <span>{{ usuario.nombre or usuario.username }}</span>
                 <span class="role-badge">{{ usuario.rol }}</span>
             </div>
-            <a href="/perfil" class="logout-btn">👤 Perfil</a>
+            <a href="/perfil" class="perfil-btn">👤 Perfil</a>
             <a href="/logout" class="logout-btn">Cerrar sesión</a>
         </div>
     </header>
@@ -297,18 +310,21 @@
     </div>
 
     <script>
-        let usuarioId = {{ usuario.id }};
-        let modulos = [];
-        let moduloCargado = false;
-        let intervaloEstadisticas = null;
+        // ============================================
+        // VARIABLES
+        // ============================================
+        var usuarioId = {{ usuario.id }};
+        var modulos = [];
+        var moduloCargado = false;
+        var intervaloEstadisticas = null;
 
         // ============================================
         // OBTENER FECHA ACTUAL
         // ============================================
 
         function obtenerFechaHoy() {
-            const hoy = new Date();
-            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            var hoy = new Date();
+            var opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             return hoy.toLocaleDateString('es-ES', opciones);
         }
 
@@ -318,34 +334,32 @@
 
         async function cargarDatos() {
             try {
-                const modRes = await fetch('/api/modulos');
-                const modulosData = await modRes.json();
+                var modRes = await fetch('/api/modulos');
+                var modulosData = await modRes.json();
                 modulos = Array.isArray(modulosData) ? modulosData : (modulosData.modulos || Object.values(modulosData));
 
-                const permRes = await fetch(`/api/usuario/${usuarioId}/permisos`);
-                const permisos = await permRes.json();
+                var permRes = await fetch('/api/usuario/' + usuarioId + '/permisos');
+                var permisos = await permRes.json();
 
-                const modulosPermitidos = modulos.filter(mod => {
-                    const permiso = permisos.find(p => p.id === mod.id);
+                var modulosPermitidos = modulos.filter(function(mod) {
+                    var permiso = permisos.find(function(p) { return p.id === mod.id; });
                     return permiso && permiso.permiso_activo === 1;
                 });
 
                 if (modulosPermitidos.length > 0) {
-                    // Buscar el módulo de ventas primero
-                    const ventasModulo = modulosPermitidos.find(m => m.nombre === 'ventas');
-                    const moduloACargar = ventasModulo || modulosPermitidos[0];
+                    var ventasModulo = modulosPermitidos.find(function(m) { return m.nombre === 'ventas'; });
+                    var moduloACargar = ventasModulo || modulosPermitidos[0];
                     cargarModulo(moduloACargar.nombre);
                 } else {
-                    document.getElementById('loader').innerHTML = `
-                        <div style="text-align:center;color:#666680;">
-                            <div style="font-size:48px;margin-bottom:12px;">🔒</div>
-                            <div style="font-size:16px;">No tienes módulos asignados</div>
-                            <div style="font-size:13px;margin-top:4px;">Contacta con tu administrador</div>
-                        </div>
-                    `;
+                    document.getElementById('loader').innerHTML = 
+                        '<div style="text-align:center;color:#666680;">' +
+                            '<div style="font-size:48px;margin-bottom:12px;">🔒</div>' +
+                            '<div style="font-size:16px;">No tienes módulos asignados</div>' +
+                            '<div style="font-size:13px;margin-top:4px;">Contacta con tu administrador</div>' +
+                        '</div>';
                 }
 
-                document.getElementById('fechaHoy').innerHTML = `📅 ${obtenerFechaHoy()}`;
+                document.getElementById('fechaHoy').innerHTML = '📅 ' + obtenerFechaHoy();
                 
                 cargarEstadisticas();
                 
@@ -354,12 +368,11 @@
 
             } catch (error) {
                 console.error('Error:', error);
-                document.getElementById('loader').innerHTML = `
-                    <div style="text-align:center;color:#ff6b6b;">
-                        <div style="font-size:48px;margin-bottom:12px;">❌</div>
-                        <div style="font-size:16px;">Error al cargar datos</div>
-                    </div>
-                `;
+                document.getElementById('loader').innerHTML = 
+                    '<div style="text-align:center;color:#ff6b6b;">' +
+                        '<div style="font-size:48px;margin-bottom:12px;">❌</div>' +
+                        '<div style="font-size:16px;">Error al cargar datos</div>' +
+                    '</div>';
             }
         }
 
@@ -368,13 +381,13 @@
         // ============================================
 
         function cargarModulo(nombre) {
-            const frame = document.getElementById('moduleFrame');
-            const loader = document.getElementById('loader');
+            var frame = document.getElementById('moduleFrame');
+            var loader = document.getElementById('loader');
             
             loader.style.display = 'flex';
             frame.style.display = 'none';
             
-            frame.src = `/negocio/${nombre}?trabajador_id=${usuarioId}`;
+            frame.src = '/negocio/' + nombre + '?trabajador_id=' + usuarioId;
             
             frame.onload = function() {
                 loader.style.display = 'none';
@@ -389,15 +402,15 @@
 
         async function cargarEstadisticas() {
             try {
-                const response = await fetch('/api/trabajador/estadisticas');
+                var response = await fetch('/api/trabajador/estadisticas');
                 if (!response.ok) {
                     throw new Error('Error al cargar estadísticas');
                 }
-                const stats = await response.json();
+                var stats = await response.json();
                 
                 document.getElementById('statVentasHoy').textContent = stats.ventas || 0;
                 document.getElementById('statClientesHoy').textContent = stats.clientes || 0;
-                document.getElementById('statIngresosHoy').textContent = `$${parseFloat(stats.ingresos || 0).toFixed(2)}`;
+                document.getElementById('statIngresosHoy').textContent = '$' + parseFloat(stats.ingresos || 0).toFixed(2);
                 document.getElementById('statServiciosHoy').textContent = stats.servicios || 0;
                 
             } catch (error) {
