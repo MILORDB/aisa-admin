@@ -9,6 +9,7 @@ from psycopg2.extras import RealDictCursor
 import traceback
 import time
 from datetime import datetime, timedelta
+import io
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -55,7 +56,10 @@ try:
         crear_contrato, obtener_contratos, obtener_todos_contratos, 
         actualizar_contrato, actualizar_estado_contrato, eliminar_contrato,
         obtener_ultimo_numero_contrato, obtener_datos_negocio,
-        obtener_estadisticas_productos
+        obtener_estadisticas_productos,
+        obtener_nomina_mes, calcular_nomina, obtener_nomina_trabajador,
+        obtener_comisiones_trabajador_mes, obtener_comisiones_negocio_mes,
+        registrar_comision, obtener_resumen_nomina
     )
     from web_admin.auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
     from web_admin.storage import get_storage_manager
@@ -230,7 +234,7 @@ def fix_ventas():
         """, 500
 
 # ============================================
-# ENDPOINT PARA REPARAR PRODUCTOS (AGREGAR COLUMNA COSTO Y COMISION)
+# ENDPOINT PARA REPARAR PRODUCTOS (AGREGAR COLUMNAS COSTO Y COMISION)
 # ============================================
 
 @app.route('/fix-productos', methods=['GET'])
@@ -264,7 +268,7 @@ def fix_productos():
         
         mensajes = []
         
-        # 1. Verificar y agregar columna 'costo'
+        # Verificar y agregar columna 'costo'
         cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
@@ -287,7 +291,7 @@ def fix_productos():
             mensajes.append("✅ La columna 'costo' ya existe")
             print("✅ La columna 'costo' ya existe")
         
-        # 2. Verificar y agregar columna 'comision'
+        # Verificar y agregar columna 'comision'
         cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
@@ -310,7 +314,7 @@ def fix_productos():
             mensajes.append("✅ La columna 'comision' ya existe")
             print("✅ La columna 'comision' ya existe")
         
-        # 3. Actualizar NULL a 0 en ambas columnas
+        # Actualizar NULL a 0
         cursor.execute("UPDATE productos SET costo = 0 WHERE costo IS NULL")
         filas_costo = cursor.rowcount
         
@@ -324,7 +328,7 @@ def fix_productos():
         if filas_comision > 0:
             mensajes.append(f"✅ {filas_comision} productos actualizados con comisión = 0")
         
-        # 4. Verificar columnas actuales
+        # Verificar columnas actuales
         cursor.execute("""
             SELECT column_name, data_type
             FROM information_schema.columns 
@@ -615,7 +619,6 @@ def api_obtener_perfil_usuario():
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 401
     
-    # Obtener datos de negocio si existen
     datos_negocio = {}
     if usuario.get('datos_negocio'):
         try:
@@ -639,7 +642,8 @@ def api_obtener_perfil_usuario():
             'direccion': datos_negocio.get('direccion', ''),
             'nombre_negocio': datos_negocio.get('nombre_negocio', ''),
             'ruc': datos_negocio.get('ruc', ''),
-            'descripcion': datos_negocio.get('descripcion', '')
+            'descripcion': datos_negocio.get('descripcion', ''),
+            'salario': datos_negocio.get('salario', 0)
         }
     })
 
@@ -655,7 +659,6 @@ def api_actualizar_perfil_usuario():
     
     data = request.get_json()
     
-    # Campos que se pueden actualizar
     nombre = data.get('nombre')
     email = data.get('email')
     telefono = data.get('telefono')
@@ -665,8 +668,8 @@ def api_actualizar_perfil_usuario():
     nombre_negocio = data.get('nombre_negocio')
     ruc = data.get('ruc')
     descripcion = data.get('descripcion')
+    salario = data.get('salario', 0)
     
-    # Validaciones básicas
     if not nombre:
         return jsonify({'error': 'El nombre es obligatorio'}), 400
     
@@ -676,7 +679,6 @@ def api_actualizar_perfil_usuario():
     if not provincia or not municipio:
         return jsonify({'error': 'Provincia y municipio son obligatorios'}), 400
     
-    # Obtener datos de negocio actuales
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
@@ -689,15 +691,14 @@ def api_actualizar_perfil_usuario():
         except:
             datos_negocio = {}
     
-    # Actualizar datos
     datos_negocio.update({
         'telefono': telefono,
         'provincia': provincia,
         'municipio': municipio,
-        'direccion': direccion or ''
+        'direccion': direccion or '',
+        'salario': salario
     })
     
-    # Si es negocio, actualizar campos de negocio
     if usuario['tipo'] == 'negocio':
         datos_negocio.update({
             'nombre_negocio': nombre_negocio or datos_negocio.get('nombre_negocio', ''),
@@ -705,7 +706,6 @@ def api_actualizar_perfil_usuario():
             'descripcion': descripcion or datos_negocio.get('descripcion', '')
         })
     
-    # Actualizar en la base de datos
     cursor.execute('''
         UPDATE usuarios 
         SET nombre = %s, email = %s, datos_negocio = %s
@@ -936,6 +936,13 @@ def negocio_contratos():
     usuario = obtener_usuario_sesion(token)
     return render_template('negocio/contratos.html', usuario=usuario, version=int(time.time()))
 
+@app.route('/negocio/nomina')
+@login_required
+def negocio_nomina():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('negocio/nomina.html', usuario=usuario, version=int(time.time()))
+
 # ============================================
 # API - USUARIOS
 # ============================================
@@ -1093,7 +1100,6 @@ def api_negocios_cercanos():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
 # ============================================
 # API - TODOS LOS PRODUCTOS (para admin)
 # ============================================
@@ -1394,7 +1400,7 @@ def api_actualizar_trabajador(trabajador_id):
     })
 
 # ============================================
-# API - NEGOCIO - ELIMINAR TRABAJADOR (CORREGIDO)
+# API - NEGOCIO - ELIMINAR TRABAJADOR
 # ============================================
 
 @app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['DELETE'])
@@ -1411,7 +1417,6 @@ def api_eliminar_trabajador(trabajador_id):
         conn = get_db()
         cursor = conn.cursor()
         
-        # 1. Verificar que el trabajador existe y pertenece al negocio
         cursor.execute('''
             SELECT u.id, u.username, u.nombre, u.datos_negocio
             FROM trabajadores_negocio tn
@@ -1425,25 +1430,15 @@ def api_eliminar_trabajador(trabajador_id):
             conn.close()
             return jsonify({'error': 'Trabajador no encontrado o no pertenece a tu negocio'}), 404
         
-        # 2. Obtener nombre para el log
         nombre_trabajador = trabajador[2] or trabajador[1] or 'Desconocido'
         
-        # 3. Eliminar primero las sesiones del trabajador (para evitar conflictos de foreign key)
         cursor.execute('DELETE FROM sesiones WHERE usuario_id = %s', (trabajador_id,))
-        
-        # 4. Eliminar permisos del trabajador
         cursor.execute('DELETE FROM permisos_usuario WHERE usuario_id = %s', (trabajador_id,))
-        
-        # 5. Eliminar la relación en trabajadores_negocio
         cursor.execute('''
             DELETE FROM trabajadores_negocio 
             WHERE negocio_id = %s AND trabajador_id = %s
         ''', (usuario['id'], trabajador_id))
-        
-        # 6. Eliminar logs del trabajador
         cursor.execute('DELETE FROM logs WHERE usuario_id = %s', (trabajador_id,))
-        
-        # 7. Finalmente eliminar el usuario
         cursor.execute('DELETE FROM usuarios WHERE id = %s', (trabajador_id,))
         
         conn.commit()
@@ -1870,7 +1865,6 @@ def api_tienda_public():
         conn = get_db()
         cursor = conn.cursor()
         
-        # Obtener ubicación del usuario si está autenticado
         token = request.cookies.get('token')
         usuario = None
         provincia_filtro = None
@@ -1879,12 +1873,10 @@ def api_tienda_public():
         if token:
             usuario = obtener_usuario_sesion(token)
             if usuario:
-                # Obtener provincia y municipio del usuario
                 datos_negocio = obtener_datos_negocio(usuario['id'])
                 provincia_filtro = datos_negocio.get('provincia')
                 municipio_filtro = datos_negocio.get('municipio')
         
-        # Construir la consulta SQL con filtros
         query = '''
             SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
                    u.id as negocio_id, u.nombre as negocio_nombre, u.username as negocio_username,
@@ -1897,7 +1889,6 @@ def api_tienda_public():
         
         params = []
         
-        # Si el usuario tiene ubicación, filtrar por provincia y municipio
         if provincia_filtro and municipio_filtro:
             query += '''
                 AND (
@@ -1908,7 +1899,6 @@ def api_tienda_public():
             '''
             params.extend([f'%"provincia": "{provincia_filtro}"%', f'%"municipio": "{municipio_filtro}"%'])
         elif provincia_filtro:
-            # Si solo tiene provincia, filtrar por provincia
             query += '''
                 AND (
                     u.datos_negocio IS NOT NULL 
@@ -1925,9 +1915,8 @@ def api_tienda_public():
         
         resultado = []
         for row in rows:
-            # Parsear datos del negocio para obtener ubicación
             datos_negocio = {}
-            if row[8]:  # datos_negocio
+            if row[8]:
                 try:
                     datos_negocio = json.loads(row[8]) if isinstance(row[8], str) else row[8]
                 except:
@@ -2070,7 +2059,7 @@ def api_actualizar_estado_venta(venta_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - ELIMINAR VENTA (CORREGIDO)
+# API - ELIMINAR VENTA
 # ============================================
 
 @app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
@@ -2084,7 +2073,6 @@ def api_eliminar_venta(venta_id):
         return jsonify({'error': 'No autorizado'}), 403
     
     try:
-        # Verificar si es una oferta (no afecta stock)
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT estado, producto_id FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
@@ -2094,7 +2082,6 @@ def api_eliminar_venta(venta_id):
         if not venta:
             return jsonify({'error': 'Venta no encontrada'}), 404
         
-        # Si es oferta, eliminar sin reintegro
         if venta[0] == 'oferta':
             conn = get_db()
             cursor = conn.cursor()
@@ -2107,7 +2094,6 @@ def api_eliminar_venta(venta_id):
                 'message': 'Oferta eliminada correctamente'
             })
         
-        # Eliminar venta con reintegro de stock
         exito, resultado = eliminar_venta_con_reintegro(venta_id, usuario['id'])
         
         if not exito:
@@ -2135,7 +2121,7 @@ def api_eliminar_venta(venta_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - FACTURAS Y OFERTAS (VERSIÓN MEJORADA)
+# API - FACTURAS Y OFERTAS
 # ============================================
 
 @app.route('/api/venta/<int:venta_id>/factura', methods=['GET'])
@@ -2151,7 +2137,6 @@ def api_generar_factura(venta_id):
     es_oferta = request.args.get('oferta', 'false').lower() == 'true'
     
     try:
-        # Obtener datos de la venta
         conn = get_db()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute('''
@@ -2166,21 +2151,13 @@ def api_generar_factura(venta_id):
         if not venta:
             return jsonify({'error': 'Venta no encontrada'}), 404
         
-        # ============================================
-        # OBTENER TODOS LOS ITEMS DE LA VENTA
-        # ============================================
         items = []
-        
-        # Verificar si la venta tiene múltiples productos separados por coma
         producto_str = venta['producto']
         
-        # Intentar separar por comas si hay múltiples productos
         if ',' in producto_str:
             productos_separados = [p.strip() for p in producto_str.split(',')]
-            # Si hay más de un producto, crear items separados
             if len(productos_separados) > 1:
                 for nombre in productos_separados:
-                    # Buscar precio del producto en la base de datos
                     conn = get_db()
                     cursor2 = conn.cursor()
                     cursor2.execute('SELECT precio FROM productos WHERE nombre = %s AND negocio_id = %s', 
@@ -2197,7 +2174,6 @@ def api_generar_factura(venta_id):
                         'subtotal': precio
                     })
             else:
-                # Un solo producto
                 items.append({
                     'nombre': producto_str,
                     'cantidad': venta.get('cantidad', 1),
@@ -2205,8 +2181,6 @@ def api_generar_factura(venta_id):
                     'subtotal': venta.get('total', 0)
                 })
         else:
-            # Producto único (sin comas)
-            # Verificar si el producto tiene ID
             if venta.get('producto_id'):
                 conn = get_db()
                 cursor2 = conn.cursor()
@@ -2236,7 +2210,6 @@ def api_generar_factura(venta_id):
                     'subtotal': venta.get('total', 0)
                 })
         
-        # Obtener datos del negocio
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
@@ -2248,7 +2221,6 @@ def api_generar_factura(venta_id):
         negocio_telefono = datos_negocio.get('telefono', '')
         negocio_direccion = datos_negocio.get('direccion', '')
         
-        # Obtener quien atendió (trabajador o el mismo negocio)
         atendido_por = venta.get('atendido_por_nombre') or usuario['nombre'] or usuario['username'] or 'Admin'
         
         venta_data = {
@@ -2262,7 +2234,6 @@ def api_generar_factura(venta_id):
             'atendido_por': atendido_por
         }
         
-        # Generar PDF
         generador = GeneradorReportes(
             negocio_id=usuario['id'],
             negocio_nombre=negocio_nombre,
@@ -2291,7 +2262,6 @@ def api_generar_factura(venta_id):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
 # ============================================
 # API - CONTRATOS
 # ============================================
@@ -2414,7 +2384,7 @@ def api_eliminar_contrato(contrato_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - OBTENER EMPRESAS CON CONTRATOS ACTIVOS (NUEVO)
+# API - OBTENER EMPRESAS CON CONTRATOS ACTIVOS
 # ============================================
 
 @app.route('/api/contratos/empresas', methods=['GET'])
@@ -2850,6 +2820,241 @@ def api_resumen_productos():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
+# API - NÓMINA
+# ============================================
+
+@app.route('/api/nomina', methods=['GET'])
+@login_required
+def api_obtener_nomina():
+    """Obtiene la nómina de un mes específico"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    mes = request.args.get('mes', type=int)
+    ano = request.args.get('ano', type=int)
+    
+    if not mes or not ano:
+        return jsonify({'error': 'Mes y año son requeridos'}), 400
+    
+    nominas = obtener_nomina_mes(usuario['id'], mes, ano)
+    
+    return jsonify({
+        'success': True,
+        'nominas': nominas
+    })
+
+@app.route('/api/nomina/calcular', methods=['POST'])
+@login_required
+def api_calcular_nomina():
+    """Calcula la nómina para todos los trabajadores en un mes"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    data = request.get_json()
+    mes = data.get('mes')
+    ano = data.get('ano')
+    
+    if not mes or not ano:
+        return jsonify({'error': 'Mes y año son requeridos'}), 400
+    
+    trabajadores = obtener_trabajadores_por_empresa(usuario['id'])
+    
+    contador = 0
+    for t in trabajadores:
+        resultado = calcular_nomina(usuario['id'], t['id'], mes, ano)
+        if resultado:
+            contador += 1
+    
+    return jsonify({
+        'success': True,
+        'trabajadores': contador,
+        'message': f'Nómina calculada para {contador} trabajadores'
+    })
+
+@app.route('/api/nomina/detalle', methods=['GET'])
+@login_required
+def api_nomina_detalle():
+    """Obtiene el detalle de nómina de un trabajador"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    trabajador_id = request.args.get('trabajador_id', type=int)
+    mes = request.args.get('mes', type=int)
+    ano = request.args.get('ano', type=int)
+    
+    if not trabajador_id or not mes or not ano:
+        return jsonify({'error': 'Trabajador, mes y año son requeridos'}), 400
+    
+    nomina = obtener_nomina_trabajador(trabajador_id, mes, ano)
+    
+    if not nomina:
+        return jsonify({'error': 'No se encontró nómina para este trabajador'}), 404
+    
+    comisiones = obtener_comisiones_trabajador_mes(trabajador_id, mes, ano)
+    
+    from calendar import monthrange
+    _, dias_mes = monthrange(ano, mes)
+    
+    trabajador = obtener_usuario_por_id(trabajador_id)
+    datos = json.loads(trabajador['datos_negocio']) if trabajador['datos_negocio'] else {}
+    salario_base = datos.get('salario', 0)
+    
+    salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
+    
+    return jsonify({
+        'success': True,
+        'detalle': {
+            'id': nomina['id'],
+            'trabajador_id': trabajador_id,
+            'nombre': trabajador['nombre'],
+            'mes': mes,
+            'ano': ano,
+            'dias_mes': dias_mes,
+            'salario_base': salario_base,
+            'salario_diario': salario_diario,
+            'dias_trabajados': nomina['dias_trabajados'],
+            'dias_ausencia': nomina['dias_ausencia'] or 0,
+            'salario_devengado': nomina['salario_devengado'],
+            'comisiones': nomina['comisiones'] or 0,
+            'total': nomina['total'],
+            'comisiones_list': comisiones
+        }
+    })
+
+@app.route('/api/nomina/reporte', methods=['GET'])
+@login_required
+def api_nomina_reporte():
+    """Genera un reporte PDF de nómina"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    mes = request.args.get('mes', type=int)
+    ano = request.args.get('ano', type=int)
+    
+    if not mes or not ano:
+        return jsonify({'error': 'Mes y año son requeridos'}), 400
+    
+    nominas = obtener_nomina_mes(usuario['id'], mes, ano)
+    
+    if not nominas:
+        return jsonify({'error': 'No hay datos de nómina para este mes'}), 404
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
+    negocio = cursor.fetchone()
+    conn.close()
+    
+    negocio_nombre = negocio[0] or 'Mi Negocio'
+    datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
+    negocio_telefono = datos_negocio.get('telefono', '')
+    negocio_direccion = datos_negocio.get('direccion', '')
+    
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
+    styles = getSampleStyleSheet()
+    elementos = []
+    
+    estilo_titulo = ParagraphStyle('Titulo', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#6c3ce0'), alignment=TA_CENTER)
+    elementos.append(Paragraph(f"📊 REPORTE DE NÓMINA", estilo_titulo))
+    elementos.append(Paragraph(f"{negocio_nombre}", styles['Heading2']))
+    
+    meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    nombre_mes = meses[mes - 1] if 1 <= mes <= 12 else str(mes)
+    elementos.append(Paragraph(f"{nombre_mes} de {ano}", styles['Normal']))
+    elementos.append(Spacer(1, 10))
+    
+    tabla_datos = []
+    headers = ['Trabajador', 'Salario Base', 'Días Trabajados', 'Ausencias', 'Salario Devengado', 'Comisiones', 'Total']
+    tabla_datos.append(headers)
+    
+    total_general = 0
+    total_comisiones = 0
+    
+    for n in nominas:
+        total_general += n['total']
+        total_comisiones += n['comisiones'] or 0
+        tabla_datos.append([
+            n['nombre'],
+            f"${n['salario_base']:.2f}",
+            str(n['dias_trabajados']),
+            str(n['dias_ausencia'] or 0),
+            f"${n['salario_devengado']:.2f}",
+            f"${(n['comisiones'] or 0):.2f}",
+            f"${n['total']:.2f}"
+        ])
+    
+    tabla_datos.append([
+        'TOTAL',
+        '',
+        '',
+        '',
+        '',
+        f"${total_comisiones:.2f}",
+        f"${total_general:.2f}"
+    ])
+    
+    tabla = Table(tabla_datos, colWidths=[120, 90, 80, 80, 100, 100, 100])
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('ALIGN', (4, 1), (6, -1), 'RIGHT'),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e8e8e8')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+    ]))
+    
+    elementos.append(tabla)
+    elementos.append(Spacer(1, 10))
+    
+    estilo_resumen = ParagraphStyle('Resumen', parent=styles['Normal'], fontSize=10, alignment=TA_RIGHT)
+    elementos.append(Paragraph(f"Total de trabajadores: {len(nominas)}", estilo_resumen))
+    elementos.append(Paragraph(f"Total de comisiones: ${total_comisiones:.2f}", estilo_resumen))
+    elementos.append(Paragraph(f"Total de nómina: ${total_general:.2f}", estilo_resumen))
+    
+    estilo_pie = ParagraphStyle('Pie', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#999999'), alignment=TA_CENTER)
+    elementos.append(Spacer(1, 20))
+    elementos.append(Paragraph(f"Reporte generado por AIsa - {datetime.now().strftime('%d/%m/%Y %H:%M')}", estilo_pie))
+    
+    doc.build(elementos)
+    
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    
+    response = make_response(pdf_bytes)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=nomina_{mes}_{ano}.pdf'
+    
+    return response
+
+# ============================================
 # API - ESTADÍSTICAS TRABAJADOR
 # ============================================
 
@@ -2948,4 +3153,4 @@ if __name__ == '__main__':
     print("👤 admin / admin123")
     print("=" * 60)
     
-    app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(debug=False, host='0.0.0.0', port=port) 
