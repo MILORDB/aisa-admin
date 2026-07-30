@@ -81,6 +81,7 @@
         .tabla .badge.medio { background: #443322; color: #ffbb33; }
         .tabla .badge.alto { background: #224422; color: #6bff6b; }
         .tabla .badge.agotado { background: #442222; color: #ff6b6b; font-weight: bold; }
+        .tabla .badge.ganancia { background: #1a237e; color: #6bff6b; }
         .form-row {
             display: flex;
             gap: 8px;
@@ -102,6 +103,28 @@
             outline: none;
         }
         .form-row select option { background: #1a1a2e; }
+        .form-row .costo-field {
+            border-left: 2px solid #ff9800;
+            padding-left: 8px;
+        }
+        .form-row .costo-field label {
+            font-size: 10px;
+            color: #ff9800;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .form-row .ganancia-preview {
+            font-size: 10px;
+            color: #6bff6b;
+            padding: 4px 8px;
+            background: rgba(76,175,80,0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(76,175,80,0.2);
+            display: none;
+        }
+        .form-row .ganancia-preview.show {
+            display: block;
+        }
         .search-bar {
             display: flex;
             gap: 8px;
@@ -160,8 +183,16 @@
             margin: 0 -4px;
         }
         .table-wrapper table {
-            min-width: 600px;
+            min-width: 700px;
         }
+        .ganancia-indicador {
+            font-size: 9px;
+            padding: 1px 6px;
+            border-radius: 8px;
+        }
+        .ganancia-indicador.alta { background: rgba(76,175,80,0.15); color: #6bff6b; }
+        .ganancia-indicador.media { background: rgba(255,152,0,0.15); color: #ffbb33; }
+        .ganancia-indicador.baja { background: rgba(244,67,54,0.15); color: #ff6b6b; }
         @media (max-width: 600px) {
             body { padding: 8px; }
             .card { padding: 10px; }
@@ -210,7 +241,15 @@
             </div>
             <div class="stat-item">
                 <span class="number" id="valorInventario">$0</span>
-                <span class="label">💰 Valor</span>
+                <span class="label">💰 Valor venta</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="costoInventario">$0</span>
+                <span class="label">💸 Costo total</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="gananciaPotencial">$0</span>
+                <span class="label">📈 Ganancia potencial</span>
             </div>
         </div>
     </div>
@@ -227,9 +266,6 @@
                 <input type="text" id="prodNombre" placeholder="Nombre">
                 <select id="prodCategoria">
                     <option value="">-- Seleccionar categoría --</option>
-                    <!-- ======================================== -->
-                    <!-- CATEGORÍAS COMPLETAS -->
-                    <!-- ======================================== -->
                     <optgroup label="👗 Moda y Ropa">
                         <option value="ropa_mujer">Ropa de Mujer</option>
                         <option value="ropa_hombre">Ropa de Hombre</option>
@@ -290,9 +326,18 @@
                 </select>
             </div>
             <div class="form-row">
-                <input type="number" id="prodPrecio" placeholder="Precio" step="0.01">
+                <input type="number" id="prodPrecio" placeholder="Precio venta" step="0.01">
+                <div class="costo-field" style="flex:1;">
+                    <label>💰 Costo</label>
+                    <input type="number" id="prodCosto" placeholder="Costo del producto" step="0.01" oninput="calcularGanancia()">
+                </div>
                 <input type="number" id="prodStock" placeholder="Stock">
                 <input type="number" id="prodMinimo" placeholder="Mínimo">
+            </div>
+            <div class="form-row">
+                <div class="ganancia-preview" id="gananciaPreview">
+                    <span id="gananciaTexto">📈 Ganancia: $0.00 (0%)</span>
+                </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <button class="btn btn-success" onclick="guardarProducto()" id="btnGuardar">💾 Guardar</button>
@@ -366,6 +411,37 @@
             }, 4000);
         }
 
+        // ============================================
+        // CALCULAR GANANCIA
+        // ============================================
+        function calcularGanancia() {
+            const precio = parseFloat(document.getElementById('prodPrecio').value) || 0;
+            const costo = parseFloat(document.getElementById('prodCosto').value) || 0;
+            const preview = document.getElementById('gananciaPreview');
+            const texto = document.getElementById('gananciaTexto');
+            
+            if (costo > 0 && precio > 0) {
+                const ganancia = precio - costo;
+                const porcentaje = (ganancia / costo) * 100;
+                preview.classList.add('show');
+                let emoji = '📈';
+                let color = '#6bff6b';
+                if (porcentaje < 10) { emoji = '📉'; color = '#ff6b6b'; }
+                else if (porcentaje < 30) { emoji = '📊'; color = '#ffbb33'; }
+                texto.innerHTML = `${emoji} Ganancia: $${ganancia.toFixed(2)} (${porcentaje.toFixed(1)}%)`;
+                texto.style.color = color;
+            } else if (costo > 0 && precio === 0) {
+                preview.classList.add('show');
+                texto.innerHTML = '⚠️ Define el precio de venta';
+                texto.style.color = '#ffbb33';
+            } else {
+                preview.classList.remove('show');
+            }
+        }
+
+        // ============================================
+        // CARGAR PRODUCTOS
+        // ============================================
         async function cargarProductos() {
             const container = document.getElementById('productosContainer');
             container.innerHTML = '<div class="loading">Cargando...</div>';
@@ -402,6 +478,8 @@
                     <th>Producto</th>
                     <th>Categoría</th>
                     <th>Precio</th>
+                    <th>Costo</th>
+                    <th>Ganancia</th>
                     <th>Stock</th>
                     <th>Estado</th>
                     <th>Acciones</th>
@@ -414,12 +492,26 @@
                 else { estado = '✅ Normal'; clase = 'alto'; }
                 
                 const categoriaDisplay = categoriasMap[p.categoria] || p.categoria || '-';
+                const costo = p.costo || 0;
+                const ganancia = p.precio - costo;
+                const porcentaje = costo > 0 ? (ganancia / costo) * 100 : 0;
+                
+                let gananciaClase = 'media';
+                let gananciaLabel = '📊';
+                if (porcentaje > 50) { gananciaClase = 'alta'; gananciaLabel = '📈'; }
+                else if (porcentaje < 10) { gananciaClase = 'baja'; gananciaLabel = '📉'; }
                 
                 html += `
                     <tr>
                         <td><strong>${p.nombre}</strong></td>
                         <td><span class="categoria-tag">${categoriaDisplay}</span></td>
                         <td>$${parseFloat(p.precio).toFixed(2)}</td>
+                        <td>$${costo.toFixed(2)}</td>
+                        <td>
+                            <span class="ganancia-indicador ${gananciaClase}">
+                                ${gananciaLabel} $${ganancia.toFixed(2)} (${porcentaje.toFixed(1)}%)
+                            </span>
+                        </td>
                         <td>${p.stock}</td>
                         <td><span class="badge ${clase}">${estado}</span></td>
                         <td>
@@ -441,11 +533,15 @@
             const bajo = productos.filter(p => p.stock > 0 && p.stock <= (p.stock_minimo || 3)).length;
             const agotados = productos.filter(p => p.stock === 0).length;
             const valor = productos.reduce((sum, p) => sum + (parseFloat(p.precio) * p.stock), 0);
+            const costoTotal = productos.reduce((sum, p) => sum + ((p.costo || 0) * p.stock), 0);
+            const gananciaPotencial = valor - costoTotal;
             
             document.getElementById('totalProductos').textContent = total;
             document.getElementById('productosBajo').textContent = bajo;
             document.getElementById('productosAgotados').textContent = agotados;
             document.getElementById('valorInventario').textContent = `$${valor.toFixed(2)}`;
+            document.getElementById('costoInventario').textContent = `$${costoTotal.toFixed(2)}`;
+            document.getElementById('gananciaPotencial').textContent = `$${gananciaPotencial.toFixed(2)}`;
         }
 
         function filtrarProductos() {
@@ -462,8 +558,10 @@
             document.getElementById('prodNombre').value = '';
             document.getElementById('prodCategoria').value = '';
             document.getElementById('prodPrecio').value = '';
+            document.getElementById('prodCosto').value = '';
             document.getElementById('prodStock').value = '';
             document.getElementById('prodMinimo').value = '';
+            document.getElementById('gananciaPreview').classList.remove('show');
         }
 
         function cancelarFormulario() {
@@ -479,6 +577,7 @@
             document.getElementById('prodNombre').value = p.nombre;
             document.getElementById('prodCategoria').value = p.categoria || '';
             document.getElementById('prodPrecio').value = p.precio;
+            document.getElementById('prodCosto').value = p.costo || 0;
             document.getElementById('prodStock').value = p.stock;
             document.getElementById('prodMinimo').value = p.stock_minimo || 3;
             
@@ -487,6 +586,8 @@
             document.getElementById('btnGuardar').textContent = '💾 Actualizar';
             document.getElementById('btnGuardar').className = 'btn btn-warning';
             
+            calcularGanancia();
+            
             document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
@@ -494,6 +595,7 @@
             const nombre = document.getElementById('prodNombre').value.trim();
             const categoria = document.getElementById('prodCategoria').value;
             const precio = parseFloat(document.getElementById('prodPrecio').value);
+            const costo = parseFloat(document.getElementById('prodCosto').value) || 0;
             const stock = parseInt(document.getElementById('prodStock').value) || 0;
             const stock_minimo = parseInt(document.getElementById('prodMinimo').value) || 3;
 
@@ -502,7 +604,7 @@
                 return;
             }
 
-            const data = { nombre, categoria, precio, stock, stock_minimo };
+            const data = { nombre, categoria, precio, costo, stock, stock_minimo };
 
             try {
                 let response, result;
@@ -562,6 +664,10 @@
                 mostrarMensaje('Error de conexión', 'error');
             }
         }
+
+        // Event listener para calcular ganancia en tiempo real
+        document.getElementById('prodPrecio').addEventListener('input', calcularGanancia);
+        document.getElementById('prodCosto').addEventListener('input', calcularGanancia);
 
         cargarProductos();
         setInterval(cargarProductos, 30000);
