@@ -5,6 +5,7 @@ from datetime import datetime
 import bcrypt
 import json
 import urllib.parse
+from calendar import monthrange
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
@@ -221,6 +222,64 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLAS PARA NÓMINA
+    # ============================================
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS asistencia (
+        id SERIAL PRIMARY KEY,
+        trabajador_id INTEGER NOT NULL,
+        negocio_id INTEGER NOT NULL,
+        fecha TEXT NOT NULL,
+        presente INTEGER DEFAULT 1,
+        horas_trabajadas REAL DEFAULT 8,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        UNIQUE(trabajador_id, fecha)
+    )
+    ''')
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS nomina (
+        id SERIAL PRIMARY KEY,
+        negocio_id INTEGER NOT NULL,
+        trabajador_id INTEGER NOT NULL,
+        mes INTEGER NOT NULL,
+        ano INTEGER NOT NULL,
+        salario_base REAL NOT NULL,
+        dias_trabajados INTEGER DEFAULT 0,
+        dias_ausencia INTEGER DEFAULT 0,
+        dias_extras INTEGER DEFAULT 0,
+        salario_devengado REAL DEFAULT 0,
+        comisiones REAL DEFAULT 0,
+        total REAL DEFAULT 0,
+        creado_en TEXT NOT NULL,
+        actualizado_en TEXT,
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        UNIQUE(negocio_id, trabajador_id, mes, ano)
+    )
+    ''')
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS comisiones_trabajador (
+        id SERIAL PRIMARY KEY,
+        negocio_id INTEGER NOT NULL,
+        trabajador_id INTEGER NOT NULL,
+        venta_id INTEGER NOT NULL,
+        producto_id INTEGER NOT NULL,
+        monto REAL NOT NULL,
+        fecha TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
+        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+    )
+    ''')
+    
     # Insertar módulos
     cursor.execute("SELECT COUNT(*) FROM modulos")
     if cursor.fetchone()[0] == 0:
@@ -238,6 +297,7 @@ def init_db():
             ('servicios', 'Gestión de servicios ofrecidos', 1, 'negocio'),
             ('ventas', 'Gestión de ventas y facturación', 1, 'negocio'),
             ('contratos', 'Gestión de contratos con clientes', 1, 'negocio'),
+            ('nomina', 'Gestión de nómina y salarios', 1, 'negocio'),
         ]
         cursor.executemany(
             'INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido) VALUES (%s, %s, %s, %s)',
@@ -305,6 +365,8 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
                 datos_negocio['direccion'] = ''
             if 'descripcion' not in datos_negocio:
                 datos_negocio['descripcion'] = ''
+            if 'salario' not in datos_negocio:
+                datos_negocio['salario'] = 0
             datos_negocio = json.dumps(datos_negocio, ensure_ascii=False)
         elif datos_negocio and isinstance(datos_negocio, str):
             pass
@@ -553,8 +615,7 @@ def obtener_logs(limit=50):
     logs = cursor.fetchall()
     conn.close()
     return logs
-
-# ============================================
+    # ============================================
 # FUNCIONES PARA PRODUCTOS (CON COSTO Y COMISION)
 # ============================================
 
@@ -1165,8 +1226,7 @@ def obtener_estadisticas_trabajador(trabajador_id):
         'servicios': servicios[0] if servicios else 0,
         'clientes': clientes[0] if clientes else 0
     }
-
-# ============================================
+    # ============================================
 # FUNCIONES PARA CONTRATOS
 # ============================================
 
@@ -1258,3 +1318,304 @@ def eliminar_contrato(contrato_id):
     cursor.execute('DELETE FROM contratos WHERE id = %s', (contrato_id,))
     conn.commit()
     conn.close()
+
+# ============================================
+# FUNCIONES PARA NÓMINA
+# ============================================
+
+def registrar_asistencia(trabajador_id, negocio_id, fecha, presente=1, horas=8):
+    """Registra la asistencia de un trabajador"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+        INSERT INTO asistencia (trabajador_id, negocio_id, fecha, presente, horas_trabajadas, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        ON CONFLICT (trabajador_id, fecha) DO UPDATE SET
+            presente = EXCLUDED.presente,
+            horas_trabajadas = EXCLUDED.horas_trabajadas
+        ''', (trabajador_id, negocio_id, fecha, presente, horas, datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error al registrar asistencia: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+def obtener_asistencia_mes(trabajador_id, mes, ano):
+    """Obtiene la asistencia de un trabajador en un mes específico"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT * FROM asistencia 
+        WHERE trabajador_id = %s 
+        AND EXTRACT(MONTH FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+        AND EXTRACT(YEAR FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+        ORDER BY fecha ASC
+    ''', (trabajador_id, mes, ano))
+    asistencias = cursor.fetchall()
+    conn.close()
+    return asistencias
+
+def obtener_dias_trabajados_mes(trabajador_id, mes, ano):
+    """Obtiene el conteo de días trabajados en un mes"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT COUNT(*) FROM asistencia 
+        WHERE trabajador_id = %s 
+        AND EXTRACT(MONTH FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+        AND EXTRACT(YEAR FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+        AND presente = 1
+    ''', (trabajador_id, mes, ano))
+    dias = cursor.fetchone()[0]
+    conn.close()
+    return dias
+
+def obtener_dias_ausencia_mes(trabajador_id, mes, ano):
+    """Obtiene el conteo de días de ausencia en un mes"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT COUNT(*) FROM asistencia 
+        WHERE trabajador_id = %s 
+        AND EXTRACT(MONTH FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+        AND EXTRACT(YEAR FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+        AND presente = 0
+    ''', (trabajador_id, mes, ano))
+    dias = cursor.fetchone()[0]
+    conn.close()
+    return dias
+
+def obtener_dias_extras_mes(trabajador_id, mes, ano):
+    """Obtiene el conteo de días extras trabajados en un mes"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT COUNT(*) FROM asistencia 
+        WHERE trabajador_id = %s 
+        AND EXTRACT(MONTH FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+        AND EXTRACT(YEAR FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+        AND horas_trabajadas > 8
+    ''', (trabajador_id, mes, ano))
+    dias = cursor.fetchone()[0]
+    conn.close()
+    return dias
+
+# ============================================
+# FUNCIONES PARA COMISIONES
+# ============================================
+
+def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
+    """Registra una comisión generada por una venta"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+        INSERT INTO comisiones_trabajador (negocio_id, trabajador_id, venta_id, producto_id, monto, fecha, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ''', (negocio_id, trabajador_id, venta_id, producto_id, monto, datetime.now().isoformat(), datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error al registrar comisión: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
+    """Obtiene las comisiones de un trabajador en un mes específico"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT c.*, p.nombre as producto_nombre, v.cliente, v.fecha as venta_fecha
+        FROM comisiones_trabajador c
+        LEFT JOIN productos p ON c.producto_id = p.id
+        LEFT JOIN ventas v ON c.venta_id = v.id
+        WHERE c.trabajador_id = %s 
+        AND EXTRACT(MONTH FROM TO_DATE(c.fecha, 'YYYY-MM-DD')) = %s
+        AND EXTRACT(YEAR FROM TO_DATE(c.fecha, 'YYYY-MM-DD')) = %s
+        ORDER BY c.fecha DESC
+    ''', (trabajador_id, mes, ano))
+    comisiones = cursor.fetchall()
+    conn.close()
+    return comisiones
+
+def obtener_total_comisiones_mes(trabajador_id, mes, ano):
+    """Obtiene el total de comisiones de un trabajador en un mes"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT COALESCE(SUM(monto), 0) FROM comisiones_trabajador 
+        WHERE trabajador_id = %s 
+        AND EXTRACT(MONTH FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+        AND EXTRACT(YEAR FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+    ''', (trabajador_id, mes, ano))
+    total = cursor.fetchone()[0]
+    conn.close()
+    return total
+
+def obtener_comisiones_negocio_mes(negocio_id, mes, ano):
+    """Obtiene todas las comisiones de un negocio en un mes"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT c.*, u.nombre as trabajador_nombre, p.nombre as producto_nombre, v.cliente
+        FROM comisiones_trabajador c
+        JOIN usuarios u ON c.trabajador_id = u.id
+        LEFT JOIN productos p ON c.producto_id = p.id
+        LEFT JOIN ventas v ON c.venta_id = v.id
+        WHERE c.negocio_id = %s 
+        AND EXTRACT(MONTH FROM TO_DATE(c.fecha, 'YYYY-MM-DD')) = %s
+        AND EXTRACT(YEAR FROM TO_DATE(c.fecha, 'YYYY-MM-DD')) = %s
+        ORDER BY u.nombre ASC, c.fecha DESC
+    ''', (negocio_id, mes, ano))
+    comisiones = cursor.fetchall()
+    conn.close()
+    return comisiones
+
+# ============================================
+# FUNCIONES PARA NÓMINA
+# ============================================
+
+def calcular_nomina(negocio_id, trabajador_id, mes, ano):
+    """Calcula la nómina de un trabajador para un mes específico"""
+    _, dias_mes = monthrange(ano, mes)
+    
+    # Obtener datos del trabajador
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT u.id, u.nombre, u.datos_negocio
+        FROM usuarios u
+        WHERE u.id = %s
+    ''', (trabajador_id,))
+    trabajador = cursor.fetchone()
+    
+    if not trabajador:
+        conn.close()
+        return None
+    
+    # Obtener salario base del trabajador
+    datos = json.loads(trabajador['datos_negocio']) if trabajador['datos_negocio'] else {}
+    salario_base = datos.get('salario', 0)
+    
+    # Obtener días trabajados
+    dias_trabajados = obtener_dias_trabajados_mes(trabajador_id, mes, ano)
+    
+    # Obtener días de ausencia
+    dias_ausencia = obtener_dias_ausencia_mes(trabajador_id, mes, ano)
+    
+    # Obtener días extras
+    dias_extras = obtener_dias_extras_mes(trabajador_id, mes, ano)
+    
+    # Calcular salario diario
+    salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
+    
+    # Calcular salario devengado (días trabajados)
+    salario_devengado = salario_diario * dias_trabajados
+    
+    # Calcular comisiones
+    comisiones = obtener_total_comisiones_mes(trabajador_id, mes, ano)
+    
+    # Calcular total
+    total = salario_devengado + comisiones
+    
+    # Guardar o actualizar nómina
+    cursor.execute('''
+        INSERT INTO nomina (
+            negocio_id, trabajador_id, mes, ano, salario_base, 
+            dias_trabajados, dias_ausencia, dias_extras, salario_devengado, comisiones, total,
+            creado_en
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (negocio_id, trabajador_id, mes, ano) DO UPDATE SET
+            salario_base = EXCLUDED.salario_base,
+            dias_trabajados = EXCLUDED.dias_trabajados,
+            dias_ausencia = EXCLUDED.dias_ausencia,
+            dias_extras = EXCLUDED.dias_extras,
+            salario_devengado = EXCLUDED.salario_devengado,
+            comisiones = EXCLUDED.comisiones,
+            total = EXCLUDED.total,
+            actualizado_en = %s
+    ''', (
+        negocio_id, trabajador_id, mes, ano, salario_base,
+        dias_trabajados, dias_ausencia, dias_extras, salario_devengado, comisiones, total,
+        datetime.now().isoformat(),
+        datetime.now().isoformat()
+    ))
+    
+    conn.commit()
+    conn.close()
+    
+    return {
+        'trabajador_id': trabajador_id,
+        'nombre': trabajador['nombre'],
+        'salario_base': salario_base,
+        'dias_mes': dias_mes,
+        'dias_trabajados': dias_trabajados,
+        'dias_ausencia': dias_ausencia,
+        'dias_extras': dias_extras,
+        'salario_diario': salario_diario,
+        'salario_devengado': salario_devengado,
+        'comisiones': comisiones,
+        'total': total
+    }
+
+def obtener_nomina_mes(negocio_id, mes, ano):
+    """Obtiene la nómina de todos los trabajadores para un mes específico"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT n.*, u.nombre, u.datos_negocio
+        FROM nomina n
+        JOIN usuarios u ON n.trabajador_id = u.id
+        WHERE n.negocio_id = %s AND n.mes = %s AND n.ano = %s
+        ORDER BY u.nombre ASC
+    ''', (negocio_id, mes, ano))
+    nomina = cursor.fetchall()
+    conn.close()
+    return nomina
+
+def obtener_nomina_trabajador(trabajador_id, mes, ano):
+    """Obtiene la nómina de un trabajador específico para un mes"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT n.*, u.nombre, u.datos_negocio
+        FROM nomina n
+        JOIN usuarios u ON n.trabajador_id = u.id
+        WHERE n.trabajador_id = %s AND n.mes = %s AND n.ano = %s
+    ''', (trabajador_id, mes, ano))
+    nomina = cursor.fetchone()
+    conn.close()
+    return nomina
+
+def obtener_resumen_nomina(negocio_id, mes, ano):
+    """Obtiene un resumen de la nómina de un negocio para un mes"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT 
+            COUNT(*) as total_trabajadores,
+            COALESCE(SUM(dias_trabajados), 0) as total_dias_trabajados,
+            COALESCE(SUM(dias_ausencia), 0) as total_ausencias,
+            COALESCE(SUM(salario_devengado), 0) as total_salarios,
+            COALESCE(SUM(comisiones), 0) as total_comisiones,
+            COALESCE(SUM(total), 0) as total_nomina
+        FROM nomina
+        WHERE negocio_id = %s AND mes = %s AND ano = %s
+    ''', (negocio_id, mes, ano))
+    resultado = cursor.fetchone()
+    conn.close()
+    return {
+        'total_trabajadores': resultado[0] or 0,
+        'total_dias_trabajados': resultado[1] or 0,
+        'total_ausencias': resultado[2] or 0,
+        'total_salarios': resultado[3] or 0,
+        'total_comisiones': resultado[4] or 0,
+        'total_nomina': resultado[5] or 0
+    }
