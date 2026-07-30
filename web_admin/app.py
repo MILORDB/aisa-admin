@@ -230,12 +230,12 @@ def fix_ventas():
         """, 500
 
 # ============================================
-# ENDPOINT PARA REPARAR PRODUCTOS (AGREGAR COLUMNA COSTO)
+# ENDPOINT PARA REPARAR PRODUCTOS (AGREGAR COLUMNA COSTO Y COMISION)
 # ============================================
 
 @app.route('/fix-productos', methods=['GET'])
 def fix_productos():
-    """Endpoint para agregar la columna costo a la tabla productos"""
+    """Endpoint para agregar las columnas costo y comision a la tabla productos"""
     try:
         import urllib.parse
         import psycopg2
@@ -262,39 +262,69 @@ def fix_productos():
         cursor = conn.cursor()
         print("✅ Conectado a PostgreSQL")
         
-        # Verificar si la columna existe
+        mensajes = []
+        
+        # 1. Verificar y agregar columna 'costo'
         cursor.execute("""
             SELECT column_name 
             FROM information_schema.columns 
             WHERE table_name = 'productos' AND column_name = 'costo'
         """)
-        existe = cursor.fetchone()
+        existe_costo = cursor.fetchone()
         
-        if not existe:
-            print("🔧 Agregando columna 'costo' a la tabla productos...")
+        if not existe_costo:
+            print("🔧 Agregando columna 'costo'...")
             try:
                 cursor.execute("ALTER TABLE productos ADD COLUMN costo REAL DEFAULT 0")
                 conn.commit()
-                mensaje = "✅ Columna 'costo' agregada correctamente"
-                print(mensaje)
+                mensajes.append("✅ Columna 'costo' agregada correctamente")
+                print("✅ Columna 'costo' agregada correctamente")
             except psycopg2.Error as e:
                 conn.rollback()
-                mensaje = f"❌ Error al agregar columna: {e}"
-                print(mensaje)
-                return f"""
-                <html>
-                    <head><title>Error</title></head>
-                    <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
-                        <h1 style="color:#ff6b6b;">❌ {mensaje}</h1>
-                        <a href="/negocio/inventario" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Inventario</a>
-                    </body>
-                </html>
-                """
+                mensajes.append(f"❌ Error al agregar 'costo': {e}")
+                print(f"❌ Error al agregar 'costo': {e}")
         else:
-            mensaje = "✅ La columna 'costo' ya existe"
-            print(mensaje)
+            mensajes.append("✅ La columna 'costo' ya existe")
+            print("✅ La columna 'costo' ya existe")
         
-        # Verificar columnas actuales
+        # 2. Verificar y agregar columna 'comision'
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'productos' AND column_name = 'comision'
+        """)
+        existe_comision = cursor.fetchone()
+        
+        if not existe_comision:
+            print("🔧 Agregando columna 'comision'...")
+            try:
+                cursor.execute("ALTER TABLE productos ADD COLUMN comision REAL DEFAULT 0")
+                conn.commit()
+                mensajes.append("✅ Columna 'comision' agregada correctamente")
+                print("✅ Columna 'comision' agregada correctamente")
+            except psycopg2.Error as e:
+                conn.rollback()
+                mensajes.append(f"❌ Error al agregar 'comision': {e}")
+                print(f"❌ Error al agregar 'comision': {e}")
+        else:
+            mensajes.append("✅ La columna 'comision' ya existe")
+            print("✅ La columna 'comision' ya existe")
+        
+        # 3. Actualizar NULL a 0 en ambas columnas
+        cursor.execute("UPDATE productos SET costo = 0 WHERE costo IS NULL")
+        filas_costo = cursor.rowcount
+        
+        cursor.execute("UPDATE productos SET comision = 0 WHERE comision IS NULL")
+        filas_comision = cursor.rowcount
+        
+        conn.commit()
+        
+        if filas_costo > 0:
+            mensajes.append(f"✅ {filas_costo} productos actualizados con costo = 0")
+        if filas_comision > 0:
+            mensajes.append(f"✅ {filas_comision} productos actualizados con comisión = 0")
+        
+        # 4. Verificar columnas actuales
         cursor.execute("""
             SELECT column_name, data_type
             FROM information_schema.columns 
@@ -305,22 +335,59 @@ def fix_productos():
         
         html_columnas = ""
         for col, tipo in columnas:
-            html_columnas += f"• {col} ({tipo})<br>"
+            html_columnas += f"• <strong>{col}</strong> ({tipo})<br>"
         
         conn.close()
         
+        html_mensajes = "<br>".join(mensajes)
+        
         return f"""
         <html>
-            <head><title>Productos Reparados</title></head>
-            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
-                <h1 style="color:#6c3ce0;">✅ {mensaje}</h1>
-                <div style="background:#1a1a2e;border-radius:8px;padding:20px;margin:20px auto;max-width:600px;text-align:left;border:1px solid #2a2a3e;">
-                    <h3 style="color:#aaa;margin-bottom:10px;">📋 Columnas en 'productos':</h3>
-                    {html_columnas}
+            <head>
+                <title>Productos Reparados</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .error {{ color: #ff6b6b; }}
+                    .btn {{
+                        display: inline-block;
+                        padding: 10px 20px;
+                        margin: 10px;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        text-decoration: none;
+                        transition: all 0.3s;
+                    }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Productos</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        {html_mensajes}
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Columnas en 'productos'</h3>
+                        {html_columnas}
+                    </div>
+                    
+                    <div>
+                        <a href="/negocio/inventario" class="btn btn-primary">📦 Ir al Inventario</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
                 </div>
-                <br>
-                <a href="/negocio/inventario" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;display:inline-block;">Ir al Inventario</a>
-                <a href="/dashboard" style="color:#888;text-decoration:none;border:1px solid #2a2a3e;padding:10px 20px;border-radius:8px;display:inline-block;margin-left:10px;">Volver al Dashboard</a>
             </body>
         </html>
         """
@@ -1419,7 +1486,7 @@ def api_toggle_trabajador_negocio(trabajador_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - PRODUCTOS (CON COSTO)
+# API - PRODUCTOS (CON COSTO Y COMISION)
 # ============================================
 
 @app.route('/api/productos', methods=['GET', 'POST'])
@@ -1440,14 +1507,15 @@ def api_productos():
     categoria = data.get('categoria')
     precio = data.get('precio')
     costo = data.get('costo', 0)
+    comision = data.get('comision', 0)
     stock = data.get('stock', 0)
     stock_minimo = data.get('stock_minimo', 3)
     
     if not nombre or precio is None:
         return jsonify({'error': 'Nombre y precio son requeridos'}), 400
     
-    producto_id = crear_producto(usuario['id'], nombre, categoria, precio, costo, stock, stock_minimo)
-    registrar_log(usuario['id'], 'producto_creado', f'Producto: {nombre} (Costo: ${costo})')
+    producto_id = crear_producto(usuario['id'], nombre, categoria, precio, costo, comision, stock, stock_minimo)
+    registrar_log(usuario['id'], 'producto_creado', f'Producto: {nombre} (Costo: ${costo}, Comisión: ${comision})')
     
     return jsonify({'success': True, 'id': producto_id})
 
@@ -1510,6 +1578,7 @@ def api_producto(producto_id):
         categoria = data.get('categoria')
         precio = data.get('precio')
         costo = data.get('costo', 0)
+        comision = data.get('comision', 0)
         stock = data.get('stock', 0)
         stock_minimo = data.get('stock_minimo', 3)
         
@@ -1525,8 +1594,8 @@ def api_producto(producto_id):
         if not producto or producto[0] != usuario['id']:
             return jsonify({'error': 'Producto no encontrado'}), 404
         
-        actualizar_producto(producto_id, nombre, categoria, precio, costo, stock, stock_minimo)
-        registrar_log(usuario['id'], 'producto_actualizado', f'ID: {producto_id} (Costo: ${costo})')
+        actualizar_producto(producto_id, nombre, categoria, precio, costo, comision, stock, stock_minimo)
+        registrar_log(usuario['id'], 'producto_actualizado', f'ID: {producto_id} (Costo: ${costo}, Comisión: ${comision})')
         return jsonify({'success': True})
         
     except Exception as e:
