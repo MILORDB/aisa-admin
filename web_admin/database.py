@@ -222,10 +222,7 @@ def init_db():
     )
     ''')
     
-    # ============================================
     # TABLAS PARA NÓMINA
-    # ============================================
-    
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS asistencia (
         id SERIAL PRIMARY KEY,
@@ -615,7 +612,8 @@ def obtener_logs(limit=50):
     logs = cursor.fetchall()
     conn.close()
     return logs
-    # ============================================
+
+# ============================================
 # FUNCIONES PARA PRODUCTOS (CON COSTO Y COMISION)
 # ============================================
 
@@ -1084,7 +1082,6 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
     conn = get_db()
     cursor = conn.cursor()
     try:
-        # 1. Obtener datos de la venta
         cursor.execute('''
             SELECT producto_id, cantidad, total, cliente, producto, fecha, empresa, tipo, 
                    factura_url, factura, transferencia_id, transferencia_cedula, 
@@ -1102,7 +1099,6 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
         producto_id = venta[0]
         cantidad = venta[1]
         
-        # 2. Si tiene producto, reintegrar stock
         if producto_id:
             cursor.execute('''
                 UPDATE productos 
@@ -1110,16 +1106,13 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
                 WHERE id = %s
             ''', (cantidad, datetime.now().isoformat(), producto_id))
             
-            # Verificar que se actualizó el stock
             if cursor.rowcount == 0:
                 conn.rollback()
                 conn.close()
                 return False, "Error al actualizar el stock del producto"
         
-        # 3. Eliminar la venta
         cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, negocio_id))
         
-        # Verificar que se eliminó
         if cursor.rowcount == 0:
             conn.rollback()
             conn.close()
@@ -1226,7 +1219,8 @@ def obtener_estadisticas_trabajador(trabajador_id):
         'servicios': servicios[0] if servicios else 0,
         'clientes': clientes[0] if clientes else 0
     }
-    # ============================================
+
+# ============================================
 # FUNCIONES PARA CONTRATOS
 # ============================================
 
@@ -1404,10 +1398,6 @@ def obtener_dias_extras_mes(trabajador_id, mes, ano):
     conn.close()
     return dias
 
-# ============================================
-# FUNCIONES PARA COMISIONES
-# ============================================
-
 def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
     """Registra una comisión generada por una venta"""
     conn = get_db()
@@ -1477,15 +1467,10 @@ def obtener_comisiones_negocio_mes(negocio_id, mes, ano):
     conn.close()
     return comisiones
 
-# ============================================
-# FUNCIONES PARA NÓMINA
-# ============================================
-
 def calcular_nomina(negocio_id, trabajador_id, mes, ano):
     """Calcula la nómina de un trabajador para un mes específico"""
     _, dias_mes = monthrange(ano, mes)
     
-    # Obtener datos del trabajador
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -1499,32 +1484,18 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
         conn.close()
         return None
     
-    # Obtener salario base del trabajador
     datos = json.loads(trabajador['datos_negocio']) if trabajador['datos_negocio'] else {}
     salario_base = datos.get('salario', 0)
     
-    # Obtener días trabajados
     dias_trabajados = obtener_dias_trabajados_mes(trabajador_id, mes, ano)
-    
-    # Obtener días de ausencia
     dias_ausencia = obtener_dias_ausencia_mes(trabajador_id, mes, ano)
-    
-    # Obtener días extras
     dias_extras = obtener_dias_extras_mes(trabajador_id, mes, ano)
     
-    # Calcular salario diario
     salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
-    
-    # Calcular salario devengado (días trabajados)
     salario_devengado = salario_diario * dias_trabajados
-    
-    # Calcular comisiones
     comisiones = obtener_total_comisiones_mes(trabajador_id, mes, ano)
-    
-    # Calcular total
     total = salario_devengado + comisiones
     
-    # Guardar o actualizar nómina
     cursor.execute('''
         INSERT INTO nomina (
             negocio_id, trabajador_id, mes, ano, salario_base, 
