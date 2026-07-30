@@ -547,6 +547,25 @@ def api_actualizar_perfil_usuario():
         'message': 'Perfil actualizado correctamente'
     })
 
+@app.route('/api/usuario/ubicacion', methods=['GET'])
+@login_required
+def api_obtener_ubicacion_usuario():
+    """Obtiene la ubicación del usuario actual"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    datos = obtener_datos_negocio(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'provincia': datos.get('provincia', ''),
+        'municipio': datos.get('municipio', ''),
+        'tiene_ubicacion': bool(datos.get('provincia') and datos.get('municipio'))
+    })
+
 @app.route('/api/perfil')
 @admin_required
 def api_perfil():
@@ -827,6 +846,78 @@ def api_eliminar_usuario(user_id):
 def api_negocios():
     negocios = obtener_negocios()
     return jsonify([dict(n) for n in negocios])
+
+@app.route('/api/negocios/cercanos', methods=['GET'])
+@login_required
+def api_negocios_cercanos():
+    """Obtiene negocios cercanos basados en la ubicación del usuario"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        datos_usuario = obtener_datos_negocio(usuario['id'])
+        provincia = datos_usuario.get('provincia')
+        municipio = datos_usuario.get('municipio')
+        
+        if not provincia or not municipio:
+            return jsonify({
+                'success': True,
+                'negocios': [],
+                'message': 'Actualiza tu ubicación en el perfil para ver negocios cercanos'
+            })
+        
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute('''
+            SELECT id, username, nombre, datos_negocio, activo, fecha_registro
+            FROM usuarios 
+            WHERE tipo = 'negocio' 
+            AND activo = 1
+            AND datos_negocio IS NOT NULL
+            AND datos_negocio LIKE %s
+            AND datos_negocio LIKE %s
+            ORDER BY id DESC
+        ''', (f'%"provincia": "{provincia}"%', f'%"municipio": "{municipio}"%'))
+        
+        negocios = cursor.fetchall()
+        conn.close()
+        
+        resultado = []
+        for n in negocios:
+            datos = {}
+            if n['datos_negocio']:
+                try:
+                    datos = json.loads(n['datos_negocio']) if isinstance(n['datos_negocio'], str) else n['datos_negocio']
+                except:
+                    pass
+            
+            resultado.append({
+                'id': n['id'],
+                'username': n['username'],
+                'nombre': n['nombre'] or datos.get('nombre_negocio', n['username']),
+                'telefono': datos.get('telefono', ''),
+                'direccion': datos.get('direccion', ''),
+                'descripcion': datos.get('descripcion', ''),
+                'activo': n['activo']
+            })
+        
+        return jsonify({
+            'success': True,
+            'negocios': resultado,
+            'provincia': provincia,
+            'municipio': municipio,
+            'total': len(resultado)
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_negocios_cercanos: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 # ============================================
 # API - TODOS LOS PRODUCTOS (para admin)
@@ -1590,29 +1681,79 @@ def api_tienda_eliminar_producto(tienda_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - TIENDA PÚBLICA
+# API - TIENDA PÚBLICA FILTRADA POR UBICACIÓN
 # ============================================
 
 @app.route('/api/tienda/public', methods=['GET'])
 def api_tienda_public():
+    """Obtiene productos de la tienda pública con filtro de ubicación"""
     try:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute('''
-        SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
-               u.id as negocio_id, u.nombre as negocio_nombre, u.username as negocio_username
-        FROM productos_tienda pt
-        JOIN productos p ON pt.producto_id = p.id
-        JOIN usuarios u ON pt.negocio_id = u.id
-        WHERE p.stock > 0 AND u.activo = 1
-        ORDER BY pt.destacado DESC, pt.created_at DESC
-        ''')
         
+        # Obtener ubicación del usuario si está autenticado
+        token = request.cookies.get('token')
+        usuario = None
+        provincia_filtro = None
+        municipio_filtro = None
+        
+        if token:
+            usuario = obtener_usuario_sesion(token)
+            if usuario:
+                # Obtener provincia y municipio del usuario
+                datos_negocio = obtener_datos_negocio(usuario['id'])
+                provincia_filtro = datos_negocio.get('provincia')
+                municipio_filtro = datos_negocio.get('municipio')
+        
+        # Construir la consulta SQL con filtros
+        query = '''
+            SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
+                   u.id as negocio_id, u.nombre as negocio_nombre, u.username as negocio_username,
+                   u.datos_negocio
+            FROM productos_tienda pt
+            JOIN productos p ON pt.producto_id = p.id
+            JOIN usuarios u ON pt.negocio_id = u.id
+            WHERE p.stock > 0 AND u.activo = 1
+        '''
+        
+        params = []
+        
+        # Si el usuario tiene ubicación, filtrar por provincia y municipio
+        if provincia_filtro and municipio_filtro:
+            query += '''
+                AND (
+                    u.datos_negocio IS NOT NULL 
+                    AND u.datos_negocio LIKE %s 
+                    AND u.datos_negocio LIKE %s
+                )
+            '''
+            params.extend([f'%"provincia": "{provincia_filtro}"%', f'%"municipio": "{municipio_filtro}"%'])
+        elif provincia_filtro:
+            # Si solo tiene provincia, filtrar por provincia
+            query += '''
+                AND (
+                    u.datos_negocio IS NOT NULL 
+                    AND u.datos_negocio LIKE %s
+                )
+            '''
+            params.append(f'%"provincia": "{provincia_filtro}"%')
+        
+        query += ' ORDER BY pt.destacado DESC, pt.created_at DESC'
+        
+        cursor.execute(query, params)
         rows = cursor.fetchall()
         conn.close()
         
         resultado = []
         for row in rows:
+            # Parsear datos del negocio para obtener ubicación
+            datos_negocio = {}
+            if row[8]:  # datos_negocio
+                try:
+                    datos_negocio = json.loads(row[8]) if isinstance(row[8], str) else row[8]
+                except:
+                    pass
+            
             resultado.append({
                 'id': row[0],
                 'nombre': row[1],
@@ -1621,13 +1762,18 @@ def api_tienda_public():
                 'stock': row[4],
                 'foto_url': row[5],
                 'negocio_id': row[6],
-                'negocio_nombre': row[7],
-                'negocio_username': row[8]
+                'negocio_nombre': row[7] or row[9] or 'Negocio',
+                'negocio_username': row[9],
+                'provincia': datos_negocio.get('provincia', ''),
+                'municipio': datos_negocio.get('municipio', '')
             })
         
         return jsonify(resultado)
+        
     except Exception as e:
         print(f"❌ Error en tienda pública: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ============================================
