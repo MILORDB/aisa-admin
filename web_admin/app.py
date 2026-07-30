@@ -2865,6 +2865,181 @@ def api_rechazar_trabajador(user_id):
     return jsonify({'success': True})
 
 # ============================================
+# ENDPOINT PARA AGREGAR MÓDULO NOMINA
+# ============================================
+
+@app.route('/fix-nomina', methods=['GET'])
+def fix_nomina_endpoint():
+    """Endpoint para agregar el módulo nomina a la base de datos"""
+    try:
+        import urllib.parse
+        import psycopg2
+        
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL")
+        
+        mensajes = []
+        
+        # 1. Verificar si el módulo existe
+        cursor.execute("SELECT id FROM modulos WHERE nombre = 'nomina'")
+        existe = cursor.fetchone()
+        
+        if not existe:
+            print("🔧 Agregando módulo 'nomina'...")
+            cursor.execute('''
+            INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido)
+            VALUES (%s, %s, %s, %s)
+            ''', ('nomina', 'Gestión de nómina y salarios', 1, 'negocio'))
+            conn.commit()
+            mensajes.append("✅ Módulo 'nomina' agregado correctamente")
+            print("✅ Módulo 'nomina' agregado correctamente")
+            
+            cursor.execute("SELECT id FROM modulos WHERE nombre = 'nomina'")
+            modulo_id = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT id FROM usuarios WHERE tipo = 'negocio' AND activo = 1")
+            negocios = cursor.fetchall()
+            
+            contador = 0
+            for negocio in negocios:
+                negocio_id = negocio[0]
+                cursor.execute('''
+                SELECT id FROM permisos_usuario 
+                WHERE usuario_id = %s AND modulo_id = %s
+                ''', (negocio_id, modulo_id))
+                
+                if not cursor.fetchone():
+                    cursor.execute('''
+                    INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+                    VALUES (%s, %s, 1, 'aprobado')
+                    ''', (negocio_id, modulo_id))
+                    contador += 1
+            
+            conn.commit()
+            mensajes.append(f"✅ Módulo asignado a {contador} negocios")
+            print(f"✅ Módulo asignado a {contador} negocios")
+        else:
+            mensajes.append(f"✅ El módulo 'nomina' ya existe con ID: {existe[0]}")
+            print(f"✅ El módulo 'nomina' ya existe con ID: {existe[0]}")
+            
+            cursor.execute("SELECT id FROM modulos WHERE nombre = 'nomina'")
+            modulo_id = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT id FROM usuarios WHERE tipo = 'negocio' AND activo = 1")
+            negocios = cursor.fetchall()
+            
+            contador = 0
+            for negocio in negocios:
+                negocio_id = negocio[0]
+                cursor.execute('''
+                SELECT id FROM permisos_usuario 
+                WHERE usuario_id = %s AND modulo_id = %s AND activo = 1
+                ''', (negocio_id, modulo_id))
+                
+                if not cursor.fetchone():
+                    cursor.execute('''
+                    INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+                    VALUES (%s, %s, 1, 'aprobado')
+                    ''', (negocio_id, modulo_id))
+                    contador += 1
+            
+            conn.commit()
+            if contador > 0:
+                mensajes.append(f"✅ Módulo asignado a {contador} negocios adicionales")
+                print(f"✅ Módulo asignado a {contador} negocios adicionales")
+        
+        cursor.execute("SELECT id, nombre FROM modulos ORDER BY nombre")
+        modulos = cursor.fetchall()
+        
+        html_modulos = ""
+        for mod in modulos:
+            html_modulos += f"• <strong>{mod[1]}</strong> (ID: {mod[0]})<br>"
+        
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head>
+                <title>Módulo Nómina Agregado</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{
+                        display: inline-block;
+                        padding: 10px 20px;
+                        margin: 10px;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        text-decoration: none;
+                        transition: all 0.3s;
+                    }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Módulo Nómina</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        {html_mensajes}
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Módulos disponibles</h3>
+                        {html_modulos}
+                    </div>
+                    
+                    <div>
+                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al agregar módulo</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
 # EJECUCIÓN (VERSIÓN PARA RENDER)
 # ============================================
 
