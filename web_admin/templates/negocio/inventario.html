@@ -53,6 +53,8 @@
         .btn-warning { background: #ff9800; color: #fff; }
         .btn-warning:hover { background: #e68900; }
         .btn-sm { padding: 3px 8px; font-size: 10px; }
+        .btn-info { background: #2196f3; color: #fff; }
+        .btn-info:hover { background: #1976d2; }
         .tabla {
             width: 100%;
             border-collapse: collapse;
@@ -82,6 +84,7 @@
         .tabla .badge.alto { background: #224422; color: #6bff6b; }
         .tabla .badge.agotado { background: #442222; color: #ff6b6b; font-weight: bold; }
         .tabla .badge.ganancia { background: #1a237e; color: #6bff6b; }
+        .tabla .badge.comision { background: #ff9800; color: #000; }
         .form-row {
             display: flex;
             gap: 8px;
@@ -112,6 +115,21 @@
             color: #ff9800;
             display: block;
             margin-bottom: 2px;
+        }
+        .form-row .comision-field {
+            border-left: 2px solid #2196f3;
+            padding-left: 8px;
+        }
+        .form-row .comision-field label {
+            font-size: 10px;
+            color: #2196f3;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .form-row .comision-field .help-text {
+            font-size: 9px;
+            color: #666;
+            margin-top: 2px;
         }
         .form-row .ganancia-preview {
             font-size: 10px;
@@ -183,7 +201,7 @@
             margin: 0 -4px;
         }
         .table-wrapper table {
-            min-width: 700px;
+            min-width: 800px;
         }
         .ganancia-indicador {
             font-size: 9px;
@@ -193,6 +211,17 @@
         .ganancia-indicador.alta { background: rgba(76,175,80,0.15); color: #6bff6b; }
         .ganancia-indicador.media { background: rgba(255,152,0,0.15); color: #ffbb33; }
         .ganancia-indicador.baja { background: rgba(244,67,54,0.15); color: #ff6b6b; }
+        .comision-tag {
+            font-size: 9px;
+            padding: 1px 6px;
+            border-radius: 8px;
+            background: rgba(33,150,243,0.15);
+            color: #2196f3;
+        }
+        .comision-tag.sin-comision {
+            background: rgba(255,255,255,0.05);
+            color: #666;
+        }
         @media (max-width: 600px) {
             body { padding: 8px; }
             .card { padding: 10px; }
@@ -331,6 +360,13 @@
                     <label>💰 Costo</label>
                     <input type="number" id="prodCosto" placeholder="Costo del producto" step="0.01" oninput="calcularGanancia()">
                 </div>
+                <div class="comision-field" style="flex:1;">
+                    <label>💵 Comisión por venta</label>
+                    <input type="number" id="prodComision" placeholder="Ej: 5.00" step="0.01" min="0">
+                    <div class="help-text">⚠️ Opcional - Cantidad fija por unidad vendida</div>
+                </div>
+            </div>
+            <div class="form-row">
                 <input type="number" id="prodStock" placeholder="Stock">
                 <input type="number" id="prodMinimo" placeholder="Mínimo">
             </div>
@@ -480,6 +516,7 @@
                     <th>Precio</th>
                     <th>Costo</th>
                     <th>Ganancia</th>
+                    <th>Comisión</th>
                     <th>Stock</th>
                     <th>Estado</th>
                     <th>Acciones</th>
@@ -495,11 +532,16 @@
                 const costo = p.costo || 0;
                 const ganancia = p.precio - costo;
                 const porcentaje = costo > 0 ? (ganancia / costo) * 100 : 0;
+                const comision = p.comision || 0;
                 
                 let gananciaClase = 'media';
                 let gananciaLabel = '📊';
                 if (porcentaje > 50) { gananciaClase = 'alta'; gananciaLabel = '📈'; }
                 else if (porcentaje < 10) { gananciaClase = 'baja'; gananciaLabel = '📉'; }
+                
+                const comisionDisplay = comision > 0 
+                    ? `<span class="comision-tag">💵 $${comision.toFixed(2)}</span>`
+                    : `<span class="comision-tag sin-comision">— Sin comisión</span>`;
                 
                 html += `
                     <tr>
@@ -512,6 +554,7 @@
                                 ${gananciaLabel} $${ganancia.toFixed(2)} (${porcentaje.toFixed(1)}%)
                             </span>
                         </td>
+                        <td>${comisionDisplay}</td>
                         <td>${p.stock}</td>
                         <td><span class="badge ${clase}">${estado}</span></td>
                         <td>
@@ -559,6 +602,7 @@
             document.getElementById('prodCategoria').value = '';
             document.getElementById('prodPrecio').value = '';
             document.getElementById('prodCosto').value = '';
+            document.getElementById('prodComision').value = '';
             document.getElementById('prodStock').value = '';
             document.getElementById('prodMinimo').value = '';
             document.getElementById('gananciaPreview').classList.remove('show');
@@ -578,6 +622,7 @@
             document.getElementById('prodCategoria').value = p.categoria || '';
             document.getElementById('prodPrecio').value = p.precio;
             document.getElementById('prodCosto').value = p.costo || 0;
+            document.getElementById('prodComision').value = p.comision || 0;
             document.getElementById('prodStock').value = p.stock;
             document.getElementById('prodMinimo').value = p.stock_minimo || 3;
             
@@ -596,6 +641,7 @@
             const categoria = document.getElementById('prodCategoria').value;
             const precio = parseFloat(document.getElementById('prodPrecio').value);
             const costo = parseFloat(document.getElementById('prodCosto').value) || 0;
+            const comision = parseFloat(document.getElementById('prodComision').value) || 0;
             const stock = parseInt(document.getElementById('prodStock').value) || 0;
             const stock_minimo = parseInt(document.getElementById('prodMinimo').value) || 3;
 
@@ -604,7 +650,7 @@
                 return;
             }
 
-            const data = { nombre, categoria, precio, costo, stock, stock_minimo };
+            const data = { nombre, categoria, precio, costo, comision, stock, stock_minimo };
 
             try {
                 let response, result;
