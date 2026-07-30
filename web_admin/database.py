@@ -282,19 +282,6 @@ def verify_password(password, password_hash):
 def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='cliente', datos_negocio=None):
     """
     Crea un nuevo usuario en la base de datos
-    
-    Args:
-        username (str): Nombre de usuario único
-        email (str): Email único
-        password (str): Contraseña (se hashea automáticamente)
-        nombre (str, optional): Nombre completo del usuario
-        rol (str, optional): Rol del usuario (usuario, admin, trabajador)
-        tipo (str, optional): Tipo de usuario (cliente, negocio)
-        datos_negocio (dict, optional): Datos del negocio si tipo='negocio'
-            Debe contener: nombre_negocio, ruc, provincia, municipio, telefono, direccion, descripcion
-    
-    Returns:
-        int: ID del usuario creado o None si hay error
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -303,7 +290,6 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         fecha = datetime.now().isoformat()
         
         if datos_negocio and isinstance(datos_negocio, dict):
-            # Asegurar que los campos de provincia y municipio estén presentes
             if 'provincia' not in datos_negocio:
                 datos_negocio['provincia'] = ''
             if 'municipio' not in datos_negocio:
@@ -332,13 +318,10 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         
         user_id = cursor.fetchone()[0]
         
-        # Asignar módulos según el tipo de usuario
         if rol != 'trabajador':
             if tipo == 'negocio':
-                # Para negocios, asignar módulos de negocio
                 cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'negocio'))
             else:
-                # Para clientes, asignar módulos de cliente
                 cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'cliente'))
             
             for mod in cursor.fetchall():
@@ -393,7 +376,6 @@ def obtener_negocios():
     return negocios
 
 def eliminar_usuario(user_id):
-    """Elimina un usuario y todos sus datos relacionados (ON DELETE CASCADE lo hará automáticamente)"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -437,14 +419,6 @@ def actualizar_tipo_usuario(user_id, tipo):
     conn.close()
 
 def actualizar_datos_negocio(user_id, datos):
-    """
-    Actualiza los datos de negocio de un usuario
-    
-    Args:
-        user_id (int): ID del usuario
-        datos (dict): Diccionario con los datos del negocio
-            Incluye: nombre_negocio, ruc, provincia, municipio, telefono, direccion, descripcion
-    """
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('UPDATE usuarios SET datos_negocio = %s WHERE id = %s', (json.dumps(datos, ensure_ascii=False), user_id))
@@ -452,7 +426,6 @@ def actualizar_datos_negocio(user_id, datos):
     conn.close()
 
 def obtener_datos_negocio(user_id):
-    """Obtiene los datos de negocio de un usuario"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (user_id,))
@@ -587,32 +560,25 @@ def obtener_logs(limit=50):
 def crear_producto(negocio_id, nombre, categoria, precio, costo=0, stock=0, stock_minimo=3):
     """
     Crea un nuevo producto en la base de datos
-    
-    Args:
-        negocio_id (int): ID del negocio
-        nombre (str): Nombre del producto
-        categoria (str): Categoría del producto
-        precio (float): Precio de venta
-        costo (float, optional): Costo del producto. Default 0.
-        stock (int, optional): Cantidad en stock. Default 0.
-        stock_minimo (int, optional): Stock mínimo de alerta. Default 3.
-    
-    Returns:
-        int: ID del producto creado
     """
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-    INSERT INTO productos (negocio_id, nombre, categoria, precio, costo, stock, stock_minimo, created_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    ''', (negocio_id, nombre, categoria, precio, costo, stock, stock_minimo, datetime.now().isoformat()))
-    conn.commit()
-    producto_id = cursor.lastrowid
-    conn.close()
-    return producto_id
+    try:
+        cursor.execute('''
+        INSERT INTO productos (negocio_id, nombre, categoria, precio, costo, stock, stock_minimo, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (negocio_id, nombre, categoria, precio, costo, stock, stock_minimo, datetime.now().isoformat()))
+        conn.commit()
+        producto_id = cursor.lastrowid
+        conn.close()
+        return producto_id
+    except Exception as e:
+        print(f"❌ Error al crear producto: {e}")
+        conn.rollback()
+        conn.close()
+        return None
 
 def obtener_productos(negocio_id):
-    """Obtiene todos los productos de un negocio"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('SELECT * FROM productos WHERE negocio_id = %s ORDER BY id DESC', (negocio_id,))
@@ -621,7 +587,6 @@ def obtener_productos(negocio_id):
     return productos
 
 def obtener_todos_productos():
-    """Obtiene todos los productos de todos los negocios (para admin)"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -633,7 +598,6 @@ def obtener_todos_productos():
     return productos
 
 def obtener_productos_con_stock(negocio_id):
-    """Obtiene productos con stock disponible"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('SELECT id, nombre, precio, costo, stock FROM productos WHERE negocio_id = %s AND stock > 0 ORDER BY nombre',
@@ -643,7 +607,6 @@ def obtener_productos_con_stock(negocio_id):
     return productos
 
 def obtener_productos_tienda():
-    """Obtiene productos disponibles para la tienda pública"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -656,28 +619,23 @@ def obtener_productos_tienda():
     return productos
 
 def actualizar_producto(producto_id, nombre, categoria, precio, costo, stock, stock_minimo):
-    """
-    Actualiza un producto existente
-    
-    Args:
-        producto_id (int): ID del producto
-        nombre (str): Nombre del producto
-        categoria (str): Categoría del producto
-        precio (float): Precio de venta
-        costo (float): Costo del producto
-        stock (int): Cantidad en stock
-        stock_minimo (int): Stock mínimo de alerta
-    """
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-    UPDATE productos 
-    SET nombre = %s, categoria = %s, precio = %s, costo = %s,
-    stock = %s, stock_minimo = %s, updated_at = %s 
-    WHERE id = %s
-    ''', (nombre, categoria, precio, costo, stock, stock_minimo, datetime.now().isoformat(), producto_id))
-    conn.commit()
-    conn.close()
+    try:
+        cursor.execute('''
+        UPDATE productos 
+        SET nombre = %s, categoria = %s, precio = %s, costo = %s,
+        stock = %s, stock_minimo = %s, updated_at = %s 
+        WHERE id = %s
+        ''', (nombre, categoria, precio, costo, stock, stock_minimo, datetime.now().isoformat(), producto_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error al actualizar producto: {e}")
+        conn.rollback()
+        conn.close()
+        return False
 
 def actualizar_foto_producto(producto_id, foto_url, foto_public_id=None):
     conn = get_db()
@@ -712,7 +670,6 @@ def obtener_foto_producto(producto_id):
     return {'url': None, 'public_id': None}
 
 def eliminar_producto(producto_id):
-    """Elimina un producto y verifica que no tenga ventas asociadas"""
     conn = get_db()
     cursor = conn.cursor()
     
@@ -727,14 +684,12 @@ def eliminar_producto(producto_id):
         
         print(f"🗑️ Eliminando producto: {producto[1]} (ID: {producto_id})")
         
-        # Verificar si está en la tienda
         cursor.execute('SELECT id FROM productos_tienda WHERE producto_id = %s', (producto_id,))
         tienda = cursor.fetchone()
         if tienda:
             print(f"⚠️ Eliminando referencia en productos_tienda para producto {producto_id}")
             cursor.execute('DELETE FROM productos_tienda WHERE producto_id = %s', (producto_id,))
         
-        # Verificar si tiene ventas asociadas
         cursor.execute('SELECT id FROM ventas WHERE producto_id = %s LIMIT 1', (producto_id,))
         venta = cursor.fetchone()
         if venta:
@@ -742,7 +697,6 @@ def eliminar_producto(producto_id):
             conn.close()
             return False
         
-        # Eliminar el producto
         cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
         
         if cursor.rowcount > 0:
@@ -768,7 +722,6 @@ def eliminar_producto(producto_id):
         return False
 
 def actualizar_stock_producto(producto_id, cantidad):
-    """Actualiza el stock de un producto (resta la cantidad vendida)"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -780,36 +733,24 @@ def actualizar_stock_producto(producto_id, cantidad):
     return filas > 0
 
 def obtener_estadisticas_productos(negocio_id):
-    """
-    Obtiene estadísticas de productos para un negocio
-    
-    Returns:
-        dict: Estadísticas de productos
-    """
     conn = get_db()
     cursor = conn.cursor()
     
-    # Total de productos
     cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s', (negocio_id,))
     total = cursor.fetchone()[0]
     
-    # Productos con stock bajo
     cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock > 0 AND stock <= stock_minimo', (negocio_id,))
     stock_bajo = cursor.fetchone()[0]
     
-    # Productos agotados
     cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock = 0', (negocio_id,))
     agotados = cursor.fetchone()[0]
     
-    # Valor total del inventario (precio de venta)
     cursor.execute('SELECT COALESCE(SUM(precio * stock), 0) FROM productos WHERE negocio_id = %s', (negocio_id,))
     valor_total = cursor.fetchone()[0]
     
-    # Costo total del inventario
     cursor.execute('SELECT COALESCE(SUM(costo * stock), 0) FROM productos WHERE negocio_id = %s', (negocio_id,))
     costo_total = cursor.fetchone()[0]
     
-    # Ganancia potencial
     ganancia_potencial = valor_total - costo_total
     
     conn.close()
@@ -1056,11 +997,9 @@ def actualizar_estado_venta(venta_id, negocio_id, estado):
     return filas > 0
 
 def eliminar_venta_con_reintegro(venta_id, negocio_id):
-    """Elimina una venta y reintegra el stock del producto"""
     conn = get_db()
     cursor = conn.cursor()
     try:
-        # 1. Obtener datos de la venta
         cursor.execute('''
             SELECT producto_id, cantidad, total, cliente, producto, fecha, empresa, tipo, 
                    factura_url, factura, transferencia_id, transferencia_cedula, 
@@ -1078,7 +1017,6 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
         producto_id = venta[0]
         cantidad = venta[1]
         
-        # 2. Si tiene producto, reintegrar stock
         if producto_id:
             cursor.execute('''
                 UPDATE productos 
@@ -1086,16 +1024,13 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
                 WHERE id = %s
             ''', (cantidad, datetime.now().isoformat(), producto_id))
             
-            # Verificar que se actualizó el stock
             if cursor.rowcount == 0:
                 conn.rollback()
                 conn.close()
                 return False, "Error al actualizar el stock del producto"
         
-        # 3. Eliminar la venta
         cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, negocio_id))
         
-        # Verificar que se eliminó
         if cursor.rowcount == 0:
             conn.rollback()
             conn.close()
