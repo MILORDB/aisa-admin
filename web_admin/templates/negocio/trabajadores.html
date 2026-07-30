@@ -42,15 +42,27 @@
         .btn-eliminar:hover { background: #b71c1c; }
         
         .tabla {
-            width: 100%; border-collapse: collapse; font-size: 12px;
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
         }
         .tabla th {
-            text-align: left; padding: 6px 8px; color: #888;
-            border-bottom: 1px solid #2a2a3e; font-size: 10px; text-transform: uppercase;
+            text-align: left;
+            padding: 6px 8px;
+            color: #888;
+            border-bottom: 1px solid #2a2a3e;
+            font-size: 10px;
+            text-transform: uppercase;
         }
-        .tabla td { padding: 6px 8px; border-bottom: 1px solid #1a1a2e; vertical-align: middle; }
+        .tabla td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #1a1a2e;
+            vertical-align: middle;
+        }
         .tabla .badge {
-            padding: 1px 8px; border-radius: 10px; font-size: 9px;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 9px;
         }
         .tabla .badge.activo { background: #224422; color: #6bff6b; }
         .tabla .badge.inactivo { background: #442222; color: #ff6b6b; }
@@ -58,12 +70,20 @@
         .tabla .badge.cada2dias { background: #ff9800; color: #000; }
         
         .form-row {
-            display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
         }
         .form-row input, .form-row select {
-            padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px;
-            background: #0f0f1a; color: #fff; font-size: 12px;
-            flex: 1; min-width: 100px;
+            padding: 6px 10px;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 12px;
+            flex: 1;
+            min-width: 100px;
         }
         .form-row input:focus, .form-row select:focus { border-color: #6c3ce0; outline: none; }
         .form-row label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
@@ -83,27 +103,50 @@
             width: auto; accent-color: #6c3ce0; cursor: pointer;
         }
         .search-bar {
-            display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
         }
         .search-bar input {
-            flex: 1; padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px;
-            background: #0f0f1a; color: #fff; font-size: 12px; min-width: 100px;
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 12px;
+            min-width: 100px;
         }
         .search-bar input:focus { border-color: #6c3ce0; outline: none; }
         .search-bar select {
-            padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px;
-            background: #0f0f1a; color: #fff; font-size: 12px;
+            padding: 6px 10px;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 12px;
         }
         .empty { text-align: center; color: #888; padding: 30px; font-size: 13px; }
         .loading { text-align: center; color: #888; padding: 20px; font-size: 13px; }
         .mensaje-exito {
-            background: #224422; color: #6bff6b;
-            padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; display: none;
+            background: #224422;
+            color: #6bff6b;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            display: none;
         }
         .mensaje-exito.show { display: block; }
         .mensaje-error {
-            background: #442222; color: #ff6b6b;
-            padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; display: none;
+            background: #442222;
+            color: #ff6b6b;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            display: none;
         }
         .mensaje-error.show { display: block; }
         
@@ -116,7 +159,30 @@
         .stat-item .number { font-size: 18px; font-weight: 700; color: #6c3ce0; }
         .stat-item .label { font-size: 8px; color: #888; margin-top: 1px; }
         
-        .acciones-cell { display: flex; gap: 4px; flex-wrap: wrap; }
+        .acciones-cell {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .acciones-cell .btn-sm {
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            padding: 3px 8px;
+            font-size: 10px;
+            transition: all 0.3s;
+        }
+        .acciones-cell .btn-sm:hover {
+            transform: scale(1.05);
+        }
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin: 0 -4px;
+        }
+        .table-wrapper table {
+            min-width: 700px;
+        }
         .modal-confirm { max-width: 400px; }
         .modal-confirm .nombre-eliminar { text-align: center; font-size: 16px; font-weight: 700; color: #ff6b6b; margin-bottom: 10px; }
         .modal-confirm .detalles-eliminar {
@@ -150,9 +216,6 @@
         }
         .modal-content .seccion-datos .seccion-titulo { font-size: 12px; color: #6c3ce0; margin-bottom: 6px; }
         
-        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
-        .table-wrapper table { min-width: 700px; }
-
         @media (max-width: 600px) {
             body { padding: 8px; }
             .card { padding: 10px; }
@@ -301,14 +364,20 @@
     </div>
 
     <script>
-        let trabajadores = [];
-        let editandoId = null;
-        let modulosDisponibles = [];
-        let trabajadorAEliminar = null;
+        // ============================================
+        // VARIABLES GLOBALES
+        // ============================================
+        var trabajadores = [];
+        var editandoId = null;
+        var modulosDisponibles = [];
+        var trabajadorAEliminar = null;
 
+        // ============================================
+        // FUNCIONES DE MENSAJES
+        // ============================================
         function mostrarMensaje(texto, tipo) {
-            const errorEl = document.getElementById('mensajeError');
-            const exitoEl = document.getElementById('mensajeExito');
+            var errorEl = document.getElementById('mensajeError');
+            var exitoEl = document.getElementById('mensajeExito');
             errorEl.classList.remove('show');
             exitoEl.classList.remove('show');
             if (tipo === 'error') {
@@ -318,41 +387,46 @@
                 exitoEl.textContent = '✅ ' + texto;
                 exitoEl.classList.add('show');
             }
-            setTimeout(() => {
+            setTimeout(function() {
                 errorEl.classList.remove('show');
                 exitoEl.classList.remove('show');
             }, 4000);
         }
 
+        // ============================================
+        // CARGAR MÓDULOS DISPONIBLES
+        // ============================================
         async function cargarModulosDisponibles() {
             try {
-                const response = await fetch('/api/modulos');
+                var response = await fetch('/api/modulos');
                 if (!response.ok) throw new Error('Error');
-                const data = await response.json();
-                const nombresNegocio = ['inventario', 'tienda', 'trabajadores', 'servicios', 'ventas', 'contratos'];
-                modulosDisponibles = data.filter(m => nombresNegocio.includes(m.nombre.toLowerCase()));
+                var data = await response.json();
+                var nombresNegocio = ['inventario', 'tienda', 'trabajadores', 'servicios', 'ventas', 'contratos'];
+                modulosDisponibles = data.filter(function(m) { 
+                    return m && m.nombre && nombresNegocio.indexOf(m.nombre.toLowerCase()) !== -1; 
+                });
                 renderModulosCheckboxes();
             } catch (error) {
                 console.error('Error:', error);
             }
         }
 
-        function renderModulosCheckboxes(modulosPredefinidos = null) {
-            const container = document.getElementById('modulosGrid');
+        function renderModulosCheckboxes(modulosPredefinidos) {
+            var container = document.getElementById('modulosGrid');
             container.innerHTML = '';
-            const iconos = { 'inventario': '📦', 'tienda': '🛍️', 'trabajadores': '👥', 'servicios': '📋', 'ventas': '💰', 'contratos': '📄' };
-            const nombres = { 'inventario': 'Inventario', 'tienda': 'Tienda', 'trabajadores': 'Trabajadores', 'servicios': 'Servicios', 'ventas': 'Ventas', 'contratos': 'Contratos' };
-
-            modulosDisponibles.forEach(mod => {
-                const div = document.createElement('div');
+            var iconos = { 'inventario': '📦', 'tienda': '🛍️', 'trabajadores': '👥', 'servicios': '📋', 'ventas': '💰', 'contratos': '📄' };
+            var nombres = { 'inventario': 'Inventario', 'tienda': 'Tienda', 'trabajadores': 'Trabajadores', 'servicios': 'Servicios', 'ventas': 'Ventas', 'contratos': 'Contratos' };
+            
+            modulosDisponibles.forEach(function(mod) {
+                var div = document.createElement('div');
                 div.className = 'modulo-check';
-                const checked = modulosPredefinidos ? modulosPredefinidos.includes(mod.nombre) : false;
+                var checked = modulosPredefinidos ? modulosPredefinidos.indexOf(mod.nombre) !== -1 : false;
                 div.innerHTML = `
                     <input type="checkbox" class="modulo-checkbox" value="${mod.nombre}" ${checked ? 'checked' : ''}>
                     <span>${iconos[mod.nombre] || '📦'}</span>
                     <span style="font-size:11px;">${nombres[mod.nombre] || mod.nombre}</span>
                 `;
-                const checkbox = div.querySelector('.modulo-checkbox');
+                var checkbox = div.querySelector('.modulo-checkbox');
                 checkbox.addEventListener('change', function() {
                     div.classList.toggle('checked');
                     actualizarContadorModulos();
@@ -364,117 +438,130 @@
         }
 
         function actualizarContadorModulos() {
-            const count = document.querySelectorAll('.modulo-checkbox:checked').length;
+            var count = document.querySelectorAll('.modulo-checkbox:checked').length;
             document.getElementById('modulosCount').textContent = count;
         }
 
         function getModulosSeleccionados() {
-            return Array.from(document.querySelectorAll('.modulo-checkbox:checked')).map(cb => cb.value);
+            var checkboxes = document.querySelectorAll('.modulo-checkbox:checked');
+            var result = [];
+            checkboxes.forEach(function(cb) {
+                result.push(cb.value);
+            });
+            return result;
         }
 
+        // ============================================
+        // CARGAR TRABAJADORES
+        // ============================================
         async function cargarTrabajadores() {
-            const container = document.getElementById('trabajadoresContainer');
+            var container = document.getElementById('trabajadoresContainer');
             container.innerHTML = '<div class="loading">Cargando...</div>';
 
             try {
-                const response = await fetch('/api/negocio/trabajadores');
+                var response = await fetch('/api/negocio/trabajadores');
                 if (!response.ok) throw new Error('Error');
                 trabajadores = await response.json();
                 renderTrabajadores();
                 actualizarEstadisticas();
             } catch (error) {
                 console.error('Error:', error);
-                container.innerHTML = `<div class="empty">❌ Error al cargar</div>`;
+                container.innerHTML = '<div class="empty">❌ Error al cargar</div>';
             }
         }
 
-        function renderTrabajadores(filtro = '', estadoFiltro = 'todos') {
-            const container = document.getElementById('trabajadoresContainer');
-            const filtroLower = filtro.toLowerCase();
+        function renderTrabajadores(filtro, estadoFiltro) {
+            filtro = filtro || '';
+            estadoFiltro = estadoFiltro || 'todos';
             
-            let filtrados = trabajadores.filter(t => 
-                t.nombre.toLowerCase().includes(filtroLower) ||
-                (t.apellidos && t.apellidos.toLowerCase().includes(filtroLower)) ||
-                (t.ci && t.ci.includes(filtroLower))
-            );
-
-            if (estadoFiltro === 'activo') {
-                filtrados = filtrados.filter(t => t.activo === 1 || t.activo === true);
-            } else if (estadoFiltro === 'inactivo') {
-                filtrados = filtrados.filter(t => t.activo === 0 || t.activo === false);
-            }
+            var container = document.getElementById('trabajadoresContainer');
+            var filtroLower = filtro.toLowerCase();
+            
+            var filtrados = trabajadores.filter(function(t) {
+                var match = t.nombre.toLowerCase().indexOf(filtroLower) !== -1 ||
+                    (t.apellidos && t.apellidos.toLowerCase().indexOf(filtroLower) !== -1) ||
+                    (t.ci && t.ci.indexOf(filtroLower) !== -1);
+                if (!match) return false;
+                
+                if (estadoFiltro === 'activo') {
+                    return t.activo === 1 || t.activo === true;
+                } else if (estadoFiltro === 'inactivo') {
+                    return t.activo === 0 || t.activo === false;
+                }
+                return true;
+            });
 
             if (filtrados.length === 0) {
-                container.innerHTML = `<div class="empty">No hay trabajadores</div>`;
+                container.innerHTML = '<div class="empty">No hay trabajadores</div>';
                 return;
             }
 
-            let html = `<table class="tabla">
-                <thead><tr>
-                    <th>Nombre</th><th>CI</th><th>Frecuencia</th><th>Salario</th><th>Módulos</th><th>Estado</th><th>Acciones</th>
-                </tr></thead><tbody>`;
+            var html = '<table class="tabla"><thead><tr>' +
+                '<th>Nombre</th><th>CI</th><th>Frecuencia</th><th>Salario</th><th>Módulos</th><th>Estado</th><th>Acciones</th>' +
+                '</tr></thead><tbody>';
 
-            filtrados.forEach(t => {
-                const nombreCompleto = t.apellidos ? `${t.nombre} ${t.apellidos}` : t.nombre;
-                const frecuenciaLabel = t.frecuencia === 'diaria' ? '🔄 Diaria' : '📅 Cada 2 días';
-                const frecuenciaClass = t.frecuencia === 'diaria' ? 'diaria' : 'cada2dias';
-                const estadoClass = t.activo ? 'activo' : 'inactivo';
-                const estadoLabel = t.activo ? '🟢 Activo' : '🔴 Inactivo';
+            filtrados.forEach(function(t) {
+                var nombreCompleto = t.apellidos ? t.nombre + ' ' + t.apellidos : t.nombre;
+                var frecuenciaLabel = t.frecuencia === 'diaria' ? '🔄 Diaria' : '📅 Cada 2 días';
+                var frecuenciaClass = t.frecuencia === 'diaria' ? 'diaria' : 'cada2dias';
+                var estadoClass = t.activo ? 'activo' : 'inactivo';
+                var estadoLabel = t.activo ? '🟢 Activo' : '🔴 Inactivo';
                 
-                let modulosHtml = '';
+                var modulosHtml = '';
                 if (t.modulos && t.modulos.length > 0) {
-                    const modulosList = Array.isArray(t.modulos) ? t.modulos : t.modulos.split(',');
-                    modulosList.forEach(mod => {
-                        const nombreMod = mod.trim();
+                    var modulosList = Array.isArray(t.modulos) ? t.modulos : t.modulos.split(',');
+                    modulosList.forEach(function(mod) {
+                        var nombreMod = mod.trim();
                         if (nombreMod) {
-                            modulosHtml += `<span class="badge" style="background:rgba(108,60,224,0.15);color:#6c3ce0;font-size:8px;margin:1px;">${nombreMod}</span>`;
+                            modulosHtml += '<span class="badge" style="background:rgba(108,60,224,0.15);color:#6c3ce0;font-size:8px;margin:1px;">' + nombreMod + '</span>';
                         }
                     });
                 } else {
                     modulosHtml = '<span style="color:#666;font-size:9px;">Sin módulos</span>';
                 }
                 
-                html += `
-                    <tr>
-                        <td><strong>${nombreCompleto}</strong></td>
-                        <td>${t.ci || '-'}</td>
-                        <td><span class="badge ${frecuenciaClass}">${frecuenciaLabel}</span></td>
-                        <td>$${t.salario ? parseFloat(t.salario).toFixed(2) : '0.00'}</td>
-                        <td>${modulosHtml}</td>
-                        <td><span class="badge ${estadoClass}">${estadoLabel}</span></td>
-                        <td>
-                            <div class="acciones-cell">
-                                <button class="btn btn-warning btn-sm" onclick="editarTrabajador(${t.id})">✏️</button>
-                                <button class="btn ${t.activo ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleTrabajador(${t.id}, ${t.activo ? 0 : 1})">${t.activo ? '🔴' : '🟢'}</button>
-                                <button class="btn btn-eliminar btn-sm" onclick="abrirModalEliminar(${t.id})">🗑️</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                html += '<tr>' +
+                    '<td><strong>' + nombreCompleto + '</strong></td>' +
+                    '<td>' + (t.ci || '-') + '</td>' +
+                    '<td><span class="badge ' + frecuenciaClass + '">' + frecuenciaLabel + '</span></td>' +
+                    '<td>$' + (t.salario ? parseFloat(t.salario).toFixed(2) : '0.00') + '</td>' +
+                    '<td>' + modulosHtml + '</td>' +
+                    '<td><span class="badge ' + estadoClass + '">' + estadoLabel + '</span></td>' +
+                    '<td>' +
+                        '<div class="acciones-cell">' +
+                            '<button class="btn btn-warning btn-sm" onclick="editarTrabajador(' + t.id + ')">✏️</button>' +
+                            '<button class="btn ' + (t.activo ? 'btn-danger' : 'btn-success') + ' btn-sm" onclick="toggleTrabajador(' + t.id + ', ' + (t.activo ? 0 : 1) + ')">' + (t.activo ? '🔴' : '🟢') + '</button>' +
+                            '<button class="btn btn-eliminar btn-sm" onclick="abrirModalEliminar(' + t.id + ')">🗑️</button>' +
+                        '</div>' +
+                    '</td>' +
+                '</tr>';
             });
 
-            html += `</tbody></table>`;
+            html += '</tbody></table>';
             container.innerHTML = html;
         }
 
         function actualizarEstadisticas() {
-            const total = trabajadores.length;
-            const activos = trabajadores.filter(t => t.activo === 1 || t.activo === true).length;
-            const inactivos = total - activos;
-            const nomina = trabajadores.reduce((sum, t) => sum + (parseFloat(t.salario) || 0), 0);
+            var total = trabajadores.length;
+            var activos = trabajadores.filter(function(t) { return t.activo === 1 || t.activo === true; }).length;
+            var inactivos = total - activos;
+            var nomina = trabajadores.reduce(function(sum, t) { return sum + (parseFloat(t.salario) || 0); }, 0);
             
             document.getElementById('totalTrabajadores').textContent = total;
             document.getElementById('trabajadoresActivos').textContent = activos;
             document.getElementById('trabajadoresInactivos').textContent = inactivos;
-            document.getElementById('nominaTotal').textContent = `$${nomina.toFixed(2)}`;
+            document.getElementById('nominaTotal').textContent = '$' + nomina.toFixed(2);
         }
 
         function filtrarTrabajadores() {
-            const filtro = document.getElementById('searchInput').value;
-            const estado = document.getElementById('filtroEstado').value;
+            var filtro = document.getElementById('searchInput').value;
+            var estado = document.getElementById('filtroEstado').value;
             renderTrabajadores(filtro, estado);
         }
 
+        // ============================================
+        // FORMULARIO
+        // ============================================
         function mostrarFormulario() {
             document.getElementById('formTrabajador').style.display = 'block';
             document.getElementById('traNombre').focus();
@@ -505,8 +592,18 @@
         }
 
         function editarTrabajador(id) {
-            const t = trabajadores.find(t => t.id === id);
-            if (!t) return;
+            // Buscar el trabajador en el array local
+            var t = null;
+            for (var i = 0; i < trabajadores.length; i++) {
+                if (trabajadores[i].id === id) {
+                    t = trabajadores[i];
+                    break;
+                }
+            }
+            if (!t) {
+                mostrarMensaje('Trabajador no encontrado', 'error');
+                return;
+            }
             
             document.getElementById('formTrabajador').style.display = 'block';
             document.getElementById('traNombre').value = t.nombre || '';
@@ -528,20 +625,22 @@
             
             if (modulosDisponibles.length === 0) { cargarModulosDisponibles(); }
             renderModulosCheckboxes(t.modulos || []);
+            
+            document.getElementById('formTrabajador').scrollIntoView({ behavior: 'smooth' });
         }
 
         async function guardarTrabajador() {
-            const nombre = document.getElementById('traNombre').value.trim();
-            const apellidos = document.getElementById('traApellidos').value.trim();
-            const ci = document.getElementById('traCI').value.trim();
-            const movil = document.getElementById('traMovil').value.trim();
-            const direccion = document.getElementById('traDireccion').value.trim();
-            const frecuencia = document.getElementById('traFrecuencia').value;
-            const salario = parseFloat(document.getElementById('traSalario').value);
-            const email = document.getElementById('traEmail').value.trim();
-            const usuario = document.getElementById('traUsuario').value.trim();
-            const password = document.getElementById('traPassword').value.trim();
-            const modulosSeleccionados = getModulosSeleccionados();
+            var nombre = document.getElementById('traNombre').value.trim();
+            var apellidos = document.getElementById('traApellidos').value.trim();
+            var ci = document.getElementById('traCI').value.trim();
+            var movil = document.getElementById('traMovil').value.trim();
+            var direccion = document.getElementById('traDireccion').value.trim();
+            var frecuencia = document.getElementById('traFrecuencia').value;
+            var salario = parseFloat(document.getElementById('traSalario').value);
+            var email = document.getElementById('traEmail').value.trim();
+            var usuario = document.getElementById('traUsuario').value.trim();
+            var password = document.getElementById('traPassword').value.trim();
+            var modulosSeleccionados = getModulosSeleccionados();
 
             if (!nombre || !apellidos || !ci || isNaN(salario) || !usuario) {
                 mostrarMensaje('Completa todos los campos obligatorios', 'error');
@@ -560,25 +659,33 @@
                 return;
             }
 
-            const data = {
-                nombre, apellidos, ci, movil, direccion, frecuencia,
-                salario, email, usuario, password,
+            var data = {
+                nombre: nombre,
+                apellidos: apellidos,
+                ci: ci,
+                movil: movil,
+                direccion: direccion,
+                frecuencia: frecuencia,
+                salario: salario,
+                email: email,
+                usuario: usuario,
+                password: password,
                 modulos: modulosSeleccionados
             };
 
             try {
-                const url = editandoId ? `/api/negocio/trabajador/${editandoId}` : '/api/negocio/trabajador/crear';
-                const method = editandoId ? 'PUT' : 'POST';
+                var url = editandoId ? '/api/negocio/trabajador/' + editandoId : '/api/negocio/trabajador/crear';
+                var method = editandoId ? 'PUT' : 'POST';
 
-                const response = await fetch(url, {
+                var response = await fetch(url, {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-                const result = await response.json();
+                var result = await response.json();
 
                 if (result.success) {
-                    mostrarMensaje(`✅ ${editandoId ? 'Actualizado' : 'Creado'} "${nombre} ${apellidos}"`, 'exito');
+                    mostrarMensaje('✅ ' + (editandoId ? 'Actualizado' : 'Creado') + ' "' + nombre + ' ' + apellidos + '"', 'exito');
                     cancelarFormulario();
                     await cargarTrabajadores();
                 } else {
@@ -592,13 +699,13 @@
 
         async function toggleTrabajador(id, activo) {
             try {
-                const response = await fetch(`/api/usuario/${id}/toggle`, {
+                var response = await fetch('/api/usuario/' + id + '/toggle', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ activo })
+                    body: JSON.stringify({ activo: activo })
                 });
                 if (response.ok) {
-                    mostrarMensaje(`✅ ${activo ? 'Activado' : 'Desactivado'}`, 'exito');
+                    mostrarMensaje('✅ ' + (activo ? 'Activado' : 'Desactivado'), 'exito');
                     await cargarTrabajadores();
                 } else {
                     mostrarMensaje('Error', 'error');
@@ -610,22 +717,28 @@
         }
 
         // ============================================
-        // ELIMINAR TRABAJADOR (CORREGIDO)
+        // ELIMINAR TRABAJADOR
         // ============================================
-
         function abrirModalEliminar(id) {
-            const t = trabajadores.find(t => t.id === id);
+            // Buscar el trabajador en el array local
+            var t = null;
+            for (var i = 0; i < trabajadores.length; i++) {
+                if (trabajadores[i].id === id) {
+                    t = trabajadores[i];
+                    break;
+                }
+            }
             if (!t) {
                 mostrarMensaje('Trabajador no encontrado', 'error');
                 return;
             }
             trabajadorAEliminar = t;
-            const nombreCompleto = t.apellidos ? `${t.nombre} ${t.apellidos}` : t.nombre;
+            var nombreCompleto = t.apellidos ? t.nombre + ' ' + t.apellidos : t.nombre;
             document.getElementById('nombreEliminar').textContent = nombreCompleto;
             document.getElementById('detalleNombre').textContent = nombreCompleto;
             document.getElementById('detalleCI').textContent = t.ci || '-';
             document.getElementById('detalleMovil').textContent = t.movil || '-';
-            document.getElementById('detalleSalario').textContent = `$${t.salario ? parseFloat(t.salario).toFixed(2) : '0.00'}`;
+            document.getElementById('detalleSalario').textContent = '$' + (t.salario ? parseFloat(t.salario).toFixed(2) : '0.00');
             document.getElementById('detalleEstado').textContent = t.activo ? '🟢 Activo' : '🔴 Inactivo';
             document.getElementById('modalEliminar').classList.add('show');
         }
@@ -645,23 +758,23 @@
                 return;
             }
             
-            const btn = document.getElementById('btnConfirmarEliminar');
-            const textoOriginal = btn.textContent;
+            var btn = document.getElementById('btnConfirmarEliminar');
+            var textoOriginal = btn.textContent;
             btn.disabled = true;
             btn.textContent = '⏳ Eliminando...';
             
             try {
-                const response = await fetch(`/api/negocio/trabajador/${trabajadorAEliminar.id}`, {
+                var response = await fetch('/api/negocio/trabajador/' + trabajadorAEliminar.id, {
                     method: 'DELETE'
                 });
                 
-                const data = await response.json();
+                var data = await response.json();
                 
                 if (data.success) {
-                    const nombre = trabajadorAEliminar.apellidos ? 
-                        `${trabajadorAEliminar.nombre} ${trabajadorAEliminar.apellidos}` : 
+                    var nombre = trabajadorAEliminar.apellidos ? 
+                        trabajadorAEliminar.nombre + ' ' + trabajadorAEliminar.apellidos : 
                         trabajadorAEliminar.nombre;
-                    mostrarMensaje(`✅ "${nombre}" eliminado correctamente`, 'exito');
+                    mostrarMensaje('✅ "' + nombre + '" eliminado correctamente', 'exito');
                     cerrarModalEliminar();
                     await cargarTrabajadores();
                 } else {
@@ -679,7 +792,6 @@
         // ============================================
         // INICIO
         // ============================================
-
         cargarModulosDisponibles();
         cargarTrabajadores();
         setInterval(cargarTrabajadores, 30000);
