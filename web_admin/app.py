@@ -2224,7 +2224,7 @@ def api_obtener_empresas_con_contratos():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - SERVICIOS (PARA NEGOCIOS Y TRABAJADORES)
+# API - SERVICIOS (PARA NEGOCIOS Y TRABAJADORES) - CORREGIDO
 # ============================================
 
 @app.route('/api/servicios', methods=['GET', 'POST'])
@@ -2236,23 +2236,33 @@ def api_servicios():
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Permitir tanto a negocios como a trabajadores
     if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Obtener el negocio_id
     negocio_id = usuario['id']
+    trabajador_id = None
+    
     if usuario['rol'] == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
         if not negocio_id:
             return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
+        trabajador_id = usuario['id']
     
     if request.method == 'GET':
-        trabajador_id = request.args.get('trabajador_id')
+        # Si es trabajador, ver sus servicios (y los del negocio)
         if usuario['rol'] == 'trabajador':
-            servicios = obtener_servicios(negocio_id, usuario['id'])
+            # Obtener servicios del negocio (todos, no solo los del trabajador)
+            servicios = obtener_servicios(negocio_id, None)
         else:
-            servicios = obtener_servicios(negocio_id, trabajador_id)
+            trabajador_id_param = request.args.get('trabajador_id')
+            servicios = obtener_servicios(negocio_id, trabajador_id_param)
+        
+        print(f"📋 Servicios encontrados: {len(servicios)} para negocio {negocio_id}")
         return jsonify([dict(s) for s in servicios])
     
+    # Los trabajadores NO pueden crear servicios
     if usuario['rol'] == 'trabajador':
         return jsonify({'error': 'No tienes permisos para crear servicios'}), 403
     
@@ -2262,45 +2272,15 @@ def api_servicios():
     precio = data.get('precio')
     duracion = data.get('duracion', 60)
     descripcion = data.get('descripcion', '')
-    trabajador_id = data.get('trabajador_id')
+    trabajador_id_crear = data.get('trabajador_id')
     
     if not nombre or precio is None:
         return jsonify({'error': 'Nombre y precio son requeridos'}), 400
     
-    servicio_id = crear_servicio(negocio_id, trabajador_id, nombre, categoria, precio, duracion, 1, descripcion)
+    servicio_id = crear_servicio(negocio_id, trabajador_id_crear, nombre, categoria, precio, duracion, 1, descripcion)
     registrar_log(usuario['id'], 'servicio_creado', f'Servicio: {nombre}')
     
     return jsonify({'success': True, 'id': servicio_id})
-
-@app.route('/api/servicio/<int:servicio_id>/toggle', methods=['POST'])
-@login_required
-def api_toggle_servicio(servicio_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    data = request.get_json()
-    activo = data.get('activo', 1)
-    toggle_servicio(servicio_id, activo)
-    registrar_log(usuario['id'], 'servicio_toggle', f'ID: {servicio_id} - Activo: {activo}')
-    
-    return jsonify({'success': True})
-
-@app.route('/api/servicio/<int:servicio_id>', methods=['DELETE'])
-@login_required
-def api_eliminar_servicio(servicio_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    eliminar_servicio(servicio_id)
-    registrar_log(usuario['id'], 'servicio_eliminado', f'ID: {servicio_id}')
-    
-    return jsonify({'success': True})
 
 # ============================================
 # API - REPORTES
