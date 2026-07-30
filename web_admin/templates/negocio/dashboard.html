@@ -152,7 +152,7 @@
         }
 
         /* ============================================
-           MENÚ DESPLEGABLE DEL USUARIO (CORREGIDO)
+           MENÚ DESPLEGABLE DEL USUARIO
            ============================================ */
         .user-menu {
             position: absolute;
@@ -1356,33 +1356,27 @@
         }
 
         // ============================================
-        // MENÚ DESPLEGABLE DEL USUARIO (CORREGIDO)
+        // MENÚ DESPLEGABLE DEL USUARIO
         // ============================================
 
-        // Abrir/cerrar menú al hacer clic en el botón de usuario
         document.getElementById('userMenuToggle').addEventListener('click', function(e) {
             e.stopPropagation();
             const menu = document.getElementById('userMenu');
             menu.classList.toggle('open');
         });
 
-        // Cerrar menú al hacer clic fuera
         document.addEventListener('click', function(e) {
             const menu = document.getElementById('userMenu');
             const toggle = document.getElementById('userMenuToggle');
             
-            // Si el clic no fue en el menú ni en el botón, cerrar
             if (!menu.contains(e.target) && !toggle.contains(e.target)) {
                 menu.classList.remove('open');
             }
         });
 
-        // Cerrar menú al hacer clic en una opción (excepto en el botón de cerrar sesión que redirige)
         document.querySelectorAll('.user-menu .menu-item').forEach(item => {
             item.addEventListener('click', function(e) {
-                // No cerrar si es el enlace de cerrar sesión (para que redirija)
                 if (!this.getAttribute('href') || this.getAttribute('href') !== '/logout') {
-                    // Cerrar menú después de un breve retraso para que se vea el clic
                     setTimeout(() => {
                         document.getElementById('userMenu').classList.remove('open');
                     }, 200);
@@ -1426,7 +1420,6 @@
             document.getElementById('confirmPassword').value = '';
             document.getElementById('mensajePassword').className = 'mensaje';
             document.getElementById('mensajePassword').textContent = '';
-            // Cerrar menú al abrir modal
             document.getElementById('userMenu').classList.remove('open');
         }
 
@@ -1552,8 +1545,16 @@
             const container = document.getElementById('modulosContainer');
             container.innerHTML = '';
 
-            const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos'];
-            const iconos = { 'inventario': '📦', 'tienda': '🛍️', 'trabajadores': '👥', 'servicios': '📋', 'ventas': '💰', 'contratos': '📄' };
+            const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos', 'nomina'];
+            const iconos = { 
+                'inventario': '📦', 
+                'tienda': '🛍️', 
+                'trabajadores': '👥', 
+                'servicios': '📋', 
+                'ventas': '💰', 
+                'contratos': '📄',
+                'nomina': '📊'
+            };
 
             const modulosNegocio = modulos.filter(m => m && m.nombre && nombresNegocio.includes(m.nombre.toLowerCase()));
 
@@ -1611,8 +1612,16 @@
             const container = document.getElementById('modulosMobileList');
             container.innerHTML = '';
 
-            const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos'];
-            const iconos = { 'inventario': '📦', 'tienda': '🛍️', 'trabajadores': '👥', 'servicios': '📋', 'ventas': '💰', 'contratos': '📄' };
+            const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos', 'nomina'];
+            const iconos = { 
+                'inventario': '📦', 
+                'tienda': '🛍️', 
+                'trabajadores': '👥', 
+                'servicios': '📋', 
+                'ventas': '💰', 
+                'contratos': '📄',
+                'nomina': '📊'
+            };
 
             const modulosNegocio = modulos.filter(m => m && m.nombre && nombresNegocio.includes(m.nombre.toLowerCase()));
 
