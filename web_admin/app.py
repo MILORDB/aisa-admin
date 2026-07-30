@@ -230,6 +230,113 @@ def fix_ventas():
         """, 500
 
 # ============================================
+# ENDPOINT PARA REPARAR PRODUCTOS (AGREGAR COLUMNA COSTO)
+# ============================================
+
+@app.route('/fix-productos', methods=['GET'])
+def fix_productos():
+    """Endpoint para agregar la columna costo a la tabla productos"""
+    try:
+        import urllib.parse
+        import psycopg2
+        
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL")
+        
+        # Verificar si la columna existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'productos' AND column_name = 'costo'
+        """)
+        existe = cursor.fetchone()
+        
+        if not existe:
+            print("🔧 Agregando columna 'costo' a la tabla productos...")
+            try:
+                cursor.execute("ALTER TABLE productos ADD COLUMN costo REAL DEFAULT 0")
+                conn.commit()
+                mensaje = "✅ Columna 'costo' agregada correctamente"
+                print(mensaje)
+            except psycopg2.Error as e:
+                conn.rollback()
+                mensaje = f"❌ Error al agregar columna: {e}"
+                print(mensaje)
+                return f"""
+                <html>
+                    <head><title>Error</title></head>
+                    <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                        <h1 style="color:#ff6b6b;">❌ {mensaje}</h1>
+                        <a href="/negocio/inventario" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Inventario</a>
+                    </body>
+                </html>
+                """
+        else:
+            mensaje = "✅ La columna 'costo' ya existe"
+            print(mensaje)
+        
+        # Verificar columnas actuales
+        cursor.execute("""
+            SELECT column_name, data_type
+            FROM information_schema.columns 
+            WHERE table_name = 'productos'
+            ORDER BY ordinal_position
+        """)
+        columnas = cursor.fetchall()
+        
+        html_columnas = ""
+        for col, tipo in columnas:
+            html_columnas += f"• {col} ({tipo})<br>"
+        
+        conn.close()
+        
+        return f"""
+        <html>
+            <head><title>Productos Reparados</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#6c3ce0;">✅ {mensaje}</h1>
+                <div style="background:#1a1a2e;border-radius:8px;padding:20px;margin:20px auto;max-width:600px;text-align:left;border:1px solid #2a2a3e;">
+                    <h3 style="color:#aaa;margin-bottom:10px;">📋 Columnas en 'productos':</h3>
+                    {html_columnas}
+                </div>
+                <br>
+                <a href="/negocio/inventario" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;display:inline-block;">Ir al Inventario</a>
+                <a href="/dashboard" style="color:#888;text-decoration:none;border:1px solid #2a2a3e;padding:10px 20px;border-radius:8px;display:inline-block;margin-left:10px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al reparar productos</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
 # DECORADORES
 # ============================================
 
