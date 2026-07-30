@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nómina - AIsa Negocio</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            padding: 12px;
+        }
+        .card {
+            background: #1a1a2e;
+            border-radius: 10px;
+            padding: 14px;
+            border: 1px solid #2a2a3e;
+            margin-bottom: 12px;
+        }
+        .card h2 { font-size: 15px; color: #6c3ce0; margin-bottom: 12px; }
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-success:hover { background: #3d8b40; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-danger:hover { background: #c62828; }
+        .btn-warning { background: #ff9800; color: #fff; }
+        .btn-warning:hover { background: #e68900; }
+        .btn-info { background: #2196f3; color: #fff; }
+        .btn-info:hover { background: #1976d2; }
+        .btn-sm { padding: 3px 8px; font-size: 10px; }
+        
+        .tabla {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .tabla th {
+            text-align: left;
+            padding: 6px 8px;
+            color: #888;
+            border-bottom: 1px solid #2a2a3e;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+        .tabla td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #1a1a2e;
+            vertical-align: middle;
+        }
+        .tabla .badge {
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 9px;
+        }
+        .tabla .badge.presente { background: #224422; color: #6bff6b; }
+        .tabla .badge.ausente { background: #442222; color: #ff6b6b; }
+        
+        .form-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        .form-row input, .form-row select {
+            padding: 6px 10px;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 12px;
+            flex: 1;
+            min-width: 100px;
+        }
+        .form-row input:focus, .form-row select:focus {
+            border-color: #6c3ce0;
+            outline: none;
+        }
+        .form-row label {
+            font-size: 11px;
+            color: #aaa;
+            display: block;
+            margin-bottom: 2px;
+        }
+        
+        .search-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .search-bar input {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 12px;
+            min-width: 100px;
+        }
+        .search-bar input:focus { border-color: #6c3ce0; outline: none; }
+        .search-bar select {
+            padding: 6px 10px;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 12px;
+        }
+        
+        .empty { text-align: center; color: #888; padding: 30px; font-size: 13px; }
+        .loading { text-align: center; color: #888; padding: 20px; font-size: 13px; }
+        .mensaje-exito {
+            background: #224422;
+            color: #6bff6b;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            display: none;
+        }
+        .mensaje-exito.show { display: block; }
+        .mensaje-error {
+            background: #442222;
+            color: #ff6b6b;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            display: none;
+        }
+        .mensaje-error.show { display: block; }
+        
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-content {
+            background: #1a1a2e;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 600px;
+            width: 100%;
+            border: 1px solid #2a2a3e;
+            max-height: 95vh;
+            overflow-y: auto;
+        }
+        .modal-content h3 { font-size: 16px; margin-bottom: 4px; }
+        .modal-content .modal-subtitle { font-size: 11px; color: #888; margin-bottom: 12px; }
+        .modal-content .form-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            border-top: 1px solid #2a2a3e;
+            padding-top: 12px;
+        }
+        .modal-content .form-actions .btn { flex: 1; }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .stat-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            padding: 8px;
+            text-align: center;
+        }
+        .stat-item .number { font-size: 18px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 8px; color: #888; margin-top: 1px; }
+        
+        .acciones-cell { display: flex; gap: 4px; flex-wrap: wrap; }
+        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
+        .table-wrapper table { min-width: 700px; }
+        
+        .resumen-nomina {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .resumen-nomina .fila {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .resumen-nomina .fila:last-child { border-bottom: none; }
+        .resumen-nomina .label { color: #888; font-size: 11px; }
+        .resumen-nomina .value { color: #fff; font-weight: 600; }
+        .resumen-nomina .value.total { color: #6c3ce0; font-size: 16px; }
+        .resumen-nomina .value.comision { color: #2196f3; }
+        
+        .comisiones-list {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .comisiones-list .item {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            border-bottom: 1px solid #1a1a2e;
+            font-size: 11px;
+        }
+        .comisiones-list .item .producto { color: #aaa; }
+        .comisiones-list .item .monto { color: #2196f3; font-weight: 600; }
+        
+        @media (max-width: 600px) {
+            body { padding: 8px; }
+            .card { padding: 10px; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .form-row { flex-direction: column; }
+            .search-bar { flex-direction: column; }
+            .acciones-cell { flex-direction: row; flex-wrap: wrap; }
+            .acciones-cell .btn-sm { flex: 1; text-align: center; min-width: 50px; }
+            .tabla { font-size: 11px; }
+            .tabla th, .tabla td { padding: 4px 6px; }
+            .modal-content { padding: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:6px;">
+        <h1 style="font-size:18px;display:flex;align-items:center;gap:8px;">📊 Nómina <span style="font-size:12px;font-weight:normal;opacity:0.7;">Gestión de salarios</span></h1>
+    </div>
+
+    <div class="mensaje-error" id="mensajeError"></div>
+    <div class="mensaje-exito" id="mensajeExito"></div>
+
+    <div class="card">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="number" id="totalTrabajadores">0</span>
+                <span class="label">👥 Trabajadores</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="totalNomina">$0</span>
+                <span class="label">💰 Total Nómina</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="totalComisiones">$0</span>
+                <span class="label">💵 Comisiones</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar trabajador..." oninput="filtrarNominas()">
+            <select id="filtroMes" onchange="cargarNominas()">
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+            <select id="filtroAno" onchange="cargarNominas()"></select>
+            <button class="btn btn-primary" onclick="calcularNomina()">📊 Calcular Nómina</button>
+            <button class="btn btn-success" onclick="generarReporte()">📄 Reporte</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-wrapper">
+            <div id="nominasContainer">
+                <div class="loading">Cargando...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detalle Nómina -->
+    <div class="modal-overlay" id="modalDetalle">
+        <div class="modal-content">
+            <h3 id="modalTitulo">📊 Detalle de Nómina</h3>
+            <div class="modal-subtitle" id="modalSubtitulo">Detalle del trabajador</div>
+            
+            <div class="resumen-nomina" id="resumenNomina">
+                <div class="fila">
+                    <span class="label">💰 Salario Base</span>
+                    <span class="value" id="detalleSalarioBase">$0.00</span>
+                </div>
+                <div class="fila">
+                    <span class="label">📅 Días del Mes</span>
+                    <span class="value" id="detalleDiasMes">0</span>
+                </div>
+                <div class="fila">
+                    <span class="label">✅ Días Trabajados</span>
+                    <span class="value" id="detalleDiasTrabajados">0</span>
+                </div>
+                <div class="fila">
+                    <span class="label">❌ Días Ausencia</span>
+                    <span class="value" id="detalleDiasAusencia">0</span>
+                </div>
+                <div class="fila">
+                    <span class="label">💵 Salario Diario</span>
+                    <span class="value" id="detalleSalarioDiario">$0.00</span>
+                </div>
+                <div class="fila">
+                    <span class="label">📈 Salario Devengado</span>
+                    <span class="value" id="detalleSalarioDevengado">$0.00</span>
+                </div>
+                <div class="fila">
+                    <span class="label">💵 Comisiones</span>
+                    <span class="value comision" id="detalleComisiones">$0.00</span>
+                </div>
+                <div class="fila" style="border-top:2px solid #6c3ce0;margin-top:4px;padding-top:6px;">
+                    <span class="label" style="font-weight:700;">💰 TOTAL</span>
+                    <span class="value total" id="detalleTotal">$0.00</span>
+                </div>
+            </div>
+
+            <div style="margin-top:12px;">
+                <h4 style="font-size:13px;color:#2196f3;margin-bottom:6px;">📋 Comisiones del Mes</h4>
+                <div class="comisiones-list" id="detalleComisionesList">
+                    <div class="empty">No hay comisiones registradas</div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-primary" onclick="cerrarModal()">✕ Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let nominas = [];
+        let trabajadores = [];
+        let mesActual = new Date().getMonth() + 1;
+        let anoActual = new Date().getFullYear();
+
+        // ============================================
+        // INICIALIZAR
+        // ============================================
+        
+        function init() {
+            // Llenar selector de años
+            const anoSelect = document.getElementById('filtroAno');
+            const anoActual = new Date().getFullYear();
+            for (let i = anoActual - 5; i <= anoActual + 1; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i;
+                if (i === anoActual) option.selected = true;
+                anoSelect.appendChild(option);
+            }
+            
+            // Setear mes actual
+            document.getElementById('filtroMes').value = new Date().getMonth() + 1;
+            
+            cargarNominas();
+            cargarTrabajadores();
+        }
+
+        // ============================================
+        // CARGAR TRABAJADORES
+        // ============================================
+        
+        async function cargarTrabajadores() {
+            try {
+                const response = await fetch('/api/negocio/trabajadores');
+                const data = await response.json();
+                trabajadores = data;
+                document.getElementById('totalTrabajadores').textContent = trabajadores.length;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        // ============================================
+        // CARGAR NÓMINAS
+        // ============================================
+        
+        async function cargarNominas() {
+            const container = document.getElementById('nominasContainer');
+            container.innerHTML = '<div class="loading">Cargando...</div>';
+            
+            const mes = document.getElementById('filtroMes').value;
+            const ano = document.getElementById('filtroAno').value;
+            
+            try {
+                const response = await fetch(`/api/nomina?mes=${mes}&ano=${ano}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    nominas = data.nominas || [];
+                    renderNominas();
+                    actualizarEstadisticas();
+                } else {
+                    container.innerHTML = `<div class="empty">❌ ${data.message || 'Error al cargar'}</div>`;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                container.innerHTML = `<div class="empty">❌ Error al cargar</div>`;
+            }
+        }
+
+        // ============================================
+        // RENDER NÓMINAS
+        // ============================================
+        
+        function renderNominas(filtro = '') {
+            const container = document.getElementById('nominasContainer');
+            const filtroLower = filtro.toLowerCase();
+            
+            const filtrados = nominas.filter(n => 
+                n.nombre.toLowerCase().includes(filtroLower)
+            );
+            
+            if (filtrados.length === 0) {
+                container.innerHTML = `<div class="empty">No hay registros de nómina para este mes</div>`;
+                return;
+            }
+            
+            let html = `<table class="tabla">
+                <thead><tr>
+                    <th>Trabajador</th>
+                    <th>Salario Base</th>
+                    <th>Días Trabajados</th>
+                    <th>Ausencias</th>
+                    <th>Salario Devengado</th>
+                    <th>Comisiones</th>
+                    <th>Total</th>
+                    <th>Acciones</th>
+                </tr></thead><tbody>`;
+            
+            filtrados.forEach(n => {
+                html += `
+                    <tr>
+                        <td><strong>${n.nombre}</strong></td>
+                        <td>$${parseFloat(n.salario_base).toFixed(2)}</td>
+                        <td>${n.dias_trabajados}</td>
+                        <td>${n.dias_ausencia || 0}</td>
+                        <td>$${parseFloat(n.salario_devengado).toFixed(2)}</td>
+                        <td>$${parseFloat(n.comisiones || 0).toFixed(2)}</td>
+                        <td><strong>$${parseFloat(n.total).toFixed(2)}</strong></td>
+                        <td>
+                            <div class="acciones-cell">
+                                <button class="btn btn-info btn-sm" onclick="verDetalle(${n.trabajador_id})">👁️</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+
+        // ============================================
+        // ACTUALIZAR ESTADÍSTICAS
+        // ============================================
+        
+        function actualizarEstadisticas() {
+            const totalNomina = nominas.reduce((sum, n) => sum + parseFloat(n.total || 0), 0);
+            const totalComisiones = nominas.reduce((sum, n) => sum + parseFloat(n.comisiones || 0), 0);
+            
+            document.getElementById('totalNomina').textContent = `$${totalNomina.toFixed(2)}`;
+            document.getElementById('totalComisiones').textContent = `$${totalComisiones.toFixed(2)}`;
+        }
+
+        // ============================================
+        // FILTRAR
+        // ============================================
+        
+        function filtrarNominas() {
+            renderNominas(document.getElementById('searchInput').value);
+        }
+
+        // ============================================
+        // CALCULAR NÓMINA
+        // ============================================
+        
+        async function calcularNomina() {
+            const mes = document.getElementById('filtroMes').value;
+            const ano = document.getElementById('filtroAno').value;
+            
+            if (!confirm(`📊 ¿Calcular nómina para ${getNombreMes(parseInt(mes))} de ${ano}?`)) return;
+            
+            const btn = document.querySelector('.btn-primary');
+            const textoOriginal = btn.textContent;
+            btn.textContent = '⏳ Calculando...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/nomina/calcular', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mes: parseInt(mes), ano: parseInt(ano) })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    mostrarMensaje(`✅ Nómina calculada para ${data.trabajadores} trabajadores`, 'exito');
+                    await cargarNominas();
+                } else {
+                    mostrarMensaje(`❌ ${data.message || 'Error al calcular'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('❌ Error de conexión', 'error');
+            } finally {
+                btn.textContent = textoOriginal;
+                btn.disabled = false;
+            }
+        }
+
+        // ============================================
+        // VER DETALLE
+        // ============================================
+        
+        async function verDetalle(trabajadorId) {
+            const mes = document.getElementById('filtroMes').value;
+            const ano = document.getElementById('filtroAno').value;
+            
+            try {
+                const response = await fetch(`/api/nomina/detalle?trabajador_id=${trabajadorId}&mes=${mes}&ano=${ano}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const d = data.detalle;
+                    
+                    document.getElementById('modalTitulo').textContent = `📊 Nómina de ${d.nombre}`;
+                    document.getElementById('modalSubtitulo').textContent = `${getNombreMes(d.mes)} de ${d.ano}`;
+                    
+                    document.getElementById('detalleSalarioBase').textContent = `$${d.salario_base.toFixed(2)}`;
+                    document.getElementById('detalleDiasMes').textContent = d.dias_mes;
+                    document.getElementById('detalleDiasTrabajados').textContent = d.dias_trabajados;
+                    document.getElementById('detalleDiasAusencia').textContent = d.dias_ausencia || 0;
+                    document.getElementById('detalleSalarioDiario').textContent = `$${d.salario_diario.toFixed(2)}`;
+                    document.getElementById('detalleSalarioDevengado').textContent = `$${d.salario_devengado.toFixed(2)}`;
+                    document.getElementById('detalleComisiones').textContent = `$${(d.comisiones || 0).toFixed(2)}`;
+                    document.getElementById('detalleTotal').textContent = `$${d.total.toFixed(2)}`;
+                    
+                    // Mostrar comisiones
+                    const listContainer = document.getElementById('detalleComisionesList');
+                    if (d.comisiones_list && d.comisiones_list.length > 0) {
+                        let html = '';
+                        d.comisiones_list.forEach(c => {
+                            html += `
+                                <div class="item">
+                                    <span class="producto">${c.producto_nombre || 'Producto'} - ${c.cliente || 'Cliente'}</span>
+                                    <span class="monto">$${parseFloat(c.monto).toFixed(2)}</span>
+                                </div>
+                            `;
+                        });
+                        listContainer.innerHTML = html;
+                    } else {
+                        listContainer.innerHTML = '<div class="empty">No hay comisiones registradas</div>';
+                    }
+                    
+                    document.getElementById('modalDetalle').classList.add('show');
+                } else {
+                    mostrarMensaje(`❌ ${data.message || 'Error al obtener detalle'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('❌ Error de conexión', 'error');
+            }
+        }
+
+        // ============================================
+        // GENERAR REPORTE
+        // ============================================
+        
+        function generarReporte() {
+            const mes = document.getElementById('filtroMes').value;
+            const ano = document.getElementById('filtroAno').value;
+            
+            if (nominas.length === 0) {
+                mostrarMensaje('⚠️ No hay datos de nómina para generar reporte', 'error');
+                return;
+            }
+            
+            if (!confirm(`📄 ¿Generar reporte de nómina para ${getNombreMes(parseInt(mes))} de ${ano}?`)) return;
+            
+            const btn = document.querySelector('.btn-success');
+            const textoOriginal = btn.textContent;
+            btn.textContent = '⏳ Generando...';
+            btn.disabled = true;
+            
+            fetch(`/api/nomina/reporte?mes=${mes}&ano=${ano}`)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Error');
+                        });
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `nomina_${mes}_${ano}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    mostrarMensaje('✅ Reporte generado correctamente', 'exito');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    mostrarMensaje(`❌ ${error.message || 'Error al generar reporte'}`, 'error');
+                })
+                .finally(() => {
+                    btn.textContent = textoOriginal;
+                    btn.disabled = false;
+                });
+        }
+
+        // ============================================
+        // FUNCIONES AUXILIARES
+        // ============================================
+        
+        function mostrarMensaje(texto, tipo) {
+            const errorEl = document.getElementById('mensajeError');
+            const exitoEl = document.getElementById('mensajeExito');
+            errorEl.classList.remove('show');
+            exitoEl.classList.remove('show');
+            if (tipo === 'error') {
+                errorEl.textContent = '❌ ' + texto;
+                errorEl.classList.add('show');
+            } else {
+                exitoEl.textContent = '✅ ' + texto;
+                exitoEl.classList.add('show');
+            }
+            setTimeout(() => {
+                errorEl.classList.remove('show');
+                exitoEl.classList.remove('show');
+            }, 4000);
+        }
+        
+        function getNombreMes(mes) {
+            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            return meses[mes - 1] || mes;
+        }
+        
+        function cerrarModal() {
+            document.getElementById('modalDetalle').classList.remove('show');
+        }
+        
+        document.getElementById('modalDetalle').addEventListener('click', function(e) {
+            if (e.target === this) cerrarModal();
+        });
+
+        // ============================================
+        // INICIO
+        // ============================================
+        
+        init();
+    </script>
+</body>
+</html>
