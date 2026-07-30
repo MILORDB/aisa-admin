@@ -129,8 +129,7 @@ def init_db_route():
             </body>
         </html>
         """, 500
-
-# ============================================
+        # ============================================
 # DECORADORES
 # ============================================
 
@@ -900,8 +899,7 @@ def api_asignar_permiso(user_id, modulo_id):
     asignar_permiso_usuario(user_id, modulo_id, activo)
     registrar_log(None, 'permiso_usuario', f'Usuario {user_id} módulo {modulo_id} activo={activo}')
     return jsonify({'success': True})
-
-# ============================================
+    # ============================================
 # API - NEGOCIO - TRABAJADORES
 # ============================================
 
@@ -1213,9 +1211,11 @@ def api_productos():
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Permitir tanto a negocios como a trabajadores
     if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Obtener el negocio_id del trabajador o usar su propio id
     negocio_id = usuario['id']
     if usuario['rol'] == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
@@ -1226,6 +1226,7 @@ def api_productos():
         productos = obtener_productos(negocio_id)
         return jsonify([dict(p) for p in productos])
     
+    # Los trabajadores NO pueden crear/editar productos
     if usuario['rol'] == 'trabajador':
         return jsonify({'error': 'No tienes permisos para crear productos'}), 403
     
@@ -1258,6 +1259,7 @@ def api_producto(producto_id):
     if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Obtener el negocio_id
     negocio_id = usuario['id']
     if usuario['rol'] == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
@@ -1305,6 +1307,7 @@ def api_producto(producto_id):
             traceback.print_exc()
             return jsonify({'error': str(e)}), 500
     
+    # Los trabajadores NO pueden editar productos
     if usuario['rol'] == 'trabajador':
         return jsonify({'error': 'No tienes permisos para editar productos'}), 403
     
@@ -1355,6 +1358,7 @@ def api_productos_stock():
     if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Obtener el negocio_id
     negocio_id = usuario['id']
     if usuario['rol'] == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
@@ -1696,6 +1700,94 @@ def api_tienda_public():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+        # ============================================
+# API - SERVICIOS (PARA NEGOCIOS Y TRABAJADORES) - CORREGIDO
+# ============================================
+
+@app.route('/api/servicios', methods=['GET', 'POST'])
+@login_required
+def api_servicios():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    # Permitir tanto a negocios como a trabajadores
+    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    # Obtener el negocio_id
+    negocio_id = usuario['id']
+    trabajador_id = None
+    
+    if usuario['rol'] == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
+        trabajador_id = usuario['id']
+    
+    if request.method == 'GET':
+        # Si es trabajador, ver sus servicios (y los del negocio)
+        if usuario['rol'] == 'trabajador':
+            # Obtener servicios del negocio (todos, no solo los del trabajador)
+            servicios = obtener_servicios(negocio_id, None)
+        else:
+            trabajador_id_param = request.args.get('trabajador_id')
+            servicios = obtener_servicios(negocio_id, trabajador_id_param)
+        
+        print(f"📋 Servicios encontrados: {len(servicios)} para negocio {negocio_id}")
+        return jsonify([dict(s) for s in servicios])
+    
+    # Los trabajadores NO pueden crear servicios
+    if usuario['rol'] == 'trabajador':
+        return jsonify({'error': 'No tienes permisos para crear servicios'}), 403
+    
+    data = request.get_json()
+    nombre = data.get('nombre')
+    categoria = data.get('categoria')
+    precio = data.get('precio')
+    duracion = data.get('duracion', 60)
+    descripcion = data.get('descripcion', '')
+    trabajador_id_crear = data.get('trabajador_id')
+    
+    if not nombre or precio is None:
+        return jsonify({'error': 'Nombre y precio son requeridos'}), 400
+    
+    servicio_id = crear_servicio(negocio_id, trabajador_id_crear, nombre, categoria, precio, duracion, 1, descripcion)
+    registrar_log(usuario['id'], 'servicio_creado', f'Servicio: {nombre}')
+    
+    return jsonify({'success': True, 'id': servicio_id})
+
+@app.route('/api/servicio/<int:servicio_id>/toggle', methods=['POST'])
+@login_required
+def api_toggle_servicio(servicio_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    data = request.get_json()
+    activo = data.get('activo', 1)
+    toggle_servicio(servicio_id, activo)
+    registrar_log(usuario['id'], 'servicio_toggle', f'ID: {servicio_id} - Activo: {activo}')
+    
+    return jsonify({'success': True})
+
+@app.route('/api/servicio/<int:servicio_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_servicio(servicio_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    eliminar_servicio(servicio_id)
+    registrar_log(usuario['id'], 'servicio_eliminado', f'ID: {servicio_id}')
+    
+    return jsonify({'success': True})
 
 # ============================================
 # API - VENTAS (PARA NEGOCIOS Y TRABAJADORES)
@@ -1713,6 +1805,7 @@ def api_ventas():
     if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Obtener el negocio_id del trabajador o usar su propio id
     negocio_id = usuario['id']
     trabajador_id = None
     if usuario['rol'] == 'trabajador':
@@ -1722,6 +1815,7 @@ def api_ventas():
         trabajador_id = usuario['id']
     
     if request.method == 'GET':
+        # Si es trabajador, solo ver sus propias ventas
         if usuario['rol'] == 'trabajador':
             ventas = obtener_ventas(negocio_id, trabajador_id)
         else:
@@ -1738,6 +1832,7 @@ def api_ventas():
     cantidad = data.get('cantidad', 1)
     precio = data.get('precio')
     total = data.get('total', precio * cantidad if precio else 0)
+    # Si es trabajador, forzar su ID
     if usuario['rol'] == 'trabajador':
         trabajador_id = usuario['id']
     else:
@@ -1782,6 +1877,7 @@ def api_ventas():
     if tipo == 'producto' and producto_id and estado != 'oferta':
         actualizar_stock_producto(producto_id, cantidad)
     
+    # Registrar comisión si corresponde
     if trabajador_id and tipo == 'producto':
         conn = get_db()
         cursor = conn.cursor()
@@ -2067,6 +2163,7 @@ def api_contratos():
     if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Obtener el negocio_id del trabajador o usar su propio id
     negocio_id = usuario['id']
     if usuario['rol'] == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
@@ -2074,10 +2171,11 @@ def api_contratos():
             return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
     
     if request.method == 'GET':
-        trabajador_id = request.args.get('trabajador_id')
+        trabajador_id = request.args.get('travajador_id')
         contratos = obtener_contratos(negocio_id, trabajador_id)
         return jsonify([dict(c) for c in contratos])
     
+    # Los trabajadores NO pueden crear contratos
     if usuario['rol'] == 'trabajador':
         return jsonify({'error': 'No tienes permisos para crear contratos'}), 403
     
@@ -2189,6 +2287,7 @@ def api_obtener_empresas_con_contratos():
     if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Obtener el negocio_id del trabajador o usar su propio id
     negocio_id = usuario['id']
     if usuario['rol'] == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
@@ -2222,67 +2321,7 @@ def api_obtener_empresas_con_contratos():
     except Exception as e:
         print(f"❌ Error obteniendo empresas con contratos: {e}")
         return jsonify({'error': str(e)}), 500
-
-# ============================================
-# API - SERVICIOS (PARA NEGOCIOS Y TRABAJADORES) - CORREGIDO
-# ============================================
-
-@app.route('/api/servicios', methods=['GET', 'POST'])
-@login_required
-def api_servicios():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    # Permitir tanto a negocios como a trabajadores
-    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    # Obtener el negocio_id
-    negocio_id = usuario['id']
-    trabajador_id = None
-    
-    if usuario['rol'] == 'trabajador':
-        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-        if not negocio_id:
-            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
-        trabajador_id = usuario['id']
-    
-    if request.method == 'GET':
-        # Si es trabajador, ver sus servicios (y los del negocio)
-        if usuario['rol'] == 'trabajador':
-            # Obtener servicios del negocio (todos, no solo los del trabajador)
-            servicios = obtener_servicios(negocio_id, None)
-        else:
-            trabajador_id_param = request.args.get('trabajador_id')
-            servicios = obtener_servicios(negocio_id, trabajador_id_param)
-        
-        print(f"📋 Servicios encontrados: {len(servicios)} para negocio {negocio_id}")
-        return jsonify([dict(s) for s in servicios])
-    
-    # Los trabajadores NO pueden crear servicios
-    if usuario['rol'] == 'trabajador':
-        return jsonify({'error': 'No tienes permisos para crear servicios'}), 403
-    
-    data = request.get_json()
-    nombre = data.get('nombre')
-    categoria = data.get('categoria')
-    precio = data.get('precio')
-    duracion = data.get('duracion', 60)
-    descripcion = data.get('descripcion', '')
-    trabajador_id_crear = data.get('trabajador_id')
-    
-    if not nombre or precio is None:
-        return jsonify({'error': 'Nombre y precio son requeridos'}), 400
-    
-    servicio_id = crear_servicio(negocio_id, trabajador_id_crear, nombre, categoria, precio, duracion, 1, descripcion)
-    registrar_log(usuario['id'], 'servicio_creado', f'Servicio: {nombre}')
-    
-    return jsonify({'success': True, 'id': servicio_id})
-
-# ============================================
+        # ============================================
 # API - REPORTES
 # ============================================
 
@@ -2613,7 +2652,7 @@ def api_resumen_productos():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - NÓMINA
+# API - NÓMINA (CORREGIDO)
 # ============================================
 
 @app.route('/api/nomina', methods=['GET'])
@@ -2656,19 +2695,48 @@ def api_calcular_nomina():
     if not mes or not ano:
         return jsonify({'error': 'Mes y año son requeridos'}), 400
     
-    trabajadores = obtener_trabajadores_por_empresa(usuario['id'])
-    
-    contador = 0
-    for t in trabajadores:
-        resultado = calcular_nomina(usuario['id'], t['id'], mes, ano)
-        if resultado:
-            contador += 1
-    
-    return jsonify({
-        'success': True,
-        'trabajadores': contador,
-        'message': f'Nómina calculada para {contador} trabajadores'
-    })
+    try:
+        # Obtener trabajadores del negocio
+        trabajadores = obtener_trabajadores_por_empresa(usuario['id'])
+        
+        if not trabajadores:
+            return jsonify({
+                'success': True,
+                'trabajadores': 0,
+                'message': 'No hay trabajadores registrados'
+            })
+        
+        contador = 0
+        errores = []
+        
+        for t in trabajadores:
+            try:
+                resultado = calcular_nomina(usuario['id'], t['id'], mes, ano)
+                if resultado:
+                    contador += 1
+            except Exception as e:
+                errores.append(f"Error con trabajador {t.get('nombre', t.get('id'))}: {str(e)}")
+                print(f"❌ Error calculando nómina para trabajador {t.get('id')}: {e}")
+        
+        mensaje = f'Nómina calculada para {contador} trabajadores'
+        if errores:
+            mensaje += f' ({len(errores)} errores)'
+            print(f"⚠️ Errores: {errores}")
+        
+        return jsonify({
+            'success': True,
+            'trabajadores': contador,
+            'message': mensaje,
+            'errores': errores if errores else None
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_calcular_nomina: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': f'Error al calcular nómina: {str(e)}'
+        }), 500
 
 @app.route('/api/nomina/detalle', methods=['GET'])
 @login_required
@@ -2848,6 +2916,49 @@ def api_nomina_reporte():
     return response
 
 # ============================================
+# API - NOMINA DEBUG (PARA DEPURAR ERRORES)
+# ============================================
+
+@app.route('/api/nomina/debug', methods=['GET'])
+@login_required
+def api_nomina_debug():
+    """Endpoint de depuración para nómina"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    try:
+        # Verificar trabajadores
+        trabajadores = obtener_trabajadores_por_empresa(usuario['id'])
+        
+        # Verificar funciones
+        resultado = {
+            'negocio_id': usuario['id'],
+            'trabajadores': len(trabajadores),
+            'trabajadores_lista': [{'id': t['id'], 'nombre': t['nombre']} for t in trabajadores],
+            'db_conexion': 'OK'
+        }
+        
+        # Probar una consulta simple
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT 1')
+        cursor.fetchone()
+        conn.close()
+        resultado['db_test'] = 'OK'
+        
+        return jsonify(resultado)
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+# ============================================
 # API - ESTADÍSTICAS TRABAJADOR
 # ============================================
 
@@ -2947,3 +3058,4 @@ if __name__ == '__main__':
     print("=" * 60)
     
     app.run(debug=False, host='0.0.0.0', port=port)
+    
