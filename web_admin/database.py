@@ -1149,13 +1149,21 @@ def crear_servicio(negocio_id, trabajador_id, nombre, categoria, precio, duracio
     return servicio_id
 
 def obtener_servicios(negocio_id, trabajador_id=None):
+    """Obtiene servicios de un negocio, opcionalmente filtrados por trabajador"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     if trabajador_id:
-        cursor.execute('SELECT * FROM servicios WHERE negocio_id = %s AND trabajador_id = %s ORDER BY id DESC',
-                       (negocio_id, trabajador_id))
+        cursor.execute('''
+            SELECT * FROM servicios 
+            WHERE negocio_id = %s AND trabajador_id = %s 
+            ORDER BY id DESC
+        ''', (negocio_id, trabajador_id))
     else:
-        cursor.execute('SELECT * FROM servicios WHERE negocio_id = %s ORDER BY id DESC', (negocio_id,))
+        cursor.execute('''
+            SELECT * FROM servicios 
+            WHERE negocio_id = %s 
+            ORDER BY id DESC
+        ''', (negocio_id,))
     servicios = cursor.fetchall()
     conn.close()
     return servicios
