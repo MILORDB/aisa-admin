@@ -108,7 +108,7 @@ def init_db():
     )
     ''')
     
-    # TABLA PRODUCTOS CON CAMPO COSTO
+    # TABLA PRODUCTOS CON CAMPO COSTO Y COMISION
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS productos (
         id SERIAL PRIMARY KEY,
@@ -117,6 +117,7 @@ def init_db():
         categoria TEXT,
         precio REAL NOT NULL,
         costo REAL DEFAULT 0,
+        comision REAL DEFAULT 0,
         stock INTEGER DEFAULT 0,
         stock_minimo INTEGER DEFAULT 3,
         foto_url TEXT,
@@ -554,10 +555,10 @@ def obtener_logs(limit=50):
     return logs
 
 # ============================================
-# FUNCIONES PARA PRODUCTOS (CON COSTO)
+# FUNCIONES PARA PRODUCTOS (CON COSTO Y COMISION)
 # ============================================
 
-def crear_producto(negocio_id, nombre, categoria, precio, costo=0, stock=0, stock_minimo=3):
+def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, stock=0, stock_minimo=3):
     """
     Crea un nuevo producto en la base de datos
     """
@@ -565,9 +566,9 @@ def crear_producto(negocio_id, nombre, categoria, precio, costo=0, stock=0, stoc
     cursor = conn.cursor()
     try:
         cursor.execute('''
-        INSERT INTO productos (negocio_id, nombre, categoria, precio, costo, stock, stock_minimo, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (negocio_id, nombre, categoria, precio, costo, stock, stock_minimo, datetime.now().isoformat()))
+        INSERT INTO productos (negocio_id, nombre, categoria, precio, costo, comision, stock, stock_minimo, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ''', (negocio_id, nombre, categoria, precio, costo, comision, stock, stock_minimo, datetime.now().isoformat()))
         conn.commit()
         producto_id = cursor.lastrowid
         conn.close()
@@ -579,6 +580,7 @@ def crear_producto(negocio_id, nombre, categoria, precio, costo=0, stock=0, stoc
         return None
 
 def obtener_productos(negocio_id):
+    """Obtiene todos los productos de un negocio"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('SELECT * FROM productos WHERE negocio_id = %s ORDER BY id DESC', (negocio_id,))
@@ -587,6 +589,7 @@ def obtener_productos(negocio_id):
     return productos
 
 def obtener_todos_productos():
+    """Obtiene todos los productos de todos los negocios (para admin)"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -598,15 +601,17 @@ def obtener_todos_productos():
     return productos
 
 def obtener_productos_con_stock(negocio_id):
+    """Obtiene productos con stock disponible"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT id, nombre, precio, costo, stock FROM productos WHERE negocio_id = %s AND stock > 0 ORDER BY nombre',
+    cursor.execute('SELECT id, nombre, precio, costo, comision, stock FROM productos WHERE negocio_id = %s AND stock > 0 ORDER BY nombre',
                    (negocio_id,))
     productos = cursor.fetchall()
     conn.close()
     return productos
 
 def obtener_productos_tienda():
+    """Obtiene productos disponibles para la tienda pública"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -618,16 +623,19 @@ def obtener_productos_tienda():
     conn.close()
     return productos
 
-def actualizar_producto(producto_id, nombre, categoria, precio, costo, stock, stock_minimo):
+def actualizar_producto(producto_id, nombre, categoria, precio, costo, comision, stock, stock_minimo):
+    """
+    Actualiza un producto existente
+    """
     conn = get_db()
     cursor = conn.cursor()
     try:
         cursor.execute('''
         UPDATE productos 
-        SET nombre = %s, categoria = %s, precio = %s, costo = %s,
+        SET nombre = %s, categoria = %s, precio = %s, costo = %s, comision = %s,
         stock = %s, stock_minimo = %s, updated_at = %s 
         WHERE id = %s
-        ''', (nombre, categoria, precio, costo, stock, stock_minimo, datetime.now().isoformat(), producto_id))
+        ''', (nombre, categoria, precio, costo, comision, stock, stock_minimo, datetime.now().isoformat(), producto_id))
         conn.commit()
         conn.close()
         return True
@@ -670,6 +678,7 @@ def obtener_foto_producto(producto_id):
     return {'url': None, 'public_id': None}
 
 def eliminar_producto(producto_id):
+    """Elimina un producto y verifica que no tenga ventas asociadas"""
     conn = get_db()
     cursor = conn.cursor()
     
@@ -684,12 +693,14 @@ def eliminar_producto(producto_id):
         
         print(f"🗑️ Eliminando producto: {producto[1]} (ID: {producto_id})")
         
+        # Verificar si está en la tienda
         cursor.execute('SELECT id FROM productos_tienda WHERE producto_id = %s', (producto_id,))
         tienda = cursor.fetchone()
         if tienda:
             print(f"⚠️ Eliminando referencia en productos_tienda para producto {producto_id}")
             cursor.execute('DELETE FROM productos_tienda WHERE producto_id = %s', (producto_id,))
         
+        # Verificar si tiene ventas asociadas
         cursor.execute('SELECT id FROM ventas WHERE producto_id = %s LIMIT 1', (producto_id,))
         venta = cursor.fetchone()
         if venta:
@@ -697,6 +708,7 @@ def eliminar_producto(producto_id):
             conn.close()
             return False
         
+        # Eliminar el producto
         cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
         
         if cursor.rowcount > 0:
@@ -722,6 +734,7 @@ def eliminar_producto(producto_id):
         return False
 
 def actualizar_stock_producto(producto_id, cantidad):
+    """Actualiza el stock de un producto (resta la cantidad vendida)"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
@@ -733,24 +746,33 @@ def actualizar_stock_producto(producto_id, cantidad):
     return filas > 0
 
 def obtener_estadisticas_productos(negocio_id):
+    """
+    Obtiene estadísticas de productos para un negocio
+    """
     conn = get_db()
     cursor = conn.cursor()
     
+    # Total de productos
     cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s', (negocio_id,))
     total = cursor.fetchone()[0]
     
+    # Productos con stock bajo
     cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock > 0 AND stock <= stock_minimo', (negocio_id,))
     stock_bajo = cursor.fetchone()[0]
     
+    # Productos agotados
     cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock = 0', (negocio_id,))
     agotados = cursor.fetchone()[0]
     
+    # Valor total del inventario (precio de venta)
     cursor.execute('SELECT COALESCE(SUM(precio * stock), 0) FROM productos WHERE negocio_id = %s', (negocio_id,))
     valor_total = cursor.fetchone()[0]
     
+    # Costo total del inventario
     cursor.execute('SELECT COALESCE(SUM(costo * stock), 0) FROM productos WHERE negocio_id = %s', (negocio_id,))
     costo_total = cursor.fetchone()[0]
     
+    # Ganancia potencial
     ganancia_potencial = valor_total - costo_total
     
     conn.close()
@@ -782,7 +804,7 @@ def obtener_productos_tienda_negocio(negocio_id):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
-    SELECT pt.id, p.nombre, p.precio, p.costo, p.stock, p.foto_url, pt.destacado
+    SELECT pt.id, p.nombre, p.precio, p.costo, p.comision, p.stock, p.foto_url, pt.destacado
     FROM productos_tienda pt
     JOIN productos p ON pt.producto_id = p.id
     WHERE pt.negocio_id = %s ORDER BY pt.id DESC
@@ -997,9 +1019,11 @@ def actualizar_estado_venta(venta_id, negocio_id, estado):
     return filas > 0
 
 def eliminar_venta_con_reintegro(venta_id, negocio_id):
+    """Elimina una venta y reintegra el stock del producto"""
     conn = get_db()
     cursor = conn.cursor()
     try:
+        # 1. Obtener datos de la venta
         cursor.execute('''
             SELECT producto_id, cantidad, total, cliente, producto, fecha, empresa, tipo, 
                    factura_url, factura, transferencia_id, transferencia_cedula, 
@@ -1017,6 +1041,7 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
         producto_id = venta[0]
         cantidad = venta[1]
         
+        # 2. Si tiene producto, reintegrar stock
         if producto_id:
             cursor.execute('''
                 UPDATE productos 
@@ -1024,13 +1049,16 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
                 WHERE id = %s
             ''', (cantidad, datetime.now().isoformat(), producto_id))
             
+            # Verificar que se actualizó el stock
             if cursor.rowcount == 0:
                 conn.rollback()
                 conn.close()
                 return False, "Error al actualizar el stock del producto"
         
+        # 3. Eliminar la venta
         cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, negocio_id))
         
+        # Verificar que se eliminó
         if cursor.rowcount == 0:
             conn.rollback()
             conn.close()
