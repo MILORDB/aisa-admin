@@ -59,7 +59,8 @@ try:
         obtener_estadisticas_productos,
         obtener_nomina_mes, calcular_nomina, obtener_nomina_trabajador,
         obtener_comisiones_trabajador_mes, obtener_comisiones_negocio_mes,
-        registrar_comision, obtener_resumen_nomina
+        registrar_comision, obtener_resumen_nomina,
+        obtener_negocio_de_trabajador
     )
     from web_admin.auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
     from web_admin.storage import get_storage_manager
@@ -128,8 +129,7 @@ def init_db_route():
             </body>
         </html>
         """, 500
-
-# ============================================
+        # ============================================
 # DECORADORES
 # ============================================
 
@@ -899,8 +899,7 @@ def api_asignar_permiso(user_id, modulo_id):
     asignar_permiso_usuario(user_id, modulo_id, activo)
     registrar_log(None, 'permiso_usuario', f'Usuario {user_id} módulo {modulo_id} activo={activo}')
     return jsonify({'success': True})
-
-# ============================================
+    # ============================================
 # API - NEGOCIO - TRABAJADORES
 # ============================================
 
@@ -1122,10 +1121,6 @@ def api_actualizar_trabajador(trabajador_id):
         'message': 'Trabajador actualizado correctamente'
     })
 
-# ============================================
-# API - NEGOCIO - ELIMINAR TRABAJADOR
-# ============================================
-
 @app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['DELETE'])
 @login_required
 def api_eliminar_trabajador(trabajador_id):
@@ -1204,7 +1199,7 @@ def api_toggle_trabajador_negocio(trabajador_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - PRODUCTOS (CON COSTO Y COMISION)
+# API - PRODUCTOS (CON COSTO Y COMISION - PARA NEGOCIOS Y TRABAJADORES)
 # ============================================
 
 @app.route('/api/productos', methods=['GET', 'POST'])
@@ -1213,12 +1208,27 @@ def api_productos():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
+    # Permitir tanto a negocios como a trabajadores
+    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    # Obtener el negocio_id del trabajador o usar su propio id
+    negocio_id = usuario['id']
+    if usuario['rol'] == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
+    
     if request.method == 'GET':
-        productos = obtener_productos(usuario['id'])
+        productos = obtener_productos(negocio_id)
         return jsonify([dict(p) for p in productos])
+    
+    # Los trabajadores NO pueden crear/editar productos
+    if usuario['rol'] == 'trabajador':
+        return jsonify({'error': 'No tienes permisos para crear productos'}), 403
     
     data = request.get_json()
     nombre = data.get('nombre')
@@ -1232,7 +1242,7 @@ def api_productos():
     if not nombre or precio is None:
         return jsonify({'error': 'Nombre y precio son requeridos'}), 400
     
-    producto_id = crear_producto(usuario['id'], nombre, categoria, precio, costo, comision, stock, stock_minimo)
+    producto_id = crear_producto(negocio_id, nombre, categoria, precio, costo, comision, stock, stock_minimo)
     registrar_log(usuario['id'], 'producto_creado', f'Producto: {nombre} (Costo: ${costo}, Comisión: ${comision})')
     
     return jsonify({'success': True, 'id': producto_id})
@@ -1243,8 +1253,18 @@ def api_producto(producto_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
+    
+    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    # Obtener el negocio_id
+    negocio_id = usuario['id']
+    if usuario['rol'] == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
     
     if request.method == 'DELETE':
         try:
@@ -1260,8 +1280,8 @@ def api_producto(producto_id):
                 print(f"❌ Producto {producto_id} no encontrado")
                 return jsonify({'error': 'Producto no encontrado'}), 404
             
-            if producto[0] != usuario['id']:
-                print(f"❌ Producto {producto_id} no pertenece al usuario {usuario['id']}")
+            if producto[0] != negocio_id:
+                print(f"❌ Producto {producto_id} no pertenece al negocio")
                 return jsonify({'error': 'No autorizado'}), 403
             
             exito = eliminar_producto(producto_id)
@@ -1287,6 +1307,10 @@ def api_producto(producto_id):
             traceback.print_exc()
             return jsonify({'error': str(e)}), 500
     
+    # Los trabajadores NO pueden editar productos
+    if usuario['rol'] == 'trabajador':
+        return jsonify({'error': 'No tienes permisos para editar productos'}), 403
+    
     try:
         data = request.get_json()
         if not data:
@@ -1309,7 +1333,7 @@ def api_producto(producto_id):
         producto = cursor.fetchone()
         conn.close()
         
-        if not producto or producto[0] != usuario['id']:
+        if not producto or producto[0] != negocio_id:
             return jsonify({'error': 'Producto no encontrado'}), 404
         
         actualizar_producto(producto_id, nombre, categoria, precio, costo, comision, stock, stock_minimo)
@@ -1328,10 +1352,20 @@ def api_productos_stock():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
-    productos = obtener_productos_con_stock(usuario['id'])
+    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    # Obtener el negocio_id
+    negocio_id = usuario['id']
+    if usuario['rol'] == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
+    
+    productos = obtener_productos_con_stock(negocio_id)
     return jsonify([dict(p) for p in productos])
 
 # ============================================
@@ -1666,9 +1700,90 @@ def api_tienda_public():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+        # ============================================
+# API - SERVICIOS (PARA NEGOCIOS Y TRABAJADORES)
+# ============================================
+
+@app.route('/api/servicios', methods=['GET', 'POST'])
+@login_required
+def api_servicios():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    # Obtener el negocio_id del trabajador o usar su propio id
+    negocio_id = usuario['id']
+    if usuario['rol'] == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
+    
+    if request.method == 'GET':
+        trabajador_id = request.args.get('trabajador_id')
+        # Si el usuario es trabajador, solo ver sus servicios
+        if usuario['rol'] == 'trabajador':
+            servicios = obtener_servicios(negocio_id, usuario['id'])
+        else:
+            servicios = obtener_servicios(negocio_id, trabajador_id)
+        return jsonify([dict(s) for s in servicios])
+    
+    # Los trabajadores NO pueden crear servicios
+    if usuario['rol'] == 'trabajador':
+        return jsonify({'error': 'No tienes permisos para crear servicios'}), 403
+    
+    data = request.get_json()
+    nombre = data.get('nombre')
+    categoria = data.get('categoria')
+    precio = data.get('precio')
+    duracion = data.get('duracion', 60)
+    descripcion = data.get('descripcion', '')
+    trabajador_id = data.get('trabajador_id')
+    
+    if not nombre or precio is None:
+        return jsonify({'error': 'Nombre y precio son requeridos'}), 400
+    
+    servicio_id = crear_servicio(negocio_id, trabajador_id, nombre, categoria, precio, duracion, 1, descripcion)
+    registrar_log(usuario['id'], 'servicio_creado', f'Servicio: {nombre}')
+    
+    return jsonify({'success': True, 'id': servicio_id})
+
+@app.route('/api/servicio/<int:servicio_id>/toggle', methods=['POST'])
+@login_required
+def api_toggle_servicio(servicio_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    data = request.get_json()
+    activo = data.get('activo', 1)
+    toggle_servicio(servicio_id, activo)
+    registrar_log(usuario['id'], 'servicio_toggle', f'ID: {servicio_id} - Activo: {activo}')
+    
+    return jsonify({'success': True})
+
+@app.route('/api/servicio/<int:servicio_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_servicio(servicio_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario['tipo'] != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    eliminar_servicio(servicio_id)
+    registrar_log(usuario['id'], 'servicio_eliminado', f'ID: {servicio_id}')
+    
+    return jsonify({'success': True})
 
 # ============================================
-# API - VENTAS
+# API - VENTAS (PARA NEGOCIOS Y TRABAJADORES)
 # ============================================
 
 @app.route('/api/ventas', methods=['GET', 'POST'])
@@ -1677,12 +1792,28 @@ def api_ventas():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
+    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    # Obtener el negocio_id del trabajador o usar su propio id
+    negocio_id = usuario['id']
+    trabajador_id = None
+    if usuario['rol'] == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
+        trabajador_id = usuario['id']
+    
     if request.method == 'GET':
-        trabajador_id = request.args.get('trabajador_id')
-        ventas = obtener_ventas(usuario['id'], trabajador_id)
+        # Si es trabajador, solo ver sus propias ventas
+        if usuario['rol'] == 'trabajador':
+            ventas = obtener_ventas(negocio_id, trabajador_id)
+        else:
+            trabajador_id_param = request.args.get('trabajador_id')
+            ventas = obtener_ventas(negocio_id, trabajador_id_param)
         return jsonify([dict(v) for v in ventas])
     
     data = request.get_json()
@@ -1694,7 +1825,11 @@ def api_ventas():
     cantidad = data.get('cantidad', 1)
     precio = data.get('precio')
     total = data.get('total', precio * cantidad if precio else 0)
-    trabajador_id = data.get('trabajador_id')
+    # Si es trabajador, forzar su ID
+    if usuario['rol'] == 'trabajador':
+        trabajador_id = usuario['id']
+    else:
+        trabajador_id = data.get('trabajador_id')
     estado = data.get('estado', 'pagado')
     empresa = data.get('empresa')
     tipo = data.get('tipo', 'producto')
@@ -1714,7 +1849,7 @@ def api_ventas():
     if tipo == 'producto' and producto_id:
         conn = get_db()
         cursor = conn.cursor()
-        cursor.execute('SELECT stock FROM productos WHERE id = %s AND negocio_id = %s', (producto_id, usuario['id']))
+        cursor.execute('SELECT stock FROM productos WHERE id = %s AND negocio_id = %s', (producto_id, negocio_id))
         stock_actual = cursor.fetchone()
         conn.close()
         
@@ -1725,7 +1860,7 @@ def api_ventas():
             return jsonify({'error': f'Stock insuficiente. Disponible: {stock_actual[0]} unidades'}), 400
     
     venta_id = crear_venta(
-        usuario['id'], trabajador_id, cliente, producto, 
+        negocio_id, trabajador_id, cliente, producto, 
         producto_id, cantidad, precio, total, estado, 
         empresa, tipo, factura_url, factura,
         transferencia_id, transferencia_cedula,
@@ -1734,6 +1869,17 @@ def api_ventas():
     
     if tipo == 'producto' and producto_id and estado != 'oferta':
         actualizar_stock_producto(producto_id, cantidad)
+    
+    # Registrar comisión si corresponde
+    if trabajador_id and tipo == 'producto':
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT comision FROM productos WHERE id = %s', (producto_id,))
+        comision_data = cursor.fetchone()
+        conn.close()
+        if comision_data and comision_data[0] > 0:
+            comision = comision_data[0] * cantidad
+            registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, comision)
     
     registrar_log(usuario['id'], 'venta_creada', 
                   f'Venta: {producto} - Cliente: {cliente} - Cantidad: {cantidad} - Estado: {estado}')
@@ -1780,10 +1926,6 @@ def api_actualizar_estado_venta(venta_id):
     registrar_log(usuario['id'], 'venta_estado', f'Venta {venta_id} estado={estado}')
     
     return jsonify({'success': True})
-
-# ============================================
-# API - ELIMINAR VENTA
-# ============================================
 
 @app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
 @login_required
@@ -1987,7 +2129,7 @@ def api_generar_factura(venta_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - CONTRATOS
+# API - CONTRATOS (PARA NEGOCIOS Y TRABAJADORES)
 # ============================================
 
 @app.route('/api/contratos/ultimo_numero', methods=['GET'])
@@ -2008,13 +2150,27 @@ def api_contratos():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
+    
+    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    # Obtener el negocio_id del trabajador o usar su propio id
+    negocio_id = usuario['id']
+    if usuario['rol'] == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
     
     if request.method == 'GET':
         trabajador_id = request.args.get('trabajador_id')
-        contratos = obtener_contratos(usuario['id'], trabajador_id)
+        contratos = obtener_contratos(negocio_id, trabajador_id)
         return jsonify([dict(c) for c in contratos])
+    
+    # Los trabajadores NO pueden crear contratos
+    if usuario['rol'] == 'trabajador':
+        return jsonify({'error': 'No tienes permisos para crear contratos'}), 403
     
     data = request.get_json()
     print("📥 Datos recibidos en POST:", data)
@@ -2035,7 +2191,7 @@ def api_contratos():
         return jsonify({'error': 'Tipo inválido. Debe ser: ventas, servicios o ambos'}), 400
     
     contrato_id = crear_contrato(
-        usuario['id'], None, empresa, numero_contrato,
+        negocio_id, None, empresa, numero_contrato,
         fecha_inicio, fecha_fin, tipo, monto, estado, descripcion
     )
     registrar_log(usuario['id'], 'contrato_creado', f'Contrato: {numero_contrato} - {empresa}')
@@ -2108,7 +2264,7 @@ def api_eliminar_contrato(contrato_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - OBTENER EMPRESAS CON CONTRATOS ACTIVOS
+# API - OBTENER EMPRESAS CON CONTRATOS ACTIVOS (PARA TRABAJADORES)
 # ============================================
 
 @app.route('/api/contratos/empresas', methods=['GET'])
@@ -2118,8 +2274,18 @@ def api_obtener_empresas_con_contratos():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
+    
+    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    # Obtener el negocio_id del trabajador o usar su propio id
+    negocio_id = usuario['id']
+    if usuario['rol'] == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
     
     try:
         conn = get_db()
@@ -2129,7 +2295,7 @@ def api_obtener_empresas_con_contratos():
             FROM contratos 
             WHERE negocio_id = %s AND estado = 'activo'
             ORDER BY empresa ASC
-        ''', (usuario['id'],))
+        ''', (negocio_id,))
         
         rows = cursor.fetchall()
         conn.close()
@@ -2148,908 +2314,422 @@ def api_obtener_empresas_con_contratos():
     except Exception as e:
         print(f"❌ Error obteniendo empresas con contratos: {e}")
         return jsonify({'error': str(e)}), 500
-
-# ============================================
-# API - SERVICIOS
-# ============================================
-
-@app.route('/api/servicios', methods=['GET', 'POST'])
-@login_required
-def api_servicios():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    if request.method == 'GET':
-        trabajador_id = request.args.get('trabajador_id')
-        servicios = obtener_servicios(usuario['id'], trabajador_id)
-        return jsonify([dict(s) for s in servicios])
-    
-    data = request.get_json()
-    nombre = data.get('nombre')
-    categoria = data.get('categoria')
-    precio = data.get('precio')
-    duracion = data.get('duracion', 60)
-    descripcion = data.get('descripcion', '')
-    trabajador_id = data.get('trabajador_id')
-    
-    if not nombre or precio is None:
-        return jsonify({'error': 'Nombre y precio son requeridos'}), 400
-    
-    servicio_id = crear_servicio(usuario['id'], trabajador_id, nombre, categoria, precio, duracion, 1, descripcion)
-    registrar_log(usuario['id'], 'servicio_creado', f'Servicio: {nombre}')
-    
-    return jsonify({'success': True, 'id': servicio_id})
-
-@app.route('/api/servicio/<int:servicio_id>/toggle', methods=['POST'])
-@login_required
-def api_toggle_servicio(servicio_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    data = request.get_json()
-    activo = data.get('activo', 1)
-    toggle_servicio(servicio_id, activo)
-    registrar_log(usuario['id'], 'servicio_toggle', f'ID: {servicio_id} - Activo: {activo}')
-    
-    return jsonify({'success': True})
-
-@app.route('/api/servicio/<int:servicio_id>', methods=['DELETE'])
-@login_required
-def api_eliminar_servicio(servicio_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    eliminar_servicio(servicio_id)
-    registrar_log(usuario['id'], 'servicio_eliminado', f'ID: {servicio_id}')
-    
-    return jsonify({'success': True})
-
-# ============================================
-# API - REPORTES
-# ============================================
-
-@app.route('/api/reportes/contratos', methods=['GET'])
-@login_required
-def api_reporte_contratos():
-    """Genera un reporte PDF de contratos"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    tipo = request.args.get('tipo', 'todos')
-    
-    try:
-        contratos = obtener_contratos(usuario['id'])
-        
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
-        negocio = cursor.fetchone()
-        conn.close()
-        
-        negocio_nombre = negocio[0] or 'Mi Negocio'
-        datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
-        negocio_telefono = datos_negocio.get('telefono', '')
-        
-        hoy = datetime.now().date()
-        contratos_procesados = []
-        
-        for c in contratos:
-            fecha_fin = datetime.fromisoformat(c['fecha_fin']).date() if c['fecha_fin'] else None
-            estado = c['estado']
-            
-            if estado == 'activo' and fecha_fin and fecha_fin < hoy:
-                estado = 'vencido'
-            
-            if tipo == 'activos' and estado != 'activo':
-                continue
-            if tipo == 'vencidos' and estado != 'vencido':
-                continue
-            
-            contratos_procesados.append({
-                'id': c['id'],
-                'numero_contrato': c['numero_contrato'],
-                'empresa': c['empresa'],
-                'fecha_inicio': c['fecha_inicio'],
-                'fecha_fin': c['fecha_fin'],
-                'monto': c['monto'] or 0,
-                'estado': estado,
-                'tipo': c['tipo']
-            })
-        
-        generador = GeneradorReportes(
-            negocio_id=usuario['id'],
-            negocio_nombre=negocio_nombre,
-            negocio_telefono=negocio_telefono
-        )
-        
-        pdf_bytes = generador.generar_reporte_contratos(
-            contratos_procesados,
-            tipo_reporte=tipo
-        )
-        
-        response = make_response(pdf_bytes)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=reporte_contratos_{tipo}_{datetime.now().strftime("%Y%m%d")}.pdf'
-        
-        registrar_log(usuario['id'], 'reporte_generado', f'Reporte de contratos ({tipo})')
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error generando reporte de contratos: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/reportes/contratos/resumen', methods=['GET'])
-@login_required
-def api_resumen_contratos():
-    """Obtiene un resumen de contratos para el panel lateral"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        contratos = obtener_contratos(usuario['id'])
-        
-        hoy = datetime.now().date()
-        total = len(contratos)
-        activos = 0
-        vencidos = 0
-        total_gastos = 0
-        
-        for c in contratos:
-            fecha_fin = datetime.fromisoformat(c['fecha_fin']).date() if c['fecha_fin'] else None
-            estado = c['estado']
-            
-            if estado == 'activo' and fecha_fin and fecha_fin < hoy:
-                estado = 'vencido'
-            
-            if estado == 'activo':
-                activos += 1
-            elif estado == 'vencido':
-                vencidos += 1
-            
-            total_gastos += c['monto'] or 0
-        
-        return jsonify({
-            'total': total,
-            'activos': activos,
-            'vencidos': vencidos,
-            'total_gastos': total_gastos,
-            'tiene_contratos': total > 0
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en resumen de contratos: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/reportes/ingresos', methods=['GET'])
-@login_required
-def api_reporte_ingresos():
-    """Genera un reporte PDF de ingresos"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    periodo = request.args.get('periodo', 'todos')
-    
-    try:
-        ventas = obtener_ventas(usuario['id'])
-        
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
-        negocio = cursor.fetchone()
-        conn.close()
-        
-        negocio_nombre = negocio[0] or 'Mi Negocio'
-        datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
-        negocio_telefono = datos_negocio.get('telefono', '')
-        
-        ventas_filtradas = []
-        hoy = datetime.now().date()
-        
-        for v in ventas:
-            fecha_venta = datetime.fromisoformat(v['fecha']).date() if v['fecha'] else None
-            if not fecha_venta:
-                continue
-            
-            if periodo == 'hoy':
-                if fecha_venta == hoy:
-                    ventas_filtradas.append(v)
-            elif periodo == 'semana':
-                inicio_semana = hoy - timedelta(days=hoy.weekday())
-                if fecha_venta >= inicio_semana:
-                    ventas_filtradas.append(v)
-            elif periodo == 'mes':
-                if fecha_venta.month == hoy.month and fecha_venta.year == hoy.year:
-                    ventas_filtradas.append(v)
-            else:
-                ventas_filtradas.append(v)
-        
-        total_ingresos = sum(v.get('total', 0) for v in ventas_filtradas)
-        total_ventas = len(ventas_filtradas)
-        
-        periodos = {
-            'hoy': 'Hoy',
-            'semana': 'Esta semana',
-            'mes': 'Este mes',
-            'todos': 'Todos los períodos'
+        <!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIsa - Trabajador</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
-        nombre_periodo = periodos.get(periodo, 'Todos los períodos')
-        
-        generador = GeneradorReportes(
-            negocio_id=usuario['id'],
-            negocio_nombre=negocio_nombre,
-            negocio_telefono=negocio_telefono
-        )
-        
-        pdf_bytes = generador.generar_reporte_ingresos(
-            ventas_filtradas,
-            total_ingresos,
-            total_ventas,
-            periodo=nombre_periodo
-        )
-        
-        response = make_response(pdf_bytes)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=reporte_ingresos_{periodo}_{datetime.now().strftime("%Y%m%d")}.pdf'
-        
-        registrar_log(usuario['id'], 'reporte_generado', f'Reporte de ingresos ({periodo})')
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error generando reporte de ingresos: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/reportes/ingresos/resumen', methods=['GET'])
-@login_required
-def api_resumen_ingresos():
-    """Obtiene un resumen de ingresos para el panel lateral"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        ventas = obtener_ventas(usuario['id'])
-        
-        hoy = datetime.now().date()
-        inicio_semana = hoy - timedelta(days=hoy.weekday())
-        
-        total_ventas = len(ventas)
-        total_ingresos = sum(v.get('total', 0) for v in ventas)
-        
-        ventas_hoy = [v for v in ventas if v['fecha'] and datetime.fromisoformat(v['fecha']).date() == hoy]
-        ingresos_hoy = sum(v.get('total', 0) for v in ventas_hoy)
-        
-        ventas_semana = [v for v in ventas if v['fecha'] and datetime.fromisoformat(v['fecha']).date() >= inicio_semana]
-        ingresos_semana = sum(v.get('total', 0) for v in ventas_semana)
-        
-        ventas_mes = [v for v in ventas if v['fecha'] and datetime.fromisoformat(v['fecha']).month == hoy.month]
-        ingresos_mes = sum(v.get('total', 0) for v in ventas_mes)
-        
-        return jsonify({
-            'total_ventas': total_ventas,
-            'total_ingresos': total_ingresos,
-            'ingresos_hoy': ingresos_hoy,
-            'ingresos_semana': ingresos_semana,
-            'ingresos_mes': ingresos_mes,
-            'tiene_ventas': total_ventas > 0
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en resumen de ingresos: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/reportes/productos', methods=['GET'])
-@login_required
-def api_reporte_productos():
-    """Genera un reporte PDF de productos en almacén"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        productos = obtener_productos(usuario['id'])
-        
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
-        negocio = cursor.fetchone()
-        conn.close()
-        
-        negocio_nombre = negocio[0] or 'Mi Negocio'
-        datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
-        negocio_telefono = datos_negocio.get('telefono', '')
-        
-        generador = GeneradorReportes(
-            negocio_id=usuario['id'],
-            negocio_nombre=negocio_nombre,
-            negocio_telefono=negocio_telefono
-        )
-        
-        pdf_bytes = generador.generar_reporte_productos(productos)
-        
-        response = make_response(pdf_bytes)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=reporte_productos_{datetime.now().strftime("%Y%m%d")}.pdf'
-        
-        registrar_log(usuario['id'], 'reporte_generado', 'Reporte de productos en almacén')
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error generando reporte de productos: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/reportes/productos/resumen', methods=['GET'])
-@login_required
-def api_resumen_productos():
-    """Obtiene un resumen de productos para el panel lateral"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        productos = obtener_productos(usuario['id'])
-        
-        total = len(productos)
-        stock_bajo = len([p for p in productos if p.get('stock', 0) <= (p.get('stock_minimo', 3)) and p.get('stock', 0) > 0])
-        stock_agotado = len([p for p in productos if p.get('stock', 0) == 0])
-        valor_total = sum(p.get('precio', 0) * p.get('stock', 0) for p in productos)
-        
-        return jsonify({
-            'total': total,
-            'stock_bajo': stock_bajo,
-            'stock_agotado': stock_agotado,
-            'valor_total': valor_total,
-            'tiene_productos': total > 0
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en resumen de productos: {e}")
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
-# API - NÓMINA
-# ============================================
-
-@app.route('/api/nomina', methods=['GET'])
-@login_required
-def api_obtener_nomina():
-    """Obtiene la nómina de un mes específico"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    mes = request.args.get('mes', type=int)
-    ano = request.args.get('ano', type=int)
-    
-    if not mes or not ano:
-        return jsonify({'error': 'Mes y año son requeridos'}), 400
-    
-    nominas = obtener_nomina_mes(usuario['id'], mes, ano)
-    
-    return jsonify({
-        'success': True,
-        'nominas': nominas
-    })
-
-@app.route('/api/nomina/calcular', methods=['POST'])
-@login_required
-def api_calcular_nomina():
-    """Calcula la nómina para todos los trabajadores en un mes"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    data = request.get_json()
-    mes = data.get('mes')
-    ano = data.get('ano')
-    
-    if not mes or not ano:
-        return jsonify({'error': 'Mes y año son requeridos'}), 400
-    
-    trabajadores = obtener_trabajadores_por_empresa(usuario['id'])
-    
-    contador = 0
-    for t in trabajadores:
-        resultado = calcular_nomina(usuario['id'], t['id'], mes, ano)
-        if resultado:
-            contador += 1
-    
-    return jsonify({
-        'success': True,
-        'trabajadores': contador,
-        'message': f'Nómina calculada para {contador} trabajadores'
-    })
-
-@app.route('/api/nomina/detalle', methods=['GET'])
-@login_required
-def api_nomina_detalle():
-    """Obtiene el detalle de nómina de un trabajador"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    trabajador_id = request.args.get('trabajador_id', type=int)
-    mes = request.args.get('mes', type=int)
-    ano = request.args.get('ano', type=int)
-    
-    if not trabajador_id or not mes or not ano:
-        return jsonify({'error': 'Trabajador, mes y año son requeridos'}), 400
-    
-    nomina = obtener_nomina_trabajador(trabajador_id, mes, ano)
-    
-    if not nomina:
-        return jsonify({'error': 'No se encontró nómina para este trabajador'}), 404
-    
-    comisiones = obtener_comisiones_trabajador_mes(trabajador_id, mes, ano)
-    
-    from calendar import monthrange
-    _, dias_mes = monthrange(ano, mes)
-    
-    trabajador = obtener_usuario_por_id(trabajador_id)
-    datos = json.loads(trabajador['datos_negocio']) if trabajador['datos_negocio'] else {}
-    salario_base = datos.get('salario', 0)
-    
-    salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
-    
-    return jsonify({
-        'success': True,
-        'detalle': {
-            'id': nomina['id'],
-            'trabajador_id': trabajador_id,
-            'nombre': trabajador['nombre'],
-            'mes': mes,
-            'ano': ano,
-            'dias_mes': dias_mes,
-            'salario_base': salario_base,
-            'salario_diario': salario_diario,
-            'dias_trabajados': nomina['dias_trabajados'],
-            'dias_ausencia': nomina['dias_ausencia'] or 0,
-            'salario_devengado': nomina['salario_devengado'],
-            'comisiones': nomina['comisiones'] or 0,
-            'total': nomina['total'],
-            'comisiones_list': comisiones
+        .header {
+            background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+            z-index: 10;
         }
-    })
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header-left .logo {
+            font-size: 22px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header-left .logo span { font-size: 26px; }
+        .header-left .subtitle {
+            font-size: 13px;
+            opacity: 0.7;
+            font-weight: 400;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .header-right .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        .header-right .user-info .avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+        .header-right .user-info .role-badge {
+            font-size: 10px;
+            padding: 2px 10px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.15);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .header-right .logout-btn {
+            color: #fff;
+            text-decoration: none;
+            padding: 6px 16px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            font-size: 13px;
+            transition: background 0.3s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .header-right .logout-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
 
-@app.route('/api/nomina/reporte', methods=['GET'])
-@login_required
-def api_nomina_reporte():
-    """Genera un reporte PDF de nómina"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    mes = request.args.get('mes', type=int)
-    ano = request.args.get('ano', type=int)
-    
-    if not mes or not ano:
-        return jsonify({'error': 'Mes y año son requeridos'}), 400
-    
-    nominas = obtener_nomina_mes(usuario['id'], mes, ano)
-    
-    if not nominas:
-        return jsonify({'error': 'No hay datos de nómina para este mes'}), 404
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
-    negocio = cursor.fetchone()
-    conn.close()
-    
-    negocio_nombre = negocio[0] or 'Mi Negocio'
-    datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
-    negocio_telefono = datos_negocio.get('telefono', '')
-    negocio_direccion = datos_negocio.get('direccion', '')
-    
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
-    
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
-    styles = getSampleStyleSheet()
-    elementos = []
-    
-    estilo_titulo = ParagraphStyle('Titulo', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#6c3ce0'), alignment=TA_CENTER)
-    elementos.append(Paragraph(f"📊 REPORTE DE NÓMINA", estilo_titulo))
-    elementos.append(Paragraph(f"{negocio_nombre}", styles['Heading2']))
-    
-    meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-    nombre_mes = meses[mes - 1] if 1 <= mes <= 12 else str(mes)
-    elementos.append(Paragraph(f"{nombre_mes} de {ano}", styles['Normal']))
-    elementos.append(Spacer(1, 10))
-    
-    tabla_datos = []
-    headers = ['Trabajador', 'Salario Base', 'Días Trabajados', 'Ausencias', 'Salario Devengado', 'Comisiones', 'Total']
-    tabla_datos.append(headers)
-    
-    total_general = 0
-    total_comisiones = 0
-    
-    for n in nominas:
-        total_general += n['total']
-        total_comisiones += n['comisiones'] or 0
-        tabla_datos.append([
-            n['nombre'],
-            f"${n['salario_base']:.2f}",
-            str(n['dias_trabajados']),
-            str(n['dias_ausencia'] or 0),
-            f"${n['salario_devengado']:.2f}",
-            f"${(n['comisiones'] or 0):.2f}",
-            f"${n['total']:.2f}"
-        ])
-    
-    tabla_datos.append([
-        'TOTAL',
-        '',
-        '',
-        '',
-        '',
-        f"${total_comisiones:.2f}",
-        f"${total_general:.2f}"
-    ])
-    
-    tabla = Table(tabla_datos, colWidths=[120, 90, 80, 80, 100, 100, 100])
-    tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('ALIGN', (4, 1), (6, -1), 'RIGHT'),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e8e8e8')),
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-    ]))
-    
-    elementos.append(tabla)
-    elementos.append(Spacer(1, 10))
-    
-    estilo_resumen = ParagraphStyle('Resumen', parent=styles['Normal'], fontSize=10, alignment=TA_RIGHT)
-    elementos.append(Paragraph(f"Total de trabajadores: {len(nominas)}", estilo_resumen))
-    elementos.append(Paragraph(f"Total de comisiones: ${total_comisiones:.2f}", estilo_resumen))
-    elementos.append(Paragraph(f"Total de nómina: ${total_general:.2f}", estilo_resumen))
-    
-    estilo_pie = ParagraphStyle('Pie', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#999999'), alignment=TA_CENTER)
-    elementos.append(Spacer(1, 20))
-    elementos.append(Paragraph(f"Reporte generado por AIsa - {datetime.now().strftime('%d/%m/%Y %H:%M')}", estilo_pie))
-    
-    doc.build(elementos)
-    
-    pdf_bytes = buffer.getvalue()
-    buffer.close()
-    
-    response = make_response(pdf_bytes)
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename=nomina_{mes}_{ano}.pdf'
-    
-    return response
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            gap: 0;
+        }
 
-# ============================================
-# API - ESTADÍSTICAS TRABAJADOR
-# ============================================
+        .panel-center {
+            flex: 1;
+            background: #0f0f1a;
+            padding: 0;
+            overflow: hidden;
+            min-width: 300px;
+        }
+        .panel-center iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #0f0f1a;
+        }
+        .panel-center .loader {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666680;
+            font-size: 16px;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .panel-center .loader .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #2a2a3e;
+            border-top-color: #6c3ce0;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-@app.route('/api/trabajador/estadisticas')
-@login_required
-def api_trabajador_estadisticas():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['rol'] != 'trabajador':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    stats = obtener_estadisticas_trabajador(usuario['id'])
-    return jsonify(stats)
+        .panel-right {
+            width: 260px;
+            min-width: 260px;
+            background: #1a1a2e;
+            border-left: 1px solid #2a2a3e;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+            padding: 16px 18px;
+        }
 
-# ============================================
-# API - SOLICITUDES DE MÓDULOS
-# ============================================
+        .panel-right .stats-title {
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666680;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #2a2a3e;
+            padding-bottom: 10px;
+        }
 
-@app.route('/api/usuario/<int:user_id>/solicitar/<int:modulo_id>', methods=['POST'])
-@login_required
-def api_solicitar_modulo(user_id, modulo_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    if not usuario or (usuario['id'] != user_id and usuario['rol'] != 'admin'):
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    solicitar_modulo(user_id, modulo_id)
-    registrar_log(user_id, 'solicitud_modulo', f'Solicitó módulo {modulo_id}')
-    return jsonify({'success': True})
+        .panel-right .stat-card {
+            background: #0f0f1a;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            border: 1px solid #2a2a3e;
+        }
 
-@app.route('/api/solicitudes')
-@admin_required
-def api_solicitudes():
-    solicitudes = obtener_solicitudes_pendientes()
-    return jsonify([dict(s) for s in solicitudes])
+        .panel-right .stat-card .stat-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #6c3ce0;
+            display: block;
+        }
 
-@app.route('/api/solicitud/<int:solicitud_id>/aprobar', methods=['POST'])
-@admin_required
-def api_aprobar_solicitud(solicitud_id):
-    aprobar_solicitud(solicitud_id)
-    registrar_log(None, 'solicitud_aprobada', f'Solicitud {solicitud_id} aprobada')
-    return jsonify({'success': True})
+        .panel-right .stat-card .stat-label {
+            font-size: 12px;
+            color: #888;
+            display: block;
+            margin-top: 4px;
+        }
 
-@app.route('/api/solicitud/<int:solicitud_id>/rechazar', methods=['POST'])
-@admin_required
-def api_rechazar_solicitud(solicitud_id):
-    rechazar_solicitud(solicitud_id)
-    registrar_log(None, 'solicitud_rechazada', f'Solicitud {solicitud_id} rechazada')
-    return jsonify({'success': True})
+        .panel-right .stat-card .stat-icon {
+            font-size: 16px;
+            margin-right: 6px;
+        }
 
-# ============================================
-# API - LOGS
-# ============================================
+        .panel-right .hoy-label {
+            font-size: 11px;
+            color: #666680;
+            text-align: center;
+            margin-bottom: 12px;
+        }
 
-@app.route('/api/logs')
-@admin_required
-def api_logs():
-    logs = obtener_logs(50)
-    return jsonify([dict(l) for l in logs])
+        .panel-right .hoy-label strong {
+            color: #fff;
+        }
 
-# ============================================
-# API - TRABAJADORES PENDIENTES
-# ============================================
+        .panel-right .empty-stats {
+            text-align: center;
+            color: #666680;
+            font-size: 13px;
+            padding: 30px 0;
+        }
 
-@app.route('/api/trabajadores/pendientes')
-@admin_required
-def api_trabajadores_pendientes():
-    trabajadores = obtener_trabajadores_pendientes()
-    return jsonify([dict(t) for t in trabajadores])
+        @media (max-width: 768px) {
+            .panel-right {
+                width: 100%;
+                min-width: unset;
+                border-left: none;
+                border-top: 1px solid #2a2a3e;
+                max-height: 200px;
+                flex-direction: row;
+                flex-wrap: wrap;
+                padding: 12px 16px;
+                overflow-y: auto;
+            }
+            .panel-right .stats-title {
+                width: 100%;
+                margin-bottom: 8px;
+            }
+            .panel-right .stat-card {
+                flex: 1;
+                min-width: 100px;
+                margin-bottom: 6px;
+            }
+            .panel-right .stat-card .stat-number {
+                font-size: 20px;
+            }
+            .main-container {
+                flex-direction: column;
+            }
+            .panel-center { min-height: 300px; }
+            .header-left .subtitle { display: none; }
+            .header-right .user-info .role-badge { display: none; }
+        }
 
-@app.route('/api/trabajador/<int:user_id>/aprobar', methods=['POST'])
-@admin_required
-def api_aprobar_trabajador(user_id):
-    aprobar_trabajador(user_id)
-    registrar_log(None, 'trabajador_aprobado', f'Trabajador {user_id} aprobado')
-    return jsonify({'success': True})
+        @media (max-width: 480px) {
+            .header { padding: 10px 16px; flex-wrap: wrap; gap: 8px; }
+            .panel-right .stat-card { min-width: 80px; padding: 10px 12px; }
+            .panel-right .stat-card .stat-number { font-size: 18px; }
+        }
+    </style>
+</head>
+<body>
 
-@app.route('/api/trabajador/<int:user_id>/rechazar', methods=['POST'])
-@admin_required
-def api_rechazar_trabajador(user_id):
-    rechazar_trabajador(user_id)
-    registrar_log(None, 'trabajador_rechazado', f'Trabajador {user_id} rechazado')
-    return jsonify({'success': True})
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <span>👷</span>
+                AIsa
+                <span class="subtitle">Panel de Trabajador</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="user-info">
+                <div class="avatar">👤</div>
+                <span>{{ usuario.nombre or usuario.username }}</span>
+                <span class="role-badge">{{ usuario.rol }}</span>
+            </div>
+            <a href="/perfil" class="logout-btn">👤 Perfil</a>
+            <a href="/logout" class="logout-btn">Cerrar sesión</a>
+        </div>
+    </header>
 
-# ============================================
-# ENDPOINT PARA AGREGAR MÓDULO NOMINA
-# ============================================
+    <div class="main-container">
 
-@app.route('/fix-nomina', methods=['GET'])
-def fix_nomina_endpoint():
-    """Endpoint para agregar el módulo nomina a la base de datos"""
-    try:
-        import urllib.parse
-        import psycopg2
-        
-        DATABASE_URL = os.environ.get('DATABASE_URL', '')
-        
-        if not DATABASE_URL:
-            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
-        
-        url = DATABASE_URL.strip()
-        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
-            url = 'postgresql://' + url
-        
-        parsed = urllib.parse.urlparse(url)
-        
-        conn = psycopg2.connect(
-            host=parsed.hostname or 'localhost',
-            port=parsed.port or 5432,
-            database=parsed.path.lstrip('/') if parsed.path else '',
-            user=parsed.username or '',
-            password=parsed.password or '',
-            sslmode='require'
-        )
-        cursor = conn.cursor()
-        print("✅ Conectado a PostgreSQL")
-        
-        mensajes = []
-        
-        # 1. Verificar si el módulo existe
-        cursor.execute("SELECT id FROM modulos WHERE nombre = 'nomina'")
-        existe = cursor.fetchone()
-        
-        if not existe:
-            print("🔧 Agregando módulo 'nomina'...")
-            cursor.execute('''
-            INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido)
-            VALUES (%s, %s, %s, %s)
-            ''', ('nomina', 'Gestión de nómina y salarios', 1, 'negocio'))
-            conn.commit()
-            mensajes.append("✅ Módulo 'nomina' agregado correctamente")
-            print("✅ Módulo 'nomina' agregado correctamente")
-            
-            cursor.execute("SELECT id FROM modulos WHERE nombre = 'nomina'")
-            modulo_id = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT id FROM usuarios WHERE tipo = 'negocio' AND activo = 1")
-            negocios = cursor.fetchall()
-            
-            contador = 0
-            for negocio in negocios:
-                negocio_id = negocio[0]
-                cursor.execute('''
-                SELECT id FROM permisos_usuario 
-                WHERE usuario_id = %s AND modulo_id = %s
-                ''', (negocio_id, modulo_id))
+        <div class="panel-center" id="panelCenter">
+            <div class="loader" id="loader">
+                <div class="spinner"></div>
+                <span>Cargando módulo...</span>
+            </div>
+            <iframe id="moduleFrame" style="display:none;"></iframe>
+        </div>
+
+        <div class="panel-right">
+            <div class="stats-title">📊 Estadísticas de hoy</div>
+
+            <div class="hoy-label" id="fechaHoy">📅 Cargando fecha...</div>
+
+            <div class="stat-card">
+                <span class="stat-number" id="statVentasHoy">0</span>
+                <span class="stat-label"><span class="stat-icon">💰</span> Ventas realizadas</span>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-number" id="statClientesHoy">0</span>
+                <span class="stat-label"><span class="stat-icon">👥</span> Clientes atendidos</span>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-number" id="statIngresosHoy">$0</span>
+                <span class="stat-label"><span class="stat-icon">💵</span> Ingresos del día</span>
+            </div>
+
+            <div class="stat-card">
+                <span class="stat-number" id="statServiciosHoy">0</span>
+                <span class="stat-label"><span class="stat-icon">📋</span> Servicios activos</span>
+            </div>
+
+            <div style="margin-top:auto;padding-top:12px;border-top:1px solid #2a2a3e;text-align:center;font-size:11px;color:#666680;">
+                <span>🔄 Actualizado en tiempo real</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let usuarioId = {{ usuario.id }};
+        let modulos = [];
+        let moduloCargado = false;
+        let intervaloEstadisticas = null;
+
+        // ============================================
+        // OBTENER FECHA ACTUAL
+        // ============================================
+
+        function obtenerFechaHoy() {
+            const hoy = new Date();
+            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            return hoy.toLocaleDateString('es-ES', opciones);
+        }
+
+        // ============================================
+        // CARGAR DATOS DEL TRABAJADOR
+        // ============================================
+
+        async function cargarDatos() {
+            try {
+                const modRes = await fetch('/api/modulos');
+                const modulosData = await modRes.json();
+                modulos = Array.isArray(modulosData) ? modulosData : (modulosData.modulos || Object.values(modulosData));
+
+                const permRes = await fetch(`/api/usuario/${usuarioId}/permisos`);
+                const permisos = await permRes.json();
+
+                const modulosPermitidos = modulos.filter(mod => {
+                    const permiso = permisos.find(p => p.id === mod.id);
+                    return permiso && permiso.permiso_activo === 1;
+                });
+
+                if (modulosPermitidos.length > 0) {
+                    // Buscar el módulo de ventas primero
+                    const ventasModulo = modulosPermitidos.find(m => m.nombre === 'ventas');
+                    const moduloACargar = ventasModulo || modulosPermitidos[0];
+                    cargarModulo(moduloACargar.nombre);
+                } else {
+                    document.getElementById('loader').innerHTML = `
+                        <div style="text-align:center;color:#666680;">
+                            <div style="font-size:48px;margin-bottom:12px;">🔒</div>
+                            <div style="font-size:16px;">No tienes módulos asignados</div>
+                            <div style="font-size:13px;margin-top:4px;">Contacta con tu administrador</div>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('fechaHoy').innerHTML = `📅 ${obtenerFechaHoy()}`;
                 
-                if not cursor.fetchone():
-                    cursor.execute('''
-                    INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
-                    VALUES (%s, %s, 1, 'aprobado')
-                    ''', (negocio_id, modulo_id))
-                    contador += 1
-            
-            conn.commit()
-            mensajes.append(f"✅ Módulo asignado a {contador} negocios")
-            print(f"✅ Módulo asignado a {contador} negocios")
-        else:
-            mensajes.append(f"✅ El módulo 'nomina' ya existe con ID: {existe[0]}")
-            print(f"✅ El módulo 'nomina' ya existe con ID: {existe[0]}")
-            
-            cursor.execute("SELECT id FROM modulos WHERE nombre = 'nomina'")
-            modulo_id = cursor.fetchone()[0]
-            
-            cursor.execute("SELECT id FROM usuarios WHERE tipo = 'negocio' AND activo = 1")
-            negocios = cursor.fetchall()
-            
-            contador = 0
-            for negocio in negocios:
-                negocio_id = negocio[0]
-                cursor.execute('''
-                SELECT id FROM permisos_usuario 
-                WHERE usuario_id = %s AND modulo_id = %s AND activo = 1
-                ''', (negocio_id, modulo_id))
+                cargarEstadisticas();
                 
-                if not cursor.fetchone():
-                    cursor.execute('''
-                    INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
-                    VALUES (%s, %s, 1, 'aprobado')
-                    ''', (negocio_id, modulo_id))
-                    contador += 1
+                if (intervaloEstadisticas) clearInterval(intervaloEstadisticas);
+                intervaloEstadisticas = setInterval(cargarEstadisticas, 30000);
+
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('loader').innerHTML = `
+                    <div style="text-align:center;color:#ff6b6b;">
+                        <div style="font-size:48px;margin-bottom:12px;">❌</div>
+                        <div style="font-size:16px;">Error al cargar datos</div>
+                    </div>
+                `;
+            }
+        }
+
+        // ============================================
+        // CARGAR MÓDULO EN EL IFRAME
+        // ============================================
+
+        function cargarModulo(nombre) {
+            const frame = document.getElementById('moduleFrame');
+            const loader = document.getElementById('loader');
             
-            conn.commit()
-            if contador > 0:
-                mensajes.append(f"✅ Módulo asignado a {contador} negocios adicionales")
-                print(f"✅ Módulo asignado a {contador} negocios adicionales")
-        
-        cursor.execute("SELECT id, nombre FROM modulos ORDER BY nombre")
-        modulos = cursor.fetchall()
-        
-        html_modulos = ""
-        for mod in modulos:
-            html_modulos += f"• <strong>{mod[1]}</strong> (ID: {mod[0]})<br>"
-        
-        conn.close()
-        
-        html_mensajes = "<br>".join(mensajes)
-        
-        return f"""
-        <html>
-            <head>
-                <title>Módulo Nómina Agregado</title>
-                <style>
-                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
-                    .container {{ max-width: 800px; margin: 0 auto; }}
-                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
-                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
-                    .success {{ color: #6bff6b; }}
-                    .btn {{
-                        display: inline-block;
-                        padding: 10px 20px;
-                        margin: 10px;
-                        border: none;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        font-size: 14px;
-                        text-decoration: none;
-                        transition: all 0.3s;
-                    }}
-                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
-                    .btn-primary:hover {{ background: #5a2ec0; }}
-                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
-                    .btn-secondary:hover {{ background: #3a3a4e; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1 style="color:#6c3ce0;">🔧 Reparación de Módulo Nómina</h1>
-                    
-                    <div class="card">
-                        <h3>📊 Resultado</h3>
-                        {html_mensajes}
-                    </div>
-                    
-                    <div class="card">
-                        <h3>📋 Módulos disponibles</h3>
-                        {html_modulos}
-                    </div>
-                    
-                    <div>
-                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
-                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
-                    </div>
-                </div>
-            </body>
-        </html>
-        """
-    except Exception as e:
-        return f"""
-        <html>
-            <head><title>Error</title></head>
-            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
-                <h1 style="color:#ff6b6b;">❌ Error al agregar módulo</h1>
-                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
-                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
-            </body>
-        </html>
-        """, 500
+            loader.style.display = 'flex';
+            frame.style.display = 'none';
+            
+            frame.src = `/negocio/${nombre}?trabajador_id=${usuarioId}`;
+            
+            frame.onload = function() {
+                loader.style.display = 'none';
+                frame.style.display = 'block';
+                moduloCargado = true;
+            };
+        }
 
-# ============================================
-# EJECUCIÓN (VERSIÓN PARA RENDER)
-# ============================================
+        // ============================================
+        // CARGAR ESTADÍSTICAS REALES DESDE EL SERVIDOR
+        // ============================================
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    
-    print("=" * 60)
-    print("🚀 AIsa Admin - Panel de Control")
-    print("🌐 Puerto:", port)
-    print("👤 admin / admin123")
-    print("=" * 60)
-    
-    app.run(debug=False, host='0.0.0.0', port=port)
+        async function cargarEstadisticas() {
+            try {
+                const response = await fetch('/api/trabajador/estadisticas');
+                if (!response.ok) {
+                    throw new Error('Error al cargar estadísticas');
+                }
+                const stats = await response.json();
+                
+                document.getElementById('statVentasHoy').textContent = stats.ventas || 0;
+                document.getElementById('statClientesHoy').textContent = stats.clientes || 0;
+                document.getElementById('statIngresosHoy').textContent = `$${parseFloat(stats.ingresos || 0).toFixed(2)}`;
+                document.getElementById('statServiciosHoy').textContent = stats.servicios || 0;
+                
+            } catch (error) {
+                console.error('Error al cargar estadísticas:', error);
+                document.getElementById('statVentasHoy').textContent = '0';
+                document.getElementById('statClientesHoy').textContent = '0';
+                document.getElementById('statIngresosHoy').textContent = '$0.00';
+                document.getElementById('statServiciosHoy').textContent = '0';
+            }
+        }
+
+        // ============================================
+        // INICIO
+        // ============================================
+
+        cargarDatos();
+    </script>
+</body>
+</html>
