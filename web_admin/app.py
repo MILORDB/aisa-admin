@@ -674,17 +674,22 @@ def dashboard():
     if not usuario:
         return redirect(url_for('login'))
     
-    # 🔍 DEBUG: Imprime el rol para verificar
+    # DEBUG: Imprime el rol
     print(f"🔍 Dashboard - Usuario: {usuario.get('username')}, Rol: {usuario.get('rol')}, Tipo: {usuario.get('tipo')}")
     
     try:
+        # Primero verificar si es admin
         if usuario.get('rol') == 'admin':
-            return render_template('dashboard.html', usuario=usuario)
+            print("✅ Mostrando dashboard de ADMIN")
+            return render_template('admin/dashboard.html', usuario=usuario)
         elif usuario.get('rol') == 'trabajador':
+            print("✅ Mostrando dashboard de TRABAJADOR")
             return render_template('trabajador/dashboard.html', usuario=usuario)
         elif usuario.get('tipo') == 'negocio':
+            print("✅ Mostrando dashboard de NEGOCIO")
             return render_template('negocio/dashboard.html', usuario=usuario)
         else:
+            print("✅ Mostrando dashboard de CLIENTE")
             return render_template('cliente/dashboard.html', usuario=usuario)
     except Exception as e:
         print(f"❌ Error en dashboard: {e}")
