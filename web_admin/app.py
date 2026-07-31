@@ -10,25 +10,36 @@ import traceback
 import time
 from datetime import datetime, timedelta
 import io
+from functools import wraps
 
+# ============================================
+# CONFIGURACIÓN DE LOGGING
+# ============================================
 logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# ============================================
+# CONFIGURACIÓN DE RUTAS
+# ============================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE_DIR)
 
 # ============================================
 # CREAR CARPETAS PARA ARCHIVOS ESTÁTICOS
 # ============================================
-os.makedirs('static/uploads/productos', exist_ok=True)
-os.makedirs('static/uploads/facturas', exist_ok=True)
-os.makedirs('static/img', exist_ok=True)
-print("📁 Carpetas de almacenamiento creadas/verificadas")
+try:
+    os.makedirs(os.path.join(BASE_DIR, 'static/uploads/productos'), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, 'static/uploads/facturas'), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, 'static/img'), exist_ok=True)
+    print("📁 Carpetas de almacenamiento creadas/verificadas")
+except Exception as e:
+    print(f"⚠️ Error creando carpetas: {e}")
 
 # ============================================
 # IMPORTAR FUNCIONES DE LA BASE DE DATOS
 # ============================================
-
 try:
-    from web_admin.database import (
+    from database import (
         init_db, crear_usuario, obtener_usuario_por_username,
         obtener_usuario_por_id, obtener_todos_usuarios,
         obtener_negocios, eliminar_usuario,
@@ -46,7 +57,8 @@ try:
         obtener_todos_productos, obtener_productos_con_stock, actualizar_stock_producto,
         obtener_productos_tienda,
         agregar_producto_tienda, toggle_destacado_tienda, eliminar_producto_tienda,
-        crear_venta, obtener_ventas, obtener_todas_ventas, obtener_estadisticas_ventas, eliminar_venta_con_reintegro,
+        crear_venta, obtener_ventas, obtener_todas_ventas, obtener_estadisticas_ventas, 
+        eliminar_venta_con_reintegro,
         actualizar_estado_venta,
         crear_servicio, obtener_servicios, obtener_todos_servicios, toggle_servicio, eliminar_servicio,
         obtener_estadisticas_trabajador,
@@ -60,28 +72,38 @@ try:
         obtener_nomina_mes, calcular_nomina, obtener_nomina_trabajador,
         obtener_comisiones_trabajador_mes, obtener_comisiones_negocio_mes,
         registrar_comision, obtener_resumen_nomina,
-        obtener_negocio_de_trabajador
+        obtener_negocio_de_trabajador,
+        obtener_dias_trabajados_mes, obtener_dias_ausencia_mes, obtener_dias_extras_mes,
+        obtener_total_comisiones_mes
     )
-    from web_admin.auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
-    from web_admin.storage import get_storage_manager
-    from web_admin.reportes import GeneradorReportes
+    from auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
+    from storage import get_storage_manager
+    from reportes import GeneradorReportes
     print("✅ Módulos importados correctamente")
-except Exception as e:
+except ImportError as e:
     print(f"❌ Error importando módulos: {e}")
     traceback.print_exc()
+    # Intentar importar con ruta relativa
+    try:
+        from web_admin.database import *
+        from web_admin.auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
+        from web_admin.storage import get_storage_manager
+        from web_admin.reportes import GeneradorReportes
+        print("✅ Módulos importados desde web_admin")
+    except ImportError as e2:
+        print(f"❌ Error importando desde web_admin: {e2}")
+        traceback.print_exc()
 
 # ============================================
 # CREAR APLICACIÓN FLASK
 # ============================================
-
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 CORS(app)
 
 # ============================================
 # CONFIGURACIÓN DE CACHÉ (ANTI-CACHÉ)
 # ============================================
-
 @app.after_request
 def add_header(response):
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
@@ -90,21 +112,53 @@ def add_header(response):
     return response
 
 # ============================================
+# DECORADORES
+# ============================================
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('token')
+        if not token:
+            return redirect(url_for('login'))
+        try:
+            usuario = obtener_usuario_sesion(token)
+            if not usuario:
+                return redirect(url_for('login'))
+            return f(*args, **kwargs)
+        except Exception as e:
+            print(f"❌ Error en login_required: {e}")
+            return redirect(url_for('login'))
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('token')
+        if not token:
+            return redirect(url_for('login'))
+        try:
+            usuario = obtener_usuario_sesion(token)
+            if not usuario or usuario.get('rol') != 'admin':
+                return jsonify({'error': 'Acceso denegado'}), 403
+            return f(*args, **kwargs)
+        except Exception as e:
+            print(f"❌ Error en admin_required: {e}")
+            return jsonify({'error': 'Error de autenticación'}), 401
+    return decorated_function
+
+# ============================================
 # INICIALIZAR BASE DE DATOS (DESACTIVADO)
 # ============================================
-
 print("⚠️ Inicialización automática desactivada")
 print("👉 Visita /init-db para inicializar manualmente")
 
 # ============================================
 # ENDPOINT PARA INICIALIZAR BD MANUALMENTE
 # ============================================
-
 @app.route('/init-db', methods=['GET'])
 def init_db_route():
     """Endpoint para inicializar la base de datos manualmente"""
     try:
-        from web_admin.database import init_db
         init_db()
         return """
         <html>
@@ -131,392 +185,18 @@ def init_db_route():
         """, 500
 
 # ============================================
-# ENDPOINT PARA REPARAR TABLA NOMINA
-# ============================================
-
-@app.route('/fix-nomina-tabla', methods=['GET'])
-def fix_nomina_tabla_endpoint():
-    """Endpoint para reparar la tabla nomina"""
-    try:
-        import urllib.parse
-        import psycopg2
-        
-        DATABASE_URL = os.environ.get('DATABASE_URL', '')
-        
-        if not DATABASE_URL:
-            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
-        
-        url = DATABASE_URL.strip()
-        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
-            url = 'postgresql://' + url
-        
-        parsed = urllib.parse.urlparse(url)
-        
-        conn = psycopg2.connect(
-            host=parsed.hostname or 'localhost',
-            port=parsed.port or 5432,
-            database=parsed.path.lstrip('/') if parsed.path else '',
-            user=parsed.username or '',
-            password=parsed.password or '',
-            sslmode='require'
-        )
-        cursor = conn.cursor()
-        print("✅ Conectado a PostgreSQL")
-        
-        mensajes = []
-        
-        # 1. Verificar si la tabla existe
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'nomina'
-            )
-        """)
-        tabla_existe = cursor.fetchone()[0]
-        
-        if not tabla_existe:
-            mensajes.append("⚠️ La tabla 'nomina' no existe. Creándola...")
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS nomina (
-                id SERIAL PRIMARY KEY,
-                negocio_id INTEGER NOT NULL,
-                trabajador_id INTEGER NOT NULL,
-                mes INTEGER NOT NULL,
-                ano INTEGER NOT NULL,
-                salario_base REAL NOT NULL DEFAULT 0,
-                dias_trabajados INTEGER DEFAULT 0,
-                dias_ausencia INTEGER DEFAULT 0,
-                dias_extras INTEGER DEFAULT 0,
-                salario_devengado REAL DEFAULT 0,
-                comisiones REAL DEFAULT 0,
-                total REAL DEFAULT 0,
-                creado_en TEXT NOT NULL,
-                actualizado_en TEXT,
-                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-                UNIQUE(negocio_id, trabajador_id, mes, ano)
-            )
-            ''')
-            conn.commit()
-            mensajes.append("✅ Tabla 'nomina' creada correctamente")
-        
-        # 2. Verificar columnas existentes
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'nomina'
-        """)
-        columnas = [col[0] for col in cursor.fetchall()]
-        mensajes.append(f"📋 Columnas existentes: {', '.join(columnas)}")
-        
-        # 3. Columnas necesarias
-        columnas_necesarias = {
-            'salario_base': 'REAL NOT NULL DEFAULT 0',
-            'dias_trabajados': 'INTEGER DEFAULT 0',
-            'dias_ausencia': 'INTEGER DEFAULT 0',
-            'dias_extras': 'INTEGER DEFAULT 0',
-            'salario_devengado': 'REAL DEFAULT 0',
-            'comisiones': 'REAL DEFAULT 0',
-            'total': 'REAL DEFAULT 0'
-        }
-        
-        # 4. Agregar columnas faltantes
-        for col, tipo in columnas_necesarias.items():
-            if col not in columnas:
-                try:
-                    cursor.execute(f"ALTER TABLE nomina ADD COLUMN {col} {tipo}")
-                    mensajes.append(f"✅ Columna '{col}' agregada")
-                    print(f"✅ Columna '{col}' agregada")
-                except psycopg2.Error as e:
-                    if "duplicate column" not in str(e).lower():
-                        mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
-                        print(f"⚠️ Error al agregar '{col}': {e}")
-                except Exception as e:
-                    mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
-                    print(f"⚠️ Error al agregar '{col}': {e}")
-            else:
-                mensajes.append(f"✅ Columna '{col}' ya existe")
-        
-        conn.commit()
-        
-        # 5. Verificar estructura final
-        cursor.execute("""
-            SELECT column_name, data_type
-            FROM information_schema.columns 
-            WHERE table_name = 'nomina'
-            ORDER BY ordinal_position
-        """)
-        columnas_final = cursor.fetchall()
-        
-        html_columnas = ""
-        for col, tipo in columnas_final:
-            html_columnas += f"• <strong>{col}</strong> ({tipo})<br>"
-        
-        # 6. Contar registros
-        cursor.execute("SELECT COUNT(*) FROM nomina")
-        total_registros = cursor.fetchone()[0]
-        
-        conn.close()
-        
-        html_mensajes = "<br>".join(mensajes)
-        
-        return f"""
-        <html>
-            <head>
-                <title>Tabla Nómina Reparada</title>
-                <style>
-                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
-                    .container {{ max-width: 800px; margin: 0 auto; }}
-                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
-                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
-                    .success {{ color: #6bff6b; }}
-                    .btn {{
-                        display: inline-block;
-                        padding: 10px 20px;
-                        margin: 10px;
-                        border: none;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        font-size: 14px;
-                        text-decoration: none;
-                        transition: all 0.3s;
-                    }}
-                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
-                    .btn-primary:hover {{ background: #5a2ec0; }}
-                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
-                    .btn-secondary:hover {{ background: #3a3a4e; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1 style="color:#6c3ce0;">🔧 Reparación de Tabla Nómina</h1>
-                    
-                    <div class="card">
-                        <h3>📊 Resultado</h3>
-                        {html_mensajes}
-                    </div>
-                    
-                    <div class="card">
-                        <h3>📋 Estructura final de la tabla 'nomina'</h3>
-                        {html_columnas}
-                    </div>
-                    
-                    <div class="card">
-                        <h3>📊 Estadísticas</h3>
-                        <p>Total de registros en nómina: <strong>{total_registros}</strong></p>
-                    </div>
-                    
-                    <div>
-                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
-                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
-                    </div>
-                </div>
-            </body>
-        </html>
-        """
-    except Exception as e:
-        return f"""
-        <html>
-            <head><title>Error</title></head>
-            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
-                <h1 style="color:#ff6b6b;">❌ Error al reparar tabla</h1>
-                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
-                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
-            </body>
-        </html>
-        """, 500
-
-# ============================================
-# ENDPOINT PARA VERIFICAR TABLA COMISIONES
-# ============================================
-
-@app.route('/debug/comisiones-tabla', methods=['GET'])
-@login_required
-def debug_comisiones_tabla():
-    """Verifica la estructura de la tabla comisiones_trabajador"""
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        # Verificar si la tabla existe
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'comisiones_trabajador'
-            )
-        """)
-        existe = cursor.fetchone()[0]
-        
-        if not existe:
-            return jsonify({
-                'existe': False,
-                'mensaje': 'La tabla comisiones_trabajador NO existe'
-            })
-        
-        # Verificar columnas
-        cursor.execute("""
-            SELECT column_name, data_type
-            FROM information_schema.columns 
-            WHERE table_name = 'comisiones_trabajador'
-            ORDER BY ordinal_position
-        """)
-        columnas = cursor.fetchall()
-        
-        # Verificar si hay registros
-        cursor.execute("SELECT COUNT(*) FROM comisiones_trabajador")
-        total = cursor.fetchone()[0]
-        
-        # Verificar algunos registros
-        if total > 0:
-            cursor.execute("SELECT * FROM comisiones_trabajador LIMIT 3")
-            ejemplos = cursor.fetchall()
-            ejemplos_list = []
-            for row in ejemplos:
-                ejemplos_list.append(dict(zip([col[0] for col in columnas], row)))
-        else:
-            ejemplos_list = []
-        
-        conn.close()
-        
-        return jsonify({
-            'existe': True,
-            'total_registros': total,
-            'columnas': [{'nombre': col[0], 'tipo': col[1]} for col in columnas],
-            'ejemplos': ejemplos_list
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
-
-# ============================================
-# ENDPOINT PARA AGREGAR COMISIONES DE PRUEBA
-# ============================================
-
-@app.route('/debug/add-test-comisiones', methods=['GET'])
-@login_required
-def add_test_comisiones():
-    """Agrega comisiones de prueba para un trabajador"""
-    try:
-        token = request.cookies.get('token')
-        usuario = obtener_usuario_sesion(token)
-        
-        if not usuario or usuario['tipo'] != 'negocio':
-            return jsonify({'error': 'No autorizado'}), 403
-        
-        # Obtener el primer trabajador del negocio
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT tn.trabajador_id 
-            FROM trabajadores_negocio tn
-            WHERE tn.negocio_id = %s AND tn.activo = 1
-            LIMIT 1
-        ''', (usuario['id'],))
-        trabajador = cursor.fetchone()
-        
-        if not trabajador:
-            conn.close()
-            return jsonify({'error': 'No hay trabajadores en este negocio'})
-        
-        trabajador_id = trabajador[0]
-        
-        # Obtener un producto del negocio
-        cursor.execute('''
-            SELECT id, nombre, comision 
-            FROM productos 
-            WHERE negocio_id = %s AND comision > 0
-            LIMIT 1
-        ''', (usuario['id'],))
-        producto = cursor.fetchone()
-        
-        if not producto:
-            conn.close()
-            return jsonify({'error': 'No hay productos con comisión en este negocio'})
-        
-        producto_id = producto[0]
-        producto_nombre = producto[1]
-        comision = producto[2]
-        
-        # Obtener una venta del trabajador
-        cursor.execute('''
-            SELECT id, cliente 
-            FROM ventas 
-            WHERE negocio_id = %s AND trabajador_id = %s
-            LIMIT 1
-        ''', (usuario['id'], trabajador_id))
-        venta = cursor.fetchone()
-        
-        if not venta:
-            conn.close()
-            return jsonify({'error': 'No hay ventas de este trabajador'})
-        
-        venta_id = venta[0]
-        cliente = venta[1]
-        
-        # Insertar comisión de prueba
-        fecha = datetime.now().isoformat()
-        cursor.execute('''
-            INSERT INTO comisiones_trabajador 
-            (negocio_id, trabajador_id, venta_id, producto_id, monto, fecha, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ''', (usuario['id'], trabajador_id, venta_id, producto_id, comision, fecha, fecha))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'mensaje': f'Comisión de prueba agregada: ${comision} para {producto_nombre}',
-            'trabajador_id': trabajador_id,
-            'producto': producto_nombre,
-            'comision': comision,
-            'cliente': cliente
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
-
-# ============================================
-# DECORADORES
-# ============================================
-
-def login_required(f):
-    from functools import wraps
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.cookies.get('token')
-        if not token:
-            return redirect(url_for('login'))
-        usuario = obtener_usuario_sesion(token)
-        if not usuario:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-def admin_required(f):
-    from functools import wraps
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.cookies.get('token')
-        if not token:
-            return redirect(url_for('login'))
-        usuario = obtener_usuario_sesion(token)
-        if not usuario or usuario['rol'] != 'admin':
-            return jsonify({'error': 'Acceso denegado'}), 403
-        return f(*args, **kwargs)
-    return decorated_function
-
-# ============================================
 # RUTAS PRINCIPALES
 # ============================================
-
 @app.route('/')
 def index():
     token = request.cookies.get('token')
     if token:
-        usuario = obtener_usuario_sesion(token)
-        if usuario:
-            return redirect(url_for('dashboard'))
+        try:
+            usuario = obtener_usuario_sesion(token)
+            if usuario:
+                return redirect(url_for('dashboard'))
+        except:
+            pass
     return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -569,7 +249,7 @@ def login():
     except Exception as e:
         print(f"❌ Error en login: {e}")
         traceback.print_exc()
-        return jsonify({'error': f'Error interno del servidor'}), 500
+        return jsonify({'error': 'Error interno del servidor'}), 500
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -624,19 +304,22 @@ def dashboard():
     if not usuario:
         return redirect(url_for('login'))
     
-    if usuario['rol'] == 'admin':
-        return render_template('dashboard.html', usuario=usuario)
-    elif usuario['rol'] == 'trabajador':
-        return render_template('trabajador/dashboard.html', usuario=usuario)
-    elif usuario['tipo'] == 'negocio':
-        return render_template('negocio/dashboard.html', usuario=usuario)
-    else:
-        return render_template('cliente/dashboard.html', usuario=usuario)
+    try:
+        if usuario.get('rol') == 'admin':
+            return render_template('dashboard.html', usuario=usuario)
+        elif usuario.get('rol') == 'trabajador':
+            return render_template('trabajador/dashboard.html', usuario=usuario)
+        elif usuario.get('tipo') == 'negocio':
+            return render_template('negocio/dashboard.html', usuario=usuario)
+        else:
+            return render_template('cliente/dashboard.html', usuario=usuario)
+    except Exception as e:
+        print(f"❌ Error en dashboard: {e}")
+        return render_template('login.html')
 
 @app.route('/perfil')
 @login_required
 def perfil_usuario():
-    """Página de perfil del usuario"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -654,7 +337,6 @@ def logout():
 # ============================================
 # ADMIN - PERFIL Y GESTOR DB
 # ============================================
-
 @app.route('/admin/perfil')
 @admin_required
 def admin_perfil():
@@ -675,294 +357,8 @@ def admin_trabajadores_pendientes():
     return render_template('admin/trabajadores_pendientes.html')
 
 # ============================================
-# API - PERFIL DE USUARIO
-# ============================================
-
-@app.route('/api/usuario/perfil', methods=['GET'])
-@login_required
-def api_obtener_perfil_usuario():
-    """Obtiene el perfil completo del usuario actual"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    datos_negocio = {}
-    if usuario.get('datos_negocio'):
-        try:
-            datos_negocio = json.loads(usuario['datos_negocio']) if isinstance(usuario['datos_negocio'], str) else usuario['datos_negocio']
-        except:
-            datos_negocio = {}
-    
-    return jsonify({
-        'success': True,
-        'usuario': {
-            'id': usuario['id'],
-            'username': usuario['username'],
-            'email': usuario['email'],
-            'nombre': usuario['nombre'],
-            'rol': usuario['rol'],
-            'tipo': usuario['tipo'],
-            'fecha_registro': usuario['fecha_registro'],
-            'telefono': datos_negocio.get('telefono', ''),
-            'provincia': datos_negocio.get('provincia', ''),
-            'municipio': datos_negocio.get('municipio', ''),
-            'direccion': datos_negocio.get('direccion', ''),
-            'nombre_negocio': datos_negocio.get('nombre_negocio', ''),
-            'ruc': datos_negocio.get('ruc', ''),
-            'descripcion': datos_negocio.get('descripcion', ''),
-            'salario': datos_negocio.get('salario', 0)
-        }
-    })
-
-@app.route('/api/usuario/perfil', methods=['PUT'])
-@login_required
-def api_actualizar_perfil_usuario():
-    """Actualiza el perfil del usuario actual"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    data = request.get_json()
-    
-    nombre = data.get('nombre')
-    email = data.get('email')
-    telefono = data.get('telefono')
-    provincia = data.get('provincia')
-    municipio = data.get('municipio')
-    direccion = data.get('direccion')
-    nombre_negocio = data.get('nombre_negocio')
-    ruc = data.get('ruc')
-    descripcion = data.get('descripcion')
-    salario = data.get('salario', 0)
-    
-    if not nombre:
-        return jsonify({'error': 'El nombre es obligatorio'}), 400
-    
-    if not telefono:
-        return jsonify({'error': 'El teléfono es obligatorio'}), 400
-    
-    if not provincia or not municipio:
-        return jsonify({'error': 'Provincia y municipio son obligatorios'}), 400
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
-    result = cursor.fetchone()
-    
-    datos_negocio = {}
-    if result and result[0]:
-        try:
-            datos_negocio = json.loads(result[0]) if isinstance(result[0], str) else result[0]
-        except:
-            datos_negocio = {}
-    
-    datos_negocio.update({
-        'telefono': telefono,
-        'provincia': provincia,
-        'municipio': municipio,
-        'direccion': direccion or '',
-        'salario': salario
-    })
-    
-    if usuario['tipo'] == 'negocio':
-        datos_negocio.update({
-            'nombre_negocio': nombre_negocio or datos_negocio.get('nombre_negocio', ''),
-            'ruc': ruc or datos_negocio.get('ruc', ''),
-            'descripcion': descripcion or datos_negocio.get('descripcion', '')
-        })
-    
-    cursor.execute('''
-        UPDATE usuarios 
-        SET nombre = %s, email = %s, datos_negocio = %s
-        WHERE id = %s
-    ''', (nombre, email, json.dumps(datos_negocio, ensure_ascii=False), usuario['id']))
-    
-    conn.commit()
-    conn.close()
-    
-    registrar_log(usuario['id'], 'perfil_actualizado', 'Perfil de usuario actualizado')
-    
-    return jsonify({
-        'success': True,
-        'message': 'Perfil actualizado correctamente'
-    })
-
-@app.route('/api/usuario/ubicacion', methods=['GET'])
-@login_required
-def api_obtener_ubicacion_usuario():
-    """Obtiene la ubicación del usuario actual"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    datos = obtener_datos_negocio(usuario['id'])
-    
-    return jsonify({
-        'success': True,
-        'provincia': datos.get('provincia', ''),
-        'municipio': datos.get('municipio', ''),
-        'tiene_ubicacion': bool(datos.get('provincia') and datos.get('municipio'))
-    })
-
-@app.route('/api/perfil')
-@admin_required
-def api_perfil():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    return jsonify({
-        'success': True,
-        'usuario': {
-            'id': usuario['id'],
-            'username': usuario['username'],
-            'email': usuario['email'],
-            'nombre': usuario['nombre'],
-            'rol': usuario['rol'],
-            'fecha_registro': usuario['fecha_registro']
-        }
-    })
-
-@app.route('/api/perfil/password', methods=['POST'])
-@admin_required
-def api_perfil_password():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    data = request.get_json()
-    current_password = data.get('current_password')
-    new_password = data.get('new_password')
-    
-    if not current_password or not new_password:
-        return jsonify({'error': 'Todos los campos son requeridos'}), 400
-    
-    if len(new_password) < 6:
-        return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
-    
-    if not verify_password(current_password, usuario['password_hash']):
-        return jsonify({'error': 'Contraseña actual incorrecta'}), 401
-    
-    new_hash = hash_password(new_password)
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET password_hash = %s WHERE id = %s', (new_hash, usuario['id']))
-    conn.commit()
-    conn.close()
-    
-    registrar_log(usuario['id'], 'cambio_password', 'Contraseña actualizada')
-    
-    return jsonify({'success': True, 'message': 'Contraseña actualizada correctamente'})
-
-# ============================================
-# API - SQL QUERY
-# ============================================
-
-@app.route('/api/sql', methods=['POST'])
-@admin_required
-def api_sql():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    data = request.get_json()
-    query = data.get('query', '').strip()
-    
-    if not query:
-        return jsonify({'error': 'La consulta SQL está vacía'}), 400
-    
-    if not query.lower().startswith('select'):
-        return jsonify({'error': 'Solo se permiten consultas SELECT'}), 403
-    
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute(query)
-        
-        column_names = [desc[0] for desc in cursor.description] if cursor.description else []
-        rows = cursor.fetchall()
-        conn.close()
-        
-        result = []
-        for row in rows:
-            result.append(dict(zip(column_names, row)))
-        
-        return jsonify({'result': result})
-    except psycopg2.Error as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
-# API - ESTADÍSTICAS
-# ============================================
-
-@app.route('/api/estadisticas')
-@admin_required
-def api_estadisticas():
-    usuarios = obtener_todos_usuarios()
-    logs = obtener_logs(100)
-    
-    total = len(usuarios)
-    activos = len([u for u in usuarios if u['activo'] == 1])
-    trabajadores = len([u for u in usuarios if u['rol'] == 'trabajador'])
-    
-    hoy = datetime.now().date()
-    registros_hoy = len([l for l in logs if datetime.fromisoformat(l['fecha']).date() == hoy])
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT COUNT(*) FROM productos')
-    total_productos = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM ventas')
-    total_ventas = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM servicios')
-    total_servicios = cursor.fetchone()[0]
-    cursor.execute('SELECT COUNT(*) FROM contratos')
-    total_contratos = cursor.fetchone()[0]
-    conn.close()
-    
-    return jsonify({
-        'total_usuarios': total,
-        'usuarios_activos': activos,
-        'total_trabajadores': trabajadores,
-        'registros_hoy': registros_hoy,
-        'total_logs': len(logs),
-        'total_productos': total_productos,
-        'total_ventas': total_ventas,
-        'total_servicios': total_servicios,
-        'total_contratos': total_contratos
-    })
-
-# ============================================
-# API - VERIFICAR USUARIO (DEBUG)
-# ============================================
-
-@app.route('/api/verificar-usuario/<username>', methods=['GET'])
-@admin_required
-def verificar_usuario(username):
-    """Endpoint para verificar si un usuario existe"""
-    usuario = obtener_usuario_por_username(username)
-    if usuario:
-        return jsonify({
-            'exists': True,
-            'usuario': {
-                'id': usuario.get('id'),
-                'username': usuario.get('username'),
-                'email': usuario.get('email'),
-                'tipo': usuario.get('tipo'),
-                'rol': usuario.get('rol')
-            }
-        })
-    return jsonify({'exists': False, 'message': 'Usuario no encontrado'})
-
-# ============================================
 # RUTAS DE MÓDULOS DE NEGOCIO
 # ============================================
-
 @app.route('/negocio/inventario')
 @login_required
 def negocio_inventario():
@@ -1013,9 +409,291 @@ def negocio_nomina():
     return render_template('negocio/nomina.html', usuario=usuario, version=int(time.time()))
 
 # ============================================
+# API - PERFIL DE USUARIO
+# ============================================
+@app.route('/api/usuario/perfil', methods=['GET'])
+@login_required
+def api_obtener_perfil_usuario():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    datos_negocio = {}
+    if usuario.get('datos_negocio'):
+        try:
+            datos_negocio = json.loads(usuario['datos_negocio']) if isinstance(usuario['datos_negocio'], str) else usuario['datos_negocio']
+        except:
+            datos_negocio = {}
+    
+    return jsonify({
+        'success': True,
+        'usuario': {
+            'id': usuario.get('id'),
+            'username': usuario.get('username'),
+            'email': usuario.get('email'),
+            'nombre': usuario.get('nombre'),
+            'rol': usuario.get('rol'),
+            'tipo': usuario.get('tipo'),
+            'fecha_registro': usuario.get('fecha_registro'),
+            'telefono': datos_negocio.get('telefono', ''),
+            'provincia': datos_negocio.get('provincia', ''),
+            'municipio': datos_negocio.get('municipio', ''),
+            'direccion': datos_negocio.get('direccion', ''),
+            'nombre_negocio': datos_negocio.get('nombre_negocio', ''),
+            'ruc': datos_negocio.get('ruc', ''),
+            'descripcion': datos_negocio.get('descripcion', ''),
+            'salario': datos_negocio.get('salario', 0)
+        }
+    })
+
+@app.route('/api/usuario/perfil', methods=['PUT'])
+@login_required
+def api_actualizar_perfil_usuario():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    
+    nombre = data.get('nombre')
+    email = data.get('email')
+    telefono = data.get('telefono')
+    provincia = data.get('provincia')
+    municipio = data.get('municipio')
+    direccion = data.get('direccion')
+    nombre_negocio = data.get('nombre_negocio')
+    ruc = data.get('ruc')
+    descripcion = data.get('descripcion')
+    salario = data.get('salario', 0)
+    
+    if not nombre:
+        return jsonify({'error': 'El nombre es obligatorio'}), 400
+    
+    if not telefono:
+        return jsonify({'error': 'El teléfono es obligatorio'}), 400
+    
+    if not provincia or not municipio:
+        return jsonify({'error': 'Provincia y municipio son obligatorios'}), 400
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
+    result = cursor.fetchone()
+    
+    datos_negocio = {}
+    if result and result[0]:
+        try:
+            datos_negocio = json.loads(result[0]) if isinstance(result[0], str) else result[0]
+        except:
+            datos_negocio = {}
+    
+    datos_negocio.update({
+        'telefono': telefono,
+        'provincia': provincia,
+        'municipio': municipio,
+        'direccion': direccion or '',
+        'salario': salario
+    })
+    
+    if usuario.get('tipo') == 'negocio':
+        datos_negocio.update({
+            'nombre_negocio': nombre_negocio or datos_negocio.get('nombre_negocio', ''),
+            'ruc': ruc or datos_negocio.get('ruc', ''),
+            'descripcion': descripcion or datos_negocio.get('descripcion', '')
+        })
+    
+    cursor.execute('''
+        UPDATE usuarios 
+        SET nombre = %s, email = %s, datos_negocio = %s
+        WHERE id = %s
+    ''', (nombre, email, json.dumps(datos_negocio, ensure_ascii=False), usuario['id']))
+    
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'perfil_actualizado', 'Perfil de usuario actualizado')
+    
+    return jsonify({
+        'success': True,
+        'message': 'Perfil actualizado correctamente'
+    })
+
+@app.route('/api/usuario/ubicacion', methods=['GET'])
+@login_required
+def api_obtener_ubicacion_usuario():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    datos = obtener_datos_negocio(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'provincia': datos.get('provincia', ''),
+        'municipio': datos.get('municipio', ''),
+        'tiene_ubicacion': bool(datos.get('provincia') and datos.get('municipio'))
+    })
+
+@app.route('/api/perfil')
+@admin_required
+def api_perfil():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return jsonify({
+        'success': True,
+        'usuario': {
+            'id': usuario.get('id'),
+            'username': usuario.get('username'),
+            'email': usuario.get('email'),
+            'nombre': usuario.get('nombre'),
+            'rol': usuario.get('rol'),
+            'fecha_registro': usuario.get('fecha_registro')
+        }
+    })
+
+@app.route('/api/perfil/password', methods=['POST'])
+@admin_required
+def api_perfil_password():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    data = request.get_json()
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    
+    if not current_password or not new_password:
+        return jsonify({'error': 'Todos los campos son requeridos'}), 400
+    
+    if len(new_password) < 6:
+        return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
+    
+    if not verify_password(current_password, usuario.get('password_hash')):
+        return jsonify({'error': 'Contraseña actual incorrecta'}), 401
+    
+    new_hash = hash_password(new_password)
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE usuarios SET password_hash = %s WHERE id = %s', (new_hash, usuario['id']))
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'cambio_password', 'Contraseña actualizada')
+    
+    return jsonify({'success': True, 'message': 'Contraseña actualizada correctamente'})
+
+# ============================================
+# API - SQL QUERY
+# ============================================
+@app.route('/api/sql', methods=['POST'])
+@admin_required
+def api_sql():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    
+    if not query:
+        return jsonify({'error': 'La consulta SQL está vacía'}), 400
+    
+    if not query.lower().startswith('select'):
+        return jsonify({'error': 'Solo se permiten consultas SELECT'}), 403
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(query)
+        
+        column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
+        conn.close()
+        
+        result = []
+        for row in rows:
+            result.append(dict(zip(column_names, row)))
+        
+        return jsonify({'result': result})
+    except psycopg2.Error as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - ESTADÍSTICAS
+# ============================================
+@app.route('/api/estadisticas')
+@admin_required
+def api_estadisticas():
+    usuarios = obtener_todos_usuarios()
+    logs = obtener_logs(100)
+    
+    total = len(usuarios)
+    activos = len([u for u in usuarios if u.get('activo') == 1])
+    trabajadores = len([u for u in usuarios if u.get('rol') == 'trabajador'])
+    
+    hoy = datetime.now().date()
+    registros_hoy = 0
+    for l in logs:
+        try:
+            if datetime.fromisoformat(l.get('fecha', '')).date() == hoy:
+                registros_hoy += 1
+        except:
+            pass
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM productos')
+    total_productos = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM ventas')
+    total_ventas = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM servicios')
+    total_servicios = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM contratos')
+    total_contratos = cursor.fetchone()[0]
+    conn.close()
+    
+    return jsonify({
+        'total_usuarios': total,
+        'usuarios_activos': activos,
+        'total_trabajadores': trabajadores,
+        'registros_hoy': registros_hoy,
+        'total_logs': len(logs),
+        'total_productos': total_productos,
+        'total_ventas': total_ventas,
+        'total_servicios': total_servicios,
+        'total_contratos': total_contratos
+    })
+
+# ============================================
+# API - VERIFICAR USUARIO (DEBUG)
+# ============================================
+@app.route('/api/verificar-usuario/<username>', methods=['GET'])
+@admin_required
+def verificar_usuario(username):
+    usuario = obtener_usuario_por_username(username)
+    if usuario:
+        return jsonify({
+            'exists': True,
+            'usuario': {
+                'id': usuario.get('id'),
+                'username': usuario.get('username'),
+                'email': usuario.get('email'),
+                'tipo': usuario.get('tipo'),
+                'rol': usuario.get('rol')
+            }
+        })
+    return jsonify({'exists': False, 'message': 'Usuario no encontrado'})
+
+# ============================================
 # API - USUARIOS
 # ============================================
-
 @app.route('/api/usuarios')
 @admin_required
 def api_usuarios():
@@ -1072,7 +750,7 @@ def api_eliminar_usuario(user_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if usuario['id'] == user_id:
+    if usuario.get('id') == user_id:
         return jsonify({'error': 'No puedes eliminar tu propio usuario'}), 400
     
     user = obtener_usuario_por_id(user_id)
@@ -1084,14 +762,13 @@ def api_eliminar_usuario(user_id):
     if not exito:
         return jsonify({'error': 'Error al eliminar el usuario'}), 500
     
-    registrar_log(usuario['id'], 'usuario_eliminado', f'Usuario {user_id} eliminado')
+    registrar_log(usuario.get('id'), 'usuario_eliminado', f'Usuario {user_id} eliminado')
     
     return jsonify({'success': True, 'message': 'Usuario eliminado correctamente'})
 
 # ============================================
 # API - NEGOCIOS
 # ============================================
-
 @app.route('/api/negocios')
 @admin_required
 def api_negocios():
@@ -1101,7 +778,6 @@ def api_negocios():
 @app.route('/api/negocios/cercanos', methods=['GET'])
 @login_required
 def api_negocios_cercanos():
-    """Obtiene negocios cercanos basados en la ubicación del usuario"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1140,20 +816,20 @@ def api_negocios_cercanos():
         resultado = []
         for n in negocios:
             datos = {}
-            if n['datos_negocio']:
+            if n.get('datos_negocio'):
                 try:
                     datos = json.loads(n['datos_negocio']) if isinstance(n['datos_negocio'], str) else n['datos_negocio']
                 except:
                     pass
             
             resultado.append({
-                'id': n['id'],
-                'username': n['username'],
-                'nombre': n['nombre'] or datos.get('nombre_negocio', n['username']),
+                'id': n.get('id'),
+                'username': n.get('username'),
+                'nombre': n.get('nombre') or datos.get('nombre_negocio', n.get('username')),
                 'telefono': datos.get('telefono', ''),
                 'direccion': datos.get('direccion', ''),
                 'descripcion': datos.get('descripcion', ''),
-                'activo': n['activo']
+                'activo': n.get('activo')
             })
         
         return jsonify({
@@ -1166,14 +842,12 @@ def api_negocios_cercanos():
         
     except Exception as e:
         print(f"❌ Error en api_negocios_cercanos: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ============================================
 # API - TODOS LOS PRODUCTOS (para admin)
 # ============================================
-
 @app.route('/api/todos/productos')
 @admin_required
 def api_todos_productos():
@@ -1183,7 +857,6 @@ def api_todos_productos():
 # ============================================
 # API - TODAS LAS VENTAS (para admin)
 # ============================================
-
 @app.route('/api/todos/ventas')
 @admin_required
 def api_todos_ventas():
@@ -1193,7 +866,6 @@ def api_todos_ventas():
 # ============================================
 # API - TODOS LOS SERVICIOS (para admin)
 # ============================================
-
 @app.route('/api/todos/servicios')
 @admin_required
 def api_todos_servicios():
@@ -1203,17 +875,16 @@ def api_todos_servicios():
 # ============================================
 # API - MÓDULOS
 # ============================================
-
 @app.route('/api/modulos')
 @login_required
 def api_modulos():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if usuario and usuario['rol'] == 'admin':
+    if usuario and usuario.get('rol') == 'admin':
         modulos = obtener_modulos()
     else:
-        tipo_usuario = usuario['tipo'] if usuario else 'cliente'
+        tipo_usuario = usuario.get('tipo') if usuario else 'cliente'
         modulos = obtener_modulos(tipo_usuario)
     
     return jsonify([dict(m) for m in modulos])
@@ -1232,7 +903,7 @@ def api_toggle_modulo_global(modulo_id):
 def api_permisos_usuario(user_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
-    if not usuario or (usuario['id'] != user_id and usuario['rol'] != 'admin'):
+    if not usuario or (usuario.get('id') != user_id and usuario.get('rol') != 'admin'):
         return jsonify({'error': 'No autorizado'}), 403
     
     permisos = obtener_permisos_usuario(user_id)
@@ -1250,14 +921,13 @@ def api_asignar_permiso(user_id, modulo_id):
 # ============================================
 # API - NEGOCIO - TRABAJADORES
 # ============================================
-
 @app.route('/api/negocio/trabajadores')
 @login_required
 def api_obtener_trabajadores():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     try:
@@ -1299,7 +969,6 @@ def api_obtener_trabajadores():
         
     except Exception as e:
         print(f"❌ Error en api_obtener_trabajadores: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -1309,7 +978,7 @@ def api_crear_trabajador():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
@@ -1392,7 +1061,7 @@ def api_actualizar_trabajador(trabajador_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
@@ -1472,11 +1141,10 @@ def api_actualizar_trabajador(trabajador_id):
 @app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['DELETE'])
 @login_required
 def api_eliminar_trabajador(trabajador_id):
-    """Elimina un trabajador de un negocio"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     try:
@@ -1525,7 +1193,6 @@ def api_eliminar_trabajador(trabajador_id):
         return jsonify({'error': f'Error de base de datos: {str(e)}'}), 500
     except Exception as e:
         print(f"❌ Error eliminando trabajador: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -1535,7 +1202,7 @@ def api_toggle_trabajador_negocio(trabajador_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
@@ -1547,9 +1214,8 @@ def api_toggle_trabajador_negocio(trabajador_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - PRODUCTOS (CON COSTO Y COMISION - PARA NEGOCIOS Y TRABAJADORES)
+# API - PRODUCTOS
 # ============================================
-
 @app.route('/api/productos', methods=['GET', 'POST'])
 @login_required
 def api_productos():
@@ -1559,11 +1225,11 @@ def api_productos():
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
-    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
     negocio_id = usuario['id']
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
         if not negocio_id:
             return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
@@ -1572,7 +1238,7 @@ def api_productos():
         productos = obtener_productos(negocio_id)
         return jsonify([dict(p) for p in productos])
     
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         return jsonify({'error': 'No tienes permisos para crear productos'}), 403
     
     data = request.get_json()
@@ -1601,11 +1267,11 @@ def api_producto(producto_id):
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
-    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
     negocio_id = usuario['id']
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
         if not negocio_id:
             return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
@@ -1647,11 +1313,10 @@ def api_producto(producto_id):
                 
         except Exception as e:
             print(f"❌ Error eliminando producto: {e}")
-            import traceback
             traceback.print_exc()
             return jsonify({'error': str(e)}), 500
     
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         return jsonify({'error': 'No tienes permisos para editar productos'}), 403
     
     try:
@@ -1685,7 +1350,6 @@ def api_producto(producto_id):
         
     except Exception as e:
         print(f"❌ Error actualizando producto: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -1698,11 +1362,11 @@ def api_productos_stock():
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
-    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
     negocio_id = usuario['id']
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
         if not negocio_id:
             return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
@@ -1713,14 +1377,13 @@ def api_productos_stock():
 # ============================================
 # API - FOTOS DE PRODUCTOS
 # ============================================
-
 @app.route('/api/producto/<int:producto_id>/foto', methods=['POST'])
 @login_required
 def api_subir_foto_producto(producto_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     conn = get_db()
@@ -1770,7 +1433,7 @@ def api_eliminar_foto_producto(producto_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     conn = get_db()
@@ -1799,14 +1462,13 @@ def api_eliminar_foto_producto(producto_id):
 # ============================================
 # API - TIENDA (NEGOCIO)
 # ============================================
-
 @app.route('/api/tienda/productos', methods=['GET'])
 @login_required
 def api_tienda_productos():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     try:
@@ -1844,7 +1506,6 @@ def api_tienda_productos():
         
     except Exception as e:
         print(f"❌ Error en api_tienda_productos: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -1854,7 +1515,7 @@ def api_tienda_agregar_producto():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
@@ -1895,7 +1556,6 @@ def api_tienda_agregar_producto():
         
     except Exception as e:
         print(f"❌ Error en api_tienda_agregar_producto: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -1905,7 +1565,7 @@ def api_tienda_destacar_producto(tienda_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
@@ -1935,7 +1595,7 @@ def api_tienda_eliminar_producto(tienda_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     try:
@@ -1956,10 +1616,8 @@ def api_tienda_eliminar_producto(tienda_id):
 # ============================================
 # API - TIENDA PÚBLICA FILTRADA POR UBICACIÓN
 # ============================================
-
 @app.route('/api/tienda/public', methods=['GET'])
 def api_tienda_public():
-    """Obtiene productos de la tienda pública con filtro de ubicación"""
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -1970,11 +1628,14 @@ def api_tienda_public():
         municipio_filtro = None
         
         if token:
-            usuario = obtener_usuario_sesion(token)
-            if usuario:
-                datos_negocio = obtener_datos_negocio(usuario['id'])
-                provincia_filtro = datos_negocio.get('provincia')
-                municipio_filtro = datos_negocio.get('municipio')
+            try:
+                usuario = obtener_usuario_sesion(token)
+                if usuario:
+                    datos_negocio = obtener_datos_negocio(usuario.get('id'))
+                    provincia_filtro = datos_negocio.get('provincia')
+                    municipio_filtro = datos_negocio.get('municipio')
+            except:
+                pass
         
         query = '''
             SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
@@ -2039,14 +1700,12 @@ def api_tienda_public():
         
     except Exception as e:
         print(f"❌ Error en tienda pública: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - VENTAS (PARA NEGOCIOS Y TRABAJADORES)
+# API - VENTAS
 # ============================================
-
 @app.route('/api/ventas', methods=['GET', 'POST'])
 @login_required
 def api_ventas():
@@ -2056,19 +1715,19 @@ def api_ventas():
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
-    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
     negocio_id = usuario['id']
     trabajador_id = None
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
         if not negocio_id:
             return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
         trabajador_id = usuario['id']
     
     if request.method == 'GET':
-        if usuario['rol'] == 'trabajador':
+        if usuario.get('rol') == 'trabajador':
             ventas = obtener_ventas(negocio_id, trabajador_id)
         else:
             trabajador_id_param = request.args.get('trabajador_id')
@@ -2084,7 +1743,7 @@ def api_ventas():
     cantidad = data.get('cantidad', 1)
     precio = data.get('precio')
     total = data.get('total', precio * cantidad if precio else 0)
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         trabajador_id = usuario['id']
     else:
         trabajador_id = data.get('trabajador_id')
@@ -2149,7 +1808,7 @@ def api_ventas_estadisticas():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     trabajador_id = request.args.get('trabajador_id')
@@ -2166,7 +1825,7 @@ def api_actualizar_estado_venta(venta_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
@@ -2187,11 +1846,10 @@ def api_actualizar_estado_venta(venta_id):
 @app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
 @login_required
 def api_eliminar_venta(venta_id):
-    """Elimina una venta y reintegra el stock"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     try:
@@ -2227,10 +1885,10 @@ def api_eliminar_venta(venta_id):
         return jsonify({
             'success': True,
             'message': 'Venta eliminada y stock reintegrado correctamente',
-            'producto': resultado['producto'],
-            'cantidad': resultado['cantidad'],
-            'cliente': resultado['cliente'],
-            'total': resultado['total']
+            'producto': resultado.get('producto'),
+            'cantidad': resultado.get('cantidad'),
+            'cliente': resultado.get('cliente'),
+            'total': resultado.get('total')
         })
         
     except psycopg2.Error as e:
@@ -2238,22 +1896,19 @@ def api_eliminar_venta(venta_id):
         return jsonify({'error': f'Error de base de datos: {str(e)}'}), 500
     except Exception as e:
         print(f"❌ Error eliminando venta: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ============================================
 # API - FACTURAS Y OFERTAS
 # ============================================
-
 @app.route('/api/venta/<int:venta_id>/factura', methods=['GET'])
 @login_required
 def api_generar_factura(venta_id):
-    """Genera una factura PDF de una venta con todos los items uno debajo del otro"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     es_oferta = request.args.get('oferta', 'false').lower() == 'true'
@@ -2274,7 +1929,7 @@ def api_generar_factura(venta_id):
             return jsonify({'error': 'Venta no encontrada'}), 404
         
         items = []
-        producto_str = venta['producto']
+        producto_str = venta.get('producto', '')
         
         if ',' in producto_str:
             productos_separados = [p.strip() for p in producto_str.split(',')]
@@ -2343,16 +1998,16 @@ def api_generar_factura(venta_id):
         negocio_telefono = datos_negocio.get('telefono', '')
         negocio_direccion = datos_negocio.get('direccion', '')
         
-        atendido_por = venta.get('atendido_por_nombre') or usuario['nombre'] or usuario['username'] or 'Admin'
+        atendido_por = venta.get('atendido_por_nombre') or usuario.get('nombre') or usuario.get('username') or 'Admin'
         
         venta_data = {
-            'id': venta['id'],
-            'factura': venta.get('factura', f"FAC-{venta['id']}"),
-            'fecha': venta['fecha'],
-            'cliente': venta['cliente'],
+            'id': venta.get('id'),
+            'factura': venta.get('factura', f"FAC-{venta.get('id')}"),
+            'fecha': venta.get('fecha'),
+            'cliente': venta.get('cliente'),
             'empresa': venta.get('empresa', ''),
-            'estado': venta['estado'],
-            'total': venta['total'],
+            'estado': venta.get('estado'),
+            'total': venta.get('total'),
             'atendido_por': atendido_por
         }
         
@@ -2381,21 +2036,19 @@ def api_generar_factura(venta_id):
         
     except Exception as e:
         print(f"❌ Error generando factura: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ============================================
 # API - CONTRATOS
 # ============================================
-
 @app.route('/api/contratos/ultimo_numero', methods=['GET'])
 @login_required
 def api_ultimo_numero_contrato():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     ultimo = obtener_ultimo_numero_contrato(usuario['id'])
@@ -2410,11 +2063,11 @@ def api_contratos():
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
-    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
     negocio_id = usuario['id']
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
         if not negocio_id:
             return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
@@ -2424,7 +2077,7 @@ def api_contratos():
         contratos = obtener_contratos(negocio_id, trabajador_id)
         return jsonify([dict(c) for c in contratos])
     
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         return jsonify({'error': 'No tienes permisos para crear contratos'}), 403
     
     data = request.get_json()
@@ -2459,7 +2112,7 @@ def api_actualizar_contrato(contrato_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
@@ -2490,7 +2143,7 @@ def api_contrato_estado(contrato_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
@@ -2510,7 +2163,7 @@ def api_eliminar_contrato(contrato_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     eliminar_contrato(contrato_id)
@@ -2521,22 +2174,20 @@ def api_eliminar_contrato(contrato_id):
 # ============================================
 # API - OBTENER EMPRESAS CON CONTRATOS ACTIVOS
 # ============================================
-
 @app.route('/api/contratos/empresas', methods=['GET'])
 @login_required
 def api_obtener_empresas_con_contratos():
-    """Obtiene la lista de empresas con contratos activos"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
-    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
     negocio_id = usuario['id']
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
         if not negocio_id:
             return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
@@ -2570,9 +2221,8 @@ def api_obtener_empresas_con_contratos():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - SERVICIOS (PARA NEGOCIOS Y TRABAJADORES)
+# API - SERVICIOS
 # ============================================
-
 @app.route('/api/servicios', methods=['GET', 'POST'])
 @login_required
 def api_servicios():
@@ -2582,24 +2232,24 @@ def api_servicios():
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 403
     
-    if usuario['tipo'] != 'negocio' and usuario['rol'] != 'trabajador':
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'trabajador':
         return jsonify({'error': 'No autorizado'}), 403
     
     negocio_id = usuario['id']
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         negocio_id = obtener_negocio_de_trabajador(usuario['id'])
         if not negocio_id:
             return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
     
     if request.method == 'GET':
         trabajador_id = request.args.get('trabajador_id')
-        if usuario['rol'] == 'trabajador':
+        if usuario.get('rol') == 'trabajador':
             servicios = obtener_servicios(negocio_id, usuario['id'])
         else:
             servicios = obtener_servicios(negocio_id, trabajador_id)
         return jsonify([dict(s) for s in servicios])
     
-    if usuario['rol'] == 'trabajador':
+    if usuario.get('rol') == 'trabajador':
         return jsonify({'error': 'No tienes permisos para crear servicios'}), 403
     
     data = request.get_json()
@@ -2624,7 +2274,7 @@ def api_toggle_servicio(servicio_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
@@ -2640,7 +2290,7 @@ def api_eliminar_servicio(servicio_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     eliminar_servicio(servicio_id)
@@ -2649,24 +2299,52 @@ def api_eliminar_servicio(servicio_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - REPORTES
+# API - TRABAJADOR: ESTADÍSTICAS
 # ============================================
-
-@app.route('/api/reportes/contratos/resumen', methods=['GET'])
+@app.route('/api/trabajador/estadisticas', methods=['GET'])
 @login_required
-def api_reportes_contratos_resumen():
-    """Obtiene el resumen de contratos para el panel lateral"""
+def api_trabajador_estadisticas():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('rol') != 'trabajador':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    try:
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
+        
+        stats = obtener_estadisticas_trabajador(usuario['id'])
+        
+        return jsonify({
+            'ventas': stats.get('ventas', 0),
+            'clientes': stats.get('clientes', 0),
+            'ingresos': stats.get('ingresos', 0),
+            'servicios': stats.get('servicios', 0)
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_trabajador_estadisticas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - REPORTES
+# ============================================
+@app.route('/api/reportes/contratos/resumen', methods=['GET'])
+@login_required
+def api_reportes_contratos_resumen():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     try:
         conn = get_db()
         cursor = conn.cursor()
         
-        # Obtener todos los contratos del negocio
         cursor.execute('SELECT estado, monto FROM contratos WHERE negocio_id = %s', (usuario['id'],))
         rows = cursor.fetchall()
         conn.close()
@@ -2698,11 +2376,10 @@ def api_reportes_contratos_resumen():
 @app.route('/api/reportes/ingresos/resumen', methods=['GET'])
 @login_required
 def api_reportes_ingresos_resumen():
-    """Obtiene el resumen de ingresos para el panel lateral"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     try:
@@ -2713,7 +2390,6 @@ def api_reportes_ingresos_resumen():
         inicio_semana = hoy - timedelta(days=hoy.weekday())
         inicio_mes = hoy.replace(day=1)
         
-        # Todas las ventas
         cursor.execute('SELECT fecha, total FROM ventas WHERE negocio_id = %s', (usuario['id'],))
         rows = cursor.fetchall()
         conn.close()
@@ -2757,24 +2433,22 @@ def api_reportes_ingresos_resumen():
 @app.route('/api/reportes/productos/resumen', methods=['GET'])
 @login_required
 def api_reportes_productos_resumen():
-    """Obtiene el resumen de productos para el panel lateral"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     try:
         stats = obtener_estadisticas_productos(usuario['id'])
         
-        # Verificar si hay productos
-        tiene_productos = stats['total'] > 0
+        tiene_productos = stats.get('total', 0) > 0
         
         return jsonify({
-            'total': stats['total'],
-            'stock_bajo': stats['stock_bajo'],
-            'stock_agotado': stats['agotados'],
-            'valor_total': stats['valor_total'],
+            'total': stats.get('total', 0),
+            'stock_bajo': stats.get('stock_bajo', 0),
+            'stock_agotado': stats.get('agotados', 0),
+            'valor_total': stats.get('valor_total', 0),
             'tiene_productos': tiene_productos
         })
         
@@ -2785,11 +2459,10 @@ def api_reportes_productos_resumen():
 @app.route('/api/reportes/contratos', methods=['GET'])
 @login_required
 def api_reporte_contratos():
-    """Genera un reporte PDF de contratos"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     tipo_reporte = request.args.get('tipo', 'todos')
@@ -2815,9 +2488,8 @@ def api_reporte_contratos():
         if not contratos:
             return jsonify({'error': 'No hay contratos para generar el reporte'}), 404
         
-        # Obtener datos del negocio
         negocio_data = obtener_datos_negocio(usuario['id'])
-        negocio_nombre = negocio_data.get('nombre_negocio') or usuario['nombre'] or usuario['username']
+        negocio_nombre = negocio_data.get('nombre_negocio') or usuario.get('nombre') or usuario.get('username')
         negocio_telefono = negocio_data.get('telefono', '')
         
         generador = GeneradorReportes(
@@ -2837,18 +2509,16 @@ def api_reporte_contratos():
         
     except Exception as e:
         print(f"❌ Error generando reporte de contratos: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/reportes/ingresos', methods=['GET'])
 @login_required
 def api_reporte_ingresos():
-    """Genera un reporte PDF de ingresos"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     tipo_reporte = request.args.get('tipo', 'hoy')
@@ -2883,12 +2553,10 @@ def api_reporte_ingresos():
         if not ventas:
             return jsonify({'error': 'No hay ventas para generar el reporte'}), 404
         
-        # Calcular totales
         total_ingresos = sum(v.get('total', 0) for v in ventas)
         
-        # Obtener datos del negocio
         negocio_data = obtener_datos_negocio(usuario['id'])
-        negocio_nombre = negocio_data.get('nombre_negocio') or usuario['nombre'] or usuario['username']
+        negocio_nombre = negocio_data.get('nombre_negocio') or usuario.get('nombre') or usuario.get('username')
         negocio_telefono = negocio_data.get('telefono', '')
         
         generador = GeneradorReportes(
@@ -2915,18 +2583,16 @@ def api_reporte_ingresos():
         
     except Exception as e:
         print(f"❌ Error generando reporte de ingresos: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/reportes/productos', methods=['GET'])
 @login_required
 def api_reporte_productos():
-    """Genera un reporte PDF de productos en almacén"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     try:
@@ -2935,9 +2601,8 @@ def api_reporte_productos():
         if not productos:
             return jsonify({'error': 'No hay productos para generar el reporte'}), 404
         
-        # Obtener datos del negocio
         negocio_data = obtener_datos_negocio(usuario['id'])
-        negocio_nombre = negocio_data.get('nombre_negocio') or usuario['nombre'] or usuario['username']
+        negocio_nombre = negocio_data.get('nombre_negocio') or usuario.get('nombre') or usuario.get('username')
         negocio_telefono = negocio_data.get('telefono', '')
         
         generador = GeneradorReportes(
@@ -2957,58 +2622,19 @@ def api_reporte_productos():
         
     except Exception as e:
         print(f"❌ Error generando reporte de productos: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
-# API - TRABAJADOR: ESTADÍSTICAS
-# ============================================
-
-@app.route('/api/trabajador/estadisticas', methods=['GET'])
-@login_required
-def api_trabajador_estadisticas():
-    """Obtiene las estadísticas del trabajador para su dashboard"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['rol'] != 'trabajador':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        # Verificar que el trabajador tenga un negocio asignado
-        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-        if not negocio_id:
-            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
-        
-        # Obtener estadísticas reales
-        stats = obtener_estadisticas_trabajador(usuario['id'])
-        
-        return jsonify({
-            'ventas': stats.get('ventas', 0),
-            'clientes': stats.get('clientes', 0),
-            'ingresos': stats.get('ingresos', 0),
-            'servicios': stats.get('servicios', 0)
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en api_trabajador_estadisticas: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ============================================
 # API - NÓMINA
 # ============================================
-
 @app.route('/api/nomina', methods=['GET'])
 @login_required
 def api_nomina():
-    """Obtiene la nómina de un mes específico"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     mes = request.args.get('mes', type=int)
@@ -3025,18 +2651,16 @@ def api_nomina():
         })
     except Exception as e:
         print(f"❌ Error en api_nomina: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/nomina/calcular', methods=['POST'])
 @login_required
 def api_calcular_nomina():
-    """Calcula la nómina para todos los trabajadores de un mes"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
@@ -3047,7 +2671,6 @@ def api_calcular_nomina():
         return jsonify({'error': 'Mes y año son requeridos'}), 400
     
     try:
-        # Obtener trabajadores activos del negocio
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''
@@ -3080,18 +2703,16 @@ def api_calcular_nomina():
         
     except Exception as e:
         print(f"❌ Error en api_calcular_nomina: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/nomina/detalle', methods=['GET'])
 @login_required
 def api_nomina_detalle():
-    """Obtiene el detalle de nómina de un trabajador"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     trabajador_id = request.args.get('trabajador_id', type=int)
@@ -3102,7 +2723,6 @@ def api_nomina_detalle():
         return jsonify({'error': 'Trabajador, mes y año son requeridos'}), 400
     
     try:
-        # Obtener datos del trabajador
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute('''
@@ -3125,16 +2745,14 @@ def api_nomina_detalle():
         
         salario_base = datos.get('salario', 0)
         
-        # Obtener días del mes
         import calendar
         _, dias_mes = calendar.monthrange(ano, mes)
         
-        # Obtener días trabajados, ausencias y extras
         dias_trabajados = 0
         try:
             dias_trabajados = obtener_dias_trabajados_mes(trabajador_id, mes, ano)
         except:
-            dias_trabajados = dias_mes  # Si no hay registro, asumir que trabajó todos los días
+            dias_trabajados = dias_mes
         
         dias_ausencia = obtener_dias_ausencia_mes(trabajador_id, mes, ano)
         dias_extras = obtener_dias_extras_mes(trabajador_id, mes, ano)
@@ -3142,7 +2760,6 @@ def api_nomina_detalle():
         salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
         salario_devengado = salario_diario * dias_trabajados
         
-        # Obtener comisiones
         comisiones_list = obtener_comisiones_trabajador_mes(trabajador_id, mes, ano)
         comisiones_total = sum(c.get('monto', 0) for c in comisiones_list) if comisiones_list else 0
         
@@ -3168,18 +2785,16 @@ def api_nomina_detalle():
         
     except Exception as e:
         print(f"❌ Error en api_nomina_detalle: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/nomina/reporte', methods=['GET'])
 @login_required
 def api_nomina_reporte():
-    """Genera un reporte PDF de nómina"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
-    if not usuario or usuario['tipo'] != 'negocio':
+    if not usuario or usuario.get('tipo') != 'negocio':
         return jsonify({'error': 'No autorizado'}), 403
     
     mes = request.args.get('mes', type=int)
@@ -3194,16 +2809,10 @@ def api_nomina_reporte():
         if not nomina:
             return jsonify({'error': 'No hay datos de nómina para generar el reporte'}), 404
         
-        # Obtener datos del negocio
         negocio_data = obtener_datos_negocio(usuario['id'])
-        negocio_nombre = negocio_data.get('nombre_negocio') or usuario['nombre'] or usuario['username']
+        negocio_nombre = negocio_data.get('nombre_negocio') or usuario.get('nombre') or usuario.get('username')
         negocio_telefono = negocio_data.get('telefono', '')
         
-        # Calcular totales
-        total_nomina = sum(n.get('total', 0) for n in nomina)
-        total_comisiones = sum(n.get('comisiones', 0) for n in nomina)
-        
-        # Generar PDF
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -3225,7 +2834,6 @@ def api_nomina_reporte():
         styles = getSampleStyleSheet()
         elementos = []
         
-        # Título
         meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
                 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
         nombre_mes = meses[mes - 1] if 1 <= mes <= 12 else str(mes)
@@ -3249,13 +2857,15 @@ def api_nomina_reporte():
         )
         
         elementos.append(Paragraph(f"📊 REPORTE DE NÓMINA - {nombre_mes} de {ano}", estilo_titulo))
-        elementos.append(Paragraph(f"{negocio_nombre} | Total: ${total_nomina:,.2f}", estilo_subtitulo))
+        elementos.append(Paragraph(f"{negocio_nombre} | Total: ${sum(n.get('total', 0) for n in nomina):,.2f}", estilo_subtitulo))
         elementos.append(Spacer(1, 0.5*cm))
         
-        # Tabla
         tabla_datos = [
             ["Trabajador", "Salario Base", "Días Trab.", "Ausencias", "Salario Dev.", "Comisiones", "Total"]
         ]
+        
+        total_comisiones = 0
+        total_nomina = 0
         
         for n in nomina:
             nombre = n.get('nombre', 'Trabajador')
@@ -3265,6 +2875,9 @@ def api_nomina_reporte():
             salario_devengado = n.get('salario_devengado', 0)
             comisiones = n.get('comisiones', 0)
             total = n.get('total', 0)
+            
+            total_comisiones += comisiones
+            total_nomina += total
             
             tabla_datos.append([
                 Paragraph(nombre, styles['Normal']),
@@ -3276,7 +2889,6 @@ def api_nomina_reporte():
                 f"${total:,.2f}"
             ])
         
-        # Total
         tabla_datos.append([
             Paragraph("<b>TOTAL</b>", styles['Normal']),
             "",
@@ -3310,7 +2922,6 @@ def api_nomina_reporte():
         
         elementos.append(tabla)
         
-        # Pie de página
         estilo_pie = ParagraphStyle(
             'Pie',
             parent=styles['Normal'],
@@ -3340,14 +2951,176 @@ def api_nomina_reporte():
         
     except Exception as e:
         print(f"❌ Error generando reporte de nómina: {e}")
-        import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ============================================
+# ENDPOINT PARA REPARAR TABLA NOMINA
+# ============================================
+@app.route('/fix-nomina-tabla', methods=['GET'])
+def fix_nomina_tabla_endpoint():
+    try:
+        import urllib.parse
+        import psycopg2
+        
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL")
+        
+        mensajes = []
+        
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'nomina'
+            )
+        """)
+        tabla_existe = cursor.fetchone()[0]
+        
+        if not tabla_existe:
+            mensajes.append("⚠️ La tabla 'nomina' no existe. Creándola...")
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS nomina (
+                id SERIAL PRIMARY KEY,
+                negocio_id INTEGER NOT NULL,
+                trabajador_id INTEGER NOT NULL,
+                mes INTEGER NOT NULL,
+                ano INTEGER NOT NULL,
+                salario_base REAL NOT NULL DEFAULT 0,
+                dias_trabajados INTEGER DEFAULT 0,
+                dias_ausencia INTEGER DEFAULT 0,
+                dias_extras INTEGER DEFAULT 0,
+                salario_devengado REAL DEFAULT 0,
+                comisiones REAL DEFAULT 0,
+                total REAL DEFAULT 0,
+                creado_en TEXT NOT NULL,
+                actualizado_en TEXT,
+                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                UNIQUE(negocio_id, trabajador_id, mes, ano)
+            )
+            ''')
+            conn.commit()
+            mensajes.append("✅ Tabla 'nomina' creada correctamente")
+        
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'nomina'
+        """)
+        columnas = [col[0] for col in cursor.fetchall()]
+        mensajes.append(f"📋 Columnas existentes: {', '.join(columnas)}")
+        
+        columnas_necesarias = {
+            'salario_base': 'REAL NOT NULL DEFAULT 0',
+            'dias_trabajados': 'INTEGER DEFAULT 0',
+            'dias_ausencia': 'INTEGER DEFAULT 0',
+            'dias_extras': 'INTEGER DEFAULT 0',
+            'salario_devengado': 'REAL DEFAULT 0',
+            'comisiones': 'REAL DEFAULT 0',
+            'total': 'REAL DEFAULT 0'
+        }
+        
+        for col, tipo in columnas_necesarias.items():
+            if col not in columnas:
+                try:
+                    cursor.execute(f"ALTER TABLE nomina ADD COLUMN {col} {tipo}")
+                    mensajes.append(f"✅ Columna '{col}' agregada")
+                    print(f"✅ Columna '{col}' agregada")
+                except psycopg2.Error as e:
+                    if "duplicate column" not in str(e).lower():
+                        mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
+                        print(f"⚠️ Error al agregar '{col}': {e}")
+                except Exception as e:
+                    mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
+                    print(f"⚠️ Error al agregar '{col}': {e}")
+            else:
+                mensajes.append(f"✅ Columna '{col}' ya existe")
+        
+        conn.commit()
+        
+        cursor.execute("""
+            SELECT column_name, data_type
+            FROM information_schema.columns 
+            WHERE table_name = 'nomina'
+            ORDER BY ordinal_position
+        """)
+        columnas_final = cursor.fetchall()
+        
+        html_columnas = ""
+        for col, tipo in columnas_final:
+            html_columnas += f"• <strong>{col}</strong> ({tipo})<br>"
+        
+        cursor.execute("SELECT COUNT(*) FROM nomina")
+        total_registros = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head><title>Tabla Nómina Reparada</title>
+            <style>
+                body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                .container {{ max-width: 800px; margin: 0 auto; }}
+                .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                .success {{ color: #6bff6b; }}
+                .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                .btn-primary:hover {{ background: #5a2ec0; }}
+                .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                .btn-secondary:hover {{ background: #3a3a4e; }}
+            </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Tabla Nómina</h1>
+                    <div class="card"><h3>📊 Resultado</h3>{html_mensajes}</div>
+                    <div class="card"><h3>📋 Estructura final de la tabla 'nomina'</h3>{html_columnas}</div>
+                    <div class="card"><h3>📊 Estadísticas</h3><p>Total de registros en nómina: <strong>{total_registros}</strong></p></div>
+                    <div>
+                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al reparar tabla</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
 # INICIO DE LA APLICACIÓN
 # ============================================
-
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
