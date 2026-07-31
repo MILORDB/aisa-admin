@@ -357,7 +357,7 @@
             </div>
             <div style="color:#888;font-size:11px;text-align:center;margin-bottom:12px;">⚠️ Esta acción no se puede deshacer</div>
             <div class="form-actions">
-                <button class="btn btn-peligro" onclick="confirmarEliminar()" id="btnConfirmarEliminar">🗑️ Eliminar</button>
+                <button class="btn btn-peligro" id="btnConfirmarEliminar">🗑️ Eliminar</button>
                 <button class="btn btn-secondary" onclick="cerrarModalEliminar()">✕ Cancelar</button>
             </div>
         </div>
@@ -500,7 +500,8 @@
                 '<th>Nombre</th><th>CI</th><th>Frecuencia</th><th>Salario</th><th>Módulos</th><th>Estado</th><th>Acciones</th>' +
                 '</tr></thead><tbody>';
 
-            filtrados.forEach(function(t) {
+            for (var i = 0; i < filtrados.length; i++) {
+                var t = filtrados[i];
                 var nombreCompleto = t.apellidos ? t.nombre + ' ' + t.apellidos : t.nombre;
                 var frecuenciaLabel = t.frecuencia === 'diaria' ? '🔄 Diaria' : '📅 Cada 2 días';
                 var frecuenciaClass = t.frecuencia === 'diaria' ? 'diaria' : 'cada2dias';
@@ -510,12 +511,12 @@
                 var modulosHtml = '';
                 if (t.modulos && t.modulos.length > 0) {
                     var modulosList = Array.isArray(t.modulos) ? t.modulos : t.modulos.split(',');
-                    modulosList.forEach(function(mod) {
-                        var nombreMod = mod.trim();
+                    for (var j = 0; j < modulosList.length; j++) {
+                        var nombreMod = modulosList[j].trim();
                         if (nombreMod) {
                             modulosHtml += '<span class="badge" style="background:rgba(108,60,224,0.15);color:#6c3ce0;font-size:8px;margin:1px;">' + nombreMod + '</span>';
                         }
-                    });
+                    }
                 } else {
                     modulosHtml = '<span style="color:#666;font-size:9px;">Sin módulos</span>';
                 }
@@ -529,23 +530,56 @@
                     '<td><span class="badge ' + estadoClass + '">' + estadoLabel + '</span></td>' +
                     '<td>' +
                         '<div class="acciones-cell">' +
-                            '<button class="btn btn-warning btn-sm" onclick="editarTrabajador(' + t.id + ')">✏️</button>' +
-                            '<button class="btn ' + (t.activo ? 'btn-danger' : 'btn-success') + ' btn-sm" onclick="toggleTrabajador(' + t.id + ', ' + (t.activo ? 0 : 1) + ')">' + (t.activo ? '🔴' : '🟢') + '</button>' +
-                            '<button class="btn btn-eliminar btn-sm" onclick="abrirModalEliminar(' + t.id + ')">🗑️</button>' +
+                            '<button class="btn btn-warning btn-sm" data-id="' + t.id + '" data-accion="editar">✏️</button>' +
+                            '<button class="btn ' + (t.activo ? 'btn-danger' : 'btn-success') + ' btn-sm" data-id="' + t.id + '" data-accion="toggle" data-activo="' + (t.activo ? 0 : 1) + '">' + (t.activo ? '🔴' : '🟢') + '</button>' +
+                            '<button class="btn btn-eliminar btn-sm" data-id="' + t.id + '" data-accion="eliminar">🗑️</button>' +
                         '</div>' +
                     '</td>' +
                 '</tr>';
-            });
+            }
 
             html += '</tbody></table>';
             container.innerHTML = html;
+            
+            // ============================================
+            // AGREGAR EVENT LISTENERS A LOS BOTONES
+            // ============================================
+            var botones = container.querySelectorAll('.acciones-cell .btn-sm');
+            for (var k = 0; k < botones.length; k++) {
+                (function(btn) {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        var id = parseInt(this.getAttribute('data-id'));
+                        var accion = this.getAttribute('data-accion');
+                        
+                        if (accion === 'editar') {
+                            editarTrabajador(id);
+                        } else if (accion === 'toggle') {
+                            var activo = parseInt(this.getAttribute('data-activo'));
+                            toggleTrabajador(id, activo);
+                        } else if (accion === 'eliminar') {
+                            abrirModalEliminar(id);
+                        }
+                    });
+                })(botones[k]);
+            }
         }
 
         function actualizarEstadisticas() {
             var total = trabajadores.length;
-            var activos = trabajadores.filter(function(t) { return t.activo === 1 || t.activo === true; }).length;
-            var inactivos = total - activos;
-            var nomina = trabajadores.reduce(function(sum, t) { return sum + (parseFloat(t.salario) || 0); }, 0);
+            var activos = 0;
+            var inactivos = 0;
+            var nomina = 0;
+            
+            for (var i = 0; i < trabajadores.length; i++) {
+                var t = trabajadores[i];
+                if (t.activo === 1 || t.activo === true) {
+                    activos++;
+                } else {
+                    inactivos++;
+                }
+                nomina += (parseFloat(t.salario) || 0);
+            }
             
             document.getElementById('totalTrabajadores').textContent = total;
             document.getElementById('trabajadoresActivos').textContent = activos;
@@ -592,7 +626,6 @@
         }
 
         function editarTrabajador(id) {
-            // Buscar el trabajador en el array local
             var t = null;
             for (var i = 0; i < trabajadores.length; i++) {
                 if (trabajadores[i].id === id) {
@@ -720,7 +753,6 @@
         // ELIMINAR TRABAJADOR
         // ============================================
         function abrirModalEliminar(id) {
-            // Buscar el trabajador en el array local
             var t = null;
             for (var i = 0; i < trabajadores.length; i++) {
                 if (trabajadores[i].id === id) {
@@ -741,6 +773,12 @@
             document.getElementById('detalleSalario').textContent = '$' + (t.salario ? parseFloat(t.salario).toFixed(2) : '0.00');
             document.getElementById('detalleEstado').textContent = t.activo ? '🟢 Activo' : '🔴 Inactivo';
             document.getElementById('modalEliminar').classList.add('show');
+            
+            // Configurar evento del botón eliminar
+            var btnEliminar = document.getElementById('btnConfirmarEliminar');
+            btnEliminar.onclick = function() {
+                confirmarEliminar();
+            };
         }
 
         function cerrarModalEliminar() {
