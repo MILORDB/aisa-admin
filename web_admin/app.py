@@ -129,7 +129,149 @@ def init_db_route():
             </body>
         </html>
         """, 500
-        # ============================================
+
+@app.route('/fix-nomina-tabla', methods=['GET'])
+@login_required
+def fix_nomina_tabla_endpoint():
+    """Endpoint para reparar la tabla nomina"""
+    try:
+        import urllib.parse
+        import psycopg2
+        
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL")
+        
+        mensajes = []
+        
+        # Verificar columnas existentes
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'nomina'
+        """)
+        columnas = [col[0] for col in cursor.fetchall()]
+        mensajes.append(f"📋 Columnas existentes: {', '.join(columnas)}")
+        
+        # Columnas necesarias
+        columnas_necesarias = {
+            'salario_base': 'REAL NOT NULL DEFAULT 0',
+            'dias_trabajados': 'INTEGER DEFAULT 0',
+            'dias_ausencia': 'INTEGER DEFAULT 0',
+            'dias_extras': 'INTEGER DEFAULT 0',
+            'salario_devengado': 'REAL DEFAULT 0',
+            'comisiones': 'REAL DEFAULT 0',
+            'total': 'REAL DEFAULT 0'
+        }
+        
+        # Agregar columnas faltantes
+        for col, tipo in columnas_necesarias.items():
+            if col not in columnas:
+                try:
+                    cursor.execute(f"ALTER TABLE nomina ADD COLUMN {col} {tipo}")
+                    mensajes.append(f"✅ Columna '{col}' agregada")
+                except psycopg2.Error as e:
+                    mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
+        
+        conn.commit()
+        
+        # Verificar estructura final
+        cursor.execute("""
+            SELECT column_name, data_type
+            FROM information_schema.columns 
+            WHERE table_name = 'nomina'
+            ORDER BY ordinal_position
+        """)
+        columnas_final = cursor.fetchall()
+        
+        html_columnas = ""
+        for col, tipo in columnas_final:
+            html_columnas += f"• <strong>{col}</strong> ({tipo})<br>"
+        
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head>
+                <title>Tabla Nómina Reparada</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{
+                        display: inline-block;
+                        padding: 10px 20px;
+                        margin: 10px;
+                        border: none;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        text-decoration: none;
+                        transition: all 0.3s;
+                    }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Tabla Nómina</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        {html_mensajes}
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Estructura final de la tabla 'nomina'</h3>
+                        {html_columnas}
+                    </div>
+                    
+                    <div>
+                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al reparar tabla</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
 # DECORADORES
 # ============================================
 
