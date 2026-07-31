@@ -245,7 +245,7 @@ def init_db():
         trabajador_id INTEGER NOT NULL,
         mes INTEGER NOT NULL,
         ano INTEGER NOT NULL,
-        salario_base REAL NOT NULL,
+        salario_base REAL NOT NULL DEFAULT 0,
         dias_trabajados INTEGER DEFAULT 0,
         dias_ausencia INTEGER DEFAULT 0,
         dias_extras INTEGER DEFAULT 0,
@@ -1422,6 +1422,7 @@ def obtener_dias_extras_mes(trabajador_id, mes, ano):
         return 0
 
 def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
+    """Registra una comisión generada por una venta"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1439,21 +1440,53 @@ def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
         return False
 
 def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
+    """Obtiene las comisiones de un trabajador en un mes específico"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-        SELECT c.*, p.nombre as producto_nombre, v.cliente, v.fecha as venta_fecha
-        FROM comisiones_trabajador c
-        LEFT JOIN productos p ON c.producto_id = p.id
-        LEFT JOIN ventas v ON c.venta_id = v.id
-        WHERE c.trabajador_id = %s 
-        AND EXTRACT(MONTH FROM TO_DATE(c.fecha, 'YYYY-MM-DD')) = %s
-        AND EXTRACT(YEAR FROM TO_DATE(c.fecha, 'YYYY-MM-DD')) = %s
-        ORDER BY c.fecha DESC
-    ''', (trabajador_id, mes, ano))
-    comisiones = cursor.fetchall()
-    conn.close()
-    return comisiones
+    try:
+        # Primero verificar si hay comisiones para este trabajador
+        cursor.execute("""
+            SELECT COUNT(*) FROM comisiones_trabajador 
+            WHERE trabajador_id = %s
+        """, (trabajador_id,))
+        total = cursor.fetchone()['count']
+        
+        if total == 0:
+            conn.close()
+            return []
+        
+        # Consulta con formato de fecha corregido para PostgreSQL
+        cursor.execute('''
+            SELECT 
+                c.*, 
+                p.nombre as producto_nombre, 
+                v.cliente, 
+                v.fecha as venta_fecha
+            FROM comisiones_trabajador c
+            LEFT JOIN productos p ON c.producto_id = p.id
+            LEFT JOIN ventas v ON c.venta_id = v.id
+            WHERE c.trabajador_id = %s 
+            AND EXTRACT(MONTH FROM c.fecha::date) = %s
+            AND EXTRACT(YEAR FROM c.fecha::date) = %s
+            ORDER BY c.fecha DESC
+        ''', (trabajador_id, mes, ano))
+        
+        comisiones = cursor.fetchall()
+        conn.close()
+        
+        # Si no hay comisiones en el mes, buscar todas las comisiones del trabajador
+        if not comisiones:
+            print(f"ℹ️ No hay comisiones para el trabajador {trabajador_id} en {mes}/{ano}")
+            return []
+        
+        return comisiones
+        
+    except Exception as e:
+        print(f"❌ Error en obtener_comisiones_trabajador_mes: {e}")
+        import traceback
+        traceback.print_exc()
+        conn.close()
+        return []
 
 def obtener_total_comisiones_mes(trabajador_id, mes, ano):
     """Obtiene el total de comisiones de un trabajador en un mes"""
@@ -1463,8 +1496,8 @@ def obtener_total_comisiones_mes(trabajador_id, mes, ano):
         cursor.execute('''
             SELECT COALESCE(SUM(monto), 0) FROM comisiones_trabajador 
             WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
-            AND EXTRACT(YEAR FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+            AND EXTRACT(MONTH FROM c.fecha::date) = %s
+            AND EXTRACT(YEAR FROM c.fecha::date) = %s
         ''', (trabajador_id, mes, ano))
         total = cursor.fetchone()[0]
         conn.close()
@@ -1484,8 +1517,8 @@ def obtener_comisiones_negocio_mes(negocio_id, mes, ano):
         LEFT JOIN productos p ON c.producto_id = p.id
         LEFT JOIN ventas v ON c.venta_id = v.id
         WHERE c.negocio_id = %s 
-        AND EXTRACT(MONTH FROM TO_DATE(c.fecha, 'YYYY-MM-DD')) = %s
-        AND EXTRACT(YEAR FROM TO_DATE(c.fecha, 'YYYY-MM-DD')) = %s
+        AND EXTRACT(MONTH FROM c.fecha::date) = %s
+        AND EXTRACT(YEAR FROM c.fecha::date) = %s
         ORDER BY u.nombre ASC, c.fecha DESC
     ''', (negocio_id, mes, ano))
     comisiones = cursor.fetchall()
@@ -1523,10 +1556,19 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
         
         salario_base = datos.get('salario', 0)
         
+        if salario_base == 0:
+            print(f"⚠️ El trabajador {trabajador['nombre']} no tiene salario asignado")
+            conn.close()
+            return None
+        
         # Obtener días trabajados
         dias_trabajados = obtener_dias_trabajados_mes(trabajador_id, mes, ano)
         dias_ausencia = obtener_dias_ausencia_mes(trabajador_id, mes, ano)
         dias_extras = obtener_dias_extras_mes(trabajador_id, mes, ano)
+        
+        # Si no hay días trabajados, usar 0
+        if dias_trabajados == 0:
+            dias_trabajados = dias_mes
         
         # Calcular salario diario
         salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
@@ -1586,18 +1628,44 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
         return None
 
 def obtener_nomina_mes(negocio_id, mes, ano):
+    """Obtiene la nómina de todos los trabajadores para un mes específico"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-        SELECT n.*, u.nombre, u.datos_negocio
-        FROM nomina n
-        JOIN usuarios u ON n.trabajador_id = u.id
-        WHERE n.negocio_id = %s AND n.mes = %s AND n.ano = %s
-        ORDER BY u.nombre ASC
-    ''', (negocio_id, mes, ano))
-    nomina = cursor.fetchall()
-    conn.close()
-    return nomina
+    try:
+        # Primero verificar qué columnas existen
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'nomina'
+        """)
+        columnas = [col[0] for col in cursor.fetchall()]
+        print(f"📋 Columnas en nomina: {columnas}")
+        
+        # Construir la consulta con las columnas que existen
+        query = """
+            SELECT n.*, u.nombre, u.datos_negocio
+            FROM nomina n
+            JOIN usuarios u ON n.trabajador_id = u.id
+            WHERE n.negocio_id = %s AND n.mes = %s AND n.ano = %s
+            ORDER BY u.nombre ASC
+        """
+        
+        cursor.execute(query, (negocio_id, mes, ano))
+        nomina = cursor.fetchall()
+        conn.close()
+        
+        # Si no hay registros, devolver lista vacía
+        if not nomina:
+            print(f"ℹ️ No hay registros de nómina para mes {mes}/{ano}")
+            return []
+        
+        return nomina
+    except Exception as e:
+        print(f"❌ Error en obtener_nomina_mes: {e}")
+        import traceback
+        traceback.print_exc()
+        conn.close()
+        return []
 
 def obtener_nomina_trabajador(trabajador_id, mes, ano):
     conn = get_db()
