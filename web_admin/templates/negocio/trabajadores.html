@@ -372,6 +372,7 @@
         var modulosDisponibles = [];
         var trabajadorAEliminar = null;
         var intervaloActualizacion = null;
+        var cargando = false;
 
         // ============================================
         // FUNCIONES DE MENSAJES
@@ -457,6 +458,9 @@
         // CARGAR TRABAJADORES
         // ============================================
         async function cargarTrabajadores() {
+            if (cargando) return;
+            cargando = true;
+            
             var container = document.getElementById('trabajadoresContainer');
             container.innerHTML = '<div class="loading">Cargando...</div>';
 
@@ -469,6 +473,8 @@
             } catch (error) {
                 console.error('Error:', error);
                 container.innerHTML = '<div class="empty">❌ Error al cargar</div>';
+            } finally {
+                cargando = false;
             }
         }
 
@@ -525,6 +531,11 @@
                     modulosHtml = '<span style="color:#666;font-size:9px;">Sin módulos</span>';
                 }
                 
+                // Botones con IDs únicos usando el ID del trabajador
+                var btnEditarId = 'btnEditar_' + t.id;
+                var btnToggleId = 'btnToggle_' + t.id;
+                var btnEliminarId = 'btnEliminar_' + t.id;
+                
                 html += '<tr>' +
                     '<td><strong>' + nombreCompleto + '</strong></td>' +
                     '<td>' + (t.ci || '-') + '</td>' +
@@ -534,9 +545,9 @@
                     '<td><span class="badge ' + estadoClass + '">' + estadoLabel + '</span></td>' +
                     '<td>' +
                         '<div class="acciones-cell">' +
-                            '<button class="btn btn-warning btn-sm btn-editar" data-id="' + t.id + '">✏️</button>' +
-                            '<button class="btn ' + (t.activo ? 'btn-danger' : 'btn-success') + ' btn-sm btn-toggle" data-id="' + t.id + '" data-activo="' + (t.activo ? 0 : 1) + '">' + (t.activo ? '🔴' : '🟢') + '</button>' +
-                            '<button class="btn btn-eliminar btn-sm btn-eliminar-trabajador" data-id="' + t.id + '">🗑️</button>' +
+                            '<button class="btn btn-warning btn-sm" id="' + btnEditarId + '">✏️</button>' +
+                            '<button class="btn ' + (t.activo ? 'btn-danger' : 'btn-success') + ' btn-sm" id="' + btnToggleId + '">' + (t.activo ? '🔴' : '🟢') + '</button>' +
+                            '<button class="btn btn-eliminar btn-sm" id="' + btnEliminarId + '">🗑️</button>' +
                         '</div>' +
                     '</td>' +
                 '</tr>';
@@ -546,34 +557,44 @@
             container.innerHTML = html;
             
             // ============================================
-            // AGREGAR EVENT LISTENERS
+            // AGREGAR EVENT LISTENERS CON IDs ÚNICOS
             // ============================================
-            var botonesEditar = container.querySelectorAll('.btn-editar');
-            for (var k = 0; k < botonesEditar.length; k++) {
-                botonesEditar[k].addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    var id = parseInt(this.getAttribute('data-id'));
-                    editarTrabajador(id);
-                });
-            }
-            
-            var botonesToggle = container.querySelectorAll('.btn-toggle');
-            for (var k = 0; k < botonesToggle.length; k++) {
-                botonesToggle[k].addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    var id = parseInt(this.getAttribute('data-id'));
-                    var activo = parseInt(this.getAttribute('data-activo'));
-                    toggleTrabajador(id, activo);
-                });
-            }
-            
-            var botonesEliminar = container.querySelectorAll('.btn-eliminar-trabajador');
-            for (var k = 0; k < botonesEliminar.length; k++) {
-                botonesEliminar[k].addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    var id = parseInt(this.getAttribute('data-id'));
-                    abrirModalEliminar(id);
-                });
+            for (var i = 0; i < filtrados.length; i++) {
+                var t = filtrados[i];
+                
+                // Botón Editar
+                var btnEditar = document.getElementById('btnEditar_' + t.id);
+                if (btnEditar) {
+                    btnEditar.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var id = parseInt(this.id.replace('btnEditar_', ''));
+                        editarTrabajador(id);
+                    });
+                }
+                
+                // Botón Toggle
+                var btnToggle = document.getElementById('btnToggle_' + t.id);
+                if (btnToggle) {
+                    btnToggle.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var id = parseInt(this.id.replace('btnToggle_', ''));
+                        var activo = this.classList.contains('btn-danger') ? 0 : 1;
+                        toggleTrabajador(id, activo);
+                    });
+                }
+                
+                // Botón Eliminar
+                var btnEliminar = document.getElementById('btnEliminar_' + t.id);
+                if (btnEliminar) {
+                    btnEliminar.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var id = parseInt(this.id.replace('btnEliminar_', ''));
+                        abrirModalEliminar(id);
+                    });
+                }
             }
         }
 
@@ -606,21 +627,29 @@
         }
 
         // ============================================
-        // FORMULARIO - USANDO EVENT LISTENERS
+        // FORMULARIO
         // ============================================
-        document.getElementById('btnNuevo').addEventListener('click', function() {
+        document.getElementById('btnNuevo').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             mostrarFormulario();
         });
 
-        document.getElementById('btnCancelar').addEventListener('click', function() {
+        document.getElementById('btnCancelar').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             cancelarFormulario();
         });
 
-        document.getElementById('btnGuardar').addEventListener('click', function() {
+        document.getElementById('btnGuardar').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             guardarTrabajador();
         });
 
-        document.getElementById('btnCancelarEliminar').addEventListener('click', function() {
+        document.getElementById('btnCancelarEliminar').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             cerrarModalEliminar();
         });
 
@@ -767,13 +796,6 @@
         }
 
         async function toggleTrabajador(id, activo) {
-            var btn = document.querySelector('.btn-toggle[data-id="' + id + '"]');
-            var textoOriginal = btn ? btn.textContent : '⏳';
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = '⏳';
-            }
-            
             try {
                 var response = await fetch('/api/usuario/' + id + '/toggle', {
                     method: 'POST',
@@ -785,18 +807,10 @@
                     await cargarTrabajadores();
                 } else {
                     mostrarMensaje('Error', 'error');
-                    if (btn) {
-                        btn.disabled = false;
-                        btn.textContent = textoOriginal;
-                    }
                 }
             } catch (error) {
                 console.error('Error:', error);
                 mostrarMensaje('Error de conexión', 'error');
-                if (btn) {
-                    btn.disabled = false;
-                    btn.textContent = textoOriginal;
-                }
             }
         }
 
@@ -835,7 +849,9 @@
             if (e.target === this) { cerrarModalEliminar(); }
         });
 
-        document.getElementById('btnConfirmarEliminar').addEventListener('click', function() {
+        document.getElementById('btnConfirmarEliminar').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             confirmarEliminar();
         });
 
@@ -866,12 +882,11 @@
                     await cargarTrabajadores();
                 } else {
                     mostrarMensaje(data.error || 'Error al eliminar el trabajador', 'error');
-                    btn.disabled = false;
-                    btn.textContent = textoOriginal;
                 }
             } catch (error) {
                 console.error('Error:', error);
                 mostrarMensaje('Error de conexión con el servidor: ' + error.message, 'error');
+            } finally {
                 btn.disabled = false;
                 btn.textContent = textoOriginal;
             }
@@ -882,7 +897,13 @@
         // ============================================
         cargarModulosDisponibles();
         cargarTrabajadores();
-        setInterval(cargarTrabajadores, 30000);
+        
+        // Actualizar cada 30 segundos solo si no hay interacción
+        setInterval(function() {
+            if (!cargando) {
+                cargarTrabajadores();
+            }
+        }, 30000);
     </script>
 </body>
 </html>
