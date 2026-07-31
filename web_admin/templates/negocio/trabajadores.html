@@ -88,20 +88,7 @@
         .form-row input:focus, .form-row select:focus { border-color: #6c3ce0; outline: none; }
         .form-row label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
         .form-row .help-text { font-size: 10px; color: #666; margin-top: 2px; }
-        .form-row .modulos-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; width: 100%;
-        }
-        .form-row .modulos-grid .modulo-check {
-            display: flex; align-items: center; gap: 6px;
-            background: #0f0f1a; padding: 4px 8px; border-radius: 6px;
-            border: 1px solid #2a2a3e; cursor: pointer; font-size: 11px;
-        }
-        .form-row .modulos-grid .modulo-check.checked {
-            border-color: #6c3ce0; background: rgba(108,60,224,0.1);
-        }
-        .form-row .modulos-grid .modulo-check input[type="checkbox"] {
-            width: auto; accent-color: #6c3ce0; cursor: pointer;
-        }
+        
         .search-bar {
             display: flex;
             gap: 8px;
@@ -151,10 +138,16 @@
         .mensaje-error.show { display: block; }
         
         .stats-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 6px;
         }
         .stat-item {
-            background: #0f0f1a; border: 1px solid #2a2a3e; border-radius: 6px; padding: 8px; text-align: center;
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            padding: 8px;
+            text-align: center;
         }
         .stat-item .number { font-size: 18px; font-weight: 700; color: #6c3ce0; }
         .stat-item .label { font-size: 8px; color: #888; margin-top: 1px; }
@@ -199,29 +192,159 @@
         .btn-secondary:hover { background: #3a3a4e; }
         
         .modal-overlay {
-            display: none; position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%; background: rgba(0,0,0,0.7);
-            z-index: 1000; align-items: center; justify-content: center; padding: 16px;
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
         }
         .modal-overlay.show { display: flex; }
         .modal-content {
-            background: #1a1a2e; padding: 20px; border-radius: 10px;
-            max-width: 500px; width: 100%; border: 1px solid #2a2a3e; max-height: 90vh; overflow-y: auto;
+            background: #1a1a2e;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 100%;
+            border: 1px solid #2a2a3e;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         .modal-content h3 { font-size: 16px; margin-bottom: 6px; }
         .modal-content .modal-subtitle { font-size: 11px; color: #888; margin-bottom: 12px; }
         .modal-content .form-actions { display: flex; gap: 8px; margin-top: 12px; border-top: 1px solid #2a2a3e; padding-top: 12px; }
         .modal-content .seccion-datos {
-            background: #0f0f1a; border-radius: 6px; padding: 10px; margin-bottom: 10px; border: 1px solid #2a2a3e;
+            background: #0f0f1a;
+            border-radius: 6px;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #2a2a3e;
         }
         .modal-content .seccion-datos .seccion-titulo { font-size: 12px; color: #6c3ce0; margin-bottom: 6px; }
         
+        /* ============================================
+           ESTILOS PROPUESTA 1 - TARJETAS CON TOGGLE
+           ============================================ */
+        .modulos-grid-tarjetas {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 8px;
+            width: 100%;
+        }
+        
+        .modulo-tarjeta {
+            background: #0f0f1a;
+            border: 2px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 10px 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            user-select: none;
+        }
+        
+        .modulo-tarjeta:hover {
+            border-color: #4a4a6e;
+            transform: translateY(-2px);
+        }
+        
+        .modulo-tarjeta.seleccionado {
+            border-color: #6c3ce0;
+            background: rgba(108, 60, 224, 0.08);
+            box-shadow: 0 0 20px rgba(108, 60, 224, 0.1);
+        }
+        
+        .modulo-tarjeta .modulo-icono {
+            font-size: 22px;
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .modulo-tarjeta .modulo-nombre {
+            font-size: 11px;
+            font-weight: 600;
+            display: block;
+            margin-bottom: 6px;
+        }
+        
+        .modulo-tarjeta .modulo-check {
+            display: none;
+        }
+        
+        /* Switch estilo iOS */
+        .modulo-tarjeta .switch-container {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 9px;
+            color: #888;
+        }
+        
+        .modulo-tarjeta .switch {
+            position: relative;
+            width: 36px;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            transition: background 0.3s ease;
+            flex-shrink: 0;
+        }
+        
+        .modulo-tarjeta .switch .slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        
+        .modulo-tarjeta.seleccionado .switch {
+            background: #6c3ce0;
+        }
+        
+        .modulo-tarjeta.seleccionado .switch .slider {
+            transform: translateX(16px);
+        }
+        
+        .modulo-tarjeta .badge-count {
+            font-size: 8px;
+            background: rgba(108,60,224,0.15);
+            color: #6c3ce0;
+            padding: 0 6px;
+            border-radius: 8px;
+            margin-left: 2px;
+        }
+        
+        .modulos-resumen {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+        }
+        
         @media (max-width: 600px) {
+            .modulos-grid-tarjetas {
+                grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            }
+            .modulo-tarjeta .modulo-icono { font-size: 18px; }
+            .modulo-tarjeta .modulo-nombre { font-size: 10px; }
+            .modulo-tarjeta .switch { width: 30px; height: 18px; }
+            .modulo-tarjeta .switch .slider { width: 14px; height: 14px; }
+            .modulo-tarjeta.seleccionado .switch .slider { transform: translateX(12px); }
             body { padding: 8px; }
             .card { padding: 10px; }
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .form-row { flex-direction: column; }
-            .form-row .modulos-grid { grid-template-columns: 1fr 1fr; }
             .search-bar { flex-direction: column; }
             .acciones-cell { flex-direction: row; flex-wrap: wrap; }
             .acciones-cell .btn-sm { flex: 1; text-align: center; min-width: 50px; font-size: 9px; }
@@ -232,7 +355,7 @@
         @media (max-width: 400px) {
             .tabla { font-size: 10px; }
             .tabla th, .tabla td { padding: 3px 4px; }
-            .form-row .modulos-grid { grid-template-columns: 1fr; }
+            .modulos-grid-tarjetas { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -310,13 +433,21 @@
                 </div>
             </div>
 
+            <!-- ============================================
+            SECCIÓN DE MÓDULOS - PROPUESTA 1
+            Tarjetas con Toggle (Moderna y Visual)
+            ============================================ -->
             <div class="seccion-datos">
-                <div class="seccion-titulo">🧩 Módulos</div>
-                <div class="help-text" style="margin-bottom:6px;">Selecciona los módulos para el trabajador</div>
-                <div class="form-row">
-                    <div class="modulos-grid" id="modulosGrid"></div>
+                <div class="seccion-titulo">🧩 Módulos de Acceso</div>
+                <div class="help-text" style="margin-bottom:8px;">Activa o desactiva los módulos para este trabajador</div>
+                
+                <div class="modulos-grid-tarjetas" id="modulosGrid">
+                    <!-- Los módulos se renderizan aquí -->
                 </div>
-                <div class="help-text" style="margin-top:4px;color:#6c3ce0;">📌 Seleccionados: <span id="modulosCount">0</span></div>
+                
+                <div class="modulos-resumen">
+                    📌 <span id="modulosCount">0</span> módulos seleccionados
+                </div>
             </div>
 
             <div class="seccion-datos">
@@ -371,7 +502,6 @@
         var editandoId = null;
         var modulosDisponibles = [];
         var trabajadorAEliminar = null;
-        var intervaloActualizacion = null;
         var cargando = false;
 
         // ============================================
@@ -413,28 +543,94 @@
             }
         }
 
+        // ============================================
+        // RENDER MÓDULOS - PROPUESTA 1 (TARJETAS CON TOGGLE)
+        // ============================================
         function renderModulosCheckboxes(modulosPredefinidos) {
             var container = document.getElementById('modulosGrid');
             container.innerHTML = '';
-            var iconos = { 'inventario': '📦', 'tienda': '🛍️', 'trabajadores': '👥', 'servicios': '📋', 'ventas': '💰', 'contratos': '📄' };
-            var nombres = { 'inventario': 'Inventario', 'tienda': 'Tienda', 'trabajadores': 'Trabajadores', 'servicios': 'Servicios', 'ventas': 'Ventas', 'contratos': 'Contratos' };
+            
+            var iconos = { 
+                'inventario': '📦', 
+                'tienda': '🛍️', 
+                'trabajadores': '👥', 
+                'servicios': '📋', 
+                'ventas': '💰', 
+                'contratos': '📄' 
+            };
+            
+            var nombres = { 
+                'inventario': 'Inventario', 
+                'tienda': 'Tienda', 
+                'trabajadores': 'Trabajadores', 
+                'servicios': 'Servicios', 
+                'ventas': 'Ventas', 
+                'contratos': 'Contratos' 
+            };
+            
+            var colores = {
+                'inventario': '#4caf50',
+                'tienda': '#ff9800',
+                'trabajadores': '#2196f3',
+                'servicios': '#9c27b0',
+                'ventas': '#f44336',
+                'contratos': '#00bcd4'
+            };
             
             for (var i = 0; i < modulosDisponibles.length; i++) {
                 var mod = modulosDisponibles[i];
-                var div = document.createElement('div');
-                div.className = 'modulo-check';
                 var checked = modulosPredefinidos ? modulosPredefinidos.indexOf(mod.nombre) !== -1 : false;
+                var color = colores[mod.nombre] || '#6c3ce0';
+                
+                var div = document.createElement('div');
+                div.className = 'modulo-tarjeta' + (checked ? ' seleccionado' : '');
+                div.dataset.modulo = mod.nombre;
+                div.style.borderColor = checked ? color : '#2a2a3e';
+                
                 div.innerHTML = `
-                    <input type="checkbox" class="modulo-checkbox" value="${mod.nombre}" ${checked ? 'checked' : ''}>
-                    <span>${iconos[mod.nombre] || '📦'}</span>
-                    <span style="font-size:11px;">${nombres[mod.nombre] || mod.nombre}</span>
+                    <span class="modulo-icono">${iconos[mod.nombre] || '📦'}</span>
+                    <span class="modulo-nombre">${nombres[mod.nombre] || mod.nombre}</span>
+                    <div class="switch-container">
+                        <span>${checked ? '✅' : '⬜'}</span>
+                        <div class="switch">
+                            <div class="slider"></div>
+                        </div>
+                    </div>
                 `;
-                var checkbox = div.querySelector('.modulo-checkbox');
-                checkbox.addEventListener('change', function() {
-                    div.classList.toggle('checked');
+                
+                div.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    this.classList.toggle('seleccionado');
+                    var checkbox = this.querySelector('.modulo-checkbox');
+                    if (checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        checkbox.dispatchEvent(new Event('change'));
+                    }
+                    var modulo = this.dataset.modulo;
+                    var isChecked = this.classList.contains('seleccionado');
+                    this.style.borderColor = isChecked ? (colores[modulo] || '#6c3ce0') : '#2a2a3e';
                     actualizarContadorModulos();
                 });
-                if (checked) div.classList.add('checked');
+                
+                // Checkbox oculto para mantener compatibilidad
+                var checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'modulo-checkbox';
+                checkbox.value = mod.nombre;
+                checkbox.checked = checked;
+                checkbox.style.display = 'none';
+                checkbox.addEventListener('change', function(e) {
+                    e.stopPropagation();
+                    var parent = this.closest('.modulo-tarjeta');
+                    if (parent) {
+                        parent.classList.toggle('seleccionado', this.checked);
+                        var modulo = parent.dataset.modulo;
+                        parent.style.borderColor = this.checked ? (colores[modulo] || '#6c3ce0') : '#2a2a3e';
+                        actualizarContadorModulos();
+                    }
+                });
+                div.appendChild(checkbox);
+                
                 container.appendChild(div);
             }
             actualizarContadorModulos();
@@ -531,7 +727,6 @@
                     modulosHtml = '<span style="color:#666;font-size:9px;">Sin módulos</span>';
                 }
                 
-                // Botones con IDs únicos usando el ID del trabajador
                 var btnEditarId = 'btnEditar_' + t.id;
                 var btnToggleId = 'btnToggle_' + t.id;
                 var btnEliminarId = 'btnEliminar_' + t.id;
@@ -562,7 +757,6 @@
             for (var i = 0; i < filtrados.length; i++) {
                 var t = filtrados[i];
                 
-                // Botón Editar
                 var btnEditar = document.getElementById('btnEditar_' + t.id);
                 if (btnEditar) {
                     btnEditar.addEventListener('click', function(e) {
@@ -573,7 +767,6 @@
                     });
                 }
                 
-                // Botón Toggle
                 var btnToggle = document.getElementById('btnToggle_' + t.id);
                 if (btnToggle) {
                     btnToggle.addEventListener('click', function(e) {
@@ -585,7 +778,6 @@
                     });
                 }
                 
-                // Botón Eliminar
                 var btnEliminar = document.getElementById('btnEliminar_' + t.id);
                 if (btnEliminar) {
                     btnEliminar.addEventListener('click', function(e) {
@@ -898,7 +1090,6 @@
         cargarModulosDisponibles();
         cargarTrabajadores();
         
-        // Actualizar cada 30 segundos solo si no hay interacción
         setInterval(function() {
             if (!cargando) {
                 cargarTrabajadores();
