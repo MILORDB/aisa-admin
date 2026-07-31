@@ -674,6 +674,9 @@ def dashboard():
     if not usuario:
         return redirect(url_for('login'))
     
+    # 🔍 DEBUG: Imprime el rol para verificar
+    print(f"🔍 Dashboard - Usuario: {usuario.get('username')}, Rol: {usuario.get('rol')}, Tipo: {usuario.get('tipo')}")
+    
     try:
         if usuario.get('rol') == 'admin':
             return render_template('dashboard.html', usuario=usuario)
