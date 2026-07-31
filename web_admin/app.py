@@ -83,7 +83,6 @@ try:
 except ImportError as e:
     print(f"❌ Error importando módulos: {e}")
     traceback.print_exc()
-    # Intentar importar con ruta relativa
     try:
         from web_admin.database import *
         from web_admin.auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
@@ -147,10 +146,217 @@ def admin_required(f):
     return decorated_function
 
 # ============================================
-# INICIALIZAR BASE DE DATOS (DESACTIVADO)
+# ENDPOINT PARA REPARAR ADMIN (URL DIRECTA)
 # ============================================
-print("⚠️ Inicialización automática desactivada")
-print("👉 Visita /init-db para inicializar manualmente")
+
+@app.route('/fix-admin', methods=['GET'])
+def fix_admin_endpoint():
+    """Endpoint para reparar el admin - URL directa /fix-admin"""
+    try:
+        import urllib.parse
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        import bcrypt
+        from datetime import datetime
+        
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        # Parsear URL
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        # Conectar a PostgreSQL
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        print("✅ Conectado a PostgreSQL - Reparando admin...")
+        
+        mensajes = []
+        
+        # 1. Verificar/Crear admin
+        cursor.execute("SELECT * FROM usuarios WHERE username = 'admin'")
+        admin = cursor.fetchone()
+        
+        if admin:
+            mensajes.append(f"✅ Admin encontrado: {admin['username']} (ID: {admin['id']})")
+            admin_id = admin['id']
+        else:
+            mensajes.append("⚠️ Admin no encontrado, creándolo...")
+            password = "admin123"
+            salt = bcrypt.gensalt()
+            password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+            fecha = datetime.now().isoformat()
+            
+            cursor.execute('''
+                INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1)
+                RETURNING id
+            ''', ('admin', 'admin@aisa.com', password_hash, 'Administrador', 'admin', 'admin', fecha))
+            
+            admin_id = cursor.fetchone()['id']
+            conn.commit()
+            mensajes.append(f"✅ Admin creado con ID: {admin_id}")
+        
+        # 2. FORZAR rol y tipo a 'admin'
+        cursor.execute('''
+            UPDATE usuarios 
+            SET rol = 'admin', tipo = 'admin', activo = 1, aprobado = 1
+            WHERE id = %s
+        ''', (admin_id,))
+        conn.commit()
+        mensajes.append("✅ Rol y tipo forzados a 'admin'")
+        
+        # 3. Verificar módulos
+        cursor.execute("SELECT * FROM modulos")
+        modulos = cursor.fetchall()
+        
+        if not modulos:
+            mensajes.append("⚠️ No hay módulos. Creándolos...")
+            modulos_list = [
+                ('voz', 'Texto a voz y reconocimiento de voz', 1, 'ambos'),
+                ('control_pc', 'Control de mouse, teclado y programas', 1, 'negocio'),
+                ('busqueda_web', 'Búsqueda en internet con DeepSeek', 1, 'ambos'),
+                ('memoria', 'Memoria vectorial para recordar conversaciones', 1, 'ambos'),
+                ('archivos', 'Lectura de archivos PDF, Word, Excel', 1, 'negocio'),
+                ('contexto', 'Contexto de conversación', 1, 'ambos'),
+                ('android', 'Conexión con dispositivos Android', 1, 'negocio'),
+                ('inventario', 'Gestión de inventario y productos', 1, 'negocio'),
+                ('tienda', 'Tienda online para clientes', 1, 'negocio'),
+                ('trabajadores', 'Gestión de trabajadores y empleados', 1, 'negocio'),
+                ('servicios', 'Gestión de servicios ofrecidos', 1, 'negocio'),
+                ('ventas', 'Gestión de ventas y facturación', 1, 'negocio'),
+                ('contratos', 'Gestión de contratos con clientes', 1, 'negocio'),
+                ('nomina', 'Gestión de nómina y salarios', 1, 'negocio'),
+            ]
+            
+            for nombre, desc, activo, tipo in modulos_list:
+                cursor.execute('''
+                    INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (nombre) DO NOTHING
+                ''', (nombre, desc, activo, tipo))
+            
+            conn.commit()
+            mensajes.append("✅ Módulos creados")
+            
+            cursor.execute("SELECT * FROM modulos")
+            modulos = cursor.fetchall()
+        
+        mensajes.append(f"📋 Módulos encontrados: {len(modulos)}")
+        
+        # 4. Eliminar permisos antiguos
+        cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (admin_id,))
+        mensajes.append("🗑️ Permisos antiguos eliminados")
+        
+        # 5. Asignar todos los módulos
+        for mod in modulos:
+            cursor.execute('''
+                INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+                VALUES (%s, %s, 1, 'aprobado')
+            ''', (admin_id, mod['id']))
+        
+        conn.commit()
+        mensajes.append(f"✅ {len(modulos)} permisos asignados al admin")
+        
+        # 6. Verificar final
+        cursor.execute("SELECT id, username, rol, tipo, activo FROM usuarios WHERE id = %s", (admin_id,))
+        admin_final = cursor.fetchone()
+        
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head>
+                <title>Admin Reparado</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                    .result-box {{ background: #0f0f1a; border-radius: 8px; padding: 12px; border: 1px solid #2a2a3e; margin-top: 12px; }}
+                    .result-box .row {{ display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #1a1a2e; }}
+                    .result-box .row:last-child {{ border-bottom: none; }}
+                    .result-box .label {{ color: #888; }}
+                    .result-box .value {{ color: #fff; font-weight: 600; }}
+                    .result-box .value.ok {{ color: #6bff6b; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Admin</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        {html_mensajes}
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Datos del Admin</h3>
+                        <div class="result-box">
+                            <div class="row">
+                                <span class="label">👤 Usuario</span>
+                                <span class="value ok">{admin_final['username']}</span>
+                            </div>
+                            <div class="row">
+                                <span class="label">🔑 Rol</span>
+                                <span class="value ok">{admin_final['rol']}</span>
+                            </div>
+                            <div class="row">
+                                <span class="label">📋 Tipo</span>
+                                <span class="value ok">{admin_final['tipo']}</span>
+                            </div>
+                            <div class="row">
+                                <span class="label">✅ Activo</span>
+                                <span class="value ok">{'Sí' if admin_final['activo'] == 1 else 'No'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <a href="/logout" class="btn btn-primary">🚪 Cerrar sesión</a>
+                        <a href="/login" class="btn btn-secondary">🔑 Iniciar sesión</a>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 16px; background: #0f0f1a; border-radius: 8px; border: 1px solid #2a2a3e;">
+                        <p style="color: #888;">👤 Usuario: <strong style="color:#6c3ce0;">admin</strong></p>
+                        <p style="color: #888;">🔑 Contraseña: <strong style="color:#6c3ce0;">admin123</strong></p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/login" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Login</a>
+            </body>
+        </html>
+        """, 500
 
 # ============================================
 # ENDPOINT PARA INICIALIZAR BD MANUALMENTE
@@ -180,6 +386,170 @@ def init_db_route():
                 <h1 style="color:#ff6b6b;">❌ Error al inicializar la base de datos</h1>
                 <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
                 <a href="/login" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Ir al Login</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA REPARAR TABLA NOMINA
+# ============================================
+@app.route('/fix-nomina-tabla', methods=['GET'])
+def fix_nomina_tabla_endpoint():
+    try:
+        import urllib.parse
+        import psycopg2
+        
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL")
+        
+        mensajes = []
+        
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'nomina'
+            )
+        """)
+        tabla_existe = cursor.fetchone()[0]
+        
+        if not tabla_existe:
+            mensajes.append("⚠️ La tabla 'nomina' no existe. Creándola...")
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS nomina (
+                id SERIAL PRIMARY KEY,
+                negocio_id INTEGER NOT NULL,
+                trabajador_id INTEGER NOT NULL,
+                mes INTEGER NOT NULL,
+                ano INTEGER NOT NULL,
+                salario_base REAL NOT NULL DEFAULT 0,
+                dias_trabajados INTEGER DEFAULT 0,
+                dias_ausencia INTEGER DEFAULT 0,
+                dias_extras INTEGER DEFAULT 0,
+                salario_devengado REAL DEFAULT 0,
+                comisiones REAL DEFAULT 0,
+                total REAL DEFAULT 0,
+                creado_en TEXT NOT NULL,
+                actualizado_en TEXT,
+                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                UNIQUE(negocio_id, trabajador_id, mes, ano)
+            )
+            ''')
+            conn.commit()
+            mensajes.append("✅ Tabla 'nomina' creada correctamente")
+        
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'nomina'
+        """)
+        columnas = [col[0] for col in cursor.fetchall()]
+        mensajes.append(f"📋 Columnas existentes: {', '.join(columnas)}")
+        
+        columnas_necesarias = {
+            'salario_base': 'REAL NOT NULL DEFAULT 0',
+            'dias_trabajados': 'INTEGER DEFAULT 0',
+            'dias_ausencia': 'INTEGER DEFAULT 0',
+            'dias_extras': 'INTEGER DEFAULT 0',
+            'salario_devengado': 'REAL DEFAULT 0',
+            'comisiones': 'REAL DEFAULT 0',
+            'total': 'REAL DEFAULT 0'
+        }
+        
+        for col, tipo in columnas_necesarias.items():
+            if col not in columnas:
+                try:
+                    cursor.execute(f"ALTER TABLE nomina ADD COLUMN {col} {tipo}")
+                    mensajes.append(f"✅ Columna '{col}' agregada")
+                    print(f"✅ Columna '{col}' agregada")
+                except psycopg2.Error as e:
+                    if "duplicate column" not in str(e).lower():
+                        mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
+                        print(f"⚠️ Error al agregar '{col}': {e}")
+                except Exception as e:
+                    mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
+                    print(f"⚠️ Error al agregar '{col}': {e}")
+            else:
+                mensajes.append(f"✅ Columna '{col}' ya existe")
+        
+        conn.commit()
+        
+        cursor.execute("""
+            SELECT column_name, data_type
+            FROM information_schema.columns 
+            WHERE table_name = 'nomina'
+            ORDER BY ordinal_position
+        """)
+        columnas_final = cursor.fetchall()
+        
+        html_columnas = ""
+        for col, tipo in columnas_final:
+            html_columnas += f"• <strong>{col}</strong> ({tipo})<br>"
+        
+        cursor.execute("SELECT COUNT(*) FROM nomina")
+        total_registros = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head><title>Tabla Nómina Reparada</title>
+            <style>
+                body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                .container {{ max-width: 800px; margin: 0 auto; }}
+                .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                .success {{ color: #6bff6b; }}
+                .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                .btn-primary:hover {{ background: #5a2ec0; }}
+                .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                .btn-secondary:hover {{ background: #3a3a4e; }}
+            </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Tabla Nómina</h1>
+                    <div class="card"><h3>📊 Resultado</h3>{html_mensajes}</div>
+                    <div class="card"><h3>📋 Estructura final de la tabla 'nomina'</h3>{html_columnas}</div>
+                    <div class="card"><h3>📊 Estadísticas</h3><p>Total de registros en nómina: <strong>{total_registros}</strong></p></div>
+                    <div>
+                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al reparar tabla</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
             </body>
         </html>
         """, 500
@@ -2626,172 +2996,135 @@ def api_reporte_productos():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# FUNCIONES PARA NÓMINA (CORREGIDAS)
+# API - NÓMINA
 # ============================================
-
-def obtener_dias_trabajados_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días trabajados en un mes"""
-    conn = get_db()
-    cursor = conn.cursor()
+@app.route('/api/nomina', methods=['GET'])
+@login_required
+def api_nomina():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario.get('tipo') != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    mes = request.args.get('mes', type=int)
+    ano = request.args.get('ano', type=int)
+    
+    if not mes or not ano:
+        return jsonify({'error': 'Mes y año son requeridos'}), 400
+    
     try:
-        # Usar el formato correcto para PostgreSQL
-        cursor.execute('''
-            SELECT COUNT(*) FROM asistencia 
-            WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha::date) = %s
-            AND EXTRACT(YEAR FROM fecha::date) = %s
-            AND presente = 1
-        ''', (trabajador_id, mes, ano))
-        dias = cursor.fetchone()[0]
-        conn.close()
-        return dias
+        nomina = obtener_nomina_mes(usuario['id'], mes, ano)
+        return jsonify({
+            'success': True,
+            'nominas': nomina
+        })
     except Exception as e:
-        print(f"❌ Error en obtener_dias_trabajados_mes: {e}")
-        conn.close()
-        return 0
-
-def obtener_dias_ausencia_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días de ausencia en un mes"""
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT COUNT(*) FROM asistencia 
-            WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha::date) = %s
-            AND EXTRACT(YEAR FROM fecha::date) = %s
-            AND presente = 0
-        ''', (trabajador_id, mes, ano))
-        dias = cursor.fetchone()[0]
-        conn.close()
-        return dias
-    except Exception as e:
-        print(f"❌ Error en obtener_dias_ausencia_mes: {e}")
-        conn.close()
-        return 0
-
-def obtener_dias_extras_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días extras trabajados en un mes"""
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT COUNT(*) FROM asistencia 
-            WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha::date) = %s
-            AND EXTRACT(YEAR FROM fecha::date) = %s
-            AND horas_trabajadas > 8
-        ''', (trabajador_id, mes, ano))
-        dias = cursor.fetchone()[0]
-        conn.close()
-        return dias
-    except Exception as e:
-        print(f"❌ Error en obtener_dias_extras_mes: {e}")
-        conn.close()
-        return 0
-
-def obtener_total_comisiones_mes(trabajador_id, mes, ano):
-    """Obtiene el total de comisiones de un trabajador en un mes"""
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT COALESCE(SUM(monto), 0) FROM comisiones_trabajador 
-            WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha::date) = %s
-            AND EXTRACT(YEAR FROM fecha::date) = %s
-        ''', (trabajador_id, mes, ano))
-        total = cursor.fetchone()[0]
-        conn.close()
-        return float(total) if total else 0
-    except Exception as e:
-        print(f"❌ Error en obtener_total_comisiones_mes: {e}")
-        conn.close()
-        return 0
-
-def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
-    """Obtiene las comisiones de un trabajador en un mes específico"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        # Primero verificar si la tabla existe
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'comisiones_trabajador'
-            )
-        """)
-        tabla_existe = cursor.fetchone()['exists']
-        
-        if not tabla_existe:
-            print("⚠️ Tabla comisiones_trabajador no existe")
-            conn.close()
-            return []
-        
-        # Verificar si hay comisiones para este trabajador
-        cursor.execute("""
-            SELECT COUNT(*) FROM comisiones_trabajador 
-            WHERE trabajador_id = %s
-        """, (trabajador_id,))
-        total = cursor.fetchone()['count']
-        
-        if total == 0:
-            conn.close()
-            return []
-        
-        # Consulta con formato de fecha corregido para PostgreSQL
-        cursor.execute('''
-            SELECT 
-                c.*, 
-                p.nombre as producto_nombre, 
-                v.cliente, 
-                v.fecha as venta_fecha
-            FROM comisiones_trabajador c
-            LEFT JOIN productos p ON c.producto_id = p.id
-            LEFT JOIN ventas v ON c.venta_id = v.id
-            WHERE c.trabajador_id = %s 
-            AND EXTRACT(MONTH FROM c.fecha::date) = %s
-            AND EXTRACT(YEAR FROM c.fecha::date) = %s
-            ORDER BY c.fecha DESC
-        ''', (trabajador_id, mes, ano))
-        
-        comisiones = cursor.fetchall()
-        conn.close()
-        
-        return comisiones
-        
-    except Exception as e:
-        print(f"❌ Error en obtener_comisiones_trabajador_mes: {e}")
-        import traceback
+        print(f"❌ Error en api_nomina: {e}")
         traceback.print_exc()
-        conn.close()
-        return []
+        return jsonify({'error': str(e)}), 500
 
-def calcular_nomina(negocio_id, trabajador_id, mes, ano):
-    """Calcula la nómina de un trabajador para un mes específico"""
+@app.route('/api/nomina/calcular', methods=['POST'])
+@login_required
+def api_calcular_nomina():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario.get('tipo') != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    data = request.get_json()
+    mes = data.get('mes', type=int)
+    ano = data.get('ano', type=int)
+    
+    if not mes or not ano:
+        return jsonify({'error': 'Mes y año son requeridos'}), 400
+    
     try:
-        import calendar
-        _, dias_mes = calendar.monthrange(ano, mes)
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT tn.trabajador_id, u.nombre, u.datos_negocio
+            FROM trabajadores_negocio tn
+            JOIN usuarios u ON tn.trabajador_id = u.id
+            WHERE tn.negocio_id = %s AND tn.activo = 1
+        ''', (usuario['id'],))
+        trabajadores = cursor.fetchall()
+        conn.close()
         
+        if not trabajadores:
+            return jsonify({
+                'success': True,
+                'message': 'No hay trabajadores activos',
+                'trabajadores': 0
+            })
+        
+        contador = 0
+        errores = []
+        
+        for t in trabajadores:
+            trabajador_id = t[0]
+            nombre = t[1] or 'Trabajador'
+            try:
+                resultado = calcular_nomina(usuario['id'], trabajador_id, mes, ano)
+                if resultado:
+                    contador += 1
+                    print(f"✅ Nómina calculada para {nombre}")
+                else:
+                    errores.append(f"⚠️ No se pudo calcular nómina para {nombre}")
+            except Exception as e:
+                errores.append(f"❌ Error calculando nómina para {nombre}: {str(e)}")
+                print(f"❌ Error calculando nómina para {nombre}: {e}")
+        
+        mensaje = f'Nómina calculada para {contador} trabajadores'
+        if errores:
+            mensaje += f' | {len(errores)} errores'
+            print(f"⚠️ Errores: {errores}")
+        
+        return jsonify({
+            'success': True,
+            'message': mensaje,
+            'trabajadores': contador,
+            'errores': errores
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_calcular_nomina: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/nomina/detalle', methods=['GET'])
+@login_required
+def api_nomina_detalle():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario.get('tipo') != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    trabajador_id = request.args.get('trabajador_id', type=int)
+    mes = request.args.get('mes', type=int)
+    ano = request.args.get('ano', type=int)
+    
+    if not trabajador_id or not mes or not ano:
+        return jsonify({'error': 'Trabajador, mes y año son requeridos'}), 400
+    
+    try:
         conn = get_db()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # Obtener datos del trabajador
         cursor.execute('''
             SELECT u.id, u.nombre, u.datos_negocio
             FROM usuarios u
             WHERE u.id = %s
         ''', (trabajador_id,))
         trabajador = cursor.fetchone()
+        conn.close()
         
         if not trabajador:
-            conn.close()
-            print(f"⚠️ Trabajador {trabajador_id} no encontrado")
-            return None
+            return jsonify({'error': 'Trabajador no encontrado'}), 404
         
-        # Obtener salario base del trabajador
         datos = {}
-        if trabajador['datos_negocio']:
+        if trabajador.get('datos_negocio'):
             try:
                 datos = json.loads(trabajador['datos_negocio']) if isinstance(trabajador['datos_negocio'], str) else trabajador['datos_negocio']
             except:
@@ -2799,335 +3132,212 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
         
         salario_base = datos.get('salario', 0)
         
-        if salario_base == 0:
-            print(f"⚠️ El trabajador {trabajador['nombre']} no tiene salario asignado")
-            conn.close()
-            return None
+        import calendar
+        _, dias_mes = calendar.monthrange(ano, mes)
         
-        # Obtener días trabajados
         dias_trabajados = obtener_dias_trabajados_mes(trabajador_id, mes, ano)
         dias_ausencia = obtener_dias_ausencia_mes(trabajador_id, mes, ano)
         dias_extras = obtener_dias_extras_mes(trabajador_id, mes, ano)
         
-        # Si no hay días trabajados, usar 0 (no asumir días completos)
         if dias_trabajados == 0:
-            # Verificar si hay registros de asistencia
-            cursor.execute('''
-                SELECT COUNT(*) FROM asistencia 
-                WHERE trabajador_id = %s 
-                AND EXTRACT(MONTH FROM fecha::date) = %s
-                AND EXTRACT(YEAR FROM fecha::date) = %s
-            ''', (trabajador_id, mes, ano))
-            total_asistencias = cursor.fetchone()['count']
-            
-            if total_asistencias == 0:
-                # No hay registros de asistencia, usar días del mes
-                dias_trabajados = dias_mes
-                print(f"ℹ️ No hay registros de asistencia para {trabajador['nombre']}, usando {dias_mes} días")
+            dias_trabajados = dias_mes
         
-        # Calcular salario diario
         salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
         salario_devengado = salario_diario * dias_trabajados
         
-        # Obtener comisiones
-        comisiones = obtener_total_comisiones_mes(trabajador_id, mes, ano)
+        comisiones_list = obtener_comisiones_trabajador_mes(trabajador_id, mes, ano)
+        comisiones_total = sum(c.get('monto', 0) for c in comisiones_list) if comisiones_list else 0
         
-        # Calcular total
-        total = salario_devengado + comisiones
+        total = salario_devengado + comisiones_total
         
-        # Verificar si ya existe un registro de nómina para este mes
-        cursor.execute('''
-            SELECT id FROM nomina 
-            WHERE negocio_id = %s AND trabajador_id = %s AND mes = %s AND ano = %s
-        ''', (negocio_id, trabajador_id, mes, ano))
-        existe = cursor.fetchone()
-        
-        if existe:
-            # Actualizar registro existente
-            cursor.execute('''
-                UPDATE nomina SET
-                    salario_base = %s,
-                    dias_trabajados = %s,
-                    dias_ausencia = %s,
-                    dias_extras = %s,
-                    salario_devengado = %s,
-                    comisiones = %s,
-                    total = %s,
-                    actualizado_en = %s
-                WHERE id = %s
-            ''', (
-                salario_base, dias_trabajados, dias_ausencia, dias_extras,
-                salario_devengado, comisiones, total,
-                datetime.now().isoformat(),
-                existe['id']
-            ))
-        else:
-            # Insertar nuevo registro
-            cursor.execute('''
-                INSERT INTO nomina (
-                    negocio_id, trabajador_id, mes, ano, salario_base, 
-                    dias_trabajados, dias_ausencia, dias_extras, salario_devengado, comisiones, total,
-                    creado_en
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (
-                negocio_id, trabajador_id, mes, ano, salario_base,
-                dias_trabajados, dias_ausencia, dias_extras, salario_devengado, comisiones, total,
-                datetime.now().isoformat()
-            ))
-        
-        conn.commit()
-        conn.close()
-        
-        return {
-            'trabajador_id': trabajador_id,
-            'nombre': trabajador['nombre'],
-            'salario_base': salario_base,
-            'dias_mes': dias_mes,
-            'dias_trabajados': dias_trabajados,
-            'dias_ausencia': dias_ausencia,
-            'dias_extras': dias_extras,
-            'salario_diario': salario_diario,
-            'salario_devengado': salario_devengado,
-            'comisiones': comisiones,
-            'total': total
-        }
+        return jsonify({
+            'success': True,
+            'detalle': {
+                'trabajador_id': trabajador_id,
+                'nombre': trabajador.get('nombre') or datos.get('nombre', 'Trabajador'),
+                'salario_base': salario_base,
+                'dias_mes': dias_mes,
+                'dias_trabajados': dias_trabajados,
+                'dias_ausencia': dias_ausencia,
+                'dias_extras': dias_extras,
+                'salario_diario': salario_diario,
+                'salario_devengado': salario_devengado,
+                'comisiones': comisiones_total,
+                'total': total,
+                'comisiones_list': comisiones_list or []
+            }
+        })
         
     except Exception as e:
-        print(f"❌ Error en calcular_nomina para trabajador {trabajador_id}: {e}")
-        import traceback
+        print(f"❌ Error en api_nomina_detalle: {e}")
         traceback.print_exc()
-        return None
+        return jsonify({'error': str(e)}), 500
 
-def obtener_nomina_mes(negocio_id, mes, ano):
-    """Obtiene la nómina de todos los trabajadores para un mes específico"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
+@app.route('/api/nomina/reporte', methods=['GET'])
+@login_required
+def api_nomina_reporte():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario.get('tipo') != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    mes = request.args.get('mes', type=int)
+    ano = request.args.get('ano', type=int)
+    
+    if not mes or not ano:
+        return jsonify({'error': 'Mes y año son requeridos'}), 400
+    
     try:
-        cursor.execute('''
-            SELECT n.*, u.nombre, u.datos_negocio
-            FROM nomina n
-            JOIN usuarios u ON n.trabajador_id = u.id
-            WHERE n.negocio_id = %s AND n.mes = %s AND n.ano = %s
-            ORDER BY u.nombre ASC
-        ''', (negocio_id, mes, ano))
+        nomina = obtener_nomina_mes(usuario['id'], mes, ano)
         
-        nomina = cursor.fetchall()
-        conn.close()
+        if not nomina:
+            return jsonify({'error': 'No hay datos de nómina para generar el reporte'}), 404
         
-        return nomina
+        negocio_data = obtener_datos_negocio(usuario['id'])
+        negocio_nombre = negocio_data.get('nombre_negocio') or usuario.get('nombre') or usuario.get('username')
+        negocio_telefono = negocio_data.get('telefono', '')
         
-    except Exception as e:
-        print(f"❌ Error en obtener_nomina_mes: {e}")
-        import traceback
-        traceback.print_exc()
-        conn.close()
-        return []
-
-def obtener_resumen_nomina(negocio_id, mes, ano):
-    """Obtiene un resumen de la nómina para un mes"""
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT 
-                COUNT(*) as total_trabajadores,
-                COALESCE(SUM(dias_trabajados), 0) as total_dias_trabajados,
-                COALESCE(SUM(dias_ausencia), 0) as total_ausencias,
-                COALESCE(SUM(salario_devengado), 0) as total_salarios,
-                COALESCE(SUM(comisiones), 0) as total_comisiones,
-                COALESCE(SUM(total), 0) as total_nomina
-            FROM nomina
-            WHERE negocio_id = %s AND mes = %s AND ano = %s
-        ''', (negocio_id, mes, ano))
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
+        from reportlab.lib import colors
+        import io
         
-        resultado = cursor.fetchone()
-        conn.close()
-        
-        return {
-            'total_trabajadores': resultado[0] or 0,
-            'total_dias_trabajados': resultado[1] or 0,
-            'total_ausencias': resultado[2] or 0,
-            'total_salarios': resultado[3] or 0,
-            'total_comisiones': resultado[4] or 0,
-            'total_nomina': resultado[5] or 0
-        }
-        
-    except Exception as e:
-        print(f"❌ Error en obtener_resumen_nomina: {e}")
-        conn.close()
-        return {
-            'total_trabajadores': 0,
-            'total_dias_trabajados': 0,
-            'total_ausencias': 0,
-            'total_salarios': 0,
-            'total_comisiones': 0,
-            'total_nomina': 0
-        }
-
-# ============================================
-# ENDPOINT PARA REPARAR TABLA NOMINA
-# ============================================
-@app.route('/fix-nomina-tabla', methods=['GET'])
-def fix_nomina_tabla_endpoint():
-    try:
-        import urllib.parse
-        import psycopg2
-        
-        DATABASE_URL = os.environ.get('DATABASE_URL', '')
-        
-        if not DATABASE_URL:
-            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
-        
-        url = DATABASE_URL.strip()
-        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
-            url = 'postgresql://' + url
-        
-        parsed = urllib.parse.urlparse(url)
-        
-        conn = psycopg2.connect(
-            host=parsed.hostname or 'localhost',
-            port=parsed.port or 5432,
-            database=parsed.path.lstrip('/') if parsed.path else '',
-            user=parsed.username or '',
-            password=parsed.password or '',
-            sslmode='require'
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            rightMargin=1.5*cm,
+            leftMargin=1.5*cm,
+            topMargin=1.5*cm,
+            bottomMargin=1.5*cm
         )
-        cursor = conn.cursor()
-        print("✅ Conectado a PostgreSQL")
         
-        mensajes = []
+        styles = getSampleStyleSheet()
+        elementos = []
         
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'nomina'
-            )
-        """)
-        tabla_existe = cursor.fetchone()[0]
+        meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+        nombre_mes = meses[mes - 1] if 1 <= mes <= 12 else str(mes)
         
-        if not tabla_existe:
-            mensajes.append("⚠️ La tabla 'nomina' no existe. Creándola...")
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS nomina (
-                id SERIAL PRIMARY KEY,
-                negocio_id INTEGER NOT NULL,
-                trabajador_id INTEGER NOT NULL,
-                mes INTEGER NOT NULL,
-                ano INTEGER NOT NULL,
-                salario_base REAL NOT NULL DEFAULT 0,
-                dias_trabajados INTEGER DEFAULT 0,
-                dias_ausencia INTEGER DEFAULT 0,
-                dias_extras INTEGER DEFAULT 0,
-                salario_devengado REAL DEFAULT 0,
-                comisiones REAL DEFAULT 0,
-                total REAL DEFAULT 0,
-                creado_en TEXT NOT NULL,
-                actualizado_en TEXT,
-                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-                UNIQUE(negocio_id, trabajador_id, mes, ano)
-            )
-            ''')
-            conn.commit()
-            mensajes.append("✅ Tabla 'nomina' creada correctamente")
+        estilo_titulo = ParagraphStyle(
+            'Titulo',
+            parent=styles['Heading1'],
+            fontSize=16,
+            textColor=colors.HexColor('#6c3ce0'),
+            alignment=TA_CENTER,
+            spaceAfter=4
+        )
         
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'nomina'
-        """)
-        columnas = [col[0] for col in cursor.fetchall()]
-        mensajes.append(f"📋 Columnas existentes: {', '.join(columnas)}")
+        estilo_subtitulo = ParagraphStyle(
+            'Subtitulo',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=colors.HexColor('#888888'),
+            alignment=TA_CENTER,
+            spaceAfter=12
+        )
         
-        columnas_necesarias = {
-            'salario_base': 'REAL NOT NULL DEFAULT 0',
-            'dias_trabajados': 'INTEGER DEFAULT 0',
-            'dias_ausencia': 'INTEGER DEFAULT 0',
-            'dias_extras': 'INTEGER DEFAULT 0',
-            'salario_devengado': 'REAL DEFAULT 0',
-            'comisiones': 'REAL DEFAULT 0',
-            'total': 'REAL DEFAULT 0'
-        }
+        elementos.append(Paragraph(f"📊 REPORTE DE NÓMINA - {nombre_mes} de {ano}", estilo_titulo))
+        elementos.append(Paragraph(f"{negocio_nombre} | Total: ${sum(n.get('total', 0) for n in nomina):,.2f}", estilo_subtitulo))
+        elementos.append(Spacer(1, 0.5*cm))
         
-        for col, tipo in columnas_necesarias.items():
-            if col not in columnas:
-                try:
-                    cursor.execute(f"ALTER TABLE nomina ADD COLUMN {col} {tipo}")
-                    mensajes.append(f"✅ Columna '{col}' agregada")
-                    print(f"✅ Columna '{col}' agregada")
-                except psycopg2.Error as e:
-                    if "duplicate column" not in str(e).lower():
-                        mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
-                        print(f"⚠️ Error al agregar '{col}': {e}")
-                except Exception as e:
-                    mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
-                    print(f"⚠️ Error al agregar '{col}': {e}")
-            else:
-                mensajes.append(f"✅ Columna '{col}' ya existe")
+        tabla_datos = [
+            ["Trabajador", "Salario Base", "Días Trab.", "Ausencias", "Salario Dev.", "Comisiones", "Total"]
+        ]
         
-        conn.commit()
+        total_comisiones = 0
+        total_nomina = 0
         
-        cursor.execute("""
-            SELECT column_name, data_type
-            FROM information_schema.columns 
-            WHERE table_name = 'nomina'
-            ORDER BY ordinal_position
-        """)
-        columnas_final = cursor.fetchall()
+        for n in nomina:
+            nombre = n.get('nombre', 'Trabajador')
+            salario_base = n.get('salario_base', 0)
+            dias_trabajados = n.get('dias_trabajados', 0)
+            dias_ausencia = n.get('dias_ausencia', 0)
+            salario_devengado = n.get('salario_devengado', 0)
+            comisiones = n.get('comisiones', 0)
+            total = n.get('total', 0)
+            
+            total_comisiones += comisiones
+            total_nomina += total
+            
+            tabla_datos.append([
+                Paragraph(nombre, styles['Normal']),
+                f"${salario_base:,.2f}",
+                str(dias_trabajados),
+                str(dias_ausencia),
+                f"${salario_devengado:,.2f}",
+                f"${comisiones:,.2f}",
+                f"${total:,.2f}"
+            ])
         
-        html_columnas = ""
-        for col, tipo in columnas_final:
-            html_columnas += f"• <strong>{col}</strong> ({tipo})<br>"
+        tabla_datos.append([
+            Paragraph("<b>TOTAL</b>", styles['Normal']),
+            "",
+            "",
+            "",
+            "",
+            f"${total_comisiones:,.2f}",
+            f"${total_nomina:,.2f}"
+        ])
         
-        cursor.execute("SELECT COUNT(*) FROM nomina")
-        total_registros = cursor.fetchone()[0]
+        tabla = Table(tabla_datos, colWidths=[4*cm, 2.5*cm, 2*cm, 2*cm, 3*cm, 3*cm, 3*cm])
+        tabla.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('TOPPADDING', (0, 0), (-1, 0), 6),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+            ('TOPPADDING', (0, 1), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.HexColor('#f9f9f9'), colors.white]),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#2a2a3e')),
+            ('TEXTCOLOR', (0, -1), (-1, -1), colors.white),
+        ]))
         
-        conn.close()
+        elementos.append(tabla)
         
-        html_mensajes = "<br>".join(mensajes)
+        estilo_pie = ParagraphStyle(
+            'Pie',
+            parent=styles['Normal'],
+            fontSize=8,
+            textColor=colors.HexColor('#999999'),
+            alignment=TA_CENTER,
+            spaceBefore=20
+        )
         
-        return f"""
-        <html>
-            <head><title>Tabla Nómina Reparada</title>
-            <style>
-                body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
-                .container {{ max-width: 800px; margin: 0 auto; }}
-                .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
-                .card h3 {{ color: #aaa; margin-bottom: 10px; }}
-                .success {{ color: #6bff6b; }}
-                .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
-                .btn-primary {{ background: #6c3ce0; color: #fff; }}
-                .btn-primary:hover {{ background: #5a2ec0; }}
-                .btn-secondary {{ background: #2a2a3e; color: #fff; }}
-                .btn-secondary:hover {{ background: #3a3a4e; }}
-            </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1 style="color:#6c3ce0;">🔧 Reparación de Tabla Nómina</h1>
-                    <div class="card"><h3>📊 Resultado</h3>{html_mensajes}</div>
-                    <div class="card"><h3>📋 Estructura final de la tabla 'nomina'</h3>{html_columnas}</div>
-                    <div class="card"><h3>📊 Estadísticas</h3><p>Total de registros en nómina: <strong>{total_registros}</strong></p></div>
-                    <div>
-                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
-                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
-                    </div>
-                </div>
-            </body>
-        </html>
-        """
+        elementos.append(Spacer(1, 1*cm))
+        elementos.append(Paragraph(
+            f"Reporte generado por AIsa - Sistema de Gestión Empresarial | {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            estilo_pie
+        ))
+        
+        doc.build(elementos)
+        
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        
+        filename = f'nomina_{mes}_{ano}_{datetime.now().strftime("%Y%m%d")}.pdf'
+        response = make_response(pdf_bytes)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename={filename}'
+        
+        return response
+        
     except Exception as e:
-        return f"""
-        <html>
-            <head><title>Error</title></head>
-            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
-                <h1 style="color:#ff6b6b;">❌ Error al reparar tabla</h1>
-                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
-                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
-            </body>
-        </html>
-        """, 500
+        print(f"❌ Error generando reporte de nómina: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 # ============================================
 # INICIO DE LA APLICACIÓN
