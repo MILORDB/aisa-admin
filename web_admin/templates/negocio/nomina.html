@@ -64,8 +64,9 @@
             border-radius: 10px;
             font-size: 9px;
         }
-        .tabla .badge.presente { background: #224422; color: #6bff6b; }
-        .tabla .badge.ausente { background: #442222; color: #ff6b6b; }
+        .tabla .badge.pagado { background: #224422; color: #6bff6b; }
+        .tabla .badge.pendiente { background: #443322; color: #ffbb33; }
+        .tabla .badge.cancelado { background: #442222; color: #ff6b6b; }
         
         .form-row {
             display: flex;
@@ -100,18 +101,8 @@
             gap: 8px;
             margin-bottom: 12px;
             flex-wrap: wrap;
+            align-items: center;
         }
-        .search-bar input {
-            flex: 1;
-            padding: 6px 10px;
-            border: 1px solid #2a2a3e;
-            border-radius: 6px;
-            background: #0f0f1a;
-            color: #fff;
-            font-size: 12px;
-            min-width: 100px;
-        }
-        .search-bar input:focus { border-color: #6c3ce0; outline: none; }
         .search-bar select {
             padding: 6px 10px;
             border: 1px solid #2a2a3e;
@@ -218,19 +209,200 @@
         .resumen-nomina .value.total { color: #6c3ce0; font-size: 16px; }
         .resumen-nomina .value.comision { color: #2196f3; }
         
-        .comisiones-list {
-            max-height: 150px;
-            overflow-y: auto;
+        /* ============================================
+           ACORDEÓN DE TRABAJADORES
+           ============================================ */
+        .accordion-nomina {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
         }
-        .comisiones-list .item {
+        
+        .accordion-item-nomina {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .accordion-item-nomina:hover {
+            border-color: #3a3a5e;
+        }
+        
+        .accordion-item-nomina.abierto {
+            border-color: #6c3ce0;
+            box-shadow: 0 0 20px rgba(108, 60, 224, 0.05);
+        }
+        
+        .accordion-header-nomina {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            gap: 10px;
+            user-select: none;
+        }
+        
+        .accordion-header-nomina:hover {
+            background: rgba(255,255,255,0.02);
+        }
+        
+        .accordion-header-nomina .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #6c3ce0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        
+        .accordion-header-nomina .info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .accordion-header-nomina .info .nombre {
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .accordion-header-nomina .info .detalle {
+            font-size: 10px;
+            color: #888;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .accordion-header-nomina .resumen-rapido {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+            font-size: 11px;
+        }
+        
+        .accordion-header-nomina .resumen-rapido .total {
+            color: #6c3ce0;
+            font-weight: 700;
+        }
+        
+        .accordion-header-nomina .resumen-rapido .estado {
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 9px;
+        }
+        
+        .accordion-header-nomina .resumen-rapido .estado.calculado {
+            background: rgba(76,175,80,0.15);
+            color: #6bff6b;
+        }
+        
+        .accordion-header-nomina .resumen-rapido .estado.pendiente {
+            background: rgba(255,152,0,0.15);
+            color: #ffbb33;
+        }
+        
+        .accordion-header-nomina .arrow {
+            font-size: 12px;
+            color: #666;
+            transition: transform 0.3s ease;
+            flex-shrink: 0;
+        }
+        
+        .accordion-item-nomina.abierto .arrow {
+            transform: rotate(180deg);
+        }
+        
+        .accordion-body-nomina {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease, padding 0.3s ease;
+            padding: 0 14px;
+        }
+        
+        .accordion-item-nomina.abierto .accordion-body-nomina {
+            max-height: 800px;
+            padding: 0 14px 14px 14px;
+        }
+        
+        .accordion-body-nomina .contenido {
+            border-top: 1px solid #1a1a2e;
+            padding-top: 12px;
+        }
+        
+        .accordion-body-nomina .grid-detalle {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .accordion-body-nomina .grid-detalle .item-detalle {
+            background: #1a1a2e;
+            border-radius: 6px;
+            padding: 6px 10px;
+            text-align: center;
+        }
+        
+        .accordion-body-nomina .grid-detalle .item-detalle .numero {
+            font-size: 16px;
+            font-weight: 700;
+            display: block;
+        }
+        
+        .accordion-body-nomina .grid-detalle .item-detalle .label {
+            font-size: 9px;
+            color: #888;
+        }
+        
+        .accordion-body-nomina .comisiones-list {
+            max-height: 100px;
+            overflow-y: auto;
+            margin-top: 6px;
+        }
+        
+        .accordion-body-nomina .comisiones-list .item {
             display: flex;
             justify-content: space-between;
             padding: 3px 0;
             border-bottom: 1px solid #1a1a2e;
             font-size: 11px;
         }
-        .comisiones-list .item .producto { color: #aaa; }
-        .comisiones-list .item .monto { color: #2196f3; font-weight: 600; }
+        
+        .accordion-body-nomina .comisiones-list .item .producto { color: #aaa; }
+        .accordion-body-nomina .comisiones-list .item .monto { color: #2196f3; font-weight: 600; }
+        .accordion-body-nomina .btn-ver-detalle {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #6c3ce0;
+            border-radius: 6px;
+            background: transparent;
+            color: #6c3ce0;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.3s;
+            margin-top: 4px;
+        }
+        .accordion-body-nomina .btn-ver-detalle:hover {
+            background: rgba(108,60,224,0.1);
+        }
+        
+        .accordion-body-nomina .sin-datos {
+            text-align: center;
+            color: #888;
+            font-size: 11px;
+            padding: 8px;
+        }
         
         @media (max-width: 600px) {
             body { padding: 8px; }
@@ -243,6 +415,9 @@
             .tabla { font-size: 11px; }
             .tabla th, .tabla td { padding: 4px 6px; }
             .modal-content { padding: 12px; }
+            .accordion-header-nomina { flex-wrap: wrap; }
+            .accordion-header-nomina .resumen-rapido { width: 100%; justify-content: flex-start; padding-left: 42px; }
+            .accordion-body-nomina .grid-detalle { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -269,13 +444,16 @@
                 <span class="number" id="totalComisiones">$0</span>
                 <span class="label">💵 Comisiones</span>
             </div>
+            <div class="stat-item">
+                <span class="number" id="totalCalculados">0</span>
+                <span class="label">✅ Calculados</span>
+            </div>
         </div>
     </div>
 
     <div class="card">
         <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="🔍 Buscar trabajador..." oninput="filtrarNominas()">
-            <select id="filtroMes" onchange="cargarNominas()">
+            <select id="filtroMes" onchange="cargarDatos()">
                 <option value="1">Enero</option>
                 <option value="2">Febrero</option>
                 <option value="3">Marzo</option>
@@ -289,17 +467,15 @@
                 <option value="11">Noviembre</option>
                 <option value="12">Diciembre</option>
             </select>
-            <select id="filtroAno" onchange="cargarNominas()"></select>
-            <button class="btn btn-primary" onclick="calcularNomina()">📊 Calcular Nómina</button>
-            <button class="btn btn-success" onclick="generarReporte()">📄 Reporte</button>
+            <select id="filtroAno" onchange="cargarDatos()"></select>
+            <button class="btn btn-primary" id="btnCalcularNomina">📊 Calcular Nómina</button>
+            <button class="btn btn-success" id="btnGenerarReporte">📄 Reporte</button>
         </div>
     </div>
 
     <div class="card">
-        <div class="table-wrapper">
-            <div id="nominasContainer">
-                <div class="loading">Cargando...</div>
-            </div>
+        <div id="nominasContainer">
+            <div class="loading">Cargando...</div>
         </div>
     </div>
 
@@ -346,7 +522,7 @@
 
             <div style="margin-top:12px;">
                 <h4 style="font-size:13px;color:#2196f3;margin-bottom:6px;">📋 Comisiones del Mes</h4>
-                <div class="comisiones-list" id="detalleComisionesList">
+                <div class="comisiones-list" id="detalleComisionesList" style="max-height:200px;">
                     <div class="empty">No hay comisiones registradas</div>
                 </div>
             </div>
@@ -358,177 +534,335 @@
     </div>
 
     <script>
-        let nominas = [];
-        let trabajadores = [];
-        let mesActual = new Date().getMonth() + 1;
-        let anoActual = new Date().getFullYear();
+        // ============================================
+        // VARIABLES GLOBALES
+        // ============================================
+        var trabajadores = [];
+        var nominasData = [];
+        var mesActual = new Date().getMonth() + 1;
+        var anoActual = new Date().getFullYear();
+        var cargando = false;
 
         // ============================================
         // INICIALIZAR
         // ============================================
-        
         function init() {
             // Llenar selector de años
-            const anoSelect = document.getElementById('filtroAno');
-            const anoActual = new Date().getFullYear();
-            for (let i = anoActual - 5; i <= anoActual + 1; i++) {
-                const option = document.createElement('option');
+            var anoSelect = document.getElementById('filtroAno');
+            for (var i = anoActual - 5; i <= anoActual + 1; i++) {
+                var option = document.createElement('option');
                 option.value = i;
                 option.textContent = i;
                 if (i === anoActual) option.selected = true;
                 anoSelect.appendChild(option);
             }
             
-            // Setear mes actual
-            document.getElementById('filtroMes').value = new Date().getMonth() + 1;
+            document.getElementById('filtroMes').value = mesActual;
             
-            cargarNominas();
-            cargarTrabajadores();
+            // Event listeners
+            document.getElementById('btnCalcularNomina').addEventListener('click', function(e) {
+                e.preventDefault();
+                calcularNomina();
+            });
+            
+            document.getElementById('btnGenerarReporte').addEventListener('click', function(e) {
+                e.preventDefault();
+                generarReporte();
+            });
+            
+            cargarDatos();
         }
 
         // ============================================
-        // CARGAR TRABAJADORES
+        // FUNCIONES DE MENSAJES
         // ============================================
-        
-        async function cargarTrabajadores() {
-            try {
-                const response = await fetch('/api/negocio/trabajadores');
-                const data = await response.json();
-                trabajadores = data;
-                document.getElementById('totalTrabajadores').textContent = trabajadores.length;
-            } catch (error) {
-                console.error('Error:', error);
+        function mostrarMensaje(texto, tipo) {
+            var errorEl = document.getElementById('mensajeError');
+            var exitoEl = document.getElementById('mensajeExito');
+            errorEl.classList.remove('show');
+            exitoEl.classList.remove('show');
+            if (tipo === 'error') {
+                errorEl.textContent = '❌ ' + texto;
+                errorEl.classList.add('show');
+            } else {
+                exitoEl.textContent = '✅ ' + texto;
+                exitoEl.classList.add('show');
             }
+            setTimeout(function() {
+                errorEl.classList.remove('show');
+                exitoEl.classList.remove('show');
+            }, 4000);
         }
 
         // ============================================
-        // CARGAR NÓMINAS
+        // CARGAR DATOS
         // ============================================
-        
-        async function cargarNominas() {
-            const container = document.getElementById('nominasContainer');
+        async function cargarDatos() {
+            if (cargando) return;
+            cargando = true;
+            
+            var container = document.getElementById('nominasContainer');
             container.innerHTML = '<div class="loading">Cargando...</div>';
             
-            const mes = document.getElementById('filtroMes').value;
-            const ano = document.getElementById('filtroAno').value;
+            var mes = document.getElementById('filtroMes').value;
+            var ano = document.getElementById('filtroAno').value;
             
             try {
-                const response = await fetch(`/api/nomina?mes=${mes}&ano=${ano}`);
-                const data = await response.json();
+                // Cargar trabajadores
+                var responseTrabajadores = await fetch('/api/negocio/trabajadores');
+                if (!responseTrabajadores.ok) throw new Error('Error al cargar trabajadores');
+                trabajadores = await responseTrabajadores.json();
                 
-                if (data.success) {
-                    nominas = data.nominas || [];
-                    renderNominas();
-                    actualizarEstadisticas();
-                } else {
-                    container.innerHTML = `<div class="empty">❌ ${data.message || 'Error al cargar'}</div>`;
-                }
+                // Cargar nómina
+                var responseNomina = await fetch('/api/nomina?mes=' + mes + '&ano=' + ano);
+                if (!responseNomina.ok) throw new Error('Error al cargar nómina');
+                var data = await responseNomina.json();
+                nominasData = data.nominas || [];
+                
+                renderNominas();
+                actualizarEstadisticas();
+                
             } catch (error) {
                 console.error('Error:', error);
-                container.innerHTML = `<div class="empty">❌ Error al cargar</div>`;
+                container.innerHTML = '<div class="empty">❌ Error al cargar datos</div>';
+            } finally {
+                cargando = false;
             }
         }
 
         // ============================================
-        // RENDER NÓMINAS
+        // RENDER NÓMINA (ACORDEÓN)
         // ============================================
-        
-        function renderNominas(filtro = '') {
-            const container = document.getElementById('nominasContainer');
-            const filtroLower = filtro.toLowerCase();
+        function renderNominas() {
+            var container = document.getElementById('nominasContainer');
             
-            const filtrados = nominas.filter(n => 
-                n.nombre.toLowerCase().includes(filtroLower)
-            );
-            
-            if (filtrados.length === 0) {
-                container.innerHTML = `<div class="empty">No hay registros de nómina para este mes</div>`;
+            if (trabajadores.length === 0) {
+                container.innerHTML = '<div class="empty">No hay trabajadores registrados</div>';
                 return;
             }
             
-            let html = `<table class="tabla">
-                <thead><tr>
-                    <th>Trabajador</th>
-                    <th>Salario Base</th>
-                    <th>Días Trabajados</th>
-                    <th>Ausencias</th>
-                    <th>Salario Devengado</th>
-                    <th>Comisiones</th>
-                    <th>Total</th>
-                    <th>Acciones</th>
-                </tr></thead><tbody>`;
+            var mes = parseInt(document.getElementById('filtroMes').value);
+            var ano = parseInt(document.getElementById('filtroAno').value);
+            var meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            var nombreMes = meses[mes - 1] || mes;
             
-            filtrados.forEach(n => {
-                html += `
-                    <tr>
-                        <td><strong>${n.nombre}</strong></td>
-                        <td>$${parseFloat(n.salario_base).toFixed(2)}</td>
-                        <td>${n.dias_trabajados}</td>
-                        <td>${n.dias_ausencia || 0}</td>
-                        <td>$${parseFloat(n.salario_devengado).toFixed(2)}</td>
-                        <td>$${parseFloat(n.comisiones || 0).toFixed(2)}</td>
-                        <td><strong>$${parseFloat(n.total).toFixed(2)}</strong></td>
-                        <td>
-                            <div class="acciones-cell">
-                                <button class="btn btn-info btn-sm" onclick="verDetalle(${n.trabajador_id})">👁️</button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
+            var html = '<div class="accordion-nomina">';
             
-            html += `</tbody></table>`;
+            for (var i = 0; i < trabajadores.length; i++) {
+                var t = trabajadores[i];
+                var nombreCompleto = t.apellidos ? t.nombre + ' ' + t.apellidos : t.nombre;
+                
+                // Buscar nómina del trabajador
+                var nomina = null;
+                for (var j = 0; j < nominasData.length; j++) {
+                    if (nominasData[j].trabajador_id === t.id) {
+                        nomina = nominasData[j];
+                        break;
+                    }
+                }
+                
+                var tieneNomina = nomina !== null;
+                var total = tieneNomina ? parseFloat(nomina.total || 0) : 0;
+                var comisiones = tieneNomina ? parseFloat(nomina.comisiones || 0) : 0;
+                var salarioDevengado = tieneNomina ? parseFloat(nomina.salario_devengado || 0) : 0;
+                var diasTrabajados = tieneNomina ? nomina.dias_trabajados || 0 : 0;
+                var diasAusencia = tieneNomina ? nomina.dias_ausencia || 0 : 0;
+                var salarioBase = tieneNomina ? parseFloat(nomina.salario_base || 0) : 0;
+                
+                var estado = tieneNomina ? 'calculado' : 'pendiente';
+                var estadoLabel = tieneNomina ? '✅ Calculado' : '⏳ Pendiente';
+                var estadoIcono = tieneNomina ? '✅' : '⏳';
+                
+                var iniciales = nombreCompleto.split(' ').map(function(n) { return n[0]; }).join('').substring(0, 2).toUpperCase();
+                
+                html += '<div class="accordion-item-nomina" data-trabajador-id="' + t.id + '">';
+                html += '    <div class="accordion-header-nomina" onclick="toggleAccordion(this)">';
+                html += '        <div class="avatar">' + iniciales + '</div>';
+                html += '        <div class="info">';
+                html += '            <div class="nombre">' + nombreCompleto + '</div>';
+                html += '            <div class="detalle">' + (t.cargo || 'Trabajador') + ' • Salario: $' + salarioBase.toFixed(2) + '</div>';
+                html += '        </div>';
+                html += '        <div class="resumen-rapido">';
+                html += '            <span class="total">$' + total.toFixed(2) + '</span>';
+                html += '            <span class="estado ' + estado + '">' + estadoLabel + '</span>';
+                html += '            <span class="arrow">▼</span>';
+                html += '        </div>';
+                html += '    </div>';
+                html += '    <div class="accordion-body-nomina">';
+                html += '        <div class="contenido">';
+                
+                if (tieneNomina) {
+                    html += '            <div class="grid-detalle">';
+                    html += '                <div class="item-detalle">';
+                    html += '                    <span class="numero">' + diasTrabajados + '</span>';
+                    html += '                    <span class="label">✅ Días trabajados</span>';
+                    html += '                </div>';
+                    html += '                <div class="item-detalle">';
+                    html += '                    <span class="numero">' + diasAusencia + '</span>';
+                    html += '                    <span class="label">❌ Ausencias</span>';
+                    html += '                </div>';
+                    html += '                <div class="item-detalle">';
+                    html += '                    <span class="numero" style="color:#6c3ce0;">$' + salarioDevengado.toFixed(2) + '</span>';
+                    html += '                    <span class="label">📈 Salario devengado</span>';
+                    html += '                </div>';
+                    html += '                <div class="item-detalle">';
+                    html += '                    <span class="numero" style="color:#2196f3;">$' + comisiones.toFixed(2) + '</span>';
+                    html += '                    <span class="label">💵 Comisiones</span>';
+                    html += '                </div>';
+                    html += '            </div>';
+                    
+                    // Comisiones detalladas
+                    html += '            <div style="margin-top:6px;">';
+                    html += '                <span style="font-size:10px;color:#888;">📋 Comisiones del mes</span>';
+                    html += '                <div class="comisiones-list" id="comisiones-' + t.id + '">';
+                    html += '                    <div class="sin-datos">Cargando comisiones...</div>';
+                    html += '                </div>';
+                    html += '            </div>';
+                    
+                    html += '            <button class="btn-ver-detalle" onclick="verDetalleNomina(' + t.id + ')">👁️ Ver detalle completo</button>';
+                } else {
+                    html += '            <div class="sin-datos">';
+                    html += '                <span style="font-size:14px;">📌 Sin nómina calculada para ' + nombreMes + '</span>';
+                    html += '                <div style="margin-top:4px;font-size:11px;color:#666;">Haz clic en "Calcular Nómina" para generar</div>';
+                    html += '            </div>';
+                }
+                
+                html += '        </div>';
+                html += '    </div>';
+                html += '</div>';
+            }
+            
+            html += '</div>';
             container.innerHTML = html;
+            
+            // Cargar comisiones para cada trabajador con nómina
+            for (var i = 0; i < trabajadores.length; i++) {
+                var t = trabajadores[i];
+                var nomina = null;
+                for (var j = 0; j < nominasData.length; j++) {
+                    if (nominasData[j].trabajador_id === t.id) {
+                        nomina = nominasData[j];
+                        break;
+                    }
+                }
+                if (nomina) {
+                    cargarComisiones(t.id);
+                }
+            }
+        }
+
+        // ============================================
+        // CARGAR COMISIONES DE UN TRABAJADOR
+        // ============================================
+        async function cargarComisiones(trabajadorId) {
+            var mes = document.getElementById('filtroMes').value;
+            var ano = document.getElementById('filtroAno').value;
+            
+            try {
+                var response = await fetch('/api/nomina/detalle?trabajador_id=' + trabajadorId + '&mes=' + mes + '&ano=' + ano);
+                if (!response.ok) throw new Error('Error');
+                var data = await response.json();
+                
+                var container = document.getElementById('comisiones-' + trabajadorId);
+                if (!container) return;
+                
+                var comisiones = data.detalle && data.detalle.comisiones_list ? data.detalle.comisiones_list : [];
+                
+                if (comisiones.length === 0) {
+                    container.innerHTML = '<div class="sin-datos">No hay comisiones registradas</div>';
+                    return;
+                }
+                
+                var html = '';
+                for (var i = 0; i < comisiones.length; i++) {
+                    var c = comisiones[i];
+                    html += '<div class="item">';
+                    html += '    <span class="producto">' + (c.producto_nombre || 'Producto') + ' - ' + (c.cliente || 'Cliente') + '</span>';
+                    html += '    <span class="monto">$' + parseFloat(c.monto).toFixed(2) + '</span>';
+                    html += '</div>';
+                }
+                container.innerHTML = html;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                var container = document.getElementById('comisiones-' + trabajadorId);
+                if (container) {
+                    container.innerHTML = '<div class="sin-datos">❌ Error al cargar comisiones</div>';
+                }
+            }
+        }
+
+        // ============================================
+        // TOGGLE ACORDEÓN
+        // ============================================
+        function toggleAccordion(header) {
+            var item = header.closest('.accordion-item-nomina');
+            if (!item) return;
+            
+            // Cerrar otros abiertos
+            var abiertos = document.querySelectorAll('.accordion-item-nomina.abierto');
+            for (var i = 0; i < abiertos.length; i++) {
+                if (abiertos[i] !== item) {
+                    abiertos[i].classList.remove('abierto');
+                }
+            }
+            
+            item.classList.toggle('abierto');
         }
 
         // ============================================
         // ACTUALIZAR ESTADÍSTICAS
         // ============================================
-        
         function actualizarEstadisticas() {
-            const totalNomina = nominas.reduce((sum, n) => sum + parseFloat(n.total || 0), 0);
-            const totalComisiones = nominas.reduce((sum, n) => sum + parseFloat(n.comisiones || 0), 0);
+            var total = trabajadores.length;
+            var totalNomina = 0;
+            var totalComisiones = 0;
+            var totalCalculados = 0;
             
-            document.getElementById('totalNomina').textContent = `$${totalNomina.toFixed(2)}`;
-            document.getElementById('totalComisiones').textContent = `$${totalComisiones.toFixed(2)}`;
-        }
-
-        // ============================================
-        // FILTRAR
-        // ============================================
-        
-        function filtrarNominas() {
-            renderNominas(document.getElementById('searchInput').value);
+            for (var i = 0; i < nominasData.length; i++) {
+                var n = nominasData[i];
+                totalNomina += parseFloat(n.total || 0);
+                totalComisiones += parseFloat(n.comisiones || 0);
+                totalCalculados++;
+            }
+            
+            document.getElementById('totalTrabajadores').textContent = total;
+            document.getElementById('totalNomina').textContent = '$' + totalNomina.toFixed(2);
+            document.getElementById('totalComisiones').textContent = '$' + totalComisiones.toFixed(2);
+            document.getElementById('totalCalculados').textContent = totalCalculados;
         }
 
         // ============================================
         // CALCULAR NÓMINA
         // ============================================
-        
         async function calcularNomina() {
-            const mes = document.getElementById('filtroMes').value;
-            const ano = document.getElementById('filtroAno').value;
+            var mes = document.getElementById('filtroMes').value;
+            var ano = document.getElementById('filtroAno').value;
+            var meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            var nombreMes = meses[parseInt(mes) - 1] || mes;
             
-            if (!confirm(`📊 ¿Calcular nómina para ${getNombreMes(parseInt(mes))} de ${ano}?`)) return;
+            if (!confirm('📊 ¿Calcular nómina para ' + nombreMes + ' de ' + ano + '?')) return;
             
-            const btn = document.querySelector('.btn-primary');
-            const textoOriginal = btn.textContent;
+            var btn = document.getElementById('btnCalcularNomina');
+            var textoOriginal = btn.textContent;
             btn.textContent = '⏳ Calculando...';
             btn.disabled = true;
             
             try {
-                const response = await fetch('/api/nomina/calcular', {
+                var response = await fetch('/api/nomina/calcular', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ mes: parseInt(mes), ano: parseInt(ano) })
                 });
-                const data = await response.json();
+                var data = await response.json();
                 
                 if (data.success) {
-                    mostrarMensaje(`✅ Nómina calculada para ${data.trabajadores} trabajadores`, 'exito');
-                    await cargarNominas();
+                    mostrarMensaje('✅ Nómina calculada para ' + data.trabajadores + ' trabajadores', 'exito');
+                    await cargarDatos();
                 } else {
-                    mostrarMensaje(`❌ ${data.message || 'Error al calcular'}`, 'error');
+                    mostrarMensaje('❌ ' + (data.message || 'Error al calcular'), 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -540,44 +874,94 @@
         }
 
         // ============================================
-        // VER DETALLE
+        // GENERAR REPORTE
         // ============================================
-        
-        async function verDetalle(trabajadorId) {
-            const mes = document.getElementById('filtroMes').value;
-            const ano = document.getElementById('filtroAno').value;
+        function generarReporte() {
+            var mes = document.getElementById('filtroMes').value;
+            var ano = document.getElementById('filtroAno').value;
+            
+            if (nominasData.length === 0) {
+                mostrarMensaje('⚠️ No hay datos de nómina para generar reporte', 'error');
+                return;
+            }
+            
+            var meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            var nombreMes = meses[parseInt(mes) - 1] || mes;
+            
+            if (!confirm('📄 ¿Generar reporte de nómina para ' + nombreMes + ' de ' + ano + '?')) return;
+            
+            var btn = document.getElementById('btnGenerarReporte');
+            var textoOriginal = btn.textContent;
+            btn.textContent = '⏳ Generando...';
+            btn.disabled = true;
+            
+            fetch('/api/nomina/reporte?mes=' + mes + '&ano=' + ano)
+                .then(function(response) {
+                    if (!response.ok) {
+                        return response.json().then(function(data) {
+                            throw new Error(data.error || 'Error');
+                        });
+                    }
+                    return response.blob();
+                })
+                .then(function(blob) {
+                    var url = window.URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'nomina_' + mes + '_' + ano + '.pdf';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    mostrarMensaje('✅ Reporte generado correctamente', 'exito');
+                })
+                .catch(function(error) {
+                    console.error('Error:', error);
+                    mostrarMensaje('❌ ' + error.message, 'error');
+                })
+                .finally(function() {
+                    btn.textContent = textoOriginal;
+                    btn.disabled = false;
+                });
+        }
+
+        // ============================================
+        // VER DETALLE NÓMINA (MODAL)
+        // ============================================
+        async function verDetalleNomina(trabajadorId) {
+            var mes = document.getElementById('filtroMes').value;
+            var ano = document.getElementById('filtroAno').value;
             
             try {
-                const response = await fetch(`/api/nomina/detalle?trabajador_id=${trabajadorId}&mes=${mes}&ano=${ano}`);
-                const data = await response.json();
+                var response = await fetch('/api/nomina/detalle?trabajador_id=' + trabajadorId + '&mes=' + mes + '&ano=' + ano);
+                var data = await response.json();
                 
                 if (data.success) {
-                    const d = data.detalle;
+                    var d = data.detalle;
                     
-                    document.getElementById('modalTitulo').textContent = `📊 Nómina de ${d.nombre}`;
-                    document.getElementById('modalSubtitulo').textContent = `${getNombreMes(d.mes)} de ${d.ano}`;
+                    document.getElementById('modalTitulo').textContent = '📊 Nómina de ' + d.nombre;
+                    document.getElementById('modalSubtitulo').textContent = getNombreMes(d.mes) + ' de ' + d.ano;
                     
-                    document.getElementById('detalleSalarioBase').textContent = `$${d.salario_base.toFixed(2)}`;
+                    document.getElementById('detalleSalarioBase').textContent = '$' + d.salario_base.toFixed(2);
                     document.getElementById('detalleDiasMes').textContent = d.dias_mes;
                     document.getElementById('detalleDiasTrabajados').textContent = d.dias_trabajados;
                     document.getElementById('detalleDiasAusencia').textContent = d.dias_ausencia || 0;
-                    document.getElementById('detalleSalarioDiario').textContent = `$${d.salario_diario.toFixed(2)}`;
-                    document.getElementById('detalleSalarioDevengado').textContent = `$${d.salario_devengado.toFixed(2)}`;
-                    document.getElementById('detalleComisiones').textContent = `$${(d.comisiones || 0).toFixed(2)}`;
-                    document.getElementById('detalleTotal').textContent = `$${d.total.toFixed(2)}`;
+                    document.getElementById('detalleSalarioDiario').textContent = '$' + d.salario_diario.toFixed(2);
+                    document.getElementById('detalleSalarioDevengado').textContent = '$' + d.salario_devengado.toFixed(2);
+                    document.getElementById('detalleComisiones').textContent = '$' + (d.comisiones || 0).toFixed(2);
+                    document.getElementById('detalleTotal').textContent = '$' + d.total.toFixed(2);
                     
-                    // Mostrar comisiones
-                    const listContainer = document.getElementById('detalleComisionesList');
+                    var listContainer = document.getElementById('detalleComisionesList');
                     if (d.comisiones_list && d.comisiones_list.length > 0) {
-                        let html = '';
-                        d.comisiones_list.forEach(c => {
-                            html += `
-                                <div class="item">
-                                    <span class="producto">${c.producto_nombre || 'Producto'} - ${c.cliente || 'Cliente'}</span>
-                                    <span class="monto">$${parseFloat(c.monto).toFixed(2)}</span>
-                                </div>
-                            `;
-                        });
+                        var html = '';
+                        for (var i = 0; i < d.comisiones_list.length; i++) {
+                            var c = d.comisiones_list[i];
+                            html += '<div class="item">';
+                            html += '    <span class="producto">' + (c.producto_nombre || 'Producto') + ' - ' + (c.cliente || 'Cliente') + '</span>';
+                            html += '    <span class="monto">$' + parseFloat(c.monto).toFixed(2) + '</span>';
+                            html += '</div>';
+                        }
                         listContainer.innerHTML = html;
                     } else {
                         listContainer.innerHTML = '<div class="empty">No hay comisiones registradas</div>';
@@ -585,7 +969,7 @@
                     
                     document.getElementById('modalDetalle').classList.add('show');
                 } else {
-                    mostrarMensaje(`❌ ${data.message || 'Error al obtener detalle'}`, 'error');
+                    mostrarMensaje('❌ ' + (data.message || 'Error al obtener detalle'), 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -594,87 +978,18 @@
         }
 
         // ============================================
-        // GENERAR REPORTE
-        // ============================================
-        
-        function generarReporte() {
-            const mes = document.getElementById('filtroMes').value;
-            const ano = document.getElementById('filtroAno').value;
-            
-            if (nominas.length === 0) {
-                mostrarMensaje('⚠️ No hay datos de nómina para generar reporte', 'error');
-                return;
-            }
-            
-            if (!confirm(`📄 ¿Generar reporte de nómina para ${getNombreMes(parseInt(mes))} de ${ano}?`)) return;
-            
-            const btn = document.querySelector('.btn-success');
-            const textoOriginal = btn.textContent;
-            btn.textContent = '⏳ Generando...';
-            btn.disabled = true;
-            
-            fetch(`/api/nomina/reporte?mes=${mes}&ano=${ano}`)
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(data => {
-                            throw new Error(data.error || 'Error');
-                        });
-                    }
-                    return response.blob();
-                })
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `nomina_${mes}_${ano}.pdf`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                    mostrarMensaje('✅ Reporte generado correctamente', 'exito');
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    mostrarMensaje(`❌ ${error.message || 'Error al generar reporte'}`, 'error');
-                })
-                .finally(() => {
-                    btn.textContent = textoOriginal;
-                    btn.disabled = false;
-                });
-        }
-
-        // ============================================
         // FUNCIONES AUXILIARES
         // ============================================
-        
-        function mostrarMensaje(texto, tipo) {
-            const errorEl = document.getElementById('mensajeError');
-            const exitoEl = document.getElementById('mensajeExito');
-            errorEl.classList.remove('show');
-            exitoEl.classList.remove('show');
-            if (tipo === 'error') {
-                errorEl.textContent = '❌ ' + texto;
-                errorEl.classList.add('show');
-            } else {
-                exitoEl.textContent = '✅ ' + texto;
-                exitoEl.classList.add('show');
-            }
-            setTimeout(() => {
-                errorEl.classList.remove('show');
-                exitoEl.classList.remove('show');
-            }, 4000);
-        }
-        
         function getNombreMes(mes) {
-            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-                          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            var meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
             return meses[mes - 1] || mes;
         }
-        
+
         function cerrarModal() {
             document.getElementById('modalDetalle').classList.remove('show');
         }
-        
+
         document.getElementById('modalDetalle').addEventListener('click', function(e) {
             if (e.target === this) cerrarModal();
         });
@@ -682,8 +997,9 @@
         // ============================================
         // INICIO
         // ============================================
-        
-        init();
+        document.addEventListener('DOMContentLoaded', function() {
+            init();
+        });
     </script>
 </body>
 </html>
