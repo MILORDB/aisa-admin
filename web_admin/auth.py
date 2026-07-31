@@ -64,4 +64,7 @@ def obtener_usuario_sesion(token):
     sesion = verificar_sesion(token)
     if not sesion:
         return None
-    return obtener_usuario_por_id(sesion['usuario_id'])
+    usuario = obtener_usuario_por_id(sesion['usuario_id'])
+    if usuario:
+        print(f"🔍 obtener_usuario_sesion: {usuario.get('username')} - Rol: {usuario.get('rol')}")
+    return usuario
