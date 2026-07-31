@@ -327,39 +327,154 @@ def fix_nomina_tabla_endpoint():
         """, 500
 
 # ============================================
-# ENDPOINT PARA VERIFICAR TABLA NOMINA
+# ENDPOINT PARA VERIFICAR TABLA COMISIONES
 # ============================================
 
-@app.route('/debug/nomina-existe', methods=['GET'])
-def debug_nomina_existe():
-    """Verifica si la tabla nomina existe"""
+@app.route('/debug/comisiones-tabla', methods=['GET'])
+@login_required
+def debug_comisiones_tabla():
+    """Verifica la estructura de la tabla comisiones_trabajador"""
     try:
         conn = get_db()
         cursor = conn.cursor()
         
+        # Verificar si la tabla existe
         cursor.execute("""
             SELECT EXISTS (
                 SELECT FROM information_schema.tables 
-                WHERE table_name = 'nomina'
+                WHERE table_name = 'comisiones_trabajador'
             )
         """)
         existe = cursor.fetchone()[0]
         
-        # Si existe, contar registros
-        registros = 0
-        if existe:
-            cursor.execute("SELECT COUNT(*) FROM nomina")
-            registros = cursor.fetchone()[0]
+        if not existe:
+            return jsonify({
+                'existe': False,
+                'mensaje': 'La tabla comisiones_trabajador NO existe'
+            })
+        
+        # Verificar columnas
+        cursor.execute("""
+            SELECT column_name, data_type
+            FROM information_schema.columns 
+            WHERE table_name = 'comisiones_trabajador'
+            ORDER BY ordinal_position
+        """)
+        columnas = cursor.fetchall()
+        
+        # Verificar si hay registros
+        cursor.execute("SELECT COUNT(*) FROM comisiones_trabajador")
+        total = cursor.fetchone()[0]
+        
+        # Verificar algunos registros
+        if total > 0:
+            cursor.execute("SELECT * FROM comisiones_trabajador LIMIT 3")
+            ejemplos = cursor.fetchall()
+            ejemplos_list = []
+            for row in ejemplos:
+                ejemplos_list.append(dict(zip([col[0] for col in columnas], row)))
+        else:
+            ejemplos_list = []
         
         conn.close()
         
         return jsonify({
-            'tabla_nomina_existe': existe,
-            'total_registros': registros,
-            'mensaje': 'La tabla nomina existe' if existe else 'La tabla nomina NO existe'
+            'existe': True,
+            'total_registros': total,
+            'columnas': [{'nombre': col[0], 'tipo': col[1]} for col in columnas],
+            'ejemplos': ejemplos_list
         })
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+# ============================================
+# ENDPOINT PARA AGREGAR COMISIONES DE PRUEBA
+# ============================================
+
+@app.route('/debug/add-test-comisiones', methods=['GET'])
+@login_required
+def add_test_comisiones():
+    """Agrega comisiones de prueba para un trabajador"""
+    try:
+        token = request.cookies.get('token')
+        usuario = obtener_usuario_sesion(token)
+        
+        if not usuario or usuario['tipo'] != 'negocio':
+            return jsonify({'error': 'No autorizado'}), 403
+        
+        # Obtener el primer trabajador del negocio
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT tn.trabajador_id 
+            FROM trabajadores_negocio tn
+            WHERE tn.negocio_id = %s AND tn.activo = 1
+            LIMIT 1
+        ''', (usuario['id'],))
+        trabajador = cursor.fetchone()
+        
+        if not trabajador:
+            conn.close()
+            return jsonify({'error': 'No hay trabajadores en este negocio'})
+        
+        trabajador_id = trabajador[0]
+        
+        # Obtener un producto del negocio
+        cursor.execute('''
+            SELECT id, nombre, comision 
+            FROM productos 
+            WHERE negocio_id = %s AND comision > 0
+            LIMIT 1
+        ''', (usuario['id'],))
+        producto = cursor.fetchone()
+        
+        if not producto:
+            conn.close()
+            return jsonify({'error': 'No hay productos con comisión en este negocio'})
+        
+        producto_id = producto[0]
+        producto_nombre = producto[1]
+        comision = producto[2]
+        
+        # Obtener una venta del trabajador
+        cursor.execute('''
+            SELECT id, cliente 
+            FROM ventas 
+            WHERE negocio_id = %s AND trabajador_id = %s
+            LIMIT 1
+        ''', (usuario['id'], trabajador_id))
+        venta = cursor.fetchone()
+        
+        if not venta:
+            conn.close()
+            return jsonify({'error': 'No hay ventas de este trabajador'})
+        
+        venta_id = venta[0]
+        cliente = venta[1]
+        
+        # Insertar comisión de prueba
+        fecha = datetime.now().isoformat()
+        cursor.execute('''
+            INSERT INTO comisiones_trabajador 
+            (negocio_id, trabajador_id, venta_id, producto_id, monto, fecha, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ''', (usuario['id'], trabajador_id, venta_id, producto_id, comision, fecha, fecha))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'mensaje': f'Comisión de prueba agregada: ${comision} para {producto_nombre}',
+            'trabajador_id': trabajador_id,
+            'producto': producto_nombre,
+            'comision': comision,
+            'cliente': cliente
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
 
 # ============================================
 # DECORADORES
@@ -896,8 +1011,7 @@ def negocio_nomina():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     return render_template('negocio/nomina.html', usuario=usuario, version=int(time.time()))
-
-# ============================================
+    # ============================================
 # API - USUARIOS
 # ============================================
 
@@ -1354,10 +1468,6 @@ def api_actualizar_trabajador(trabajador_id):
         'message': 'Trabajador actualizado correctamente'
     })
 
-# ============================================
-# API - NEGOCIO - ELIMINAR TRABAJADOR
-# ============================================
-
 @app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['DELETE'])
 @login_required
 def api_eliminar_trabajador(trabajador_id):
@@ -1434,9 +1544,8 @@ def api_toggle_trabajador_negocio(trabajador_id):
     registrar_log(usuario['id'], 'trabajador_toggle', f'Trabajador {trabajador_id} activo={activo}')
     
     return jsonify({'success': True})
-
-# ============================================
-# API - PRODUCTOS (CON COSTO Y COMISION)
+    # ============================================
+# API - PRODUCTOS (CON COSTO Y COMISION - PARA NEGOCIOS Y TRABAJADORES)
 # ============================================
 
 @app.route('/api/productos', methods=['GET', 'POST'])
@@ -1684,8 +1793,7 @@ def api_eliminar_foto_producto(producto_id):
         return jsonify({'success': True, 'message': 'Foto eliminada correctamente'})
     else:
         return jsonify({'success': True, 'message': 'Foto eliminada de la base de datos'})
-
-# ============================================
+        # ============================================
 # API - TIENDA (NEGOCIO)
 # ============================================
 
@@ -1933,7 +2041,7 @@ def api_tienda_public():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - VENTAS
+# API - VENTAS (PARA NEGOCIOS Y TRABAJADORES)
 # ============================================
 
 @app.route('/api/ventas', methods=['GET', 'POST'])
@@ -2072,10 +2180,6 @@ def api_actualizar_estado_venta(venta_id):
     registrar_log(usuario['id'], 'venta_estado', f'Venta {venta_id} estado={estado}')
     
     return jsonify({'success': True})
-
-# ============================================
-# API - ELIMINAR VENTA
-# ============================================
 
 @app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
 @login_required
@@ -2277,8 +2381,7 @@ def api_generar_factura(venta_id):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
-# ============================================
+    # ============================================
 # API - CONTRATOS
 # ============================================
 
@@ -2463,7 +2566,7 @@ def api_obtener_empresas_con_contratos():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - SERVICIOS
+# API - SERVICIOS (PARA NEGOCIOS Y TRABAJADORES)
 # ============================================
 
 @app.route('/api/servicios', methods=['GET', 'POST'])
@@ -2540,737 +2643,8 @@ def api_eliminar_servicio(servicio_id):
     registrar_log(usuario['id'], 'servicio_eliminado', f'ID: {servicio_id}')
     
     return jsonify({'success': True})
-
-# ============================================
+    # ============================================
 # API - REPORTES
 # ============================================
 
-@app.route('/api/reportes/contratos', methods=['GET'])
-@login_required
-def api_reporte_contratos():
-    """Genera un reporte PDF de contratos"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    tipo = request.args.get('tipo', 'todos')
-    
-    try:
-        contratos = obtener_contratos(usuario['id'])
-        
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
-        negocio = cursor.fetchone()
-        conn.close()
-        
-        negocio_nombre = negocio[0] or 'Mi Negocio'
-        datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
-        negocio_telefono = datos_negocio.get('telefono', '')
-        
-        hoy = datetime.now().date()
-        contratos_procesados = []
-        
-        for c in contratos:
-            fecha_fin = datetime.fromisoformat(c['fecha_fin']).date() if c['fecha_fin'] else None
-            estado = c['estado']
-            
-            if estado == 'activo' and fecha_fin and fecha_fin < hoy:
-                estado = 'vencido'
-            
-            if tipo == 'activos' and estado != 'activo':
-                continue
-            if tipo == 'vencidos' and estado != 'vencido':
-                continue
-            
-            contratos_procesados.append({
-                'id': c['id'],
-                'numero_contrato': c['numero_contrato'],
-                'empresa': c['empresa'],
-                'fecha_inicio': c['fecha_inicio'],
-                'fecha_fin': c['fecha_fin'],
-                'monto': c['monto'] or 0,
-                'estado': estado,
-                'tipo': c['tipo']
-            })
-        
-        generador = GeneradorReportes(
-            negocio_id=usuario['id'],
-            negocio_nombre=negocio_nombre,
-            negocio_telefono=negocio_telefono
-        )
-        
-        pdf_bytes = generador.generar_reporte_contratos(
-            contratos_procesados,
-            tipo_reporte=tipo
-        )
-        
-        response = make_response(pdf_bytes)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=reporte_contratos_{tipo}_{datetime.now().strftime("%Y%m%d")}.pdf'
-        
-        registrar_log(usuario['id'], 'reporte_generado', f'Reporte de contratos ({tipo})')
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error generando reporte de contratos: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/reportes/contratos/resumen', methods=['GET'])
-@login_required
-def api_resumen_contratos():
-    """Obtiene un resumen de contratos para el panel lateral"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        contratos = obtener_contratos(usuario['id'])
-        
-        hoy = datetime.now().date()
-        total = len(contratos)
-        activos = 0
-        vencidos = 0
-        total_gastos = 0
-        
-        for c in contratos:
-            fecha_fin = datetime.fromisoformat(c['fecha_fin']).date() if c['fecha_fin'] else None
-            estado = c['estado']
-            
-            if estado == 'activo' and fecha_fin and fecha_fin < hoy:
-                estado = 'vencido'
-            
-            if estado == 'activo':
-                activos += 1
-            elif estado == 'vencido':
-                vencidos += 1
-            
-            total_gastos += c['monto'] or 0
-        
-        return jsonify({
-            'total': total,
-            'activos': activos,
-            'vencidos': vencidos,
-            'total_gastos': total_gastos,
-            'tiene_contratos': total > 0
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en resumen de contratos: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/reportes/ingresos', methods=['GET'])
-@login_required
-def api_reporte_ingresos():
-    """Genera un reporte PDF de ingresos"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    periodo = request.args.get('periodo', 'todos')
-    
-    try:
-        ventas = obtener_ventas(usuario['id'])
-        
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
-        negocio = cursor.fetchone()
-        conn.close()
-        
-        negocio_nombre = negocio[0] or 'Mi Negocio'
-        datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
-        negocio_telefono = datos_negocio.get('telefono', '')
-        
-        ventas_filtradas = []
-        hoy = datetime.now().date()
-        
-        for v in ventas:
-            fecha_venta = datetime.fromisoformat(v['fecha']).date() if v['fecha'] else None
-            if not fecha_venta:
-                continue
-            
-            if periodo == 'hoy':
-                if fecha_venta == hoy:
-                    ventas_filtradas.append(v)
-            elif periodo == 'semana':
-                inicio_semana = hoy - timedelta(days=hoy.weekday())
-                if fecha_venta >= inicio_semana:
-                    ventas_filtradas.append(v)
-            elif periodo == 'mes':
-                if fecha_venta.month == hoy.month and fecha_venta.year == hoy.year:
-                    ventas_filtradas.append(v)
-            else:
-                ventas_filtradas.append(v)
-        
-        total_ingresos = sum(v.get('total', 0) for v in ventas_filtradas)
-        total_ventas = len(ventas_filtradas)
-        
-        periodos = {
-            'hoy': 'Hoy',
-            'semana': 'Esta semana',
-            'mes': 'Este mes',
-            'todos': 'Todos los períodos'
-        }
-        nombre_periodo = periodos.get(periodo, 'Todos los períodos')
-        
-        generador = GeneradorReportes(
-            negocio_id=usuario['id'],
-            negocio_nombre=negocio_nombre,
-            negocio_telefono=negocio_telefono
-        )
-        
-        pdf_bytes = generador.generar_reporte_ingresos(
-            ventas_filtradas,
-            total_ingresos,
-            total_ventas,
-            periodo=nombre_periodo
-        )
-        
-        response = make_response(pdf_bytes)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=reporte_ingresos_{periodo}_{datetime.now().strftime("%Y%m%d")}.pdf'
-        
-        registrar_log(usuario['id'], 'reporte_generado', f'Reporte de ingresos ({periodo})')
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error generando reporte de ingresos: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/reportes/ingresos/resumen', methods=['GET'])
-@login_required
-def api_resumen_ingresos():
-    """Obtiene un resumen de ingresos para el panel lateral"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        ventas = obtener_ventas(usuario['id'])
-        
-        hoy = datetime.now().date()
-        inicio_semana = hoy - timedelta(days=hoy.weekday())
-        
-        total_ventas = len(ventas)
-        total_ingresos = sum(v.get('total', 0) for v in ventas)
-        
-        ventas_hoy = [v for v in ventas if v['fecha'] and datetime.fromisoformat(v['fecha']).date() == hoy]
-        ingresos_hoy = sum(v.get('total', 0) for v in ventas_hoy)
-        
-        ventas_semana = [v for v in ventas if v['fecha'] and datetime.fromisoformat(v['fecha']).date() >= inicio_semana]
-        ingresos_semana = sum(v.get('total', 0) for v in ventas_semana)
-        
-        ventas_mes = [v for v in ventas if v['fecha'] and datetime.fromisoformat(v['fecha']).month == hoy.month]
-        ingresos_mes = sum(v.get('total', 0) for v in ventas_mes)
-        
-        return jsonify({
-            'total_ventas': total_ventas,
-            'total_ingresos': total_ingresos,
-            'ingresos_hoy': ingresos_hoy,
-            'ingresos_semana': ingresos_semana,
-            'ingresos_mes': ingresos_mes,
-            'tiene_ventas': total_ventas > 0
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en resumen de ingresos: {e}")
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/reportes/productos', methods=['GET'])
-@login_required
-def api_reporte_productos():
-    """Genera un reporte PDF de productos en almacén"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        productos = obtener_productos(usuario['id'])
-        
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
-        negocio = cursor.fetchone()
-        conn.close()
-        
-        negocio_nombre = negocio[0] or 'Mi Negocio'
-        datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
-        negocio_telefono = datos_negocio.get('telefono', '')
-        
-        generador = GeneradorReportes(
-            negocio_id=usuario['id'],
-            negocio_nombre=negocio_nombre,
-            negocio_telefono=negocio_telefono
-        )
-        
-        pdf_bytes = generador.generar_reporte_productos(productos)
-        
-        response = make_response(pdf_bytes)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=reporte_productos_{datetime.now().strftime("%Y%m%d")}.pdf'
-        
-        registrar_log(usuario['id'], 'reporte_generado', 'Reporte de productos en almacén')
-        
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error generando reporte de productos: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/reportes/productos/resumen', methods=['GET'])
-@login_required
-def api_resumen_productos():
-    """Obtiene un resumen de productos para el panel lateral"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        productos = obtener_productos(usuario['id'])
-        
-        total = len(productos)
-        stock_bajo = len([p for p in productos if p.get('stock', 0) <= (p.get('stock_minimo', 3)) and p.get('stock', 0) > 0])
-        stock_agotado = len([p for p in productos if p.get('stock', 0) == 0])
-        valor_total = sum(p.get('precio', 0) * p.get('stock', 0) for p in productos)
-        
-        return jsonify({
-            'total': total,
-            'stock_bajo': stock_bajo,
-            'stock_agotado': stock_agotado,
-            'valor_total': valor_total,
-            'tiene_productos': total > 0
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en resumen de productos: {e}")
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
-# API - NÓMINA
-# ============================================
-
-@app.route('/api/nomina', methods=['GET'])
-@login_required
-def api_obtener_nomina():
-    """Obtiene la nómina de un mes específico"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    mes = request.args.get('mes', type=int)
-    ano = request.args.get('ano', type=int)
-    
-    if not mes or not ano:
-        return jsonify({'error': 'Mes y año son requeridos'}), 400
-    
-    nominas = obtener_nomina_mes(usuario['id'], mes, ano)
-    
-    return jsonify({
-        'success': True,
-        'nominas': nominas
-    })
-
-@app.route('/api/nomina/calcular', methods=['POST'])
-@login_required
-def api_calcular_nomina():
-    """Calcula la nómina para todos los trabajadores en un mes"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    data = request.get_json()
-    mes = data.get('mes')
-    ano = data.get('ano')
-    
-    if not mes or not ano:
-        return jsonify({'error': 'Mes y año son requeridos'}), 400
-    
-    try:
-        trabajadores = obtener_trabajadores_por_empresa(usuario['id'])
-        
-        if not trabajadores:
-            return jsonify({
-                'success': True,
-                'trabajadores': 0,
-                'message': 'No hay trabajadores registrados'
-            })
-        
-        contador = 0
-        errores = []
-        
-        for t in trabajadores:
-            try:
-                resultado = calcular_nomina(usuario['id'], t['id'], mes, ano)
-                if resultado:
-                    contador += 1
-            except Exception as e:
-                errores.append(f"Error con trabajador {t.get('nombre', t.get('id'))}: {str(e)}")
-                print(f"❌ Error calculando nómina para trabajador {t.get('id')}: {e}")
-        
-        mensaje = f'Nómina calculada para {contador} trabajadores'
-        if errores:
-            mensaje += f' ({len(errores)} errores)'
-            print(f"⚠️ Errores: {errores}")
-        
-        return jsonify({
-            'success': True,
-            'trabajadores': contador,
-            'message': mensaje,
-            'errores': errores if errores else None
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en api_calcular_nomina: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'error': f'Error al calcular nómina: {str(e)}'
-        }), 500
-
-@app.route('/api/nomina/detalle', methods=['GET'])
-@login_required
-def api_nomina_detalle():
-    """Obtiene el detalle de nómina de un trabajador"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    trabajador_id = request.args.get('trabajador_id', type=int)
-    mes = request.args.get('mes', type=int)
-    ano = request.args.get('ano', type=int)
-    
-    if not trabajador_id or not mes or not ano:
-        return jsonify({'error': 'Trabajador, mes y año son requeridos'}), 400
-    
-    nomina = obtener_nomina_trabajador(trabajador_id, mes, ano)
-    
-    if not nomina:
-        return jsonify({'error': 'No se encontró nómina para este trabajador'}), 404
-    
-    comisiones = obtener_comisiones_trabajador_mes(trabajador_id, mes, ano)
-    
-    from calendar import monthrange
-    _, dias_mes = monthrange(ano, mes)
-    
-    trabajador = obtener_usuario_por_id(trabajador_id)
-    datos = json.loads(trabajador['datos_negocio']) if trabajador['datos_negocio'] else {}
-    salario_base = datos.get('salario', 0)
-    
-    salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
-    
-    return jsonify({
-        'success': True,
-        'detalle': {
-            'id': nomina['id'],
-            'trabajador_id': trabajador_id,
-            'nombre': trabajador['nombre'],
-            'mes': mes,
-            'ano': ano,
-            'dias_mes': dias_mes,
-            'salario_base': salario_base,
-            'salario_diario': salario_diario,
-            'dias_trabajados': nomina['dias_trabajados'],
-            'dias_ausencia': nomina['dias_ausencia'] or 0,
-            'salario_devengado': nomina['salario_devengado'],
-            'comisiones': nomina['comisiones'] or 0,
-            'total': nomina['total'],
-            'comisiones_list': comisiones
-        }
-    })
-
-@app.route('/api/nomina/reporte', methods=['GET'])
-@login_required
-def api_nomina_reporte():
-    """Genera un reporte PDF de nómina"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    mes = request.args.get('mes', type=int)
-    ano = request.args.get('ano', type=int)
-    
-    if not mes or not ano:
-        return jsonify({'error': 'Mes y año son requeridos'}), 400
-    
-    nominas = obtener_nomina_mes(usuario['id'], mes, ano)
-    
-    if not nominas:
-        return jsonify({'error': 'No hay datos de nómina para este mes'}), 404
-    
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT nombre, datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
-    negocio = cursor.fetchone()
-    conn.close()
-    
-    negocio_nombre = negocio[0] or 'Mi Negocio'
-    datos_negocio = json.loads(negocio[1]) if negocio[1] else {}
-    negocio_telefono = datos_negocio.get('telefono', '')
-    negocio_direccion = datos_negocio.get('direccion', '')
-    
-    from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_RIGHT, TA_LEFT, TA_CENTER
-    
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
-    styles = getSampleStyleSheet()
-    elementos = []
-    
-    estilo_titulo = ParagraphStyle('Titulo', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#6c3ce0'), alignment=TA_CENTER)
-    elementos.append(Paragraph(f"📊 REPORTE DE NÓMINA", estilo_titulo))
-    elementos.append(Paragraph(f"{negocio_nombre}", styles['Heading2']))
-    
-    meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-    nombre_mes = meses[mes - 1] if 1 <= mes <= 12 else str(mes)
-    elementos.append(Paragraph(f"{nombre_mes} de {ano}", styles['Normal']))
-    elementos.append(Spacer(1, 10))
-    
-    tabla_datos = []
-    headers = ['Trabajador', 'Salario Base', 'Días Trabajados', 'Ausencias', 'Salario Devengado', 'Comisiones', 'Total']
-    tabla_datos.append(headers)
-    
-    total_general = 0
-    total_comisiones = 0
-    
-    for n in nominas:
-        total_general += n['total']
-        total_comisiones += n['comisiones'] or 0
-        tabla_datos.append([
-            n['nombre'],
-            f"${n['salario_base']:.2f}",
-            str(n['dias_trabajados']),
-            str(n['dias_ausencia'] or 0),
-            f"${n['salario_devengado']:.2f}",
-            f"${(n['comisiones'] or 0):.2f}",
-            f"${n['total']:.2f}"
-        ])
-    
-    tabla_datos.append([
-        'TOTAL',
-        '',
-        '',
-        '',
-        '',
-        f"${total_comisiones:.2f}",
-        f"${total_general:.2f}"
-    ])
-    
-    tabla = Table(tabla_datos, colWidths=[120, 90, 80, 80, 100, 100, 100])
-    tabla.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
-        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('ALIGN', (4, 1), (6, -1), 'RIGHT'),
-        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#e8e8e8')),
-        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-    ]))
-    
-    elementos.append(tabla)
-    elementos.append(Spacer(1, 10))
-    
-    estilo_resumen = ParagraphStyle('Resumen', parent=styles['Normal'], fontSize=10, alignment=TA_RIGHT)
-    elementos.append(Paragraph(f"Total de trabajadores: {len(nominas)}", estilo_resumen))
-    elementos.append(Paragraph(f"Total de comisiones: ${total_comisiones:.2f}", estilo_resumen))
-    elementos.append(Paragraph(f"Total de nómina: ${total_general:.2f}", estilo_resumen))
-    
-    estilo_pie = ParagraphStyle('Pie', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#999999'), alignment=TA_CENTER)
-    elementos.append(Spacer(1, 20))
-    elementos.append(Paragraph(f"Reporte generado por AIsa - {datetime.now().strftime('%d/%m/%Y %H:%M')}", estilo_pie))
-    
-    doc.build(elementos)
-    
-    pdf_bytes = buffer.getvalue()
-    buffer.close()
-    
-    response = make_response(pdf_bytes)
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename=nomina_{mes}_{ano}.pdf'
-    
-    return response
-
-# ============================================
-# API - NOMINA DEBUG
-# ============================================
-
-@app.route('/api/nomina/debug', methods=['GET'])
-@login_required
-def api_nomina_debug():
-    """Endpoint de depuración para nómina"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['tipo'] != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        trabajadores = obtener_trabajadores_por_empresa(usuario['id'])
-        
-        resultado = {
-            'negocio_id': usuario['id'],
-            'trabajadores': len(trabajadores),
-            'trabajadores_lista': [{'id': t['id'], 'nombre': t['nombre']} for t in trabajadores],
-            'db_conexion': 'OK'
-        }
-        
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT 1')
-        cursor.fetchone()
-        conn.close()
-        resultado['db_test'] = 'OK'
-        
-        return jsonify(resultado)
-        
-    except Exception as e:
-        import traceback
-        return jsonify({
-            'error': str(e),
-            'traceback': traceback.format_exc()
-        }), 500
-
-# ============================================
-# API - ESTADÍSTICAS TRABAJADOR
-# ============================================
-
-@app.route('/api/trabajador/estadisticas')
-@login_required
-def api_trabajador_estadisticas():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario['rol'] != 'trabajador':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    stats = obtener_estadisticas_trabajador(usuario['id'])
-    return jsonify(stats)
-
-# ============================================
-# API - SOLICITUDES DE MÓDULOS
-# ============================================
-
-@app.route('/api/usuario/<int:user_id>/solicitar/<int:modulo_id>', methods=['POST'])
-@login_required
-def api_solicitar_modulo(user_id, modulo_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    if not usuario or (usuario['id'] != user_id and usuario['rol'] != 'admin'):
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    solicitar_modulo(user_id, modulo_id)
-    registrar_log(user_id, 'solicitud_modulo', f'Solicitó módulo {modulo_id}')
-    return jsonify({'success': True})
-
-@app.route('/api/solicitudes')
-@admin_required
-def api_solicitudes():
-    solicitudes = obtener_solicitudes_pendientes()
-    return jsonify([dict(s) for s in solicitudes])
-
-@app.route('/api/solicitud/<int:solicitud_id>/aprobar', methods=['POST'])
-@admin_required
-def api_aprobar_solicitud(solicitud_id):
-    aprobar_solicitud(solicitud_id)
-    registrar_log(None, 'solicitud_aprobada', f'Solicitud {solicitud_id} aprobada')
-    return jsonify({'success': True})
-
-@app.route('/api/solicitud/<int:solicitud_id>/rechazar', methods=['POST'])
-@admin_required
-def api_rechazar_solicitud(solicitud_id):
-    rechazar_solicitud(solicitud_id)
-    registrar_log(None, 'solicitud_rechazada', f'Solicitud {solicitud_id} rechazada')
-    return jsonify({'success': True})
-
-# ============================================
-# API - LOGS
-# ============================================
-
-@app.route('/api/logs')
-@admin_required
-def api_logs():
-    logs = obtener_logs(50)
-    return jsonify([dict(l) for l in logs])
-
-# ============================================
-# API - TRABAJADORES PENDIENTES
-# ============================================
-
-@app.route('/api/trabajadores/pendientes')
-@admin_required
-def api_trabajadores_pendientes():
-    trabajadores = obtener_trabajadores_pendientes()
-    return jsonify([dict(t) for t in trabajadores])
-
-@app.route('/api/trabajador/<int:user_id>/aprobar', methods=['POST'])
-@admin_required
-def api_aprobar_trabajador(user_id):
-    aprobar_trabajador(user_id)
-    registrar_log(None, 'trabajador_aprobado', f'Trabajador {user_id} aprobado')
-    return jsonify({'success': True})
-
-@app.route('/api/trabajador/<int:user_id>/rechazar', methods=['POST'])
-@admin_required
-def api_rechazar_trabajador(user_id):
-    rechazar_trabajador(user_id)
-    registrar_log(None, 'trabajador_rechazado', f'Trabajador {user_id} rechazado')
-    return jsonify({'success': True})
-
-# ============================================
-# EJECUCIÓN (VERSIÓN PARA RENDER)
-# ============================================
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    
-    print("=" * 60)
-    print("🚀 AIsa Admin - Panel de Control")
-    print("🌐 Puerto:", port)
-    print("👤 admin / admin123")
-    print("=" * 60)
-    
-    app.run(debug=False, host='0.0.0.0', port=port)
+@app.route('/api/report
