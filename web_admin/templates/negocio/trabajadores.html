@@ -274,7 +274,7 @@
                 <option value="activo">🟢 Activos</option>
                 <option value="inactivo">🔴 Inactivos</option>
             </select>
-            <button class="btn btn-primary" onclick="mostrarFormulario()">+ Nuevo</button>
+            <button class="btn btn-primary" id="btnNuevo">+ Nuevo</button>
         </div>
 
         <div id="formTrabajador" style="display:none;border-top:1px solid #2a2a3e;padding-top:12px;margin-top:8px;">
@@ -329,8 +329,8 @@
 
             <input type="hidden" id="traId" value="">
             <div class="form-actions">
-                <button class="btn btn-success" onclick="guardarTrabajador()" id="btnGuardar">💾 Guardar</button>
-                <button class="btn btn-danger" onclick="cancelarFormulario()">✕ Cancelar</button>
+                <button class="btn btn-success" id="btnGuardar">💾 Guardar</button>
+                <button class="btn btn-danger" id="btnCancelar">✕ Cancelar</button>
             </div>
         </div>
     </div>
@@ -358,7 +358,7 @@
             <div style="color:#888;font-size:11px;text-align:center;margin-bottom:12px;">⚠️ Esta acción no se puede deshacer</div>
             <div class="form-actions">
                 <button class="btn btn-peligro" id="btnConfirmarEliminar">🗑️ Eliminar</button>
-                <button class="btn btn-secondary" onclick="cerrarModalEliminar()">✕ Cancelar</button>
+                <button class="btn btn-secondary" id="btnCancelarEliminar">✕ Cancelar</button>
             </div>
         </div>
     </div>
@@ -371,6 +371,7 @@
         var editandoId = null;
         var modulosDisponibles = [];
         var trabajadorAEliminar = null;
+        var intervaloActualizacion = null;
 
         // ============================================
         // FUNCIONES DE MENSAJES
@@ -417,7 +418,8 @@
             var iconos = { 'inventario': '📦', 'tienda': '🛍️', 'trabajadores': '👥', 'servicios': '📋', 'ventas': '💰', 'contratos': '📄' };
             var nombres = { 'inventario': 'Inventario', 'tienda': 'Tienda', 'trabajadores': 'Trabajadores', 'servicios': 'Servicios', 'ventas': 'Ventas', 'contratos': 'Contratos' };
             
-            modulosDisponibles.forEach(function(mod) {
+            for (var i = 0; i < modulosDisponibles.length; i++) {
+                var mod = modulosDisponibles[i];
                 var div = document.createElement('div');
                 div.className = 'modulo-check';
                 var checked = modulosPredefinidos ? modulosPredefinidos.indexOf(mod.nombre) !== -1 : false;
@@ -433,7 +435,7 @@
                 });
                 if (checked) div.classList.add('checked');
                 container.appendChild(div);
-            });
+            }
             actualizarContadorModulos();
         }
 
@@ -445,9 +447,9 @@
         function getModulosSeleccionados() {
             var checkboxes = document.querySelectorAll('.modulo-checkbox:checked');
             var result = [];
-            checkboxes.forEach(function(cb) {
-                result.push(cb.value);
-            });
+            for (var i = 0; i < checkboxes.length; i++) {
+                result.push(checkboxes[i].value);
+            }
             return result;
         }
 
@@ -477,19 +479,21 @@
             var container = document.getElementById('trabajadoresContainer');
             var filtroLower = filtro.toLowerCase();
             
-            var filtrados = trabajadores.filter(function(t) {
+            var filtrados = [];
+            for (var i = 0; i < trabajadores.length; i++) {
+                var t = trabajadores[i];
                 var match = t.nombre.toLowerCase().indexOf(filtroLower) !== -1 ||
                     (t.apellidos && t.apellidos.toLowerCase().indexOf(filtroLower) !== -1) ||
                     (t.ci && t.ci.indexOf(filtroLower) !== -1);
-                if (!match) return false;
+                if (!match) continue;
                 
                 if (estadoFiltro === 'activo') {
-                    return t.activo === 1 || t.activo === true;
+                    if (!(t.activo === 1 || t.activo === true)) continue;
                 } else if (estadoFiltro === 'inactivo') {
-                    return t.activo === 0 || t.activo === false;
+                    if (!(t.activo === 0 || t.activo === false)) continue;
                 }
-                return true;
-            });
+                filtrados.push(t);
+            }
 
             if (filtrados.length === 0) {
                 container.innerHTML = '<div class="empty">No hay trabajadores</div>';
@@ -530,9 +534,9 @@
                     '<td><span class="badge ' + estadoClass + '">' + estadoLabel + '</span></td>' +
                     '<td>' +
                         '<div class="acciones-cell">' +
-                            '<button class="btn btn-warning btn-sm" data-id="' + t.id + '" data-accion="editar">✏️</button>' +
-                            '<button class="btn ' + (t.activo ? 'btn-danger' : 'btn-success') + ' btn-sm" data-id="' + t.id + '" data-accion="toggle" data-activo="' + (t.activo ? 0 : 1) + '">' + (t.activo ? '🔴' : '🟢') + '</button>' +
-                            '<button class="btn btn-eliminar btn-sm" data-id="' + t.id + '" data-accion="eliminar">🗑️</button>' +
+                            '<button class="btn btn-warning btn-sm btn-editar" data-id="' + t.id + '">✏️</button>' +
+                            '<button class="btn ' + (t.activo ? 'btn-danger' : 'btn-success') + ' btn-sm btn-toggle" data-id="' + t.id + '" data-activo="' + (t.activo ? 0 : 1) + '">' + (t.activo ? '🔴' : '🟢') + '</button>' +
+                            '<button class="btn btn-eliminar btn-sm btn-eliminar-trabajador" data-id="' + t.id + '">🗑️</button>' +
                         '</div>' +
                     '</td>' +
                 '</tr>';
@@ -542,26 +546,34 @@
             container.innerHTML = html;
             
             // ============================================
-            // AGREGAR EVENT LISTENERS A LOS BOTONES
+            // AGREGAR EVENT LISTENERS
             // ============================================
-            var botones = container.querySelectorAll('.acciones-cell .btn-sm');
-            for (var k = 0; k < botones.length; k++) {
-                (function(btn) {
-                    btn.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        var id = parseInt(this.getAttribute('data-id'));
-                        var accion = this.getAttribute('data-accion');
-                        
-                        if (accion === 'editar') {
-                            editarTrabajador(id);
-                        } else if (accion === 'toggle') {
-                            var activo = parseInt(this.getAttribute('data-activo'));
-                            toggleTrabajador(id, activo);
-                        } else if (accion === 'eliminar') {
-                            abrirModalEliminar(id);
-                        }
-                    });
-                })(botones[k]);
+            var botonesEditar = container.querySelectorAll('.btn-editar');
+            for (var k = 0; k < botonesEditar.length; k++) {
+                botonesEditar[k].addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var id = parseInt(this.getAttribute('data-id'));
+                    editarTrabajador(id);
+                });
+            }
+            
+            var botonesToggle = container.querySelectorAll('.btn-toggle');
+            for (var k = 0; k < botonesToggle.length; k++) {
+                botonesToggle[k].addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var id = parseInt(this.getAttribute('data-id'));
+                    var activo = parseInt(this.getAttribute('data-activo'));
+                    toggleTrabajador(id, activo);
+                });
+            }
+            
+            var botonesEliminar = container.querySelectorAll('.btn-eliminar-trabajador');
+            for (var k = 0; k < botonesEliminar.length; k++) {
+                botonesEliminar[k].addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var id = parseInt(this.getAttribute('data-id'));
+                    abrirModalEliminar(id);
+                });
             }
         }
 
@@ -594,8 +606,24 @@
         }
 
         // ============================================
-        // FORMULARIO
+        // FORMULARIO - USANDO EVENT LISTENERS
         // ============================================
+        document.getElementById('btnNuevo').addEventListener('click', function() {
+            mostrarFormulario();
+        });
+
+        document.getElementById('btnCancelar').addEventListener('click', function() {
+            cancelarFormulario();
+        });
+
+        document.getElementById('btnGuardar').addEventListener('click', function() {
+            guardarTrabajador();
+        });
+
+        document.getElementById('btnCancelarEliminar').addEventListener('click', function() {
+            cerrarModalEliminar();
+        });
+
         function mostrarFormulario() {
             document.getElementById('formTrabajador').style.display = 'block';
             document.getElementById('traNombre').focus();
@@ -706,6 +734,11 @@
                 modulos: modulosSeleccionados
             };
 
+            var btn = document.getElementById('btnGuardar');
+            var textoOriginal = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Guardando...';
+
             try {
                 var url = editandoId ? '/api/negocio/trabajador/' + editandoId : '/api/negocio/trabajador/crear';
                 var method = editandoId ? 'PUT' : 'POST';
@@ -727,10 +760,20 @@
             } catch (error) {
                 console.error('Error:', error);
                 mostrarMensaje('Error de conexión', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = textoOriginal;
             }
         }
 
         async function toggleTrabajador(id, activo) {
+            var btn = document.querySelector('.btn-toggle[data-id="' + id + '"]');
+            var textoOriginal = btn ? btn.textContent : '⏳';
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳';
+            }
+            
             try {
                 var response = await fetch('/api/usuario/' + id + '/toggle', {
                     method: 'POST',
@@ -742,10 +785,18 @@
                     await cargarTrabajadores();
                 } else {
                     mostrarMensaje('Error', 'error');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = textoOriginal;
+                    }
                 }
             } catch (error) {
                 console.error('Error:', error);
                 mostrarMensaje('Error de conexión', 'error');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = textoOriginal;
+                }
             }
         }
 
@@ -773,12 +824,6 @@
             document.getElementById('detalleSalario').textContent = '$' + (t.salario ? parseFloat(t.salario).toFixed(2) : '0.00');
             document.getElementById('detalleEstado').textContent = t.activo ? '🟢 Activo' : '🔴 Inactivo';
             document.getElementById('modalEliminar').classList.add('show');
-            
-            // Configurar evento del botón eliminar
-            var btnEliminar = document.getElementById('btnConfirmarEliminar');
-            btnEliminar.onclick = function() {
-                confirmarEliminar();
-            };
         }
 
         function cerrarModalEliminar() {
@@ -788,6 +833,10 @@
 
         document.getElementById('modalEliminar').addEventListener('click', function(e) {
             if (e.target === this) { cerrarModalEliminar(); }
+        });
+
+        document.getElementById('btnConfirmarEliminar').addEventListener('click', function() {
+            confirmarEliminar();
         });
 
         async function confirmarEliminar() {
@@ -817,11 +866,12 @@
                     await cargarTrabajadores();
                 } else {
                     mostrarMensaje(data.error || 'Error al eliminar el trabajador', 'error');
+                    btn.disabled = false;
+                    btn.textContent = textoOriginal;
                 }
             } catch (error) {
                 console.error('Error:', error);
                 mostrarMensaje('Error de conexión con el servidor: ' + error.message, 'error');
-            } finally {
                 btn.disabled = false;
                 btn.textContent = textoOriginal;
             }
