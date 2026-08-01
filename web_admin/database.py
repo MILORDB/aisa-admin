@@ -35,7 +35,7 @@ def get_db():
         raise
 
 def init_db():
-    """Inicializa la base de datos con PostgreSQL (SERIAL)"""
+    """Inicializa la base de datos con PostgreSQL"""
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -44,7 +44,7 @@ def init_db():
         print(f"❌ Error de conexión: {e}")
         return
     
-    # TABLAS CON SERIAL (PostgreSQL) - CON ON DELETE CASCADE
+    # TABLAS CON SERIAL (PostgreSQL)
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -109,7 +109,6 @@ def init_db():
     )
     ''')
     
-    # TABLA PRODUCTOS CON CAMPO COSTO Y COMISION
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS productos (
         id SERIAL PRIMARY KEY,
@@ -222,7 +221,6 @@ def init_db():
     )
     ''')
     
-    # TABLAS PARA NÓMINA
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS asistencia (
         id SERIAL PRIMARY KEY,
@@ -496,7 +494,6 @@ def obtener_datos_negocio(user_id):
     return {}
 
 def obtener_negocio_de_trabajador(trabajador_id):
-    """Obtiene el negocio_id al que pertenece un trabajador"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -546,20 +543,36 @@ def obtener_permisos_usuario(user_id):
 def asignar_permiso_usuario(user_id, modulo_id, activo):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-    INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
-    VALUES (%s, %s, %s, 'aprobado')
-    ON CONFLICT (usuario_id, modulo_id) DO UPDATE SET activo = %s, estado_solicitud = 'aprobado'
-    ''', (user_id, modulo_id, activo, activo))
-    conn.commit()
-    conn.close()
+    try:
+        cursor.execute('''
+            INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+            VALUES (%s, %s, %s, 'aprobado')
+            ON CONFLICT (usuario_id, modulo_id) DO UPDATE SET 
+                activo = %s, 
+                estado_solicitud = 'aprobado'
+        ''', (user_id, modulo_id, activo, activo))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error en asignar_permiso_usuario: {e}")
+        conn.rollback()
+        conn.close()
+        return False
 
 def toggle_modulo_global(modulo_id, activo):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('UPDATE modulos SET activo_global = %s WHERE id = %s', (activo, modulo_id))
-    conn.commit()
-    conn.close()
+    try:
+        cursor.execute('UPDATE modulos SET activo_global = %s WHERE id = %s', (activo, modulo_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error en toggle_modulo_global: {e}")
+        conn.rollback()
+        conn.close()
+        return False
 
 def solicitar_modulo(user_id, modulo_id):
     conn = get_db()
@@ -1356,7 +1369,6 @@ def obtener_asistencia_mes(trabajador_id, mes, ano):
     return asistencias
 
 def obtener_dias_trabajados_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días trabajados en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1376,7 +1388,6 @@ def obtener_dias_trabajados_mes(trabajador_id, mes, ano):
         return 0
 
 def obtener_dias_ausencia_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días de ausencia en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1396,7 +1407,6 @@ def obtener_dias_ausencia_mes(trabajador_id, mes, ano):
         return 0
 
 def obtener_dias_extras_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días extras trabajados en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1416,7 +1426,6 @@ def obtener_dias_extras_mes(trabajador_id, mes, ano):
         return 0
 
 def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
-    """Registra una comisión generada por una venta"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1434,7 +1443,6 @@ def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
         return False
 
 def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
-    """Obtiene las comisiones de un trabajador en un mes específico"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1489,7 +1497,6 @@ def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
         return []
 
 def obtener_total_comisiones_mes(trabajador_id, mes, ano):
-    """Obtiene el total de comisiones de un trabajador en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1526,7 +1533,6 @@ def obtener_comisiones_negocio_mes(negocio_id, mes, ano):
     return comisiones
 
 def calcular_nomina(negocio_id, trabajador_id, mes, ano):
-    """Calcula la nómina de un trabajador para un mes específico"""
     try:
         import calendar
         _, dias_mes = calendar.monthrange(ano, mes)
@@ -1646,7 +1652,6 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
         return None
 
 def obtener_nomina_mes(negocio_id, mes, ano):
-    """Obtiene la nómina de todos los trabajadores para un mes específico"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1671,7 +1676,6 @@ def obtener_nomina_mes(negocio_id, mes, ano):
         return []
 
 def obtener_nomina_trabajador(trabajador_id, mes, ano):
-    """Obtiene la nómina de un trabajador específico para un mes"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1690,7 +1694,6 @@ def obtener_nomina_trabajador(trabajador_id, mes, ano):
         return None
 
 def obtener_resumen_nomina(negocio_id, mes, ano):
-    """Obtiene un resumen de la nómina para un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1729,3 +1732,33 @@ def obtener_resumen_nomina(negocio_id, mes, ano):
             'total_comisiones': 0,
             'total_nomina': 0
         }
+
+# ============================================
+# FUNCIONES ADICIONALES PARA MÓDULOS
+# ============================================
+
+def obtener_modulos_negocio():
+    """Obtiene los módulos disponibles para negocios"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT * FROM modulos 
+        WHERE tipo_requerido IN ('ambos', 'negocio') AND activo_global = 1
+        ORDER BY nombre
+    ''')
+    modulos = cursor.fetchall()
+    conn.close()
+    return modulos
+
+def obtener_modulos_trabajador():
+    """Obtiene los módulos disponibles para trabajadores"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT * FROM modulos 
+        WHERE tipo_requerido IN ('ambos', 'negocio') AND activo_global = 1
+        ORDER BY nombre
+    ''')
+    modulos = cursor.fetchall()
+    conn.close()
+    return modulos
