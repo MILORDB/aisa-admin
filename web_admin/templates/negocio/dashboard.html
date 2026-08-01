@@ -1545,7 +1545,7 @@
             const container = document.getElementById('modulosContainer');
             container.innerHTML = '';
 
-            const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos', 'nomina'];
+            const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos', 'nomina', 'mapa'];
             const iconos = { 
                 'inventario': '📦', 
                 'tienda': '🛍️', 
@@ -1554,6 +1554,7 @@
                 'ventas': '💰', 
                 'contratos': '📄',
                 'nomina': '📊'
+                'nomina': '🗺️'
             };
 
             const modulosNegocio = modulos.filter(m => m && m.nombre && nombresNegocio.includes(m.nombre.toLowerCase()));
@@ -1612,7 +1613,7 @@
             const container = document.getElementById('modulosMobileList');
             container.innerHTML = '';
 
-            const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos', 'nomina'];
+            const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos', 'nomina', 'mapa'];
             const iconos = { 
                 'inventario': '📦', 
                 'tienda': '🛍️', 
@@ -1621,6 +1622,7 @@
                 'ventas': '💰', 
                 'contratos': '📄',
                 'nomina': '📊'
+                'nomina': '🗺️'
             };
 
             const modulosNegocio = modulos.filter(m => m && m.nombre && nombresNegocio.includes(m.nombre.toLowerCase()));
