@@ -74,7 +74,8 @@ try:
         registrar_comision, obtener_resumen_nomina,
         obtener_negocio_de_trabajador,
         obtener_dias_trabajados_mes, obtener_dias_ausencia_mes, obtener_dias_extras_mes,
-        obtener_total_comisiones_mes
+        obtener_total_comisiones_mes,
+        obtener_modulos_negocio, obtener_modulos_trabajador
     )
     from auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
     from storage import get_storage_manager
@@ -148,7 +149,6 @@ def admin_required(f):
 # ============================================
 # ENDPOINT PARA REPARAR ADMIN (URL DIRECTA)
 # ============================================
-
 @app.route('/fix-admin', methods=['GET'])
 def fix_admin_endpoint():
     """Endpoint para reparar el admin - URL directa /fix-admin"""
@@ -164,14 +164,12 @@ def fix_admin_endpoint():
         if not DATABASE_URL:
             return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
         
-        # Parsear URL
         url = DATABASE_URL.strip()
         if not url.startswith('postgresql://') and not url.startswith('postgres://'):
             url = 'postgresql://' + url
         
         parsed = urllib.parse.urlparse(url)
         
-        # Conectar a PostgreSQL
         conn = psycopg2.connect(
             host=parsed.hostname or 'localhost',
             port=parsed.port or 5432,
@@ -260,7 +258,7 @@ def fix_admin_endpoint():
         cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (admin_id,))
         mensajes.append("🗑️ Permisos antiguos eliminados")
         
-        # 5. Asignar todos los módulos
+        # 5. Asignar todos los módulos al admin
         for mod in modulos:
             cursor.execute('''
                 INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
@@ -354,6 +352,174 @@ def fix_admin_endpoint():
                 <h1 style="color:#ff6b6b;">❌ Error</h1>
                 <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
                 <a href="/login" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Login</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA REPARAR MÓDULOS
+# ============================================
+@app.route('/fix-modulos', methods=['GET'])
+def fix_modulos_endpoint():
+    """Endpoint para reparar los módulos de todos los usuarios"""
+    try:
+        import urllib.parse
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        print("✅ Conectado a PostgreSQL - Reparando módulos...")
+        
+        mensajes = []
+        
+        # 1. Verificar módulos
+        cursor.execute("SELECT * FROM modulos")
+        modulos = cursor.fetchall()
+        
+        if not modulos:
+            mensajes.append("⚠️ No hay módulos. Creándolos...")
+            modulos_list = [
+                ('voz', 'Texto a voz y reconocimiento de voz', 1, 'ambos'),
+                ('control_pc', 'Control de mouse, teclado y programas', 1, 'negocio'),
+                ('busqueda_web', 'Búsqueda en internet con DeepSeek', 1, 'ambos'),
+                ('memoria', 'Memoria vectorial para recordar conversaciones', 1, 'ambos'),
+                ('archivos', 'Lectura de archivos PDF, Word, Excel', 1, 'negocio'),
+                ('contexto', 'Contexto de conversación', 1, 'ambos'),
+                ('android', 'Conexión con dispositivos Android', 1, 'negocio'),
+                ('inventario', 'Gestión de inventario y productos', 1, 'negocio'),
+                ('tienda', 'Tienda online para clientes', 1, 'negocio'),
+                ('trabajadores', 'Gestión de trabajadores y empleados', 1, 'negocio'),
+                ('servicios', 'Gestión de servicios ofrecidos', 1, 'negocio'),
+                ('ventas', 'Gestión de ventas y facturación', 1, 'negocio'),
+                ('contratos', 'Gestión de contratos con clientes', 1, 'negocio'),
+                ('nomina', 'Gestión de nómina y salarios', 1, 'negocio'),
+            ]
+            
+            for nombre, desc, activo, tipo in modulos_list:
+                cursor.execute('''
+                    INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (nombre) DO NOTHING
+                ''', (nombre, desc, activo, tipo))
+            
+            conn.commit()
+            mensajes.append("✅ Módulos creados")
+            
+            cursor.execute("SELECT * FROM modulos")
+            modulos = cursor.fetchall()
+        
+        mensajes.append(f"📋 Módulos encontrados: {len(modulos)}")
+        
+        # 2. Asignar permisos a cada usuario según su tipo
+        cursor.execute("SELECT id, username, rol, tipo FROM usuarios")
+        usuarios = cursor.fetchall()
+        
+        mensajes.append(f"👥 Usuarios encontrados: {len(usuarios)}")
+        
+        for u in usuarios:
+            if u['rol'] == 'admin':
+                # Admin tiene todos los módulos
+                cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (u['id'],))
+                for modulo in modulos:
+                    cursor.execute('''
+                        INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+                        VALUES (%s, %s, 1, 'aprobado')
+                    ''', (u['id'], modulo['id']))
+                mensajes.append(f"✅ Admin {u['username']} - TODOS los módulos activos")
+            elif u['tipo'] == 'negocio':
+                # Negocios tienen módulos de negocio
+                modulos_negocio = ['inventario', 'tienda', 'trabajadores', 'servicios', 'ventas', 'contratos', 'nomina']
+                cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (u['id'],))
+                for modulo in modulos:
+                    activo = 1 if modulo['nombre'] in modulos_negocio else 0
+                    cursor.execute('''
+                        INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+                        VALUES (%s, %s, %s, 'aprobado')
+                    ''', (u['id'], modulo['id'], activo))
+                mensajes.append(f"✅ Negocio {u['username']} - Módulos de negocio activos")
+            elif u['rol'] == 'trabajador':
+                # Trabajadores tienen acceso limitado
+                modulos_trabajador = ['ventas', 'servicios']
+                cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (u['id'],))
+                for modulo in modulos:
+                    activo = 1 if modulo['nombre'] in modulos_trabajador else 0
+                    cursor.execute('''
+                        INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+                        VALUES (%s, %s, %s, 'aprobado')
+                    ''', (u['id'], modulo['id'], activo))
+                mensajes.append(f"✅ Trabajador {u['username']} - Módulos: ventas, servicios")
+            else:
+                # Clientes tienen acceso básico
+                modulos_cliente = ['tienda']
+                cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (u['id'],))
+                for modulo in modulos:
+                    activo = 1 if modulo['nombre'] in modulos_cliente else 0
+                    cursor.execute('''
+                        INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+                        VALUES (%s, %s, %s, 'aprobado')
+                    ''', (u['id'], modulo['id'], activo))
+                mensajes.append(f"✅ Cliente {u['username']} - Módulo: tienda")
+        
+        conn.commit()
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head><title>Módulos Reparados</title>
+            <style>
+                body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                .container {{ max-width: 800px; margin: 0 auto; }}
+                .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                .btn-primary:hover {{ background: #5a2ec0; }}
+                .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                .btn-secondary:hover {{ background: #3a3a4e; }}
+            </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Módulos</h1>
+                    <div class="card"><h3>📊 Resultado</h3>{html_mensajes}</div>
+                    <div>
+                        <a href="/admin/db" class="btn btn-primary">🗄️ Ir al Gestor DB</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
             </body>
         </html>
         """, 500
@@ -674,11 +840,9 @@ def dashboard():
     if not usuario:
         return redirect(url_for('login'))
     
-    # DEBUG: Imprime el rol
-    print(f"🔍 Dashboard - Usuario: {usuario.get('username')}, Rol: {usuario.get('rol')}, Tipo: {usuario.get('tipo')}")
-    
     try:
-        # Primero verificar si es admin
+        print(f"🔍 Dashboard - Usuario: {usuario.get('username')}, Rol: {usuario.get('rol')}, Tipo: {usuario.get('tipo')}")
+        
         if usuario.get('rol') == 'admin':
             print("✅ Mostrando dashboard de ADMIN")
             return render_template('admin/dashboard.html', usuario=usuario)
@@ -1144,6 +1308,35 @@ def api_eliminar_usuario(user_id):
     
     return jsonify({'success': True, 'message': 'Usuario eliminado correctamente'})
 
+@app.route('/api/usuario/<int:user_id>/permisos')
+@login_required
+def api_permisos_usuario(user_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    if not usuario or (usuario.get('id') != user_id and usuario.get('rol') != 'admin'):
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    permisos = obtener_permisos_usuario(user_id)
+    return jsonify([dict(p) for p in permisos])
+
+@app.route('/api/usuario/<int:user_id>/permiso/<int:modulo_id>', methods=['POST'])
+@admin_required
+def api_asignar_permiso(user_id, modulo_id):
+    data = request.get_json()
+    activo = data.get('activo', 1)
+    asignar_permiso_usuario(user_id, modulo_id, activo)
+    registrar_log(None, 'permiso_usuario', f'Usuario {user_id} módulo {modulo_id} activo={activo}')
+    return jsonify({'success': True})
+
+@app.route('/api/modulo/<int:modulo_id>/toggle', methods=['POST'])
+@admin_required
+def api_toggle_modulo_global(modulo_id):
+    data = request.get_json()
+    activo = data.get('activo', 1)
+    toggle_modulo_global(modulo_id, activo)
+    registrar_log(None, 'modulo_global', f'Módulo {modulo_id} activo={activo}')
+    return jsonify({'success': True})
+
 # ============================================
 # API - NEGOCIOS
 # ============================================
@@ -1266,35 +1459,6 @@ def api_modulos():
         modulos = obtener_modulos(tipo_usuario)
     
     return jsonify([dict(m) for m in modulos])
-
-@app.route('/api/modulo/<int:modulo_id>/toggle', methods=['POST'])
-@admin_required
-def api_toggle_modulo_global(modulo_id):
-    data = request.get_json()
-    activo = data.get('activo', 1)
-    toggle_modulo_global(modulo_id, activo)
-    registrar_log(None, 'modulo_global', f'Módulo {modulo_id} activo={activo}')
-    return jsonify({'success': True})
-
-@app.route('/api/usuario/<int:user_id>/permisos')
-@login_required
-def api_permisos_usuario(user_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    if not usuario or (usuario.get('id') != user_id and usuario.get('rol') != 'admin'):
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    permisos = obtener_permisos_usuario(user_id)
-    return jsonify([dict(p) for p in permisos])
-
-@app.route('/api/usuario/<int:user_id>/permiso/<int:modulo_id>', methods=['POST'])
-@admin_required
-def api_asignar_permiso(user_id, modulo_id):
-    data = request.get_json()
-    activo = data.get('activo', 1)
-    asignar_permiso_usuario(user_id, modulo_id, activo)
-    registrar_log(None, 'permiso_usuario', f'Usuario {user_id} módulo {modulo_id} activo={activo}')
-    return jsonify({'success': True})
 
 # ============================================
 # API - NEGOCIO - TRABAJADORES
@@ -3154,8 +3318,7 @@ def api_nomina_detalle():
         salario_devengado = salario_diario * dias_trabajados
         
         comisiones_list = obtener_comisiones_trabajador_mes(trabajador_id, mes, ano)
-        comisiones_total = sum(c.get('monto', 0) for c in comisiones_list) if comisiones_list else 0
-        
+        comisiones_total = sum(c.get('monto', 0) for c in comisiones_list) if comisiones_list else 0        
         total = salario_devengado + comisiones_total
         
         return jsonify({
