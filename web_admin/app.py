@@ -75,7 +75,8 @@ try:
         obtener_negocio_de_trabajador,
         obtener_dias_trabajados_mes, obtener_dias_ausencia_mes, obtener_dias_extras_mes,
         obtener_total_comisiones_mes,
-        obtener_modulos_negocio, obtener_modulos_trabajador
+        obtener_modulos_negocio, obtener_modulos_trabajador,
+        actualizar_ubicacion_usuario, obtener_ubicacion_usuario, obtener_negocios_con_ubicacion
     )
     from auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
     from storage import get_storage_manager
@@ -237,6 +238,7 @@ def fix_admin_endpoint():
                 ('ventas', 'Gestión de ventas y facturación', 1, 'negocio'),
                 ('contratos', 'Gestión de contratos con clientes', 1, 'negocio'),
                 ('nomina', 'Gestión de nómina y salarios', 1, 'negocio'),
+                ('mapa', 'Ubicación en mapa interactivo', 1, 'negocio'),
             ]
             
             for nombre, desc, activo, tipo in modulos_list:
@@ -412,6 +414,7 @@ def fix_modulos_endpoint():
                 ('ventas', 'Gestión de ventas y facturación', 1, 'negocio'),
                 ('contratos', 'Gestión de contratos con clientes', 1, 'negocio'),
                 ('nomina', 'Gestión de nómina y salarios', 1, 'negocio'),
+                ('mapa', 'Ubicación en mapa interactivo', 1, 'negocio'),
             ]
             
             for nombre, desc, activo, tipo in modulos_list:
@@ -447,7 +450,7 @@ def fix_modulos_endpoint():
                 mensajes.append(f"✅ Admin {u['username']} - TODOS los módulos activos")
             elif u['tipo'] == 'negocio':
                 # Negocios tienen módulos de negocio
-                modulos_negocio = ['inventario', 'tienda', 'trabajadores', 'servicios', 'ventas', 'contratos', 'nomina']
+                modulos_negocio = ['inventario', 'tienda', 'trabajadores', 'servicios', 'ventas', 'contratos', 'nomina', 'mapa']
                 cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (u['id'],))
                 for modulo in modulos:
                     activo = 1 if modulo['nombre'] in modulos_negocio else 0
@@ -950,6 +953,14 @@ def negocio_nomina():
     usuario = obtener_usuario_sesion(token)
     return render_template('negocio/nomina.html', usuario=usuario, version=int(time.time()))
 
+@app.route('/negocio/mapa')
+@login_required
+def negocio_mapa():
+    """Página del mapa de ubicación"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('negocio/mapa.html', usuario=usuario, version=int(time.time()))
+
 # ============================================
 # API - PERFIL DE USUARIO
 # ============================================
@@ -1329,7 +1340,7 @@ def api_asignar_permiso(user_id, modulo_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - MÓDULOS (GLOBAL) - ESTE ES EL ENDPOINT QUE FALTABA
+# API - MÓDULOS (GLOBAL)
 # ============================================
 @app.route('/api/modulo/<int:modulo_id>/toggle', methods=['POST'])
 @admin_required
@@ -1446,6 +1457,88 @@ def api_negocios_cercanos():
         print(f"❌ Error en api_negocios_cercanos: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - NEGOCIOS CON UBICACIÓN PARA MAPA
+# ============================================
+@app.route('/api/negocios/mapa', methods=['GET'])
+@login_required
+def api_negocios_mapa():
+    """Obtiene todos los negocios con ubicación para el mapa"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    # Obtener el negocio del usuario si es trabajador
+    negocio_id = None
+    if usuario.get('rol') == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+    
+    # Si es negocio, obtener solo su ubicación
+    if usuario.get('tipo') == 'negocio':
+        negocios = obtener_negocios_con_ubicacion(usuario['id'])
+    else:
+        negocios = obtener_negocios_con_ubicacion()
+    
+    return jsonify({
+        'success': True,
+        'negocios': negocios
+    })
+
+# ============================================
+# API - UBICACIÓN
+# ============================================
+@app.route('/api/ubicacion/actualizar', methods=['POST'])
+@login_required
+def api_actualizar_ubicacion():
+    """Actualiza la ubicación del usuario en el mapa"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    latitud = data.get('latitud')
+    longitud = data.get('longitud')
+    
+    if latitud is None or longitud is None:
+        return jsonify({'error': 'Latitud y longitud son requeridas'}), 400
+    
+    if not (-90 <= latitud <= 90) or not (-180 <= longitud <= 180):
+        return jsonify({'error': 'Coordenadas inválidas'}), 400
+    
+    exito = actualizar_ubicacion_usuario(usuario['id'], latitud, longitud)
+    
+    if exito:
+        registrar_log(usuario['id'], 'ubicacion_actualizada', f'Lat: {latitud}, Lng: {longitud}')
+        return jsonify({'success': True, 'message': 'Ubicación actualizada correctamente'})
+    else:
+        return jsonify({'error': 'Error al actualizar la ubicación'}), 500
+
+@app.route('/api/ubicacion/obtener', methods=['GET'])
+@login_required
+def api_obtener_ubicacion():
+    """Obtiene la ubicación del usuario actual"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    ubicacion = obtener_ubicacion_usuario(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'ubicacion': {
+            'latitud': ubicacion.get('latitud') if ubicacion else None,
+            'longitud': ubicacion.get('longitud') if ubicacion else None,
+            'actualizada': ubicacion.get('ubicacion_actualizada') if ubicacion else None,
+            'tiene_ubicacion': ubicacion and ubicacion.get('latitud') is not None
+        }
+    })
 
 # ============================================
 # API - TODOS LOS PRODUCTOS (para admin)
@@ -3282,8 +3375,7 @@ def api_calcular_nomina():
 @app.route('/api/nomina/detalle', methods=['GET'])
 @login_required
 def api_nomina_detalle():
-    """Obtiene el detalle de nómina de un trabajador"""
-    token = request.cookies.get('token')  # <--- CORREGIDO: cookies en lugar de cooks
+    token = request.cookies.get('token')  # CORREGIDO: cookies en lugar de cooks
     usuario = obtener_usuario_sesion(token)
     
     if not usuario or usuario.get('tipo') != 'negocio':
