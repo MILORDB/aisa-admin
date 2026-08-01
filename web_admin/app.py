@@ -1328,14 +1328,45 @@ def api_asignar_permiso(user_id, modulo_id):
     registrar_log(None, 'permiso_usuario', f'Usuario {user_id} módulo {modulo_id} activo={activo}')
     return jsonify({'success': True})
 
+# ============================================
+# API - MÓDULOS (GLOBAL) - ESTE ES EL ENDPOINT QUE FALTABA
+# ============================================
 @app.route('/api/modulo/<int:modulo_id>/toggle', methods=['POST'])
 @admin_required
 def api_toggle_modulo_global(modulo_id):
-    data = request.get_json()
-    activo = data.get('activo', 1)
-    toggle_modulo_global(modulo_id, activo)
-    registrar_log(None, 'modulo_global', f'Módulo {modulo_id} activo={activo}')
-    return jsonify({'success': True})
+    """Activa o desactiva un módulo globalmente"""
+    try:
+        data = request.get_json()
+        activo = data.get('activo', 1)
+        
+        exito = toggle_modulo_global(modulo_id, activo)
+        
+        if exito:
+            registrar_log(None, 'modulo_global', f'Módulo {modulo_id} activo={activo}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al actualizar el módulo'}), 500
+            
+    except Exception as e:
+        print(f"❌ Error en toggle_modulo_global: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - MÓDULOS
+# ============================================
+@app.route('/api/modulos')
+@login_required
+def api_modulos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if usuario and usuario.get('rol') == 'admin':
+        modulos = obtener_modulos()
+    else:
+        tipo_usuario = usuario.get('tipo') if usuario else 'cliente'
+        modulos = obtener_modulos(tipo_usuario)
+    
+    return jsonify([dict(m) for m in modulos])
 
 # ============================================
 # API - NEGOCIOS
@@ -1442,23 +1473,6 @@ def api_todos_ventas():
 def api_todos_servicios():
     servicios = obtener_todos_servicios()
     return jsonify([dict(s) for s in servicios])
-
-# ============================================
-# API - MÓDULOS
-# ============================================
-@app.route('/api/modulos')
-@login_required
-def api_modulos():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if usuario and usuario.get('rol') == 'admin':
-        modulos = obtener_modulos()
-    else:
-        tipo_usuario = usuario.get('tipo') if usuario else 'cliente'
-        modulos = obtener_modulos(tipo_usuario)
-    
-    return jsonify([dict(m) for m in modulos])
 
 # ============================================
 # API - NEGOCIO - TRABAJADORES
@@ -3168,30 +3182,6 @@ def api_reporte_productos():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - MÓDULOS (GLOBAL)
-# ============================================
-
-@app.route('/api/modulo/<int:modulo_id>/toggle', methods=['POST'])
-@admin_required
-def api_toggle_modulo_global(modulo_id):
-    """Activa o desactiva un módulo globalmente"""
-    try:
-        data = request.get_json()
-        activo = data.get('activo', 1)
-        
-        exito = toggle_modulo_global(modulo_id, activo)
-        
-        if exito:
-            registrar_log(None, 'modulo_global', f'Módulo {modulo_id} activo={activo}')
-            return jsonify({'success': True})
-        else:
-            return jsonify({'error': 'Error al actualizar el módulo'}), 500
-            
-    except Exception as e:
-        print(f"❌ Error en toggle_modulo_global: {e}")
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
 # API - NÓMINA
 # ============================================
 @app.route('/api/nomina', methods=['GET'])
@@ -3292,7 +3282,7 @@ def api_calcular_nomina():
 @app.route('/api/nomina/detalle', methods=['GET'])
 @login_required
 def api_nomina_detalle():
-    token = request.cookies.get('token')
+    token = request.cooks.get('token')
     usuario = obtener_usuario_sesion(token)
     
     if not usuario or usuario.get('tipo') != 'negocio':
@@ -3342,7 +3332,8 @@ def api_nomina_detalle():
         salario_devengado = salario_diario * dias_trabajados
         
         comisiones_list = obtener_comisiones_trabajador_mes(trabajador_id, mes, ano)
-        comisiones_total = sum(c.get('monto', 0) for c in comisiones_list) if comisiones_list else 0        
+        comisiones_total = sum(c.get('monto', 0) for c in comisiones_list) if comisiones_list else 0
+        
         total = salario_devengado + comisiones_total
         
         return jsonify({
