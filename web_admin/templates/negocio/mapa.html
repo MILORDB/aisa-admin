@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mapa - AIsa Negocio</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .header h1 { font-size: 18px; display: flex; align-items: center; gap: 8px; }
+        .header .btn-volver {
+            color: #fff;
+            text-decoration: none;
+            padding: 4px 14px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+            font-size: 13px;
+            transition: background 0.3s;
+        }
+        .header .btn-volver:hover { background: rgba(255,255,255,0.2); }
+        .container {
+            flex: 1;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .card {
+            background: #1a1a2e;
+            border-radius: 10px;
+            padding: 14px;
+            border: 1px solid #2a2a3e;
+        }
+        .card h2 { font-size: 15px; color: #6c3ce0; margin-bottom: 10px; }
+        .card .subtitle { font-size: 12px; color: #888; margin-bottom: 12px; }
+        #map {
+            width: 100%;
+            height: 450px;
+            border-radius: 8px;
+            border: 1px solid #2a2a3e;
+            background: #1a1a2e;
+        }
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-success:hover { background: #3d8b40; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-danger:hover { background: #c62828; }
+        .btn-warning { background: #ff9800; color: #000; }
+        .btn-warning:hover { background: #e68900; }
+        .btn-sm { padding: 4px 10px; font-size: 11px; }
+        .ubicacion-info {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .ubicacion-info .coordenadas {
+            font-size: 13px;
+            color: #aaa;
+            font-family: monospace;
+        }
+        .ubicacion-info .estado {
+            font-size: 12px;
+            padding: 2px 12px;
+            border-radius: 12px;
+        }
+        .ubicacion-info .estado.activa { background: #224422; color: #6bff6b; }
+        .ubicacion-info .estado.inactiva { background: #442222; color: #ff6b6b; }
+        .mensaje-exito {
+            background: #224422;
+            color: #6bff6b;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            display: none;
+        }
+        .mensaje-exito.show { display: block; }
+        .mensaje-error {
+            background: #442222;
+            color: #ff6b6b;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            display: none;
+        }
+        .mensaje-error.show { display: block; }
+        .leyenda {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            font-size: 11px;
+            color: #888;
+            margin-top: 8px;
+        }
+        .leyenda .item { display: flex; align-items: center; gap: 4px; }
+        .leyenda .marcador { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+        .leyenda .marcador.negocio { background: #6c3ce0; }
+        .leyenda .marcador.usuario { background: #ff9800; }
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal-content {
+            background: #1a1a2e;
+            padding: 24px;
+            border-radius: 12px;
+            max-width: 400px;
+            width: 100%;
+            border: 1px solid #2a2a3e;
+        }
+        .modal-content h3 { font-size: 16px; margin-bottom: 4px; }
+        .modal-content .modal-subtitle { font-size: 12px; color: #888; margin-bottom: 16px; }
+        .modal-content .form-group { margin-bottom: 12px; }
+        .modal-content .form-group label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; }
+        .modal-content .form-group input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 13px;
+        }
+        .modal-content .form-group input:focus { border-color: #6c3ce0; outline: none; }
+        .modal-content .form-actions { display: flex; gap: 10px; margin-top: 16px; }
+        .modal-content .form-actions .btn { flex: 1; }
+        .loading { text-align: center; color: #888; padding: 40px; }
+        @media (max-width: 600px) {
+            .container { padding: 8px; }
+            .card { padding: 10px; }
+            #map { height: 300px; }
+            .ubicacion-info { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1>🗺️ Mapa de Negocios</h1>
+        <a href="/negocio/dashboard" class="btn-volver">← Volver</a>
+    </header>
+
+    <div class="container">
+        <div class="mensaje-error" id="mensajeError"></div>
+        <div class="mensaje-exito" id="mensajeExito"></div>
+
+        <!-- Mapa -->
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+                <h2 style="margin-bottom:0;">📍 Ubicación</h2>
+                <div>
+                    <button class="btn btn-primary btn-sm" onclick="centrarEnMiUbicacion()">📍 Mi ubicación</button>
+                    <button class="btn btn-success btn-sm" onclick="abrirModalUbicacion()">✏️ Marcar ubicación</button>
+                </div>
+            </div>
+            <div class="subtitle">Haz clic en el mapa para marcar tu ubicación o arrastra para explorar</div>
+            
+            <div id="map"></div>
+            
+            <div class="ubicacion-info" id="ubicacionInfo">
+                <span class="estado inactiva" id="estadoUbicacion">⚪ Sin ubicación</span>
+                <span class="coordenadas" id="coordenadasTexto">Lat: - , Lng: -</span>
+                <span style="font-size:11px;color:#666;" id="fechaActualizacion"></span>
+            </div>
+        </div>
+
+        <!-- Leyenda -->
+        <div class="card">
+            <h2>📋 Leyenda</h2>
+            <div class="leyenda">
+                <div class="item"><span class="marcador negocio"></span> Negocios registrados</div>
+                <div class="item"><span class="marcador usuario"></span> Tu ubicación</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para marcar ubicación manualmente -->
+    <div class="modal-overlay" id="modalUbicacion">
+        <div class="modal-content">
+            <h3>📍 Marcar Ubicación</h3>
+            <div class="modal-subtitle">Ingresa las coordenadas de tu negocio</div>
+            
+            <div class="form-group">
+                <label>🌐 Latitud</label>
+                <input type="number" id="inputLatitud" step="0.000001" placeholder="-90 a 90">
+            </div>
+            <div class="form-group">
+                <label>🌐 Longitud</label>
+                <input type="number" id="inputLongitud" step="0.000001" placeholder="-180 a 180">
+            </div>
+            
+            <div style="font-size:11px;color:#666;margin-bottom:12px;">
+                💡 Puedes obtener coordenadas desde Google Maps haciendo clic derecho en un lugar
+            </div>
+            
+            <div class="form-actions">
+                <button class="btn btn-success" onclick="guardarUbicacion()">💾 Guardar</button>
+                <button class="btn btn-danger" onclick="cerrarModal()">✕ Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        let map = null;
+        let markerUsuario = null;
+        let markersNegocios = [];
+        let ubicacionActual = null;
+        let usuarioId = {{ usuario.id }};
+        let usuarioTipo = '{{ usuario.tipo }}';
+
+        // ============================================
+        // INICIALIZAR MAPA
+        // ============================================
+
+        function initMap() {
+            // Coordenadas de Cuba (centro aproximado)
+            const cubaCenter = [21.5, -80];
+            
+            map = L.map('map', {
+                center: cubaCenter,
+                zoom: 7,
+                zoomControl: true,
+                attributionControl: true
+            });
+
+            // Capa de mapa (OpenStreetMap)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            // Evento de clic en el mapa
+            map.on('click', function(e) {
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+                document.getElementById('inputLatitud').value = lat.toFixed(6);
+                document.getElementById('inputLongitud').value = lng.toFixed(6);
+                abrirModalUbicacion();
+            });
+
+            // Cargar ubicación del usuario y negocios
+            cargarUbicacionUsuario();
+            cargarNegocios();
+        }
+
+        // ============================================
+        // CARGAR UBICACIÓN DEL USUARIO
+        // ============================================
+
+        async function cargarUbicacionUsuario() {
+            try {
+                const response = await fetch('/api/ubicacion/obtener');
+                const data = await response.json();
+                
+                if (data.success && data.ubicacion.tiene_ubicacion) {
+                    ubicacionActual = {
+                        lat: data.ubicacion.latitud,
+                        lng: data.ubicacion.longitud
+                    };
+                    
+                    // Actualizar info
+                    document.getElementById('estadoUbicacion').textContent = '🟢 Ubicación registrada';
+                    document.getElementById('estadoUbicacion').className = 'estado activa';
+                    document.getElementById('coordenadasTexto').textContent = `Lat: ${data.ubicacion.latitud.toFixed(6)}, Lng: ${data.ubicacion.longitud.toFixed(6)}`;
+                    
+                    if (data.ubicacion.actualizada) {
+                        const fecha = new Date(data.ubicacion.actualizada);
+                        document.getElementById('fechaActualizacion').textContent = `📅 Actualizada: ${fecha.toLocaleString()}`;
+                    }
+                    
+                    // Mostrar en el mapa
+                    mostrarUbicacionUsuario(data.ubicacion.latitud, data.ubicacion.longitud);
+                    
+                    // Centrar el mapa en la ubicación del usuario
+                    map.setView([data.ubicacion.latitud, data.ubicacion.longitud], 14);
+                } else {
+                    document.getElementById('estadoUbicacion').textContent = '⚪ Sin ubicación registrada';
+                    document.getElementById('estadoUbicacion').className = 'estado inactiva';
+                    
+                    // Intentar obtener ubicación por GPS
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(function(pos) {
+                            const lat = pos.coords.latitude;
+                            const lng = pos.coords.longitude;
+                            map.setView([lat, lng], 14);
+                            mostrarUbicacionUsuario(lat, lng);
+                        }, function() {
+                            console.log('No se pudo obtener ubicación GPS');
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error('Error al cargar ubicación:', error);
+            }
+        }
+
+        // ============================================
+        // MOSTRAR UBICACIÓN DEL USUARIO
+        // ============================================
+
+        function mostrarUbicacionUsuario(lat, lng) {
+            // Icono personalizado para el usuario
+            const usuarioIcon = L.divIcon({
+                html: '📍',
+                className: 'custom-marker',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
+            });
+
+            if (markerUsuario) {
+                markerUsuario.setLatLng([lat, lng]);
+            } else {
+                markerUsuario = L.marker([lat, lng], { icon: usuarioIcon })
+                    .addTo(map)
+                    .bindPopup('📍 <strong>Tu ubicación</strong>');
+            }
+        }
+
+        // ============================================
+        // CARGAR NEGOCIOS EN EL MAPA
+        // ============================================
+
+        async function cargarNegocios() {
+            try {
+                const response = await fetch('/api/negocios/mapa');
+                const data = await response.json();
+                
+                if (data.success && data.negocios.length > 0) {
+                    // Icono para negocios
+                    const negocioIcon = L.divIcon({
+                        html: '🏪',
+                        className: 'custom-marker',
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 30]
+                    });
+
+                    data.negocios.forEach(negocio => {
+                        if (negocio.latitud && negocio.longitud) {
+                            const marker = L.marker([negocio.latitud, negocio.longitud], { icon: negocioIcon })
+                                .addTo(map)
+                                .bindPopup(`
+                                    <div style="min-width:180px;">
+                                        <strong style="color:#6c3ce0;">🏪 ${negocio.nombre}</strong>
+                                        ${negocio.direccion ? `<br>📍 ${negocio.direccion}` : ''}
+                                        ${negocio.telefono ? `<br>📞 ${negocio.telefono}` : ''}
+                                        ${negocio.descripcion ? `<br>${negocio.descripcion}` : ''}
+                                        <br><br>
+                                        <a href="/negocio/ver/${negocio.id}" style="color:#6c3ce0;text-decoration:none;">Ver negocio →</a>
+                                    </div>
+                                `);
+                            
+                            markersNegocios.push(marker);
+                        }
+                    });
+
+                    // Si hay negocios y el usuario no tiene ubicación, ajustar el mapa
+                    if (!ubicacionActual && data.negocios.length > 0) {
+                        const bounds = L.latLngBounds(data.negocios.map(n => [n.latitud, n.longitud]));
+                        map.fitBounds(bounds, { padding: [50, 50] });
+                    }
+                }
+            } catch (error) {
+                console.error('Error al cargar negocios:', error);
+            }
+        }
+
+        // ============================================
+        // CENTRAR EN MI UBICACIÓN
+        // ============================================
+
+        function centrarEnMiUbicacion() {
+            if (ubicacionActual) {
+                map.setView([ubicacionActual.lat, ubicacionActual.lng], 15);
+                mostrarMensaje('📍 Centrando en tu ubicación', 'exito');
+            } else {
+                mostrarMensaje('⚠️ No tienes una ubicación registrada. Marca tu ubicación.', 'error');
+            }
+        }
+
+        // ============================================
+        // MODAL DE UBICACIÓN
+        // ============================================
+
+        function abrirModalUbicacion() {
+            const modal = document.getElementById('modalUbicacion');
+            modal.classList.add('show');
+            
+            if (ubicacionActual) {
+                document.getElementById('inputLatitud').value = ubicacionActual.lat;
+                document.getElementById('inputLongitud').value = ubicacionActual.lng;
+            }
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalUbicacion').classList.remove('show');
+        }
+
+        document.getElementById('modalUbicacion').addEventListener('click', function(e) {
+            if (e.target === this) cerrarModal();
+        });
+
+        // ============================================
+        // GUARDAR UBICACIÓN
+        // ============================================
+
+        async function guardarUbicacion() {
+            const lat = parseFloat(document.getElementById('inputLatitud').value);
+            const lng = parseFloat(document.getElementById('inputLongitud').value);
+            
+            if (isNaN(lat) || isNaN(lng)) {
+                mostrarMensaje('❌ Ingresa coordenadas válidas', 'error');
+                return;
+            }
+            
+            if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                mostrarMensaje('❌ Coordenadas fuera de rango', 'error');
+                return;
+            }
+            
+            const btn = event?.target || document.querySelector('.modal-content .btn-success');
+            const textoOriginal = btn ? btn.textContent : '💾 Guardar';
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
+            
+            try {
+                const response = await fetch('/api/ubicacion/actualizar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ latitud: lat, longitud: lng })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    mostrarMensaje('✅ Ubicación guardada correctamente', 'exito');
+                    cerrarModal();
+                    
+                    // Actualizar ubicación
+                    ubicacionActual = { lat, lng };
+                    mostrarUbicacionUsuario(lat, lng);
+                    map.setView([lat, lng], 15);
+                    
+                    document.getElementById('estadoUbicacion').textContent = '🟢 Ubicación registrada';
+                    document.getElementById('estadoUbicacion').className = 'estado activa';
+                    document.getElementById('coordenadasTexto').textContent = `Lat: ${lat.toFixed(6)}, Lng: ${lng.toFixed(6)}`;
+                    document.getElementById('fechaActualizacion').textContent = '📅 Actualizada: ahora';
+                } else {
+                    mostrarMensaje('❌ ' + (data.error || 'Error al guardar'), 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('❌ Error de conexión', 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
+            }
+        }
+
+        // ============================================
+        // MENSAJES
+        // ============================================
+
+        function mostrarMensaje(texto, tipo) {
+            const errorEl = document.getElementById('mensajeError');
+            const exitoEl = document.getElementById('mensajeExito');
+            errorEl.classList.remove('show');
+            exitoEl.classList.remove('show');
+            
+            if (tipo === 'error') {
+                errorEl.textContent = texto;
+                errorEl.classList.add('show');
+            } else {
+                exitoEl.textContent = texto;
+                exitoEl.classList.add('show');
+            }
+            
+            setTimeout(() => {
+                errorEl.classList.remove('show');
+                exitoEl.classList.remove('show');
+            }, 4000);
+        }
+
+        // ============================================
+        // INICIO
+        // ============================================
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+        });
+
+        // Soporte para Enter en los inputs del modal
+        document.getElementById('inputLatitud').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') document.getElementById('inputLongitud').focus();
+        });
+        document.getElementById('inputLongitud').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') guardarUbicacion();
+        });
+    </script>
+</body>
+</html>
