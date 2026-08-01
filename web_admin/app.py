@@ -147,30 +147,6 @@ def admin_required(f):
     return decorated_function
 
 # ============================================
-# API - MÓDULOS (GLOBAL)
-# ============================================
-
-@app.route('/api/modulo/<int:modulo_id>/toggle', methods=['POST'])
-@admin_required
-def api_toggle_modulo_global(modulo_id):
-    """Activa o desactiva un módulo globalmente"""
-    try:
-        data = request.get_json()
-        activo = data.get('activo', 1)
-        
-        exito = toggle_modulo_global(modulo_id, activo)
-        
-        if exito:
-            registrar_log(None, 'modulo_global', f'Módulo {modulo_id} activo={activo}')
-            return jsonify({'success': True})
-        else:
-            return jsonify({'error': 'Error al actualizar el módulo'}), 500
-            
-    except Exception as e:
-        print(f"❌ Error en toggle_modulo_global: {e}")
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
 # ENDPOINT PARA REPARAR ADMIN (URL DIRECTA)
 # ============================================
 @app.route('/fix-admin', methods=['GET'])
@@ -3189,6 +3165,30 @@ def api_reporte_productos():
     except Exception as e:
         print(f"❌ Error generando reporte de productos: {e}")
         traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - MÓDULOS (GLOBAL)
+# ============================================
+
+@app.route('/api/modulo/<int:modulo_id>/toggle', methods=['POST'])
+@admin_required
+def api_toggle_modulo_global(modulo_id):
+    """Activa o desactiva un módulo globalmente"""
+    try:
+        data = request.get_json()
+        activo = data.get('activo', 1)
+        
+        exito = toggle_modulo_global(modulo_id, activo)
+        
+        if exito:
+            registrar_log(None, 'modulo_global', f'Módulo {modulo_id} activo={activo}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al actualizar el módulo'}), 500
+            
+    except Exception as e:
+        print(f"❌ Error en toggle_modulo_global: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ============================================
