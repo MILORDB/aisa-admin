@@ -1047,7 +1047,6 @@
             </div>
         </div>
         <div class="header-right">
-            <!-- Botón de usuario que abre el menú -->
             <div class="user-info" id="userMenuToggle">
                 <div class="avatar">👤</div>
                 <span class="username">{{ usuario.nombre or usuario.username }}</span>
@@ -1055,7 +1054,6 @@
                 <span class="arrow">▼</span>
             </div>
 
-            <!-- Menú desplegable del usuario -->
             <div class="user-menu" id="userMenu">
                 <button class="menu-item" onclick="window.location.href='/perfil'">
                     <span class="menu-icon">👤</span>
@@ -1538,7 +1536,7 @@
         }
 
         // ============================================
-        // RENDER MÓDULOS - PANEL IZQUIERDO (CON NOMINA)
+        // RENDER MÓDULOS - PANEL IZQUIERDO
         // ============================================
 
         function renderModulos(permisos) {
@@ -1553,8 +1551,8 @@
                 'servicios': '📋', 
                 'ventas': '💰', 
                 'contratos': '📄',
-                'nomina': '📊'
-                'nomina': '🗺️'
+                'nomina': '📊',
+                'mapa': '🗺️'
             };
 
             const modulosNegocio = modulos.filter(m => m && m.nombre && nombresNegocio.includes(m.nombre.toLowerCase()));
@@ -1606,7 +1604,7 @@
         }
 
         // ============================================
-        // RENDER MÓDULOS - MENÚ MÓVIL (CON NOMINA)
+        // RENDER MÓDULOS - MENÚ MÓVIL
         // ============================================
 
         function renderModulosMobile(permisos) {
@@ -1621,8 +1619,8 @@
                 'servicios': '📋', 
                 'ventas': '💰', 
                 'contratos': '📄',
-                'nomina': '📊'
-                'nomina': '🗺️'
+                'nomina': '📊',
+                'mapa': '🗺️'
             };
 
             const modulosNegocio = modulos.filter(m => m && m.nombre && nombresNegocio.includes(m.nombre.toLowerCase()));
