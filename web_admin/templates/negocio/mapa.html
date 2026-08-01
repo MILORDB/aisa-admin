@@ -18,51 +18,51 @@
         }
         .header {
             background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
-            padding: 12px 20px;
+            padding: 10px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-shrink: 0;
         }
-        .header h1 { font-size: 18px; display: flex; align-items: center; gap: 8px; }
+        .header h1 { font-size: 17px; display: flex; align-items: center; gap: 8px; }
         .header .btn-volver {
             color: #fff;
             text-decoration: none;
-            padding: 4px 14px;
+            padding: 4px 12px;
             border-radius: 20px;
             background: rgba(255,255,255,0.1);
-            font-size: 13px;
+            font-size: 12px;
             transition: background 0.3s;
         }
         .header .btn-volver:hover { background: rgba(255,255,255,0.2); }
         .container {
             flex: 1;
-            padding: 12px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
         }
         .card {
             background: #1a1a2e;
             border-radius: 10px;
-            padding: 14px;
+            padding: 12px;
             border: 1px solid #2a2a3e;
         }
-        .card h2 { font-size: 15px; color: #6c3ce0; margin-bottom: 10px; }
-        .card .subtitle { font-size: 12px; color: #888; margin-bottom: 12px; }
+        .card h2 { font-size: 14px; color: #6c3ce0; margin-bottom: 8px; }
+        .card .subtitle { font-size: 11px; color: #888; margin-bottom: 10px; }
         #map {
             width: 100%;
-            height: 450px;
+            height: 400px;
             border-radius: 8px;
             border: 1px solid #2a2a3e;
             background: #1a1a2e;
         }
         .btn {
-            padding: 8px 18px;
+            padding: 6px 14px;
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            font-size: 13px;
+            font-size: 12px;
             transition: all 0.3s;
         }
         .btn-primary { background: #6c3ce0; color: #fff; }
@@ -73,22 +73,23 @@
         .btn-danger:hover { background: #c62828; }
         .btn-warning { background: #ff9800; color: #000; }
         .btn-warning:hover { background: #e68900; }
-        .btn-sm { padding: 4px 10px; font-size: 11px; }
+        .btn-sm { padding: 3px 8px; font-size: 10px; }
         .ubicacion-info {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             flex-wrap: wrap;
             align-items: center;
-            margin-top: 8px;
+            margin-top: 6px;
+            font-size: 12px;
         }
         .ubicacion-info .coordenadas {
-            font-size: 13px;
+            font-size: 12px;
             color: #aaa;
             font-family: monospace;
         }
         .ubicacion-info .estado {
-            font-size: 12px;
-            padding: 2px 12px;
+            font-size: 11px;
+            padding: 2px 10px;
             border-radius: 12px;
         }
         .ubicacion-info .estado.activa { background: #224422; color: #6bff6b; }
@@ -96,33 +97,33 @@
         .mensaje-exito {
             background: #224422;
             color: #6bff6b;
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-radius: 6px;
-            margin-bottom: 10px;
-            font-size: 12px;
+            margin-bottom: 8px;
+            font-size: 11px;
             display: none;
         }
         .mensaje-exito.show { display: block; }
         .mensaje-error {
             background: #442222;
             color: #ff6b6b;
-            padding: 8px 12px;
+            padding: 6px 10px;
             border-radius: 6px;
-            margin-bottom: 10px;
-            font-size: 12px;
+            margin-bottom: 8px;
+            font-size: 11px;
             display: none;
         }
         .mensaje-error.show { display: block; }
         .leyenda {
             display: flex;
-            gap: 16px;
+            gap: 14px;
             flex-wrap: wrap;
-            font-size: 11px;
+            font-size: 10px;
             color: #888;
-            margin-top: 8px;
+            margin-top: 6px;
         }
         .leyenda .item { display: flex; align-items: center; gap: 4px; }
-        .leyenda .marcador { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+        .leyenda .marcador { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
         .leyenda .marcador.negocio { background: #6c3ce0; }
         .leyenda .marcador.usuario { background: #ff9800; }
         .modal-overlay {
@@ -141,34 +142,41 @@
         .modal-overlay.show { display: flex; }
         .modal-content {
             background: #1a1a2e;
-            padding: 24px;
-            border-radius: 12px;
-            max-width: 400px;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 380px;
             width: 100%;
             border: 1px solid #2a2a3e;
         }
-        .modal-content h3 { font-size: 16px; margin-bottom: 4px; }
-        .modal-content .modal-subtitle { font-size: 12px; color: #888; margin-bottom: 16px; }
-        .modal-content .form-group { margin-bottom: 12px; }
-        .modal-content .form-group label { display: block; font-size: 12px; color: #aaa; margin-bottom: 4px; }
+        .modal-content h3 { font-size: 15px; margin-bottom: 4px; }
+        .modal-content .modal-subtitle { font-size: 11px; color: #888; margin-bottom: 14px; }
+        .modal-content .form-group { margin-bottom: 10px; }
+        .modal-content .form-group label { display: block; font-size: 11px; color: #aaa; margin-bottom: 3px; }
         .modal-content .form-group input {
             width: 100%;
-            padding: 8px 12px;
+            padding: 6px 10px;
             border: 1px solid #2a2a3e;
             border-radius: 6px;
             background: #0f0f1a;
             color: #fff;
-            font-size: 13px;
+            font-size: 12px;
         }
         .modal-content .form-group input:focus { border-color: #6c3ce0; outline: none; }
-        .modal-content .form-actions { display: flex; gap: 10px; margin-top: 16px; }
+        .modal-content .form-actions { display: flex; gap: 8px; margin-top: 14px; }
         .modal-content .form-actions .btn { flex: 1; }
-        .loading { text-align: center; color: #888; padding: 40px; }
+        .btn-acciones {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
         @media (max-width: 600px) {
-            .container { padding: 8px; }
-            .card { padding: 10px; }
-            #map { height: 300px; }
-            .ubicacion-info { flex-direction: column; align-items: flex-start; }
+            .container { padding: 6px; }
+            .card { padding: 8px; }
+            #map { height: 280px; }
+            .ubicacion-info { flex-direction: column; align-items: flex-start; gap: 4px; }
+            .btn-acciones { flex-direction: column; }
+            .btn-acciones .btn { width: 100%; text-align: center; }
         }
     </style>
 </head>
@@ -185,21 +193,21 @@
 
         <!-- Mapa -->
         <div class="card">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:6px;">
                 <h2 style="margin-bottom:0;">📍 Ubicación</h2>
-                <div>
+                <div class="btn-acciones">
                     <button class="btn btn-primary btn-sm" onclick="centrarEnMiUbicacion()">📍 Mi ubicación</button>
-                    <button class="btn btn-success btn-sm" onclick="abrirModalUbicacion()">✏️ Marcar ubicación</button>
+                    <button class="btn btn-success btn-sm" onclick="abrirModalUbicacion()">✏️ Marcar</button>
                 </div>
             </div>
-            <div class="subtitle">Haz clic en el mapa para marcar tu ubicación o arrastra para explorar</div>
+            <div class="subtitle">Haz clic en el mapa para marcar tu ubicación</div>
             
             <div id="map"></div>
             
             <div class="ubicacion-info" id="ubicacionInfo">
                 <span class="estado inactiva" id="estadoUbicacion">⚪ Sin ubicación</span>
                 <span class="coordenadas" id="coordenadasTexto">Lat: - , Lng: -</span>
-                <span style="font-size:11px;color:#666;" id="fechaActualizacion"></span>
+                <span style="font-size:10px;color:#666;" id="fechaActualizacion"></span>
             </div>
         </div>
 
@@ -209,6 +217,7 @@
             <div class="leyenda">
                 <div class="item"><span class="marcador negocio"></span> Negocios registrados</div>
                 <div class="item"><span class="marcador usuario"></span> Tu ubicación</div>
+                <div class="item">🖱️ Clic en el mapa para marcar</div>
             </div>
         </div>
     </div>
@@ -228,8 +237,8 @@
                 <input type="number" id="inputLongitud" step="0.000001" placeholder="-180 a 180">
             </div>
             
-            <div style="font-size:11px;color:#666;margin-bottom:12px;">
-                💡 Puedes obtener coordenadas desde Google Maps haciendo clic derecho en un lugar
+            <div style="font-size:10px;color:#666;margin-bottom:10px;">
+                💡 Puedes obtener coordenadas desde Google Maps
             </div>
             
             <div class="form-actions">
@@ -260,14 +269,13 @@
             
             map = L.map('map', {
                 center: cubaCenter,
-                zoom: 7,
-                zoomControl: true,
-                attributionControl: true
+                zoom: 6,
+                zoomControl: true
             });
 
             // Capa de mapa (OpenStreetMap)
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                attribution: '&copy; OpenStreetMap'
             }).addTo(map);
 
             // Evento de clic en el mapa
@@ -299,7 +307,6 @@
                         lng: data.ubicacion.longitud
                     };
                     
-                    // Actualizar info
                     document.getElementById('estadoUbicacion').textContent = '🟢 Ubicación registrada';
                     document.getElementById('estadoUbicacion').className = 'estado activa';
                     document.getElementById('coordenadasTexto').textContent = `Lat: ${data.ubicacion.latitud.toFixed(6)}, Lng: ${data.ubicacion.longitud.toFixed(6)}`;
@@ -309,25 +316,19 @@
                         document.getElementById('fechaActualizacion').textContent = `📅 Actualizada: ${fecha.toLocaleString()}`;
                     }
                     
-                    // Mostrar en el mapa
                     mostrarUbicacionUsuario(data.ubicacion.latitud, data.ubicacion.longitud);
-                    
-                    // Centrar el mapa en la ubicación del usuario
-                    map.setView([data.ubicacion.latitud, data.ubicacion.longitud], 14);
+                    map.setView([data.ubicacion.latitud, data.ubicacion.longitud], 13);
                 } else {
                     document.getElementById('estadoUbicacion').textContent = '⚪ Sin ubicación registrada';
                     document.getElementById('estadoUbicacion').className = 'estado inactiva';
                     
-                    // Intentar obtener ubicación por GPS
                     if (navigator.geolocation) {
                         navigator.geolocation.getCurrentPosition(function(pos) {
                             const lat = pos.coords.latitude;
                             const lng = pos.coords.longitude;
-                            map.setView([lat, lng], 14);
+                            map.setView([lat, lng], 13);
                             mostrarUbicacionUsuario(lat, lng);
-                        }, function() {
-                            console.log('No se pudo obtener ubicación GPS');
-                        });
+                        }, function() {});
                     }
                 }
             } catch (error) {
@@ -340,7 +341,6 @@
         // ============================================
 
         function mostrarUbicacionUsuario(lat, lng) {
-            // Icono personalizado para el usuario
             const usuarioIcon = L.divIcon({
                 html: '📍',
                 className: 'custom-marker',
@@ -367,7 +367,6 @@
                 const data = await response.json();
                 
                 if (data.success && data.negocios.length > 0) {
-                    // Icono para negocios
                     const negocioIcon = L.divIcon({
                         html: '🏪',
                         className: 'custom-marker',
@@ -380,13 +379,13 @@
                             const marker = L.marker([negocio.latitud, negocio.longitud], { icon: negocioIcon })
                                 .addTo(map)
                                 .bindPopup(`
-                                    <div style="min-width:180px;">
+                                    <div style="min-width:160px;font-size:12px;">
                                         <strong style="color:#6c3ce0;">🏪 ${negocio.nombre}</strong>
                                         ${negocio.direccion ? `<br>📍 ${negocio.direccion}` : ''}
                                         ${negocio.telefono ? `<br>📞 ${negocio.telefono}` : ''}
                                         ${negocio.descripcion ? `<br>${negocio.descripcion}` : ''}
-                                        <br><br>
-                                        <a href="/negocio/ver/${negocio.id}" style="color:#6c3ce0;text-decoration:none;">Ver negocio →</a>
+                                        <br>
+                                        <span style="font-size:10px;color:#888;">${negocio.latitud.toFixed(4)}, ${negocio.longitud.toFixed(4)}</span>
                                     </div>
                                 `);
                             
@@ -394,7 +393,6 @@
                         }
                     });
 
-                    // Si hay negocios y el usuario no tiene ubicación, ajustar el mapa
                     if (!ubicacionActual && data.negocios.length > 0) {
                         const bounds = L.latLngBounds(data.negocios.map(n => [n.latitud, n.longitud]));
                         map.fitBounds(bounds, { padding: [50, 50] });
@@ -414,7 +412,7 @@
                 map.setView([ubicacionActual.lat, ubicacionActual.lng], 15);
                 mostrarMensaje('📍 Centrando en tu ubicación', 'exito');
             } else {
-                mostrarMensaje('⚠️ No tienes una ubicación registrada. Marca tu ubicación.', 'error');
+                mostrarMensaje('⚠️ No tienes una ubicación registrada', 'error');
             }
         }
 
@@ -423,9 +421,7 @@
         // ============================================
 
         function abrirModalUbicacion() {
-            const modal = document.getElementById('modalUbicacion');
-            modal.classList.add('show');
-            
+            document.getElementById('modalUbicacion').classList.add('show');
             if (ubicacionActual) {
                 document.getElementById('inputLatitud').value = ubicacionActual.lat;
                 document.getElementById('inputLongitud').value = ubicacionActual.lng;
@@ -460,7 +456,7 @@
             
             const btn = event?.target || document.querySelector('.modal-content .btn-success');
             const textoOriginal = btn ? btn.textContent : '💾 Guardar';
-            if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
             
             try {
                 const response = await fetch('/api/ubicacion/actualizar', {
@@ -472,10 +468,9 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    mostrarMensaje('✅ Ubicación guardada correctamente', 'exito');
+                    mostrarMensaje('✅ Ubicación guardada', 'exito');
                     cerrarModal();
                     
-                    // Actualizar ubicación
                     ubicacionActual = { lat, lng };
                     mostrarUbicacionUsuario(lat, lng);
                     map.setView([lat, lng], 15);
@@ -516,7 +511,7 @@
             setTimeout(() => {
                 errorEl.classList.remove('show');
                 exitoEl.classList.remove('show');
-            }, 4000);
+            }, 3000);
         }
 
         // ============================================
@@ -527,7 +522,7 @@
             initMap();
         });
 
-        // Soporte para Enter en los inputs del modal
+        // Enter en inputs del modal
         document.getElementById('inputLatitud').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') document.getElementById('inputLongitud').focus();
         });
