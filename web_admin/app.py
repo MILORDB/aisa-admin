@@ -3282,7 +3282,8 @@ def api_calcular_nomina():
 @app.route('/api/nomina/detalle', methods=['GET'])
 @login_required
 def api_nomina_detalle():
-    token = request.cooks.get('token')
+    """Obtiene el detalle de nómina de un trabajador"""
+    token = request.cookies.get('token')  # <--- CORREGIDO: cookies en lugar de cooks
     usuario = obtener_usuario_sesion(token)
     
     if not usuario or usuario.get('tipo') != 'negocio':
