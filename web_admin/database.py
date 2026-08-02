@@ -44,7 +44,7 @@ def init_db():
         print(f"❌ Error de conexión: {e}")
         return
     
-    # TABLAS CON SERIAL (PostgreSQL)
+    # TABLAS CON SERIAL (PostgreSQL) - INCLUYE CAMPOS DE UBICACIÓN
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -278,7 +278,7 @@ def init_db():
     )
     ''')
     
-    # Insertar módulos
+    # Insertar módulos - INCLUYE MAPA
     cursor.execute("SELECT COUNT(*) FROM modulos")
     if cursor.fetchone()[0] == 0:
         modulos = [
@@ -302,7 +302,7 @@ def init_db():
             'INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido) VALUES (%s, %s, %s, %s)',
             modulos
         )
-        print("✅ Módulos insertados")
+        print("✅ Módulos insertados (incluye MAPA)")
     
     # Crear usuario admin
     cursor.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'admin'")
