@@ -1536,13 +1536,14 @@
         }
 
         // ============================================
-        // RENDER MÓDULOS - PANEL IZQUIERDO
+        // RENDER MÓDULOS - PANEL IZQUIERDO (CON MAPA)
         // ============================================
 
         function renderModulos(permisos) {
             const container = document.getElementById('modulosContainer');
             container.innerHTML = '';
 
+            // MÓDULOS DE NEGOCIO - INCLUYE MAPA
             const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos', 'nomina', 'mapa'];
             const iconos = { 
                 'inventario': '📦', 
@@ -1604,13 +1605,14 @@
         }
 
         // ============================================
-        // RENDER MÓDULOS - MENÚ MÓVIL
+        // RENDER MÓDULOS - MENÚ MÓVIL (CON MAPA)
         // ============================================
 
         function renderModulosMobile(permisos) {
             const container = document.getElementById('modulosMobileList');
             container.innerHTML = '';
 
+            // MÓDULOS DE NEGOCIO - INCLUYE MAPA
             const nombresNegocio = ['inventario', 'servicios', 'tienda', 'trabajadores', 'ventas', 'contratos', 'nomina', 'mapa'];
             const iconos = { 
                 'inventario': '📦', 
