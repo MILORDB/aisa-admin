@@ -224,6 +224,9 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA ASISTENCIA - CORREGIDA
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS asistencia (
         id SERIAL PRIMARY KEY,
@@ -239,6 +242,9 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA NOMINA
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS nomina (
         id SERIAL PRIMARY KEY,
@@ -261,6 +267,9 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA COMISIONES_TRABAJADOR - CORREGIDA
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS comisiones_trabajador (
         id SERIAL PRIMARY KEY,
@@ -278,7 +287,9 @@ def init_db():
     )
     ''')
     
-    # TABLA DE SECUENCIA DE FACTURAS
+    # ============================================
+    # TABLA FACTURAS_SECUENCIA
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS facturas_secuencia (
         id SERIAL PRIMARY KEY,
@@ -1430,10 +1441,11 @@ def eliminar_contrato(contrato_id):
     conn.close()
 
 # ============================================
-# FUNCIONES PARA NÓMINA
+# FUNCIONES PARA NÓMINA - CORREGIDAS CON VERIFICACIÓN DE TABLAS
 # ============================================
 
 def registrar_asistencia(trabajador_id, negocio_id, fecha, presente=1, horas=8):
+    """Registra la asistencia de un trabajador"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1454,23 +1466,41 @@ def registrar_asistencia(trabajador_id, negocio_id, fecha, presente=1, horas=8):
         return False
 
 def obtener_asistencia_mes(trabajador_id, mes, ano):
+    """Obtiene todas las asistencias de un trabajador en un mes"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-        SELECT * FROM asistencia 
-        WHERE trabajador_id = %s 
-        AND EXTRACT(MONTH FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
-        AND EXTRACT(YEAR FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
-        ORDER BY fecha ASC
-    ''', (trabajador_id, mes, ano))
-    asistencias = cursor.fetchall()
-    conn.close()
-    return asistencias
+    try:
+        cursor.execute('''
+            SELECT * FROM asistencia 
+            WHERE trabajador_id = %s 
+            AND EXTRACT(MONTH FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+            AND EXTRACT(YEAR FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+            ORDER BY fecha ASC
+        ''', (trabajador_id, mes, ano))
+        asistencias = cursor.fetchall()
+        conn.close()
+        return asistencias
+    except Exception as e:
+        print(f"❌ Error en obtener_asistencia_mes: {e}")
+        conn.close()
+        return []
 
 def obtener_dias_trabajados_mes(trabajador_id, mes, ano):
+    """Obtiene el conteo de días trabajados en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
+        # Verificar si la tabla existe
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'asistencia'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            conn.close()
+            return 0
+        
         cursor.execute('''
             SELECT COUNT(*) FROM asistencia 
             WHERE trabajador_id = %s 
@@ -1487,9 +1517,20 @@ def obtener_dias_trabajados_mes(trabajador_id, mes, ano):
         return 0
 
 def obtener_dias_ausencia_mes(trabajador_id, mes, ano):
+    """Obtiene el conteo de días de ausencia en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'asistencia'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            conn.close()
+            return 0
+        
         cursor.execute('''
             SELECT COUNT(*) FROM asistencia 
             WHERE trabajador_id = %s 
@@ -1506,9 +1547,20 @@ def obtener_dias_ausencia_mes(trabajador_id, mes, ano):
         return 0
 
 def obtener_dias_extras_mes(trabajador_id, mes, ano):
+    """Obtiene el conteo de días extras trabajados en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'asistencia'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            conn.close()
+            return 0
+        
         cursor.execute('''
             SELECT COUNT(*) FROM asistencia 
             WHERE trabajador_id = %s 
@@ -1525,6 +1577,7 @@ def obtener_dias_extras_mes(trabajador_id, mes, ano):
         return 0
 
 def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
+    """Registra una comisión generada por una venta"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1542,9 +1595,11 @@ def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
         return False
 
 def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
+    """Obtiene las comisiones de un trabajador en un mes específico"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        # Verificar si la tabla existe
         cursor.execute("""
             SELECT EXISTS (
                 SELECT FROM information_schema.tables 
@@ -1558,6 +1613,7 @@ def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
             conn.close()
             return []
         
+        # Verificar si hay comisiones para este trabajador
         cursor.execute("""
             SELECT COUNT(*) FROM comisiones_trabajador 
             WHERE trabajador_id = %s
@@ -1596,9 +1652,20 @@ def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
         return []
 
 def obtener_total_comisiones_mes(trabajador_id, mes, ano):
+    """Obtiene el total de comisiones de un trabajador en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'comisiones_trabajador'
+            )
+        """)
+        if not cursor.fetchone()[0]:
+            conn.close()
+            return 0
+        
         cursor.execute('''
             SELECT COALESCE(SUM(monto), 0) FROM comisiones_trabajador 
             WHERE trabajador_id = %s 
@@ -1632,6 +1699,7 @@ def obtener_comisiones_negocio_mes(negocio_id, mes, ano):
     return comisiones
 
 def calcular_nomina(negocio_id, trabajador_id, mes, ano):
+    """Calcula la nómina de un trabajador para un mes específico"""
     try:
         import calendar
         _, dias_mes = calendar.monthrange(ano, mes)
@@ -1639,6 +1707,7 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
         conn = get_db()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
+        # Obtener datos del trabajador
         cursor.execute('''
             SELECT u.id, u.nombre, u.datos_negocio
             FROM usuarios u
@@ -1651,6 +1720,7 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
             print(f"⚠️ Trabajador {trabajador_id} no encontrado")
             return None
         
+        # Obtener salario base
         datos = {}
         if trabajador['datos_negocio']:
             try:
@@ -1665,30 +1735,31 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
             conn.close()
             return None
         
+        # Obtener días trabajados
         dias_trabajados = obtener_dias_trabajados_mes(trabajador_id, mes, ano)
         dias_ausencia = obtener_dias_ausencia_mes(trabajador_id, mes, ano)
         dias_extras = obtener_dias_extras_mes(trabajador_id, mes, ano)
         
+        # Si no hay registros de asistencia, usar días laborables aproximados
         if dias_trabajados == 0:
-            cursor.execute('''
-                SELECT COUNT(*) FROM asistencia 
-                WHERE trabajador_id = %s 
-                AND EXTRACT(MONTH FROM fecha::date) = %s
-                AND EXTRACT(YEAR FROM fecha::date) = %s
-            ''', (trabajador_id, mes, ano))
-            total_asistencias = cursor.fetchone()['count']
-            
-            if total_asistencias == 0:
-                dias_trabajados = dias_mes
-                print(f"ℹ️ No hay registros de asistencia para {trabajador['nombre']}, usando {dias_mes} días")
+            # Calcular días laborables (lunes a viernes)
+            for d in range(1, dias_mes + 1):
+                fecha = datetime(ano, mes, d)
+                if fecha.weekday() < 5:  # 0=Lunes, 4=Viernes
+                    dias_trabajados += 1
+            print(f"ℹ️ No hay registros de asistencia para {trabajador['nombre']}, usando {dias_trabajados} días laborables")
         
+        # Calcular salario
         salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
         salario_devengado = salario_diario * dias_trabajados
         
+        # Obtener comisiones
         comisiones = obtener_total_comisiones_mes(trabajador_id, mes, ano)
         
+        # Calcular total
         total = salario_devengado + comisiones
         
+        # Guardar o actualizar nómina
         cursor.execute('''
             SELECT id FROM nomina 
             WHERE negocio_id = %s AND trabajador_id = %s AND mes = %s AND ano = %s
@@ -1751,6 +1822,7 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
         return None
 
 def obtener_nomina_mes(negocio_id, mes, ano):
+    """Obtiene la nómina de todos los trabajadores para un mes específico"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1775,6 +1847,7 @@ def obtener_nomina_mes(negocio_id, mes, ano):
         return []
 
 def obtener_nomina_trabajador(trabajador_id, mes, ano):
+    """Obtiene la nómina de un trabajador específico para un mes"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1793,6 +1866,7 @@ def obtener_nomina_trabajador(trabajador_id, mes, ano):
         return None
 
 def obtener_resumen_nomina(negocio_id, mes, ano):
+    """Obtiene un resumen de la nómina para un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
