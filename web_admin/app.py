@@ -484,6 +484,554 @@ def fix_ubicacion():
         """, 500
 
 # ============================================
+# ENDPOINT PARA REPARAR TABLAS DE NÓMINA
+# ============================================
+@app.route('/fix-tablas-nomina', methods=['GET'])
+def fix_tablas_nomina():
+    """Endpoint para crear tablas de nómina desde el navegador"""
+    try:
+        import urllib.parse
+        import psycopg2
+        
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return """
+            <html>
+                <head><title>Error</title></head>
+                <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                    <h1 style="color:#ff6b6b;">❌ DATABASE_URL no está configurada</h1>
+                    <p style="color:#888;">Asegúrate de que la variable de entorno DATABASE_URL esté configurada en Render</p>
+                    <br>
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                </body>
+            </html>
+            """, 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL - Reparando tablas de nómina...")
+        
+        mensajes = []
+        
+        # 1. Crear tabla asistencia
+        print("🔧 Creando tabla asistencia...")
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS asistencia (
+            id SERIAL PRIMARY KEY,
+            trabajador_id INTEGER NOT NULL,
+            negocio_id INTEGER NOT NULL,
+            fecha TEXT NOT NULL,
+            presente INTEGER DEFAULT 1,
+            horas_trabajadas REAL DEFAULT 8,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(trabajador_id, fecha)
+        )
+        ''')
+        mensajes.append("✅ Tabla 'asistencia' creada/verificada")
+        
+        # 2. Crear tabla comisiones_trabajador
+        print("🔧 Creando tabla comisiones_trabajador...")
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS comisiones_trabajador (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            trabajador_id INTEGER NOT NULL,
+            venta_id INTEGER NOT NULL,
+            producto_id INTEGER NOT NULL,
+            monto REAL NOT NULL,
+            fecha TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
+            FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+        )
+        ''')
+        mensajes.append("✅ Tabla 'comisiones_trabajador' creada/verificada")
+        
+        # 3. Verificar tabla nomina
+        print("🔧 Verificando tabla nomina...")
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS nomina (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            trabajador_id INTEGER NOT NULL,
+            mes INTEGER NOT NULL,
+            ano INTEGER NOT NULL,
+            salario_base REAL NOT NULL DEFAULT 0,
+            dias_trabajados INTEGER DEFAULT 0,
+            dias_ausencia INTEGER DEFAULT 0,
+            dias_extras INTEGER DEFAULT 0,
+            salario_devengado REAL DEFAULT 0,
+            comisiones REAL DEFAULT 0,
+            total REAL DEFAULT 0,
+            creado_en TEXT NOT NULL,
+            actualizado_en TEXT,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(negocio_id, trabajador_id, mes, ano)
+        )
+        ''')
+        mensajes.append("✅ Tabla 'nomina' creada/verificada")
+        
+        # 4. Verificar columna comision en productos
+        print("🔧 Verificando columna comision en productos...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'productos' AND column_name = 'comision'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE productos ADD COLUMN comision REAL DEFAULT 0")
+            mensajes.append("✅ Columna 'comision' agregada a productos")
+        else:
+            mensajes.append("✅ Columna 'comision' ya existe")
+        
+        # 5. Verificar columnas en nomina
+        print("🔧 Verificando columnas en nomina...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'nomina'
+        """)
+        columnas = [col[0] for col in cursor.fetchall()]
+        
+        columnas_necesarias = [
+            'salario_base', 'dias_trabajados', 'dias_ausencia', 
+            'dias_extras', 'salario_devengado', 'comisiones', 'total'
+        ]
+        
+        for col in columnas_necesarias:
+            if col not in columnas:
+                if col == 'salario_base':
+                    cursor.execute("ALTER TABLE nomina ADD COLUMN salario_base REAL NOT NULL DEFAULT 0")
+                elif col == 'dias_trabajados':
+                    cursor.execute("ALTER TABLE nomina ADD COLUMN dias_trabajados INTEGER DEFAULT 0")
+                elif col == 'dias_ausencia':
+                    cursor.execute("ALTER TABLE nomina ADD COLUMN dias_ausencia INTEGER DEFAULT 0")
+                elif col == 'dias_extras':
+                    cursor.execute("ALTER TABLE nomina ADD COLUMN dias_extras INTEGER DEFAULT 0")
+                elif col == 'salario_devengado':
+                    cursor.execute("ALTER TABLE nomina ADD COLUMN salario_devengado REAL DEFAULT 0")
+                elif col == 'comisiones':
+                    cursor.execute("ALTER TABLE nomina ADD COLUMN comisiones REAL DEFAULT 0")
+                elif col == 'total':
+                    cursor.execute("ALTER TABLE nomina ADD COLUMN total REAL DEFAULT 0")
+                mensajes.append(f"✅ Columna '{col}' agregada a nomina")
+            else:
+                mensajes.append(f"✅ Columna '{col}' ya existe")
+        
+        conn.commit()
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head>
+                <title>Tablas de Nómina Reparadas</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                    .btn-success {{ background: #4caf50; color: #fff; }}
+                    .btn-success:hover {{ background: #3d8b40; }}
+                    ul {{ list-style: none; padding: 0; }}
+                    ul li {{ padding: 6px 0; border-bottom: 1px solid #1a1a2e; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Tablas de Nómina</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        <ul>
+                            {''.join([f'<li>✅ {m}</li>' for m in mensajes])}
+                        </ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Tablas Creadas/Verificadas</h3>
+                        <ul>
+                            <li>✅ <strong>asistencia</strong> - Registro de asistencia de trabajadores</li>
+                            <li>✅ <strong>comisiones_trabajador</strong> - Comisiones por ventas de trabajadores</li>
+                            <li>✅ <strong>nomina</strong> - Cálculo de nómina mensual</li>
+                            <li>✅ <strong>productos</strong> - Columna 'comision' agregada</li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 16px; background: #0f0f1a; border-radius: 8px; border: 1px solid #2a2a3e;">
+                        <p style="color: #888;">ℹ️ Si el problema persiste, reinicia el servidor en Render</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_detalle = traceback.format_exc()
+        print(f"❌ Error en fix_tablas_nomina: {e}")
+        print(error_detalle)
+        
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al reparar tablas</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;font-size:12px;overflow:auto;max-height:400px;">{error_detalle}</pre>
+                <div style="margin-top:16px;">
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                </div>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA REPARAR TODAS LAS TABLAS DE NÓMINA Y COMISIONES (COMPLETO)
+# ============================================
+@app.route('/fix-nomina-completo', methods=['GET'])
+def fix_nomina_completo():
+    """Endpoint para crear todas las tablas relacionadas con nómina y comisiones"""
+    try:
+        import urllib.parse
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return """
+            <html>
+                <head><title>Error</title></head>
+                <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                    <h1 style="color:#ff6b6b;">❌ DATABASE_URL no está configurada</h1>
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                </body>
+            </html>
+            """, 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL - Reparando tablas de nómina y comisiones...")
+        
+        mensajes = []
+        errores = []
+        
+        # ============================================
+        # 1. TABLA ASISTENCIA
+        # ============================================
+        print("🔧 Creando tabla asistencia...")
+        try:
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS asistencia (
+                id SERIAL PRIMARY KEY,
+                trabajador_id INTEGER NOT NULL,
+                negocio_id INTEGER NOT NULL,
+                fecha DATE NOT NULL,
+                presente INTEGER DEFAULT 1,
+                horas_trabajadas REAL DEFAULT 8,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                UNIQUE(trabajador_id, fecha)
+            )
+            ''')
+            mensajes.append("✅ Tabla 'asistencia' creada/verificada")
+        except Exception as e:
+            errores.append(f"❌ Error creando 'asistencia': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # ============================================
+        # 2. TABLA COMISIONES_TRABAJADOR
+        # ============================================
+        print("🔧 Creando tabla comisiones_trabajador...")
+        try:
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS comisiones_trabajador (
+                id SERIAL PRIMARY KEY,
+                negocio_id INTEGER NOT NULL,
+                trabajador_id INTEGER NOT NULL,
+                venta_id INTEGER NOT NULL,
+                producto_id INTEGER,
+                monto REAL NOT NULL DEFAULT 0,
+                fecha DATE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
+                FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+            )
+            ''')
+            mensajes.append("✅ Tabla 'comisiones_trabajador' creada/verificada")
+        except Exception as e:
+            errores.append(f"❌ Error creando 'comisiones_trabajador': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # ============================================
+        # 3. TABLA NOMINA
+        # ============================================
+        print("🔧 Creando tabla nomina...")
+        try:
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS nomina (
+                id SERIAL PRIMARY KEY,
+                negocio_id INTEGER NOT NULL,
+                trabajador_id INTEGER NOT NULL,
+                mes INTEGER NOT NULL,
+                ano INTEGER NOT NULL,
+                salario_base REAL NOT NULL DEFAULT 0,
+                dias_trabajados INTEGER DEFAULT 0,
+                dias_ausencia INTEGER DEFAULT 0,
+                dias_extras INTEGER DEFAULT 0,
+                salario_devengado REAL DEFAULT 0,
+                comisiones REAL DEFAULT 0,
+                total REAL DEFAULT 0,
+                creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TIMESTAMP,
+                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                UNIQUE(negocio_id, trabajador_id, mes, ano)
+            )
+            ''')
+            mensajes.append("✅ Tabla 'nomina' creada/verificada")
+        except Exception as e:
+            errores.append(f"❌ Error creando 'nomina': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # ============================================
+        # 4. VERIFICAR COLUMNA COMISION EN PRODUCTOS
+        # ============================================
+        print("🔧 Verificando columna comision en productos...")
+        try:
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'productos' AND column_name = 'comision'
+            """)
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE productos ADD COLUMN comision REAL DEFAULT 0")
+                mensajes.append("✅ Columna 'comision' agregada a productos")
+            else:
+                mensajes.append("✅ Columna 'comision' ya existe en productos")
+        except Exception as e:
+            errores.append(f"❌ Error verificando columna 'comision': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # ============================================
+        # 5. VERIFICAR COLUMNA COSTO EN PRODUCTOS
+        # ============================================
+        print("🔧 Verificando columna costo en productos...")
+        try:
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'productos' AND column_name = 'costo'
+            """)
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE productos ADD COLUMN costo REAL DEFAULT 0")
+                mensajes.append("✅ Columna 'costo' agregada a productos")
+            else:
+                mensajes.append("✅ Columna 'costo' ya existe en productos")
+        except Exception as e:
+            errores.append(f"❌ Error verificando columna 'costo': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # ============================================
+        # 6. VERIFICAR COLUMNA FACTURA EN VENTAS
+        # ============================================
+        print("🔧 Verificando columna factura en ventas...")
+        try:
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'ventas' AND column_name = 'factura'
+            """)
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE ventas ADD COLUMN factura TEXT")
+                mensajes.append("✅ Columna 'factura' agregada a ventas")
+            else:
+                mensajes.append("✅ Columna 'factura' ya existe en ventas")
+        except Exception as e:
+            errores.append(f"❌ Error verificando columna 'factura': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # ============================================
+        # 7. CREAR ÍNDICES PARA MEJORAR RENDIMIENTO
+        # ============================================
+        print("🔧 Creando índices...")
+        try:
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_asistencia_trabajador ON asistencia(trabajador_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_asistencia_fecha ON asistencia(fecha)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_comisiones_trabajador ON comisiones_trabajador(trabajador_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_comisiones_fecha ON comisiones_trabajador(fecha)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_nomina_trabajador ON nomina(trabajador_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_nomina_mes_ano ON nomina(mes, ano)")
+            mensajes.append("✅ Índices creados/verificados")
+        except Exception as e:
+            errores.append(f"⚠️ Error creando índices: {str(e)}")
+            print(f"⚠️ Error: {e}")
+        
+        conn.commit()
+        
+        # ============================================
+        # 8. VERIFICAR QUE LAS TABLAS EXISTAN
+        # ============================================
+        print("🔧 Verificando tablas...")
+        tablas_verificadas = []
+        for tabla in ['asistencia', 'comisiones_trabajador', 'nomina']:
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = %s
+                )
+            """, (tabla,))
+            existe = cursor.fetchone()[0]
+            tablas_verificadas.append(f"{tabla}: {'✅ Existe' if existe else '❌ NO EXISTE'}")
+            if not existe:
+                errores.append(f"❌ Tabla '{tabla}' NO existe después de la creación")
+        
+        conn.close()
+        
+        # ============================================
+        # GENERAR HTML CON RESULTADOS
+        # ============================================
+        html_mensajes = "<br>".join(mensajes)
+        html_errores = "<br>".join(errores) if errores else "✅ Sin errores"
+        html_verificacion = "<br>".join(tablas_verificadas)
+        
+        return f"""
+        <html>
+            <head>
+                <title>Tablas de Nómina y Comisiones Reparadas</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 900px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .error {{ color: #ff6b6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                    .btn-success {{ background: #4caf50; color: #fff; }}
+                    .btn-success:hover {{ background: #3d8b40; }}
+                    ul {{ list-style: none; padding: 0; }}
+                    ul li {{ padding: 6px 0; border-bottom: 1px solid #1a1a2e; }}
+                    .result-box {{ background: #0f0f1a; border-radius: 8px; padding: 12px; border: 1px solid #2a2a3e; margin-top: 12px; }}
+                    .tabla-status {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+                    .tabla-status td {{ padding: 6px 12px; border-bottom: 1px solid #1a1a2e; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Tablas de Nómina y Comisiones</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        <ul>
+                            {''.join([f'<li>✅ {m}</li>' for m in mensajes])}
+                        </ul>
+                        {f'<div style="margin-top:10px;color:#ff6b6b;"><strong>❌ Errores:</strong><br>{html_errores}</div>' if errores else ''}
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Verificación de Tablas</h3>
+                        <table class="tabla-status">
+                            {''.join([f'<tr><td>📌 {t}</td></tr>' for t in tablas_verificadas])}
+                        </table>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Tablas Creadas/Verificadas</h3>
+                        <ul>
+                            <li>✅ <strong>asistencia</strong> - Registro de asistencia de trabajadores</li>
+                            <li>✅ <strong>comisiones_trabajador</strong> - Comisiones por ventas de trabajadores</li>
+                            <li>✅ <strong>nomina</strong> - Cálculo de nómina mensual</li>
+                            <li>✅ <strong>productos</strong> - Columnas 'costo' y 'comision' agregadas</li>
+                            <li>✅ <strong>ventas</strong> - Columna 'factura' agregada</li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
+                        <a href="/negocio/ventas" class="btn btn-success">💰 Ir a Ventas</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 16px; background: #0f0f1a; border-radius: 8px; border: 1px solid #2a2a3e;">
+                        <p style="color: #888;">ℹ️ Si el problema persiste, reinicia el servidor en Render</p>
+                        <p style="color: #888;">🔧 También puedes ejecutar: <code style="color:#6c3ce0;">/fix-tablas-nomina</code></p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_detalle = traceback.format_exc()
+        print(f"❌ Error en fix_nomina_completo: {e}")
+        print(error_detalle)
+        
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al reparar tablas</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;font-size:12px;overflow:auto;max-height:400px;">{error_detalle}</pre>
+                <div style="margin-top:16px;">
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                </div>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
 # ENDPOINT PARA REPARAR MÓDULOS (VIA WEB)
 # ============================================
 @app.route('/fix-modulos-web', methods=['GET'])
