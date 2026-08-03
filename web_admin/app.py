@@ -2253,7 +2253,7 @@ def api_obtener_ubicacion():
     })
 
 # ============================================
-# API - VENTAS (ACTUALIZADO CON SECUENCIA DE FACTURAS)
+# API - VENTAS (ACTUALIZADO CON SECUENCIA DE FACTURAS Y DELETE CORREGIDO)
 # ============================================
 @app.route('/api/ventas', methods=['GET', 'POST'])
 @login_required
@@ -2370,6 +2370,86 @@ def api_ventas():
         'factura': factura,
         'stock_actualizado': tipo == 'producto' and estado != 'oferta'
     })
+
+# ============================================
+# API - ELIMINAR VENTA (CORREGIDO)
+# ============================================
+@app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_venta(venta_id):
+    """Elimina una venta y reintegra el stock"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    if usuario.get('tipo') != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT estado, producto_id, cantidad FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
+        venta = cursor.fetchone()
+        
+        if not venta:
+            conn.close()
+            return jsonify({'error': 'Venta no encontrada'}), 404
+        
+        estado = venta[0]
+        producto_id = venta[1]
+        cantidad = venta[2]
+        
+        # Si es oferta, solo eliminar sin reintegrar stock
+        if estado == 'oferta':
+            cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
+            conn.commit()
+            conn.close()
+            registrar_log(usuario['id'], 'oferta_eliminada', f'Oferta #{venta_id} eliminada')
+            return jsonify({
+                'success': True,
+                'message': 'Oferta eliminada correctamente'
+            })
+        
+        # Si no es oferta, eliminar y reintegrar stock
+        if producto_id:
+            cursor.execute('''
+                UPDATE productos 
+                SET stock = stock + %s, updated_at = %s 
+                WHERE id = %s
+            ''', (cantidad, datetime.now().isoformat(), producto_id))
+            
+            if cursor.rowcount == 0:
+                conn.rollback()
+                conn.close()
+                return jsonify({'error': 'Error al actualizar el stock'}), 500
+        
+        # Obtener datos de la venta para el log
+        cursor.execute('SELECT cliente, producto, total FROM ventas WHERE id = %s', (venta_id,))
+        venta_data = cursor.fetchone()
+        
+        cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
+        conn.commit()
+        conn.close()
+        
+        registrar_log(usuario['id'], 'venta_eliminada', 
+                     f'Venta #{venta_id} eliminada. Cliente: {venta_data[0]} - Producto: {venta_data[1]} - Total: {venta_data[2]}')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Venta eliminada y stock reintegrado correctamente'
+        })
+        
+    except psycopg2.Error as e:
+        print(f"❌ Error SQL eliminando venta: {e}")
+        conn.rollback()
+        conn.close()
+        return jsonify({'error': f'Error de base de datos: {str(e)}'}), 500
+    except Exception as e:
+        print(f"❌ Error eliminando venta: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 # ============================================
 # API - TODOS LOS PRODUCTOS (para admin)
