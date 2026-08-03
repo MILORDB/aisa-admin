@@ -3992,37 +3992,13 @@ def api_reporte_productos():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - NÓMINA
+# API - NÓMINA (NUEVOS ENDPOINTS)
 # ============================================
-@app.route('/api/nomina', methods=['GET'])
-@login_required
-def api_nomina():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario.get('tipo') != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    mes = request.args.get('mes', type=int)
-    ano = request.args.get('ano', type=int)
-    
-    if not mes or not ano:
-        return jsonify({'error': 'Mes y año son requeridos'}), 400
-    
-    try:
-        nomina = obtener_nomina_mes(usuario['id'], mes, ano)
-        return jsonify({
-            'success': True,
-            'nominas': nomina
-        })
-    except Exception as e:
-        print(f"❌ Error en api_nomina: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
 
-@app.route('/api/nomina/calcular', methods=['POST'])
+@app.route('/api/nomina/asistencia', methods=['POST'])
 @login_required
-def api_calcular_nomina():
+def api_guardar_asistencia():
+    """Guarda la asistencia de un trabajador"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -4030,64 +4006,98 @@ def api_calcular_nomina():
         return jsonify({'error': 'No autorizado'}), 403
     
     data = request.get_json()
+    trabajador_id = data.get('trabajador_id')
+    fecha = data.get('fecha')
+    presente = data.get('presente', 1)
+    horas = data.get('horas', 8)
+    
+    if not trabajador_id or not fecha:
+        return jsonify({'error': 'Trabajador y fecha son requeridos'}), 400
+    
+    # Verificar que el trabajador pertenece al negocio
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id FROM trabajadores_negocio 
+        WHERE negocio_id = %s AND trabajador_id = %s AND activo = 1
+    ''', (usuario['id'], trabajador_id))
+    if not cursor.fetchone():
+        conn.close()
+        return jsonify({'error': 'Trabajador no pertenece a este negocio'}), 403
+    conn.close()
+    
+    exito = registrar_asistencia(trabajador_id, usuario['id'], fecha, presente, horas)
+    
+    if exito:
+        return jsonify({'success': True, 'message': 'Asistencia registrada'})
+    else:
+        return jsonify({'error': 'Error al registrar asistencia'}), 500
+
+@app.route('/api/nomina/comisiones', methods=['GET'])
+@login_required
+def api_obtener_comisiones_trabajador():
+    """Obtiene las comisiones de un trabajador para un mes"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario.get('tipo') != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    trabajador_id = request.args.get('trabajador_id', type=int)
+    mes = request.args.get('mes', type=int)
+    ano = request.args.get('ano', type=int)
+    
+    if not trabajador_id or not mes or not ano:
+        return jsonify({'error': 'Trabajador, mes y año son requeridos'}), 400
+    
+    comisiones = obtener_comisiones_trabajador_mes(trabajador_id, mes, ano)
+    
+    return jsonify({
+        'success': True,
+        'comisiones': comisiones
+    })
+
+@app.route('/api/nomina/calcular', methods=['POST'])
+@login_required
+def api_calcular_nomina_trabajador():
+    """Calcula la nómina de un trabajador específico"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario or usuario.get('tipo') != 'negocio':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    data = request.get_json()
+    trabajador_id = data.get('trabajador_id')
     mes = data.get('mes', type=int)
     ano = data.get('ano', type=int)
+    dias_trabajados = data.get('dias_trabajados', type=int)
     
-    if not mes or not ano:
-        return jsonify({'error': 'Mes y año son requeridos'}), 400
+    if not trabajador_id or not mes or not ano:
+        return jsonify({'error': 'Trabajador, mes y año son requeridos'}), 400
     
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT tn.trabajador_id, u.nombre, u.datos_negocio
-            FROM trabajadores_negocio tn
-            JOIN usuarios u ON tn.trabajador_id = u.id
-            WHERE tn.negocio_id = %s AND tn.activo = 1
-        ''', (usuario['id'],))
-        trabajadores = cursor.fetchall()
+    # Verificar que el trabajador pertenece al negocio
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id FROM trabajadores_negocio 
+        WHERE negocio_id = %s AND trabajador_id = %s AND activo = 1
+    ''', (usuario['id'], trabajador_id))
+    if not cursor.fetchone():
         conn.close()
-        
-        if not trabajadores:
-            return jsonify({
-                'success': True,
-                'message': 'No hay trabajadores activos',
-                'trabajadores': 0
-            })
-        
-        contador = 0
-        errores = []
-        
-        for t in trabajadores:
-            trabajador_id = t[0]
-            nombre = t[1] or 'Trabajador'
-            try:
-                resultado = calcular_nomina(usuario['id'], trabajador_id, mes, ano)
-                if resultado:
-                    contador += 1
-                    print(f"✅ Nómina calculada para {nombre}")
-                else:
-                    errores.append(f"⚠️ No se pudo calcular nómina para {nombre}")
-            except Exception as e:
-                errores.append(f"❌ Error calculando nómina para {nombre}: {str(e)}")
-                print(f"❌ Error calculando nómina para {nombre}: {e}")
-        
-        mensaje = f'Nómina calculada para {contador} trabajadores'
-        if errores:
-            mensaje += f' | {len(errores)} errores'
-            print(f"⚠️ Errores: {errores}")
-        
+        return jsonify({'error': 'Trabajador no pertenece a este negocio'}), 403
+    conn.close()
+    
+    resultado = calcular_nomina(usuario['id'], trabajador_id, mes, ano)
+    
+    if resultado:
         return jsonify({
             'success': True,
-            'message': mensaje,
-            'trabajadores': contador,
-            'errores': errores
+            'message': 'Nómina calculada correctamente',
+            'detalle': resultado
         })
-        
-    except Exception as e:
-        print(f"❌ Error en api_calcular_nomina: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+    else:
+        return jsonify({'error': 'Error al calcular la nómina'}), 500
 
 @app.route('/api/nomina/detalle', methods=['GET'])
 @login_required
