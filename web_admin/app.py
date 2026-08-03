@@ -76,7 +76,8 @@ try:
         obtener_dias_trabajados_mes, obtener_dias_ausencia_mes, obtener_dias_extras_mes,
         obtener_total_comisiones_mes,
         obtener_modulos_negocio, obtener_modulos_trabajador,
-        actualizar_ubicacion_usuario, obtener_ubicacion_usuario, obtener_negocios_con_ubicacion
+        actualizar_ubicacion_usuario, obtener_ubicacion_usuario, obtener_negocios_con_ubicacion,
+        generar_numero_factura, obtener_ultimo_numero_factura, actualizar_ultimo_numero_factura
     )
     from auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
     from storage import get_storage_manager
@@ -931,6 +932,266 @@ def fix_modulos_endpoint():
             </body>
         </html>
         """
+        
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA REPARAR SECUENCIAS DE FACTURAS
+# ============================================
+@app.route('/fix-facturas-secuencia', methods=['GET'])
+@admin_required
+def fix_facturas_secuencia():
+    """Endpoint para reparar/migrar secuencias de facturas"""
+    try:
+        import urllib.parse
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        from datetime import datetime
+        
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL - Reparando secuencias de facturas...")
+        
+        mensajes = []
+        
+        # 1. Crear tabla si no existe
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS facturas_secuencia (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            empresa TEXT NOT NULL,
+            ultimo_numero INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(negocio_id, empresa)
+        )
+        ''')
+        mensajes.append("✅ Tabla facturas_secuencia creada/verificada")
+        
+        # 2. Migrar secuencias existentes
+        cursor.execute('''
+            SELECT DISTINCT negocio_id, empresa FROM ventas 
+            WHERE empresa IS NOT NULL AND empresa != '' AND estado != 'oferta'
+        ''')
+        empresas = cursor.fetchall()
+        
+        contador = 0
+        for negocio_id, empresa in empresas:
+            if empresa and empresa != '' and empresa != '📄 OFERTA':
+                cursor.execute('''
+                    SELECT MAX(CAST(SUBSTRING(factura FROM 'FAC-[0-9]+-([0-9]+)') AS INTEGER)) 
+                    FROM ventas 
+                    WHERE negocio_id = %s AND empresa = %s AND factura IS NOT NULL
+                ''', (negocio_id, empresa))
+                ultimo = cursor.fetchone()[0]
+                if ultimo:
+                    cursor.execute('''
+                        INSERT INTO facturas_secuencia (negocio_id, empresa, ultimo_numero, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (negocio_id, empresa) DO UPDATE SET 
+                            ultimo_numero = EXCLUDED.ultimo_numero,
+                            updated_at = EXCLUDED.updated_at
+                    ''', (negocio_id, empresa, ultimo, datetime.now().isoformat(), datetime.now().isoformat()))
+                    contador += 1
+        
+        conn.commit()
+        mensajes.append(f"✅ {contador} secuencias migradas")
+        
+        # 3. Verificar secuencias actuales
+        cursor.execute('''
+            SELECT fs.*, u.username 
+            FROM facturas_secuencia fs
+            JOIN usuarios u ON fs.negocio_id = u.id
+            ORDER BY u.username, fs.empresa
+        ''')
+        secuencias = cursor.fetchall()
+        conn.close()
+        
+        html_secuencias = ""
+        for s in secuencias:
+            html_secuencias += f"""
+                <tr>
+                    <td>{s[5]}</td>
+                    <td>{s[2]}</td>
+                    <td><strong style="color:#6c3ce0;">{s[3]}</strong></td>
+                    <td>{s[4] or s[3]}</td>
+                </tr>
+            """
+        
+        return f"""
+        <html>
+            <head>
+                <title>Secuencias de Facturas</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 900px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                    .tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
+                    .tabla th { text-align: left; padding: 8px 12px; color: #888; border-bottom: 1px solid #2a2a3e; }
+                    .tabla td { padding: 8px 12px; border-bottom: 1px solid #1a1a2e; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Secuencias de Facturas</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        <ul>
+                            {''.join([f'<li>✅ {m}</li>' for m in mensajes])}
+                        </ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Secuencias por Empresa</h3>
+                        <table class="tabla">
+                            <thead>
+                                <tr>
+                                    <th>Negocio</th>
+                                    <th>Empresa</th>
+                                    <th>Último Número</th>
+                                    <th>Actualizado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {html_secuencias}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div>
+                        <a href="/admin/db" class="btn btn-primary">🗄️ Ir al Gestor DB</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA DEBUG DE SECUENCIAS DE FACTURAS
+# ============================================
+@app.route('/debug/facturas-secuencia', methods=['GET'])
+@admin_required
+def debug_facturas_secuencia():
+    """Endpoint para ver las secuencias de facturas"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('''
+            SELECT fs.*, u.username 
+            FROM facturas_secuencia fs
+            JOIN usuarios u ON fs.negocio_id = u.id
+            ORDER BY u.username, fs.empresa
+        ''')
+        secuencias = cursor.fetchall()
+        conn.close()
+        
+        html = """
+        <html>
+            <head>
+                <title>Secuencias de Facturas</title>
+                <style>
+                    body { background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }
+                    .container { max-width: 900px; margin: 0 auto; }
+                    .card { background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }
+                    .card h3 { color: #aaa; margin-bottom: 10px; }
+                    .tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
+                    .tabla th { text-align: left; padding: 8px 12px; color: #888; border-bottom: 1px solid #2a2a3e; }
+                    .tabla td { padding: 8px 12px; border-bottom: 1px solid #1a1a2e; }
+                    .btn { display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary { background: #6c3ce0; color: #fff; }
+                    .btn-primary:hover { background: #5a2ec0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">📊 Secuencias de Facturas</h1>
+                    <div class="card">
+                        <h3>📋 Secuencias por Empresa</h3>
+                        <table class="tabla">
+                            <thead>
+                                <tr>
+                                    <th>Negocio</th>
+                                    <th>Empresa</th>
+                                    <th>Último Número</th>
+                                    <th>Actualizado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+        """
+        
+        for s in secuencias:
+            html += f"""
+                                <tr>
+                                    <td>{s['username']}</td>
+                                    <td>{s['empresa']}</td>
+                                    <td><strong style="color:#6c3ce0;">{s['ultimo_numero']}</strong></td>
+                                    <td>{s['updated_at'] or s['created_at']}</td>
+                                </tr>
+            """
+        
+        html += """
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <a href="/admin/db" class="btn btn-primary">← Volver al Gestor DB</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+        return html
         
     except Exception as e:
         return f"""
@@ -1992,6 +2253,125 @@ def api_obtener_ubicacion():
     })
 
 # ============================================
+# API - VENTAS (ACTUALIZADO CON SECUENCIA DE FACTURAS)
+# ============================================
+@app.route('/api/ventas', methods=['GET', 'POST'])
+@login_required
+def api_ventas():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'trabajador':
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    negocio_id = usuario['id']
+    trabajador_id = None
+    if usuario.get('rol') == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
+        trabajador_id = usuario['id']
+    
+    if request.method == 'GET':
+        if usuario.get('rol') == 'trabajador':
+            ventas = obtener_ventas(negocio_id, trabajador_id)
+        else:
+            trabajador_id_param = request.args.get('trabajador_id')
+            ventas = obtener_ventas(negocio_id, trabajador_id_param)
+        return jsonify([dict(v) for v in ventas])
+    
+    data = request.get_json()
+    print("📥 Datos recibidos en POST:", data)
+    
+    cliente = data.get('cliente')
+    producto = data.get('producto')
+    producto_id = data.get('producto_id')
+    cantidad = data.get('cantidad', 1)
+    precio = data.get('precio')
+    total = data.get('total', precio * cantidad if precio else 0)
+    
+    if usuario.get('rol') == 'trabajador':
+        trabajador_id = usuario['id']
+    else:
+        trabajador_id = data.get('trabajador_id')
+    
+    estado = data.get('estado', 'pagado')
+    empresa = data.get('empresa')
+    tipo = data.get('tipo', 'producto')
+    factura_url = data.get('factura_url')
+    factura = data.get('factura')
+    transferencia_id = data.get('transferencia_id')
+    transferencia_cedula = data.get('transferencia_cedula')
+    transferencia_banco = data.get('transferencia_banco')
+    transferencia_fecha = data.get('transferencia_fecha')
+    
+    # ============================================
+    # GENERAR FACTURA CONSECUTIVA POR EMPRESA
+    # ============================================
+    # Si es oferta o no tiene empresa, no generar factura
+    if estado != 'oferta' and empresa and empresa != '📄 OFERTA' and empresa != '':
+        año = datetime.now().year
+        factura = generar_numero_factura(negocio_id, empresa, año)
+        print(f"📄 Factura generada: {factura} para {empresa}")
+    else:
+        factura = None
+        print("📄 Oferta o sin empresa - No se genera factura")
+    
+    if not cliente or not producto or precio is None:
+        return jsonify({'error': 'Cliente, producto y precio son requeridos'}), 400
+    
+    if not producto_id:
+        return jsonify({'error': 'ID de producto requerido para productos'}), 400
+    
+    if tipo == 'producto' and producto_id and estado != 'oferta':
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT stock FROM productos WHERE id = %s AND negocio_id = %s', (producto_id, negocio_id))
+        stock_actual = cursor.fetchone()
+        conn.close()
+        
+        if not stock_actual:
+            return jsonify({'error': 'Producto no encontrado'}), 404
+        
+        if stock_actual[0] < cantidad:
+            return jsonify({'error': f'Stock insuficiente. Disponible: {stock_actual[0]} unidades'}), 400
+    
+    venta_id = crear_venta(
+        negocio_id, trabajador_id, cliente, producto, 
+        producto_id, cantidad, precio, total, estado, 
+        empresa, tipo, factura_url, factura,
+        transferencia_id, transferencia_cedula,
+        transferencia_banco, transferencia_fecha
+    )
+    
+    # Actualizar stock SOLO si no es oferta
+    if tipo == 'producto' and producto_id and estado != 'oferta':
+        actualizar_stock_producto(producto_id, cantidad)
+    
+    if trabajador_id and tipo == 'producto' and estado != 'oferta':
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT comision FROM productos WHERE id = %s', (producto_id,))
+        comision_data = cursor.fetchone()
+        conn.close()
+        if comision_data and comision_data[0] > 0:
+            comision = comision_data[0] * cantidad
+            registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, comision)
+    
+    registrar_log(usuario['id'], 'venta_creada', 
+                  f'Venta: {producto} - Cliente: {cliente} - Cantidad: {cantidad} - Estado: {estado} - Factura: {factura}')
+    
+    return jsonify({
+        'success': True, 
+        'id': venta_id, 
+        'factura': factura,
+        'stock_actualizado': tipo == 'producto' and estado != 'oferta'
+    })
+
+# ============================================
 # API - TODOS LOS PRODUCTOS (para admin)
 # ============================================
 @app.route('/api/todos/productos')
@@ -2804,207 +3184,12 @@ def api_tienda_public():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - VENTAS
-# ============================================
-@app.route('/api/ventas', methods=['GET', 'POST'])
-@login_required
-def api_ventas():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'trabajador':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    negocio_id = usuario['id']
-    trabajador_id = None
-    if usuario.get('rol') == 'trabajador':
-        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-        if not negocio_id:
-            return jsonify({'error': 'No estás asociado a ningún negocio'}), 403
-        trabajador_id = usuario['id']
-    
-    if request.method == 'GET':
-        if usuario.get('rol') == 'trabajador':
-            ventas = obtener_ventas(negocio_id, trabajador_id)
-        else:
-            trabajador_id_param = request.args.get('trabajador_id')
-            ventas = obtener_ventas(negocio_id, trabajador_id_param)
-        return jsonify([dict(v) for v in ventas])
-    
-    data = request.get_json()
-    print("📥 Datos recibidos en POST:", data)
-    
-    cliente = data.get('cliente')
-    producto = data.get('producto')
-    producto_id = data.get('producto_id')
-    cantidad = data.get('cantidad', 1)
-    precio = data.get('precio')
-    total = data.get('total', precio * cantidad if precio else 0)
-    if usuario.get('rol') == 'trabajador':
-        trabajador_id = usuario['id']
-    else:
-        trabajador_id = data.get('trabajador_id')
-    estado = data.get('estado', 'pagado')
-    empresa = data.get('empresa')
-    tipo = data.get('tipo', 'producto')
-    factura_url = data.get('factura_url')
-    factura = data.get('factura')
-    transferencia_id = data.get('transferencia_id')
-    transferencia_cedula = data.get('transferencia_cedula')
-    transferencia_banco = data.get('transferencia_banco')
-    transferencia_fecha = data.get('transferencia_fecha')
-    
-    if not cliente or not producto or precio is None:
-        return jsonify({'error': 'Cliente, producto y precio son requeridos'}), 400
-    
-    if not producto_id:
-        return jsonify({'error': 'ID de producto requerido para productos'}), 400
-    
-    if tipo == 'producto' and producto_id:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT stock FROM productos WHERE id = %s AND negocio_id = %s', (producto_id, negocio_id))
-        stock_actual = cursor.fetchone()
-        conn.close()
-        
-        if not stock_actual:
-            return jsonify({'error': 'Producto no encontrado'}), 404
-        
-        if stock_actual[0] < cantidad:
-            return jsonify({'error': f'Stock insuficiente. Disponible: {stock_actual[0]} unidades'}), 400
-    
-    venta_id = crear_venta(
-        negocio_id, trabajador_id, cliente, producto, 
-        producto_id, cantidad, precio, total, estado, 
-        empresa, tipo, factura_url, factura,
-        transferencia_id, transferencia_cedula,
-        transferencia_banco, transferencia_fecha
-    )
-    
-    if tipo == 'producto' and producto_id and estado != 'oferta':
-        actualizar_stock_producto(producto_id, cantidad)
-    
-    if trabajador_id and tipo == 'producto':
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT comision FROM productos WHERE id = %s', (producto_id,))
-        comision_data = cursor.fetchone()
-        conn.close()
-        if comision_data and comision_data[0] > 0:
-            comision = comision_data[0] * cantidad
-            registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, comision)
-    
-    registrar_log(usuario['id'], 'venta_creada', 
-                  f'Venta: {producto} - Cliente: {cliente} - Cantidad: {cantidad} - Estado: {estado}')
-    
-    return jsonify({'success': True, 'id': venta_id, 'stock_actualizado': tipo == 'producto' and estado != 'oferta'})
-
-@app.route('/api/ventas/estadisticas')
-@login_required
-def api_ventas_estadisticas():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario.get('tipo') != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    trabajador_id = request.args.get('trabajador_id')
-    stats = obtener_estadisticas_ventas(usuario['id'], trabajador_id)
-    
-    return jsonify({
-        'total': stats[0] if stats else 0,
-        'ingresos': stats[1] if stats else 0
-    })
-
-@app.route('/api/venta/<int:venta_id>/estado', methods=['PUT'])
-@login_required
-def api_actualizar_estado_venta(venta_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario.get('tipo') != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    data = request.get_json()
-    estado = data.get('estado')
-    
-    if estado not in ['pagado', 'pendiente', 'cancelado', 'transferencia', 'oferta']:
-        return jsonify({'error': 'Estado inválido'}), 400
-    
-    exito = actualizar_estado_venta(venta_id, usuario['id'], estado)
-    
-    if not exito:
-        return jsonify({'error': 'Venta no encontrada'}), 404
-    
-    registrar_log(usuario['id'], 'venta_estado', f'Venta {venta_id} estado={estado}')
-    
-    return jsonify({'success': True})
-
-@app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
-@login_required
-def api_eliminar_venta(venta_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario or usuario.get('tipo') != 'negocio':
-        return jsonify({'error': 'No autorizado'}), 403
-    
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT estado, producto_id FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
-        venta = cursor.fetchone()
-        conn.close()
-        
-        if not venta:
-            return jsonify({'error': 'Venta no encontrada'}), 404
-        
-        if venta[0] == 'oferta':
-            conn = get_db()
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, usuario['id']))
-            conn.commit()
-            conn.close()
-            registrar_log(usuario['id'], 'oferta_eliminada', f'Oferta #{venta_id} eliminada')
-            return jsonify({
-                'success': True,
-                'message': 'Oferta eliminada correctamente'
-            })
-        
-        exito, resultado = eliminar_venta_con_reintegro(venta_id, usuario['id'])
-        
-        if not exito:
-            return jsonify({'error': resultado}), 400
-        
-        registrar_log(usuario['id'], 'venta_eliminada', 
-                      f'Venta #{venta_id} eliminada. Producto: {resultado["producto"]} - Cantidad: {resultado["cantidad"]}')
-        
-        return jsonify({
-            'success': True,
-            'message': 'Venta eliminada y stock reintegrado correctamente',
-            'producto': resultado.get('producto'),
-            'cantidad': resultado.get('cantidad'),
-            'cliente': resultado.get('cliente'),
-            'total': resultado.get('total')
-        })
-        
-    except psycopg2.Error as e:
-        print(f"❌ Error SQL eliminando venta: {e}")
-        return jsonify({'error': f'Error de base de datos: {str(e)}'}), 500
-    except Exception as e:
-        print(f"❌ Error eliminando venta: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
 # API - FACTURAS Y OFERTAS
 # ============================================
 @app.route('/api/venta/<int:venta_id>/factura', methods=['GET'])
 @login_required
 def api_generar_factura(venta_id):
+    """Genera una factura PDF de una venta con todos los items uno debajo del otro"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -3277,6 +3462,7 @@ def api_eliminar_contrato(contrato_id):
 @app.route('/api/contratos/empresas', methods=['GET'])
 @login_required
 def api_obtener_empresas_con_contratos():
+    """Obtiene la lista de empresas con contratos activos"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
