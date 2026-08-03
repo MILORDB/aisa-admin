@@ -436,16 +436,13 @@
             const facturaTitulo = document.getElementById('facturaTitulo');
             
             if (esOferta) {
-                // Si es oferta, forzar estado a "oferta" y limpiar factura
                 estadoSelect.value = 'oferta';
                 facturaInput.value = '';
                 facturaTitulo.textContent = '📄 OFERTA DE VENTA';
                 document.getElementById('facturaNumero').textContent = '📄 OFERTA';
                 document.getElementById('infoContrato').textContent = '📄 Oferta - No requiere factura';
-                // Deshabilitar campos de transferencia
                 document.getElementById('camposTransferencia').classList.remove('show');
             } else {
-                // Si no es oferta, restaurar
                 estadoSelect.value = 'pagado';
                 facturaTitulo.textContent = '🧾 FACTURA';
                 if (document.getElementById('ventaEmpresa').value) {
@@ -738,7 +735,6 @@
             const fecha = new Date().toLocaleDateString('es-ES');
             let total = 0, items = [];
             
-            // Obtener productos
             document.querySelectorAll('#productosContainer .item-line').forEach(line => {
                 const select = line.querySelector('.select-producto');
                 const cantInput = line.querySelector('.input-cantidad');
@@ -752,7 +748,6 @@
                 }
             });
             
-            // Obtener servicios
             document.querySelectorAll('#serviciosContainer .item-line').forEach(line => {
                 const select = line.querySelector('.select-servicio');
                 if (select && select.value) {
@@ -763,7 +758,6 @@
                 }
             });
             
-            // Mostrar items en preview
             document.getElementById('facturaItems').innerHTML = items.length ? items.map(i => 
                 `<div class="item ${esOferta ? 'oferta' : ''}"><span>${i.tipo} ${i.nombre}${i.cantidad > 1 ? ` x${i.cantidad}` : ''}</span><span>$${i.subtotal.toFixed(2)}</span></div>`
             ).join('') : '<div style="color:#888;font-size:10px;text-align:center;">Sin items</div>';
@@ -782,7 +776,6 @@
             };
             document.getElementById('facturaEstado').textContent = esOferta ? '📄 Oferta' : (estados[estado] || estado);
             
-            // Cambiar título de la factura
             document.getElementById('facturaTitulo').textContent = esOferta ? '📄 OFERTA DE VENTA' : '🧾 FACTURA';
         }
 
@@ -841,7 +834,6 @@
             </tr></thead><tbody>`;
             
             filtrados.forEach(v => {
-                // Mostrar "OFERTA" en lugar de número de factura si es oferta
                 const facturaDisplay = v.estado === 'oferta' 
                     ? '<span class="badge-oferta">📄 OFERTA</span>' 
                     : `<span class="badge-numero">${v.factura || '-'}</span>`;
@@ -902,11 +894,9 @@
             const btn = document.querySelector('.btn-primary');
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Cargando...'; }
             
-            // Resetear checkbox de oferta
             document.getElementById('esOferta').checked = false;
             esOferta = false;
             
-            // Limpiar campos
             document.getElementById('ventaEmpresa').value = '';
             document.getElementById('ventaFactura').value = '';
             document.getElementById('ventaEstado').value = 'pagado';
@@ -919,7 +909,6 @@
             document.getElementById('empresaInfo').style.display = 'none';
             document.getElementById('facturaTitulo').textContent = '🧾 FACTURA';
             
-            // Limpiar productos y servicios
             document.getElementById('productosContainer').innerHTML = '';
             document.getElementById('serviciosContainer').innerHTML = '';
             lineasProductos = [];
@@ -928,7 +917,6 @@
             document.getElementById('countServicios').textContent = '0';
             nextId = 1;
             
-            // Cargar productos, servicios y empresas
             await cargarProductos();
             await cargarServicios();
             await cargarEmpresasConContratos();
@@ -946,7 +934,7 @@
         document.getElementById('modalVenta').addEventListener('click', function(e) { if (e.target === this) cerrarModal(); });
 
         // ============================================
-        // GUARDAR VENTA (CON SOPORTE PARA OFERTAS)
+        // GUARDAR VENTA
         // ============================================
 
         function guardarVenta() {
@@ -989,13 +977,11 @@
             });
             if (items.length === 0) { mostrarMensaje('Agrega un producto o servicio', 'error'); return; }
             
-            // Para ofertas, no es necesario validar empresa
             if (!esOferta && estado === 'transferencia' && !empresa) {
                 mostrarMensaje('❌ Para transferencia, selecciona una empresa con contrato', 'error');
                 return;
             }
             
-            // Para ofertas, usar cliente genérico
             const cliente = esOferta ? '📄 OFERTA' : (empresa || 'Cliente sin empresa');
             const nombres = items.map(i => `${i.cantidad}x ${i.nombre}`).join(', ');
             const primerItem = items[0];
@@ -1027,7 +1013,6 @@
                 transferencia_fecha: transFecha
             };
             
-            // Si es oferta, no actualizar stock
             const btn = document.getElementById('btnGuardarVenta');
             btn.disabled = true;
             btn.textContent = '⏳ Guardando...';
@@ -1040,7 +1025,8 @@
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    mostrarMensaje(`✅ ${esOferta ? 'Oferta' : 'Venta'} registrada${esOferta ? ' (sin facturación)' : ''}`, 'exito');
+                    const mensajeFactura = data.factura ? `\n📄 Factura: ${data.factura}` : '';
+                    mostrarMensaje(`✅ ${esOferta ? 'Oferta' : 'Venta'} registrada${esOferta ? ' (sin facturación)' : ''}${mensajeFactura}`, 'exito');
                     cerrarModal(); 
                     cargarVentas(); 
                     cargarProductos();
@@ -1066,7 +1052,6 @@
             const v = ventas.find(v => v.id === id);
             if (!v || v.estado === estado) return;
             
-            // Si la venta es oferta y se quiere cambiar a otro estado, confirmar
             if (v.estado === 'oferta' && estado !== 'oferta') {
                 if (!confirm(`⚠️ Esta es una OFERTA. ¿Deseas convertirla a "${estado}"? Se generará factura y se descontará del inventario.`)) {
                     cargarVentas();
@@ -1186,7 +1171,6 @@
             const v = ventas.find(v => v.id === id);
             if (!v) return;
             
-            // Si es oferta, preguntar si quiere generar factura de oferta
             if (v.estado === 'oferta') {
                 if (!confirm(`📄 Esta es una OFERTA. ¿Generar documento de oferta?`)) return;
             } else {
