@@ -278,6 +278,20 @@ def init_db():
     )
     ''')
     
+    # TABLA DE SECUENCIA DE FACTURAS
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS facturas_secuencia (
+        id SERIAL PRIMARY KEY,
+        negocio_id INTEGER NOT NULL,
+        empresa TEXT NOT NULL,
+        ultimo_numero INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        UNIQUE(negocio_id, empresa)
+    )
+    ''')
+    
     # Insertar módulos - INCLUYE MAPA
     cursor.execute("SELECT COUNT(*) FROM modulos")
     if cursor.fetchone()[0] == 0:
@@ -1817,6 +1831,61 @@ def obtener_resumen_nomina(negocio_id, mes, ano):
             'total_comisiones': 0,
             'total_nomina': 0
         }
+
+# ============================================
+# FUNCIONES PARA SECUENCIA DE FACTURAS
+# ============================================
+
+def obtener_ultimo_numero_factura(negocio_id, empresa):
+    """Obtiene el último número de factura para una empresa"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            SELECT ultimo_numero FROM facturas_secuencia 
+            WHERE negocio_id = %s AND empresa = %s
+        ''', (negocio_id, empresa))
+        resultado = cursor.fetchone()
+        conn.close()
+        if resultado:
+            return resultado[0]
+        return 0
+    except Exception as e:
+        print(f"❌ Error en obtener_ultimo_numero_factura: {e}")
+        conn.close()
+        return 0
+
+def actualizar_ultimo_numero_factura(negocio_id, empresa, numero):
+    """Actualiza el último número de factura para una empresa"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO facturas_secuencia (negocio_id, empresa, ultimo_numero, created_at)
+            VALUES (%s, %s, %s, NOW())
+            ON CONFLICT (negocio_id, empresa) DO UPDATE SET 
+                ultimo_numero = EXCLUDED.ultimo_numero,
+                updated_at = NOW()
+        ''', (negocio_id, empresa, numero))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error en actualizar_ultimo_numero_factura: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+def generar_numero_factura(negocio_id, empresa, año=None):
+    """Genera un nuevo número de factura consecutivo para una empresa"""
+    if not año:
+        año = datetime.now().year
+    
+    ultimo = obtener_ultimo_numero_factura(negocio_id, empresa)
+    nuevo = ultimo + 1
+    actualizar_ultimo_numero_factura(negocio_id, empresa, nuevo)
+    
+    return f"FAC-{año}-{str(nuevo).zfill(4)}"
 
 # ============================================
 # FUNCIONES ADICIONALES PARA MÓDULOS
