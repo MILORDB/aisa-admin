@@ -155,6 +155,7 @@
         .factura-preview .factura-total { display: flex; justify-content: space-between; padding: 4px 0; border-top: 2px solid #6c3ce0; margin-top: 2px; font-size: 14px; font-weight: 700; color: #6c3ce0; }
         .factura-preview .factura-items { margin: 4px 0; }
         .factura-preview .factura-items .item { display: flex; justify-content: space-between; padding: 1px 0; font-size: 10px; color: #aaa; border-bottom: 1px solid #1a1a2e; }
+        .factura-preview .factura-items .item.oferta { color: #ff9800; }
         
         .campo-transferencia { display: none; border-left: 2px solid #ff9800; padding-left: 8px; margin-top: 4px; }
         .campo-transferencia.show { display: block; }
@@ -183,12 +184,43 @@
         .contrato-link { color: #6c3ce0; text-decoration: none; font-size: 11px; cursor: pointer; }
         .contrato-link:hover { text-decoration: underline; }
         .badge-numero { font-size: 10px; color: #6c3ce0; font-weight: 600; }
+        .badge-oferta { font-size: 10px; color: #ff9800; font-weight: 600; background: rgba(255,152,0,0.1); padding: 1px 6px; border-radius: 4px; }
         
         .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
         .table-wrapper table { min-width: 700px; }
         
         .modal-content .form-actions { display: flex; gap: 8px; margin-top: 12px; border-top: 1px solid #2a2a3e; padding-top: 12px; }
         .modal-content .form-actions .btn { flex: 1; }
+
+        /* ============================================
+           ESTILO PARA EL SELECTOR DE OFERTA
+           ============================================ */
+        .oferta-section {
+            border: 2px solid #ff9800;
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin: 6px 0 10px 0;
+            background: rgba(255,152,0,0.05);
+        }
+        .oferta-section .oferta-label {
+            font-size: 11px;
+            color: #ff9800;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .oferta-section .oferta-label input[type="checkbox"] {
+            width: auto;
+            accent-color: #ff9800;
+            transform: scale(1.2);
+        }
+        .oferta-section .oferta-info {
+            font-size: 10px;
+            color: #888;
+            margin-top: 4px;
+            padding-left: 24px;
+        }
 
         @media (max-width: 600px) {
             body { padding: 8px; }
@@ -204,6 +236,7 @@
             .stats-resumen { grid-template-columns: 1fr 1fr; }
             .tabla { font-size: 11px; }
             .tabla th, .tabla td { padding: 4px 6px; }
+            .oferta-section { padding: 6px 8px; }
         }
         @media (max-width: 400px) {
             .tabla { font-size: 10px; }
@@ -274,6 +307,20 @@
                 </div>
             </div>
 
+            <!-- ========================================== -->
+            <!-- SECCIÓN DE OFERTA (DEBAJO DE EMPRESAS)      -->
+            <!-- ========================================== -->
+            <div class="oferta-section">
+                <div class="oferta-label">
+                    <input type="checkbox" id="esOferta" onchange="toggleOferta()">
+                    📄 Marcar como OFERTA (sin facturación)
+                </div>
+                <div class="oferta-info">
+                    ⚠️ Las ofertas no generan número de factura y no afectan el inventario.
+                    Se identifican con el badge 📄 Oferta en la lista.
+                </div>
+            </div>
+
             <!-- Productos -->
             <div class="seccion-items">
                 <div class="seccion-titulo"><span>📦 Productos</span><span class="badge-count" id="countProductos">0</span></div>
@@ -320,7 +367,7 @@
 
             <!-- Factura Preview -->
             <div class="factura-preview" id="facturaPreview">
-                <div class="factura-titulo">🧾 FACTURA</div>
+                <div class="factura-titulo" id="facturaTitulo">🧾 FACTURA</div>
                 <div class="factura-fila"><span class="label">📄 N°</span><span class="value" id="facturaNumero">-</span></div>
                 <div class="factura-fila"><span class="label">🏢 Empresa</span><span class="value" id="facturaEmpresa">-</span></div>
                 <div class="factura-fila"><span class="label">📅 Fecha</span><span class="value" id="facturaFecha">-</span></div>
@@ -349,6 +396,7 @@
     <script>
         let ventas = [], productos = [], servicios = [], trabajadorId = null;
         let lineasProductos = [], lineasServicios = [], nextId = 1, ultimoNumeroFactura = 0;
+        let esOferta = false;
 
         function getTrabajadorId() {
             const params = new URLSearchParams(window.location.search);
@@ -379,10 +427,48 @@
         }
 
         // ============================================
+        // FUNCIÓN PARA TOGGLE DE OFERTA
+        // ============================================
+        function toggleOferta() {
+            esOferta = document.getElementById('esOferta').checked;
+            const estadoSelect = document.getElementById('ventaEstado');
+            const facturaInput = document.getElementById('ventaFactura');
+            const facturaTitulo = document.getElementById('facturaTitulo');
+            
+            if (esOferta) {
+                // Si es oferta, forzar estado a "oferta" y limpiar factura
+                estadoSelect.value = 'oferta';
+                facturaInput.value = '';
+                facturaTitulo.textContent = '📄 OFERTA DE VENTA';
+                document.getElementById('facturaNumero').textContent = '📄 OFERTA';
+                document.getElementById('infoContrato').textContent = '📄 Oferta - No requiere factura';
+                // Deshabilitar campos de transferencia
+                document.getElementById('camposTransferencia').classList.remove('show');
+            } else {
+                // Si no es oferta, restaurar
+                estadoSelect.value = 'pagado';
+                facturaTitulo.textContent = '🧾 FACTURA';
+                if (document.getElementById('ventaEmpresa').value) {
+                    generarNumeroFactura();
+                } else {
+                    document.getElementById('facturaNumero').textContent = '-';
+                }
+                document.getElementById('infoContrato').textContent = '📄 Cargando contratos...';
+                cargarEmpresasConContratos();
+            }
+            actualizarFactura();
+        }
+
+        // ============================================
         // FUNCIONES DE EMPRESAS CON CONTRATOS
         // ============================================
 
         async function cargarEmpresasConContratos() {
+            if (esOferta) {
+                document.getElementById('infoContrato').textContent = '📄 Oferta - No requiere factura';
+                return;
+            }
+            
             const select = document.getElementById('ventaEmpresa');
             select.innerHTML = '<option value="">-- Seleccionar empresa con contrato activo --</option>';
             
@@ -417,6 +503,8 @@
         }
 
         function seleccionarEmpresa() {
+            if (esOferta) return;
+            
             const select = document.getElementById('ventaEmpresa');
             const selected = select.options[select.selectedIndex];
             const infoSpan = document.getElementById('empresaInfo');
@@ -443,6 +531,11 @@
         }
 
         async function buscarContratoManual() {
+            if (esOferta) {
+                mostrarMensaje('ℹ️ Estás en modo oferta, no requiere contrato', 'exito');
+                return;
+            }
+            
             const select = document.getElementById('ventaEmpresa');
             const selected = select.options[select.selectedIndex];
             
@@ -465,6 +558,12 @@
         // ============================================
 
         function generarNumeroFactura() {
+            if (esOferta) {
+                document.getElementById('ventaFactura').value = '';
+                document.getElementById('facturaNumero').textContent = '📄 OFERTA';
+                return;
+            }
+            
             const empresa = document.getElementById('ventaEmpresa').value.trim();
             const input = document.getElementById('ventaFactura');
             if (empresa) {
@@ -635,9 +734,11 @@
         function actualizarFactura() {
             const empresa = document.getElementById('ventaEmpresa').value.trim() || '-';
             const estado = document.getElementById('ventaEstado').value;
-            const facturaNum = document.getElementById('ventaFactura').value || '-';
+            const facturaNum = document.getElementById('ventaFactura').value || (esOferta ? '📄 OFERTA' : '-');
             const fecha = new Date().toLocaleDateString('es-ES');
             let total = 0, items = [];
+            
+            // Obtener productos
             document.querySelectorAll('#productosContainer .item-line').forEach(line => {
                 const select = line.querySelector('.select-producto');
                 const cantInput = line.querySelector('.input-cantidad');
@@ -650,6 +751,8 @@
                     items.push({ nombre: selected.text, cantidad, precio, subtotal, tipo: '📦' });
                 }
             });
+            
+            // Obtener servicios
             document.querySelectorAll('#serviciosContainer .item-line').forEach(line => {
                 const select = line.querySelector('.select-servicio');
                 if (select && select.value) {
@@ -659,15 +762,28 @@
                     items.push({ nombre: selected.text, cantidad: 1, precio, subtotal: precio, tipo: '📋' });
                 }
             });
+            
+            // Mostrar items en preview
             document.getElementById('facturaItems').innerHTML = items.length ? items.map(i => 
-                `<div class="item"><span>${i.tipo} ${i.nombre}${i.cantidad > 1 ? ` x${i.cantidad}` : ''}</span><span>$${i.subtotal.toFixed(2)}</span></div>`
+                `<div class="item ${esOferta ? 'oferta' : ''}"><span>${i.tipo} ${i.nombre}${i.cantidad > 1 ? ` x${i.cantidad}` : ''}</span><span>$${i.subtotal.toFixed(2)}</span></div>`
             ).join('') : '<div style="color:#888;font-size:10px;text-align:center;">Sin items</div>';
-            document.getElementById('facturaEmpresa').textContent = empresa;
+            
+            document.getElementById('facturaEmpresa').textContent = esOferta ? '📄 OFERTA' : empresa;
             document.getElementById('facturaFecha').textContent = fecha;
             document.getElementById('facturaNumero').textContent = facturaNum;
             document.getElementById('facturaTotal').textContent = `$${total.toFixed(2)}`;
-            const estados = { 'pagado':'✅ Pagado', 'pendiente':'⏳ Pendiente', 'cancelado':'❌ Cancelado', 'transferencia':'💳 Transferencia', 'oferta':'📄 Oferta' };
-            document.getElementById('facturaEstado').textContent = estados[estado] || estado;
+            
+            const estados = { 
+                'pagado':'✅ Pagado', 
+                'pendiente':'⏳ Pendiente', 
+                'cancelado':'❌ Cancelado', 
+                'transferencia':'💳 Transferencia', 
+                'oferta':'📄 Oferta' 
+            };
+            document.getElementById('facturaEstado').textContent = esOferta ? '📄 Oferta' : (estados[estado] || estado);
+            
+            // Cambiar título de la factura
+            document.getElementById('facturaTitulo').textContent = esOferta ? '📄 OFERTA DE VENTA' : '🧾 FACTURA';
         }
 
         document.getElementById('ventaEmpresa').addEventListener('change', actualizarFactura);
@@ -696,18 +812,43 @@
         function renderVentas(filtro = '', estadoFiltro = 'todos') {
             const container = document.getElementById('ventasContainer');
             const filtroLower = filtro.toLowerCase();
-            let filtrados = ventas.filter(v => v.cliente.toLowerCase().includes(filtroLower) || v.producto.toLowerCase().includes(filtroLower) || String(v.id).includes(filtroLower) || (v.empresa && v.empresa.toLowerCase().includes(filtroLower)));
+            let filtrados = ventas.filter(v => 
+                v.cliente.toLowerCase().includes(filtroLower) || 
+                v.producto.toLowerCase().includes(filtroLower) || 
+                String(v.id).includes(filtroLower) || 
+                (v.empresa && v.empresa.toLowerCase().includes(filtroLower))
+            );
             if (estadoFiltro !== 'todos') filtrados = filtrados.filter(v => v.estado === estadoFiltro);
             if (filtrados.length === 0) { container.innerHTML = `<div class="empty">No hay ventas</div>`; return; }
-            const estados = { 'pagado':'✅ Pagado', 'pendiente':'⏳ Pendiente', 'cancelado':'❌ Cancelado', 'transferencia':'💳 Transferencia', 'oferta':'📄 Oferta' };
-            const clases = { 'pagado':'pagado', 'pendiente':'pendiente', 'cancelado':'cancelado', 'transferencia':'transferencia', 'oferta':'oferta' };
+            
+            const estados = { 
+                'pagado':'✅ Pagado', 
+                'pendiente':'⏳ Pendiente', 
+                'cancelado':'❌ Cancelado', 
+                'transferencia':'💳 Transferencia', 
+                'oferta':'📄 Oferta' 
+            };
+            const clases = { 
+                'pagado':'pagado', 
+                'pendiente':'pendiente', 
+                'cancelado':'cancelado', 
+                'transferencia':'transferencia', 
+                'oferta':'oferta' 
+            };
+            
             let html = `<table class="tabla"><thead><tr>
                 <th>#</th><th>Factura</th><th>Cliente</th><th>Producto</th><th>Total</th><th>Fecha</th><th>Estado</th><th>Acciones</th>
             </tr></thead><tbody>`;
+            
             filtrados.forEach(v => {
+                // Mostrar "OFERTA" en lugar de número de factura si es oferta
+                const facturaDisplay = v.estado === 'oferta' 
+                    ? '<span class="badge-oferta">📄 OFERTA</span>' 
+                    : `<span class="badge-numero">${v.factura || '-'}</span>`;
+                
                 html += `<tr>
                     <td>#${v.id}</td>
-                    <td><span class="badge-numero">${v.factura || '-'}</span></td>
+                    <td>${facturaDisplay}</td>
                     <td>${v.cliente}</td>
                     <td>${v.producto}</td>
                     <td>$${parseFloat(v.total).toFixed(2)}</td>
@@ -761,6 +902,10 @@
             const btn = document.querySelector('.btn-primary');
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Cargando...'; }
             
+            // Resetear checkbox de oferta
+            document.getElementById('esOferta').checked = false;
+            esOferta = false;
+            
             // Limpiar campos
             document.getElementById('ventaEmpresa').value = '';
             document.getElementById('ventaFactura').value = '';
@@ -772,6 +917,7 @@
             document.getElementById('camposTransferencia').classList.remove('show');
             document.getElementById('infoContrato').textContent = '📄 Cargando contratos...';
             document.getElementById('empresaInfo').style.display = 'none';
+            document.getElementById('facturaTitulo').textContent = '🧾 FACTURA';
             
             // Limpiar productos y servicios
             document.getElementById('productosContainer').innerHTML = '';
@@ -800,14 +946,15 @@
         document.getElementById('modalVenta').addEventListener('click', function(e) { if (e.target === this) cerrarModal(); });
 
         // ============================================
-        // GUARDAR VENTA (CON EMPRESA DEL SELECT)
+        // GUARDAR VENTA (CON SOPORTE PARA OFERTAS)
         // ============================================
 
         function guardarVenta() {
+            const esOferta = document.getElementById('esOferta').checked;
             const selectEmpresa = document.getElementById('ventaEmpresa');
-            const empresa = selectEmpresa.value.trim();
-            const estado = document.getElementById('ventaEstado').value;
-            const factura = document.getElementById('ventaFactura').value.trim();
+            const empresa = esOferta ? '📄 OFERTA' : selectEmpresa.value.trim();
+            const estado = esOferta ? 'oferta' : document.getElementById('ventaEstado').value;
+            const factura = esOferta ? null : document.getElementById('ventaFactura').value.trim();
             
             let items = [];
             document.querySelectorAll('#productosContainer .item-line').forEach(line => {
@@ -816,35 +963,52 @@
                 if (select && select.value) {
                     const selected = select.options[select.selectedIndex];
                     const cantidad = parseInt(cantInput ? cantInput.value : 1) || 1;
-                    items.push({ tipo:'producto', id:parseInt(select.value), nombre:selected.text, cantidad, precio:parseFloat(selected.dataset.precio), subtotal:parseFloat(selected.dataset.precio)*cantidad });
+                    items.push({ 
+                        tipo:'producto', 
+                        id:parseInt(select.value), 
+                        nombre:selected.text, 
+                        cantidad, 
+                        precio:parseFloat(selected.dataset.precio), 
+                        subtotal:parseFloat(selected.dataset.precio)*cantidad 
+                    });
                 }
             });
             document.querySelectorAll('#serviciosContainer .item-line').forEach(line => {
                 const select = line.querySelector('.select-servicio');
                 if (select && select.value) {
                     const selected = select.options[select.selectedIndex];
-                    items.push({ tipo:'servicio', id:parseInt(select.value), nombre:selected.text, cantidad:1, precio:parseFloat(selected.dataset.precio), subtotal:parseFloat(selected.dataset.precio) });
+                    items.push({ 
+                        tipo:'servicio', 
+                        id:parseInt(select.value), 
+                        nombre:selected.text, 
+                        cantidad:1, 
+                        precio:parseFloat(selected.dataset.precio), 
+                        subtotal:parseFloat(selected.dataset.precio) 
+                    });
                 }
             });
             if (items.length === 0) { mostrarMensaje('Agrega un producto o servicio', 'error'); return; }
             
-            // Validar que se haya seleccionado una empresa para transferencia
-            if (estado === 'transferencia' && !empresa) {
+            // Para ofertas, no es necesario validar empresa
+            if (!esOferta && estado === 'transferencia' && !empresa) {
                 mostrarMensaje('❌ Para transferencia, selecciona una empresa con contrato', 'error');
                 return;
             }
             
-            const total = items.reduce((s,i) => s + i.subtotal, 0);
-            const cliente = empresa || 'Cliente sin empresa';
+            // Para ofertas, usar cliente genérico
+            const cliente = esOferta ? '📄 OFERTA' : (empresa || 'Cliente sin empresa');
             const nombres = items.map(i => `${i.cantidad}x ${i.nombre}`).join(', ');
             const primerItem = items[0];
+            const total = items.reduce((s,i) => s + i.subtotal, 0);
+            
             let transId = null, transCedula = null, transBanco = null, transFecha = null;
-            if (estado === 'transferencia') {
+            if (!esOferta && estado === 'transferencia') {
                 transId = document.getElementById('transferenciaId').value.trim() || null;
                 transCedula = document.getElementById('transferenciaCedula').value.trim() || null;
                 transBanco = document.getElementById('transferenciaBanco').value.trim() || null;
                 transFecha = document.getElementById('transferenciaFecha').value || null;
             }
+            
             const data = {
                 cliente: cliente,
                 producto: nombres,
@@ -852,8 +1016,8 @@
                 cantidad: items.reduce((s,i) => s + i.cantidad, 0),
                 precio: total,
                 total: total,
-                empresa: empresa || null,
-                factura: factura || null,
+                empresa: esOferta ? null : (empresa || null),
+                factura: esOferta ? null : (factura || null),
                 tipo: items.length === 1 && items[0].tipo === 'servicio' ? 'servicio' : 'producto',
                 trabajador_id: trabajadorId || null,
                 estado: estado,
@@ -862,13 +1026,36 @@
                 transferencia_banco: transBanco,
                 transferencia_fecha: transFecha
             };
-            fetch('/api/ventas', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) })
-                .then(r => r.json()).then(data => {
-                    if (data.success) {
-                        mostrarMensaje(`✅ Venta registrada${estado === 'oferta' ? ' (Oferta)' : ''}`, 'exito');
-                        cerrarModal(); cargarVentas(); cargarProductos();
-                    } else { mostrarMensaje(data.error || 'Error', 'error'); }
-                }).catch(error => { console.error(error); mostrarMensaje('Error de conexión', 'error'); });
+            
+            // Si es oferta, no actualizar stock
+            const btn = document.getElementById('btnGuardarVenta');
+            btn.disabled = true;
+            btn.textContent = '⏳ Guardando...';
+            
+            fetch('/api/ventas', { 
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body:JSON.stringify(data) 
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    mostrarMensaje(`✅ ${esOferta ? 'Oferta' : 'Venta'} registrada${esOferta ? ' (sin facturación)' : ''}`, 'exito');
+                    cerrarModal(); 
+                    cargarVentas(); 
+                    cargarProductos();
+                } else {
+                    mostrarMensaje(data.error || 'Error', 'error');
+                }
+            })
+            .catch(error => { 
+                console.error(error); 
+                mostrarMensaje('Error de conexión', 'error'); 
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = '💾 Guardar';
+            });
         }
 
         // ============================================
@@ -878,17 +1065,52 @@
         function cambiarEstadoVenta(id, estado) {
             const v = ventas.find(v => v.id === id);
             if (!v || v.estado === estado) return;
-            const estados = { 'pagado':'✅ Pagado','pendiente':'⏳ Pendiente','cancelado':'❌ Cancelado','transferencia':'💳 Transferencia','oferta':'📄 Oferta' };
-            if (!confirm(`¿Cambiar estado a "${estados[estado]}"?`)) { cargarVentas(); return; }
-            fetch(`/api/venta/${id}/estado`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({estado}) })
-                .then(r => r.json()).then(data => {
-                    if (data.success) { mostrarMensaje(`✅ Estado actualizado`, 'exito'); cargarVentas(); }
-                    else { mostrarMensaje(data.error || 'Error', 'error'); cargarVentas(); }
-                }).catch(error => { console.error(error); mostrarMensaje('Error de conexión', 'error'); cargarVentas(); });
+            
+            // Si la venta es oferta y se quiere cambiar a otro estado, confirmar
+            if (v.estado === 'oferta' && estado !== 'oferta') {
+                if (!confirm(`⚠️ Esta es una OFERTA. ¿Deseas convertirla a "${estado}"? Se generará factura y se descontará del inventario.`)) {
+                    cargarVentas();
+                    return;
+                }
+            }
+            
+            const estados = { 
+                'pagado':'✅ Pagado',
+                'pendiente':'⏳ Pendiente',
+                'cancelado':'❌ Cancelado',
+                'transferencia':'💳 Transferencia',
+                'oferta':'📄 Oferta' 
+            };
+            
+            if (!confirm(`¿Cambiar estado a "${estados[estado]}"?`)) { 
+                cargarVentas(); 
+                return; 
+            }
+            
+            fetch(`/api/venta/${id}/estado`, { 
+                method:'PUT', 
+                headers:{'Content-Type':'application/json'}, 
+                body:JSON.stringify({estado}) 
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) { 
+                    mostrarMensaje(`✅ Estado actualizado`, 'exito'); 
+                    cargarVentas(); 
+                } else { 
+                    mostrarMensaje(data.error || 'Error', 'error'); 
+                    cargarVentas(); 
+                }
+            })
+            .catch(error => { 
+                console.error(error); 
+                mostrarMensaje('Error de conexión', 'error'); 
+                cargarVentas(); 
+            });
         }
 
         // ============================================
-        // ELIMINAR VENTA (CORREGIDO)
+        // ELIMINAR VENTA
         // ============================================
 
         async function eliminarVenta(id) {
@@ -963,20 +1185,37 @@
         function generarFactura(id) {
             const v = ventas.find(v => v.id === id);
             if (!v) return;
-            if (!confirm(`📄 ¿Generar factura #${id}?`)) return;
-            const btn = event?.target; const orig = btn ? btn.textContent : '📄';
+            
+            // Si es oferta, preguntar si quiere generar factura de oferta
+            if (v.estado === 'oferta') {
+                if (!confirm(`📄 Esta es una OFERTA. ¿Generar documento de oferta?`)) return;
+            } else {
+                if (!confirm(`📄 ¿Generar factura #${id}?`)) return;
+            }
+            
+            const btn = event?.target; 
+            const orig = btn ? btn.textContent : '📄';
             if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
-            fetch(`/api/venta/${id}/factura`).then(r => {
+            
+            const esOferta = v.estado === 'oferta';
+            const url = esOferta ? `/api/venta/${id}/factura?oferta=true` : `/api/venta/${id}/factura`;
+            
+            fetch(url)
+            .then(r => {
                 if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Error'); });
                 return r.blob().then(blob => {
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = url; a.download = `factura_${id}.pdf`;
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    a.href = url; 
+                    a.download = esOferta ? `oferta_${id}.pdf` : `factura_${id}.pdf`;
+                    document.body.appendChild(a); 
+                    a.click(); 
+                    document.body.removeChild(a);
                     window.URL.revokeObjectURL(url);
-                    mostrarMensaje(`✅ Factura #${id} descargada`, 'exito');
+                    mostrarMensaje(`✅ ${esOferta ? 'Oferta' : 'Factura'} #${id} descargada`, 'exito');
                 });
-            }).catch(error => { console.error(error); mostrarMensaje('Error: '+error.message, 'error'); })
+            })
+            .catch(error => { console.error(error); mostrarMensaje('Error: '+error.message, 'error'); })
             .finally(() => { if (btn) { btn.textContent = orig; btn.disabled = false; } });
         }
 
@@ -986,7 +1225,8 @@
             if (!confirm(`📄 ¿Generar oferta #${id}?`)) return;
             const btn = event?.target; const orig = btn ? btn.textContent : '📄';
             if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
-            fetch(`/api/venta/${id}/factura?oferta=true`).then(r => {
+            fetch(`/api/venta/${id}/factura?oferta=true`)
+            .then(r => {
                 if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Error'); });
                 return r.blob().then(blob => {
                     const url = window.URL.createObjectURL(blob);
@@ -996,7 +1236,8 @@
                     window.URL.revokeObjectURL(url);
                     mostrarMensaje(`✅ Oferta #${id} descargada`, 'exito');
                 });
-            }).catch(error => { console.error(error); mostrarMensaje('Error: '+error.message, 'error'); })
+            })
+            .catch(error => { console.error(error); mostrarMensaje('Error: '+error.message, 'error'); })
             .finally(() => { if (btn) { btn.textContent = orig; btn.disabled = false; } });
         }
 
