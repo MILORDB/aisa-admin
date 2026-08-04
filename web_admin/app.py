@@ -551,6 +551,94 @@ def fix_verificado():
         """, 500
 
 # ============================================
+# ENDPOINT PARA MARCAR TODOS LOS USUARIOS COMO VERIFICADOS
+# ============================================
+@app.route('/fix-verificar-todos', methods=['GET'])
+@admin_required
+def fix_verificar_todos():
+    """Endpoint para marcar todos los usuarios existentes como verificados"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Actualizar todos los usuarios que no son admin ni trabajador (ya que esos ya están verificados)
+        cursor.execute('''
+            UPDATE usuarios 
+            SET verificado = 1, aprobado = 1 
+            WHERE verificado = 0
+            RETURNING id, username, email
+        ''')
+        
+        actualizados = cursor.fetchall()
+        conn.commit()
+        conn.close()
+        
+        if actualizados:
+            mensajes = [f"✅ Usuario {u[1]} (ID: {u[0]}) - {u[2]} marcado como verificado" for u in actualizados]
+            html_lista = "<br>".join(mensajes)
+            total = len(actualizados)
+        else:
+            html_lista = "✅ No hay usuarios pendientes de verificación"
+            total = 0
+        
+        return f"""
+        <html>
+            <head>
+                <title>Usuarios Verificados</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                    .result-box {{ background: #0f0f1a; border-radius: 8px; padding: 12px; border: 1px solid #2a2a3e; margin-top: 12px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔐 Verificación Masiva de Usuarios</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        <div style="font-size:18px;font-weight:700;color:#6bff6b;text-align:center;padding:10px;">
+                            {total} usuarios verificados
+                        </div>
+                        <div class="result-box">
+                            {html_lista}
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <a href="/dashboard" class="btn btn-primary">← Volver al Dashboard</a>
+                        <a href="/login" class="btn btn-secondary">🔑 Ir al Login</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_detalle = traceback.format_exc()
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;font-size:12px;overflow:auto;max-height:400px;">{error_detalle}</pre>
+                <div style="margin-top:16px;">
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                </div>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
 # ENDPOINT PARA REPARAR UBICACIÓN (VIA WEB)
 # ============================================
 @app.route('/fix-ubicacion', methods=['GET'])
@@ -1338,6 +1426,422 @@ def fix_modulos_web():
         """, 500
 
 # ============================================
+# ENDPOINT PARA REPARAR SECUENCIAS DE FACTURAS
+# ============================================
+@app.route('/fix-facturas-secuencia', methods=['GET'])
+@admin_required
+def fix_facturas_secuencia():
+    """Endpoint para reparar/migrar secuencias de facturas"""
+    try:
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL - Reparando secuencias de facturas...")
+        
+        mensajes = []
+        
+        # 1. Crear tabla si no existe
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS facturas_secuencia (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            empresa TEXT NOT NULL,
+            ultimo_numero INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(negocio_id, empresa)
+        )
+        ''')
+        mensajes.append("✅ Tabla facturas_secuencia creada/verificada")
+        
+        # 2. Migrar secuencias existentes
+        cursor.execute('''
+            SELECT DISTINCT negocio_id, empresa FROM ventas 
+            WHERE empresa IS NOT NULL AND empresa != '' AND estado != 'oferta'
+        ''')
+        empresas = cursor.fetchall()
+        
+        contador = 0
+        for negocio_id, empresa in empresas:
+            if empresa and empresa != '' and empresa != '📄 OFERTA':
+                cursor.execute('''
+                    SELECT MAX(CAST(SUBSTRING(factura FROM 'FAC-[0-9]+-([0-9]+)') AS INTEGER)) 
+                    FROM ventas 
+                    WHERE negocio_id = %s AND empresa = %s AND factura IS NOT NULL
+                ''', (negocio_id, empresa))
+                ultimo = cursor.fetchone()[0]
+                if ultimo:
+                    cursor.execute('''
+                        INSERT INTO facturas_secuencia (negocio_id, empresa, ultimo_numero, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (negocio_id, empresa) DO UPDATE SET 
+                            ultimo_numero = EXCLUDED.ultimo_numero,
+                            updated_at = EXCLUDED.updated_at
+                    ''', (negocio_id, empresa, ultimo, datetime.now().isoformat(), datetime.now().isoformat()))
+                    contador += 1
+        
+        conn.commit()
+        mensajes.append(f"✅ {contador} secuencias migradas")
+        
+        # 3. Verificar secuencias actuales
+        cursor.execute('''
+            SELECT fs.*, u.username 
+            FROM facturas_secuencia fs
+            JOIN usuarios u ON fs.negocio_id = u.id
+            ORDER BY u.username, fs.empresa
+        ''')
+        secuencias = cursor.fetchall()
+        conn.close()
+        
+        html_secuencias = ""
+        for s in secuencias:
+            html_secuencias += f"""
+                <tr>
+                    <td>{s[5]}</td>
+                    <td>{s[2]}</td>
+                    <td><strong style="color:#6c3ce0;">{s[3]}</strong></td>
+                    <td>{s[4] or s[3]}</td>
+                </tr>
+            """
+        
+        return f"""
+        <html>
+            <head>
+                <title>Secuencias de Facturas</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 900px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                    .tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
+                    .tabla th { text-align: left; padding: 8px 12px; color: #888; border-bottom: 1px solid #2a2a3e; }
+                    .tabla td { padding: 8px 12px; border-bottom: 1px solid #1a1a2e; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Secuencias de Facturas</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        <ul>
+                            {''.join([f'<li>✅ {m}</li>' for m in mensajes])}
+                        </ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Secuencias por Empresa</h3>
+                        <table class="tabla">
+                            <thead>
+                                <tr>
+                                    <th>Negocio</th>
+                                    <th>Empresa</th>
+                                    <th>Último Número</th>
+                                    <th>Actualizado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {html_secuencias}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div>
+                        <a href="/admin/db" class="btn btn-primary">🗄️ Ir al Gestor DB</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA DEBUG DE SECUENCIAS DE FACTURAS
+# ============================================
+@app.route('/debug/facturas-secuencia', methods=['GET'])
+@admin_required
+def debug_facturas_secuencia():
+    """Endpoint para ver las secuencias de facturas"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('''
+            SELECT fs.*, u.username 
+            FROM facturas_secuencia fs
+            JOIN usuarios u ON fs.negocio_id = u.id
+            ORDER BY u.username, fs.empresa
+        ''')
+        secuencias = cursor.fetchall()
+        conn.close()
+        
+        html = """
+        <html>
+            <head>
+                <title>Secuencias de Facturas</title>
+                <style>
+                    body { background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }
+                    .container { max-width: 900px; margin: 0 auto; }
+                    .card { background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }
+                    .card h3 { color: #aaa; margin-bottom: 10px; }
+                    .tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
+                    .tabla th { text-align: left; padding: 8px 12px; color: #888; border-bottom: 1px solid #2a2a3e; }
+                    .tabla td { padding: 8px 12px; border-bottom: 1px solid #1a1a2e; }
+                    .btn { display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary { background: #6c3ce0; color: #fff; }
+                    .btn-primary:hover { background: #5a2ec0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">📊 Secuencias de Facturas</h1>
+                    <div class="card">
+                        <h3>📋 Secuencias por Empresa</h3>
+                        <table class="tabla">
+                            <thead>
+                                <tr>
+                                    <th>Negocio</th>
+                                    <th>Empresa</th>
+                                    <th>Último Número</th>
+                                    <th>Actualizado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+        """
+        
+        for s in secuencias:
+            html += f"""
+                                <tr>
+                                    <td>{s['username']}</td>
+                                    <td>{s['empresa']}</td>
+                                    <td><strong style="color:#6c3ce0;">{s['ultimo_numero']}</strong></td>
+                                    <td>{s['updated_at'] or s['created_at']}</td>
+                                </tr>
+            """
+        
+        html += """
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                        <a href="/admin/db" class="btn btn-primary">← Volver al Gestor DB</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA REPARAR TABLA NOMINA
+# ============================================
+@app.route('/fix-nomina-tabla', methods=['GET'])
+def fix_nomina_tabla_endpoint():
+    try:
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL")
+        
+        mensajes = []
+        
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'nomina'
+            )
+        """)
+        tabla_existe = cursor.fetchone()[0]
+        
+        if not tabla_existe:
+            mensajes.append("⚠️ La tabla 'nomina' no existe. Creándola...")
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS nomina (
+                id SERIAL PRIMARY KEY,
+                negocio_id INTEGER NOT NULL,
+                trabajador_id INTEGER NOT NULL,
+                mes INTEGER NOT NULL,
+                ano INTEGER NOT NULL,
+                salario_base REAL NOT NULL DEFAULT 0,
+                dias_trabajados INTEGER DEFAULT 0,
+                dias_ausencia INTEGER DEFAULT 0,
+                dias_extras INTEGER DEFAULT 0,
+                salario_devengado REAL DEFAULT 0,
+                comisiones REAL DEFAULT 0,
+                total REAL DEFAULT 0,
+                creado_en TEXT NOT NULL,
+                actualizado_en TEXT,
+                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                UNIQUE(negocio_id, trabajador_id, mes, ano)
+            )
+            ''')
+            conn.commit()
+            mensajes.append("✅ Tabla 'nomina' creada correctamente")
+        
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'nomina'
+        """)
+        columnas = [col[0] for col in cursor.fetchall()]
+        mensajes.append(f"📋 Columnas existentes: {', '.join(columnas)}")
+        
+        columnas_necesarias = {
+            'salario_base': 'REAL NOT NULL DEFAULT 0',
+            'dias_trabajados': 'INTEGER DEFAULT 0',
+            'dias_ausencia': 'INTEGER DEFAULT 0',
+            'dias_extras': 'INTEGER DEFAULT 0',
+            'salario_devengado': 'REAL DEFAULT 0',
+            'comisiones': 'REAL DEFAULT 0',
+            'total': 'REAL DEFAULT 0'
+        }
+        
+        for col, tipo in columnas_necesarias.items():
+            if col not in columnas:
+                try:
+                    cursor.execute(f"ALTER TABLE nomina ADD COLUMN {col} {tipo}")
+                    mensajes.append(f"✅ Columna '{col}' agregada")
+                    print(f"✅ Columna '{col}' agregada")
+                except psycopg2.Error as e:
+                    if "duplicate column" not in str(e).lower():
+                        mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
+                        print(f"⚠️ Error al agregar '{col}': {e}")
+                except Exception as e:
+                    mensajes.append(f"⚠️ Error al agregar '{col}': {e}")
+                    print(f"⚠️ Error al agregar '{col}': {e}")
+            else:
+                mensajes.append(f"✅ Columna '{col}' ya existe")
+        
+        conn.commit()
+        
+        cursor.execute("""
+            SELECT column_name, data_type
+            FROM information_schema.columns 
+            WHERE table_name = 'nomina'
+            ORDER BY ordinal_position
+        """)
+        columnas_final = cursor.fetchall()
+        
+        html_columnas = ""
+        for col, tipo in columnas_final:
+            html_columnas += f"• <strong>{col}</strong> ({tipo})<br>"
+        
+        cursor.execute("SELECT COUNT(*) FROM nomina")
+        total_registros = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head><title>Tabla Nómina Reparada</title>
+            <style>
+                body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                .container {{ max-width: 800px; margin: 0 auto; }}
+                .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                .success {{ color: #6bff6b; }}
+                .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                .btn-primary:hover {{ background: #5a2ec0; }}
+                .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                .btn-secondary:hover {{ background: #3a3a4e; }}
+            </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Tabla Nómina</h1>
+                    <div class="card"><h3>📊 Resultado</h3>{html_mensajes}</div>
+                    <div class="card"><h3>📋 Estructura final de la tabla 'nomina'</h3>{html_columnas}</div>
+                    <div class="card"><h3>📊 Estadísticas</h3><p>Total de registros en nómina: <strong>{total_registros}</strong></p></div>
+                    <div>
+                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al reparar tabla</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
 # RUTAS PRINCIPALES
 # ============================================
 @app.route('/')
@@ -1937,7 +2441,7 @@ def api_estadisticas():
     })
 
 # ============================================
-# API - USUARIOS (MÓDULOS ADICIONALES)
+# API - USUARIOS
 # ============================================
 @app.route('/api/usuarios')
 @admin_required
@@ -1965,6 +2469,28 @@ def api_toggle_usuario(user_id):
     activo = data.get('activo', 1)
     toggle_usuario(user_id, activo)
     registrar_log(None, 'usuario_toggle', f'Usuario {user_id} activo={activo}')
+    return jsonify({'success': True})
+
+@app.route('/api/usuario/<int:user_id>/rol', methods=['POST'])
+@admin_required
+def api_actualizar_rol(user_id):
+    data = request.get_json()
+    rol = data.get('rol', 'usuario')
+    if rol not in ['usuario', 'admin', 'trabajador']:
+        return jsonify({'error': 'Rol inválido'}), 400
+    actualizar_rol_usuario(user_id, rol)
+    registrar_log(None, 'usuario_rol', f'Usuario {user_id} rol={rol}')
+    return jsonify({'success': True})
+
+@app.route('/api/usuario/<int:user_id>/tipo', methods=['POST'])
+@admin_required
+def api_actualizar_tipo(user_id):
+    data = request.get_json()
+    tipo = data.get('tipo', 'cliente')
+    if tipo not in ['cliente', 'negocio']:
+        return jsonify({'error': 'Tipo inválido'}), 400
+    actualizar_tipo_usuario(user_id, tipo)
+    registrar_log(None, 'usuario_tipo', f'Usuario {user_id} tipo={tipo}')
     return jsonify({'success': True})
 
 @app.route('/api/usuario/<int:user_id>', methods=['DELETE'])
