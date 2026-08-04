@@ -216,6 +216,150 @@ def admin_required(f):
     return decorated_function
 
 # ============================================
+# ENDPOINT PARA LIMPIAR TODOS LOS DATOS (DEJAR BD EN CERO)
+# ============================================
+@app.route('/limpiar-bd', methods=['GET'])
+@admin_required
+def limpiar_bd():
+    """Endpoint para limpiar todos los datos de la base de datos (dejar en cero)"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        resultados = []
+        
+        # Verificar qué tablas existen
+        cursor.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+            ORDER BY table_name
+        """)
+        tablas = [row[0] for row in cursor.fetchall()]
+        
+        # Lista de tablas en orden de eliminación (respetando FK)
+        tablas_a_eliminar = [
+            'codigos_verificacion',
+            'sesiones',
+            'permisos_usuario',
+            'comisiones_trabajador',
+            'nomina',
+            'asistencia',
+            'trabajadores_negocio',
+            'contratos',
+            'ventas',
+            'productos_tienda',
+            'productos',
+            'servicios',
+            'logs',
+            'facturas_secuencia'
+        ]
+        
+        eliminados = []
+        for tabla in tablas_a_eliminar:
+            if tabla in tablas:
+                cursor.execute(f"DELETE FROM {tabla}")
+                eliminados.append(f"✅ {tabla}: {cursor.rowcount} registros eliminados")
+        
+        # Eliminar todos los usuarios excepto admin (protección)
+        cursor.execute("DELETE FROM usuarios WHERE rol != 'admin'")
+        eliminados.append(f"✅ Usuarios no-admin: {cursor.rowcount} eliminados")
+        
+        # Resetear secuencias (PostgreSQL)
+        cursor.execute("""
+            SELECT 'SELECT SETVAL(' || quote_literal(quote_ident(PG_GET_SERIAL_SEQUENCE('"'||tablename||'"', 'id'))) || 
+            ', COALESCE(MAX(id), 1), true) FROM ' || quote_ident(tablename) || ';'
+            FROM pg_tables 
+            WHERE schemaname = 'public' 
+            AND tablename IN (
+                SELECT table_name 
+                FROM information_schema.columns 
+                WHERE column_name = 'id' 
+                AND table_schema = 'public'
+            )
+        """)
+        secuencias = cursor.fetchall()
+        for seq in secuencias:
+            try:
+                cursor.execute(seq[0])
+            except:
+                pass
+        
+        conn.commit()
+        conn.close()
+        
+        html = f"""
+        <html>
+            <head>
+                <title>Base de Datos Limpiada</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-danger {{ background: #f44336; color: #fff; }}
+                    .btn-danger:hover {{ background: #c62828; }}
+                    .result-box {{ background: #0f0f1a; border-radius: 8px; padding: 12px; border: 1px solid #2a2a3e; margin-top: 12px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🧹 Base de Datos Limpiada</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        <div style="color:#6bff6b; font-size:18px; text-align:center; padding:10px;">
+                            ✅ Base de datos limpiada correctamente
+                        </div>
+                        <div class="result-box">
+                            {''.join([f'<div style="padding:2px 0;border-bottom:1px solid #1a1a2e;">{r}</div>' for r in eliminados])}
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Usuarios que quedan en el sistema</h3>
+                        <div class="result-box" style="color:#6c3ce0;">
+                            👤 admin (ID: 1) - Administrador
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <a href="/admin/db" class="btn btn-primary">🗄️ Ir al Gestor DB</a>
+                        <a href="/dashboard" class="btn btn-primary">← Volver al Dashboard</a>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 16px; background: #0f0f1a; border-radius: 8px; border: 1px solid #2a2a3e;">
+                        <p style="color: #888; font-size: 12px;">⚠️ Esta acción elimina TODOS los datos excepto el usuario admin.</p>
+                        <p style="color: #888; font-size: 12px;">🔑 Usuario admin: <strong style="color:#6c3ce0;">admin</strong> - Contraseña: <strong style="color:#6c3ce0;">admin123</strong></p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+        return html
+        
+    except Exception as e:
+        import traceback
+        error_detalle = traceback.format_exc()
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al limpiar la base de datos</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;font-size:12px;overflow:auto;max-height:400px;">{error_detalle}</pre>
+                <div style="margin-top:16px;">
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                </div>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
 # ENDPOINTS DE REPARACIÓN
 # ============================================
 
@@ -1695,155 +1839,6 @@ def fix_modulos_endpoint():
             </body>
         </html>
         """, 500
-
-# ============================================
-# ENDPOINT DE EMERGENCIA PARA ELIMINAR USUARIO (SIN PERMISOS ESPECIALES)
-# ============================================
-@app.route('/eliminar-usuario-forzado/<int:user_id>', methods=['GET'])
-@admin_required
-def eliminar_usuario_forzado(user_id):
-    """Endpoint de emergencia para eliminar un usuario (SIN PERMISOS ESPECIALES)"""
-    try:
-        token = request.cookies.get('token')
-        usuario_actual = obtener_usuario_sesion(token)
-        
-        if usuario_actual.get('id') == user_id:
-            return jsonify({'error': 'No puedes eliminar tu propio usuario'}), 400
-        
-        user = obtener_usuario_por_id(user_id)
-        if not user:
-            return jsonify({'error': 'Usuario no encontrado'}), 404
-        
-        if user.get('rol') == 'admin':
-            return jsonify({'error': 'No se puede eliminar un administrador'}), 400
-        
-        # USAR LA FUNCIÓN CORREGIDA
-        exito = eliminar_usuario(user_id)
-        
-        if not exito:
-            return jsonify({'error': 'Error al eliminar el usuario. Verifica los logs.'}), 500
-        
-        registrar_log(usuario_actual.get('id'), 'usuario_eliminado_forzado', 
-                      f'Usuario {user.get("username")} (ID: {user_id}) eliminado forzadamente')
-        
-        return jsonify({
-            'success': True,
-            'message': f'Usuario "{user.get("username")}" eliminado correctamente'
-        })
-        
-    except Exception as e:
-        import traceback
-        error_detalle = traceback.format_exc()
-        print(f"❌ Error: {error_detalle}")
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
-# ENDPOINT PARA ELIMINAR USUARIO VÍA SQL DIRECTO
-# ============================================
-@app.route('/eliminar-usuario-sql/<int:user_id>', methods=['GET'])
-@admin_required
-def eliminar_usuario_sql(user_id):
-    """Endpoint para eliminar un usuario ejecutando SQL directo"""
-    try:
-        token = request.cookies.get('token')
-        usuario_actual = obtener_usuario_sesion(token)
-        
-        if usuario_actual.get('id') == user_id:
-            return jsonify({'error': 'No puedes eliminar tu propio usuario'}), 400
-        
-        user = obtener_usuario_por_id(user_id)
-        if not user:
-            return jsonify({'error': 'Usuario no encontrado'}), 404
-        
-        if user.get('rol') == 'admin':
-            return jsonify({'error': 'No se puede eliminar un administrador'}), 400
-        
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        resultados = []
-        
-        # 1. Actualizar ventas
-        cursor.execute("UPDATE ventas SET producto_id = NULL WHERE producto_id IN (SELECT id FROM productos WHERE negocio_id = %s)", (user_id,))
-        resultados.append(f"Referencias actualizadas: {cursor.rowcount}")
-        
-        # 2. Eliminar códigos de verificación
-        cursor.execute("DELETE FROM codigos_verificacion WHERE usuario_id = %s", (user_id,))
-        resultados.append(f"Códigos verificación: {cursor.rowcount}")
-        
-        # 3. Eliminar sesiones
-        cursor.execute("DELETE FROM sesiones WHERE usuario_id = %s", (user_id,))
-        resultados.append(f"Sesiones: {cursor.rowcount}")
-        
-        # 4. Eliminar permisos
-        cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (user_id,))
-        resultados.append(f"Permisos: {cursor.rowcount}")
-        
-        # 5. Eliminar trabajadores_negocio
-        cursor.execute("DELETE FROM trabajadores_negocio WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        resultados.append(f"Trabajadores_Negocio: {cursor.rowcount}")
-        
-        # 6. Eliminar comisiones
-        cursor.execute("DELETE FROM comisiones_trabajador WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        resultados.append(f"Comisiones: {cursor.rowcount}")
-        
-        # 7. Eliminar asistencia
-        cursor.execute("DELETE FROM asistencia WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        resultados.append(f"Asistencia: {cursor.rowcount}")
-        
-        # 8. Eliminar nomina
-        cursor.execute("DELETE FROM nomina WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        resultados.append(f"Nómina: {cursor.rowcount}")
-        
-        # 9. Eliminar contratos
-        cursor.execute("DELETE FROM contratos WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        resultados.append(f"Contratos: {cursor.rowcount}")
-        
-        # 10. Eliminar ventas
-        cursor.execute("DELETE FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        resultados.append(f"Ventas: {cursor.rowcount}")
-        
-        # 11. Eliminar productos_tienda
-        cursor.execute("DELETE FROM productos_tienda WHERE negocio_id = %s", (user_id,))
-        resultados.append(f"Productos_Tienda: {cursor.rowcount}")
-        
-        # 12. Eliminar productos
-        cursor.execute("DELETE FROM productos WHERE negocio_id = %s", (user_id,))
-        resultados.append(f"Productos: {cursor.rowcount}")
-        
-        # 13. Eliminar servicios
-        cursor.execute("DELETE FROM servicios WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        resultados.append(f"Servicios: {cursor.rowcount}")
-        
-        # 14. Eliminar logs
-        cursor.execute("DELETE FROM logs WHERE usuario_id = %s", (user_id,))
-        resultados.append(f"Logs: {cursor.rowcount}")
-        
-        # 15. Eliminar facturas_secuencia
-        cursor.execute("DELETE FROM facturas_secuencia WHERE negocio_id = %s", (user_id,))
-        resultados.append(f"Facturas secuencia: {cursor.rowcount}")
-        
-        # 16. Eliminar usuario
-        cursor.execute("DELETE FROM usuarios WHERE id = %s", (user_id,))
-        resultados.append(f"Usuario: {cursor.rowcount}")
-        
-        conn.commit()
-        conn.close()
-        
-        registrar_log(usuario_actual.get('id'), 'usuario_eliminado_sql', 
-                      f'Usuario {user.get("username")} (ID: {user_id}) eliminado vía SQL')
-        
-        return jsonify({
-            'success': True,
-            'message': f'Usuario "{user.get("username")}" eliminado correctamente',
-            'detalles': resultados
-        })
-        
-    except Exception as e:
-        import traceback
-        error_detalle = traceback.format_exc()
-        print(f"❌ Error: {error_detalle}")
-        return jsonify({'error': str(e)}), 500
 
 # ============================================
 # RUTAS PRINCIPALES
