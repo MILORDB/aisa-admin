@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificar Cuenta - AIsa</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: #1a1a2e;
+            padding: 40px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 450px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        .logo h1 { font-size: 28px; color: #6c3ce0; margin-bottom: 4px; }
+        .logo p { color: #888; font-size: 14px; margin-bottom: 20px; }
+        .icon-big { font-size: 48px; margin-bottom: 12px; }
+        .subtitle { color: #aaa; font-size: 14px; margin-bottom: 24px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group input {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+            font-size: 18px;
+            text-align: center;
+            letter-spacing: 8px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus { border-color: #6c3ce0; }
+        .form-group input::placeholder { letter-spacing: 2px; font-size: 14px; color: #444; }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary {
+            background: transparent;
+            color: #888;
+            border: 1px solid #2a2a3e;
+            margin-top: 8px;
+        }
+        .btn-secondary:hover { background: #2a2a3e; color: #fff; }
+        .mensaje {
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            display: none;
+        }
+        .mensaje.exito { background: #224422; color: #6bff6b; display: block; }
+        .mensaje.error { background: #442222; color: #ff6b6b; display: block; }
+        .mensaje.info { background: #1a2a3a; color: #64b5f6; display: block; }
+        .link { margin-top: 16px; font-size: 13px; color: #888; }
+        .link a { color: #6c3ce0; text-decoration: none; }
+        .link a:hover { text-decoration: underline; }
+        .email-display {
+            background: #0f0f1a;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 16px;
+            color: #6c3ce0;
+            font-size: 14px;
+            border: 1px solid #2a2a3e;
+            word-break: break-all;
+        }
+        .timer {
+            font-size: 12px;
+            color: #666;
+            margin-top: 8px;
+        }
+        .timer span { color: #6c3ce0; font-weight: 600; }
+        .hidden { display: none; }
+        .success-box {
+            background: #0f0f1a;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #2a2a3e;
+            margin-bottom: 16px;
+        }
+        .success-box .check { font-size: 48px; color: #6bff6b; }
+        .success-box h2 { color: #6bff6b; margin: 8px 0; }
+        .success-box p { color: #888; font-size: 14px; }
+        @media (max-width: 600px) {
+            .container { padding: 24px; }
+            .form-group input { font-size: 16px; letter-spacing: 6px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="app">
+        <div class="logo">
+            <h1>🤖 AIsa</h1>
+            <p>Verificación de cuenta</p>
+        </div>
+
+        <div id="mensaje" class="mensaje"></div>
+
+        <!-- Estado: Cargando -->
+        <div id="estadoCargando">
+            <div class="icon-big">⏳</div>
+            <div class="subtitle">Cargando información...</div>
+        </div>
+
+        <!-- Estado: Verificación requerida -->
+        <div id="estadoVerificacion" class="hidden">
+            <div class="icon-big">📧</div>
+            <div class="subtitle">Te hemos enviado un código de 6 dígitos a tu correo</div>
+            
+            <div class="email-display" id="emailDisplay">correo@ejemplo.com</div>
+
+            <form id="formVerificar">
+                <div class="form-group">
+                    <input type="text" id="codigoInput" placeholder="• • • • • •" maxlength="6" autofocus>
+                </div>
+                <button type="submit" class="btn btn-primary" id="btnVerificar">🔐 Verificar</button>
+            </form>
+
+            <div class="timer" id="timerInfo">
+                ⏱️ El código expira en <span id="timerCount">15:00</span>
+            </div>
+
+            <div class="link">
+                ¿No recibiste el código? <a href="#" id="btnReenviar">Reenviar código</a>
+            </div>
+            <div class="link">
+                <a href="/login">← Volver al inicio de sesión</a>
+            </div>
+        </div>
+
+        <!-- Estado: Verificado -->
+        <div id="estadoVerificado" class="hidden">
+            <div class="success-box">
+                <div class="check">✅</div>
+                <h2>¡Cuenta activada!</h2>
+                <p>Tu cuenta ha sido verificada correctamente.</p>
+            </div>
+            <a href="/login" class="btn btn-primary">🔑 Iniciar sesión</a>
+        </div>
+
+        <!-- Estado: Error -->
+        <div id="estadoError" class="hidden">
+            <div class="icon-big">❌</div>
+            <div class="subtitle" style="color:#ff6b6b;" id="errorTexto">Ha ocurrido un error</div>
+            <a href="/login" class="btn btn-secondary">← Volver al inicio</a>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // VARIABLES
+        // ============================================
+        let email = '';
+        let userId = null;
+        let tiempoRestante = 900; // 15 minutos en segundos
+        let timerInterval = null;
+
+        // ============================================
+        // DOM ELEMENTS
+        // ============================================
+        const estadoCargando = document.getElementById('estadoCargando');
+        const estadoVerificacion = document.getElementById('estadoVerificacion');
+        const estadoVerificado = document.getElementById('estadoVerificado');
+        const estadoError = document.getElementById('estadoError');
+        const mensajeEl = document.getElementById('mensaje');
+        const emailDisplay = document.getElementById('emailDisplay');
+        const codigoInput = document.getElementById('codigoInput');
+        const formVerificar = document.getElementById('formVerificar');
+        const btnVerificar = document.getElementById('btnVerificar');
+        const btnReenviar = document.getElementById('btnReenviar');
+        const timerCount = document.getElementById('timerCount');
+        const errorTexto = document.getElementById('errorTexto');
+
+        // ============================================
+        // FUNCIONES
+        // ============================================
+
+        function mostrarMensaje(texto, tipo) {
+            mensajeEl.textContent = texto;
+            mensajeEl.className = `mensaje ${tipo}`;
+            mensajeEl.style.display = 'block';
+        }
+
+        function ocultarMensaje() {
+            mensajeEl.style.display = 'none';
+            mensajeEl.className = 'mensaje';
+        }
+
+        function mostrarEstado(estado) {
+            estadoCargando.classList.add('hidden');
+            estadoVerificacion.classList.add('hidden');
+            estadoVerificado.classList.add('hidden');
+            estadoError.classList.add('hidden');
+            
+            document.getElementById(estado).classList.remove('hidden');
+        }
+
+        function iniciarTimer(segundos) {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            tiempoRestante = segundos || 900;
+            
+            timerInterval = setInterval(() => {
+                tiempoRestante--;
+                
+                if (tiempoRestante <= 0) {
+                    clearInterval(timerInterval);
+                    timerCount.textContent = '00:00';
+                    timerCount.style.color = '#ff6b6b';
+                    mostrarMensaje('⏰ El código ha expirado. Solicita uno nuevo.', 'error');
+                    return;
+                }
+                
+                const minutos = Math.floor(tiempoRestante / 60);
+                const segundos = tiempoRestante % 60;
+                timerCount.textContent = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+                timerCount.style.color = tiempoRestante < 60 ? '#ff6b6b' : '#6c3ce0';
+            }, 1000);
+        }
+
+        async function verificarCodigo(codigo) {
+            ocultarMensaje();
+            btnVerificar.disabled = true;
+            btnVerificar.textContent = '⏳ Verificando...';
+            
+            try {
+                const response = await fetch('/api/verificar-codigo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, codigo })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    mostrarMensaje(data.message, 'exito');
+                    mostrarEstado('estadoVerificado');
+                    if (timerInterval) clearInterval(timerInterval);
+                } else {
+                    mostrarMensaje(data.error || 'Código inválido', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión', 'error');
+            } finally {
+                btnVerificar.disabled = false;
+                btnVerificar.textContent = '🔐 Verificar';
+            }
+        }
+
+        async function reenviarCodigo() {
+            ocultarMensaje();
+            btnReenviar.textContent = '⏳ Enviando...';
+            btnReenviar.style.opacity = '0.5';
+            btnReenviar.style.pointerEvents = 'none';
+            
+            try {
+                const response = await fetch('/api/reenviar-codigo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    mostrarMensaje(data.message, 'exito');
+                    // Reiniciar timer
+                    iniciarTimer(900);
+                } else {
+                    mostrarMensaje(data.error || 'Error al reenviar el código', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión', 'error');
+            } finally {
+                btnReenviar.textContent = 'Reenviar código';
+                btnReenviar.style.opacity = '1';
+                btnReenviar.style.pointerEvents = 'auto';
+            }
+        }
+
+        // ============================================
+        // INICIALIZAR
+        // ============================================
+
+        function init() {
+            // Obtener datos de la URL
+            const params = new URLSearchParams(window.location.search);
+            email = params.get('email') || '';
+            userId = params.get('user_id') || null;
+            
+            if (!email || !userId) {
+                mostrarEstado('estadoError');
+                errorTexto.textContent = 'No se encontró información de verificación.';
+                return;
+            }
+            
+            // Mostrar email
+            emailDisplay.textContent = email;
+            
+            // Mostrar estado de verificación
+            mostrarEstado('estadoVerificacion');
+            
+            // Iniciar timer
+            iniciarTimer(900);
+            
+            // Enfocar input
+            setTimeout(() => codigoInput.focus(), 300);
+        }
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+
+        // Auto-verificar al completar 6 dígitos
+        codigoInput.addEventListener('input', function() {
+            if (this.value.length === 6) {
+                verificarCodigo(this.value);
+            }
+        });
+
+        // Enviar formulario
+        formVerificar.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const codigo = codigoInput.value.trim();
+            if (codigo.length === 6) {
+                verificarCodigo(codigo);
+            } else {
+                mostrarMensaje('Ingresa el código de 6 dígitos', 'error');
+            }
+        });
+
+        // Reenviar código
+        btnReenviar.addEventListener('click', function(e) {
+            e.preventDefault();
+            reenviarCodigo();
+        });
+
+        // Tecla Enter en el input
+        codigoInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                formVerificar.dispatchEvent(new Event('submit'));
+            }
+        });
+
+        // ============================================
+        // INICIO
+        // ============================================
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
