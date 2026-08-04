@@ -1,10 +1,12 @@
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from datetime import datetime
+from datetime import datetime, timedelta
 import bcrypt
 import json
 import urllib.parse
+import random
+import string
 from calendar import monthrange
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
@@ -44,7 +46,9 @@ def init_db():
         print(f"❌ Error de conexión: {e}")
         return
     
-    # TABLAS CON SERIAL (PostgreSQL) - INCLUYE CAMPOS DE UBICACIÓN
+    # ============================================
+    # TABLA USUARIOS (con verificado)
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS usuarios (
         id SERIAL PRIMARY KEY,
@@ -56,6 +60,7 @@ def init_db():
         tipo TEXT DEFAULT 'cliente',
         activo INTEGER DEFAULT 1,
         aprobado INTEGER DEFAULT 1,
+        verificado INTEGER DEFAULT 0,
         fecha_registro TEXT NOT NULL,
         ultimo_acceso TEXT,
         datos_negocio TEXT,
@@ -65,6 +70,9 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA SESIONES
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS sesiones (
         id SERIAL PRIMARY KEY,
@@ -77,6 +85,9 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA MODULOS
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS modulos (
         id SERIAL PRIMARY KEY,
@@ -87,6 +98,9 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA PERMISOS_USUARIO
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS permisos_usuario (
         id SERIAL PRIMARY KEY,
@@ -101,6 +115,9 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA LOGS
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS logs (
         id SERIAL PRIMARY KEY,
@@ -112,6 +129,9 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA PRODUCTOS
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS productos (
         id SERIAL PRIMARY KEY,
@@ -131,6 +151,24 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA PRODUCTOS_TIENDA
+    # ============================================
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS productos_tienda (
+        id SERIAL PRIMARY KEY,
+        negocio_id INTEGER NOT NULL,
+        producto_id INTEGER NOT NULL,
+        destacado INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE
+    )
+    ''')
+    
+    # ============================================
+    # TABLA VENTAS
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS ventas (
         id SERIAL PRIMARY KEY,
@@ -159,6 +197,9 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA SERVICIOS
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS servicios (
         id SERIAL PRIMARY KEY,
@@ -177,6 +218,9 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA TRABAJADORES_NEGOCIO
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS trabajadores_negocio (
         id SERIAL PRIMARY KEY,
@@ -192,6 +236,9 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA CONTRATOS
+    # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS contratos (
         id SERIAL PRIMARY KEY,
@@ -212,33 +259,57 @@ def init_db():
     )
     ''')
     
+    # ============================================
+    # TABLA FACTURAS_SECUENCIA
+    # ============================================
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS productos_tienda (
+    CREATE TABLE IF NOT EXISTS facturas_secuencia (
         id SERIAL PRIMARY KEY,
         negocio_id INTEGER NOT NULL,
-        producto_id INTEGER NOT NULL,
-        destacado INTEGER DEFAULT 0,
+        empresa TEXT NOT NULL,
+        ultimo_numero INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
+        updated_at TEXT,
         FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE
+        UNIQUE(negocio_id, empresa)
     )
     ''')
     
     # ============================================
-    # TABLA ASISTENCIA - CORREGIDA
+    # TABLA ASISTENCIA
     # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS asistencia (
         id SERIAL PRIMARY KEY,
         trabajador_id INTEGER NOT NULL,
         negocio_id INTEGER NOT NULL,
-        fecha TEXT NOT NULL,
+        fecha DATE NOT NULL,
         presente INTEGER DEFAULT 1,
         horas_trabajadas REAL DEFAULT 8,
-        created_at TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
         FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
         UNIQUE(trabajador_id, fecha)
+    )
+    ''')
+    
+    # ============================================
+    # TABLA COMISIONES_TRABAJADOR
+    # ============================================
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS comisiones_trabajador (
+        id SERIAL PRIMARY KEY,
+        negocio_id INTEGER NOT NULL,
+        trabajador_id INTEGER NOT NULL,
+        venta_id INTEGER NOT NULL,
+        producto_id INTEGER,
+        monto REAL NOT NULL DEFAULT 0,
+        fecha DATE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
+        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
     )
     ''')
     
@@ -259,8 +330,8 @@ def init_db():
         salario_devengado REAL DEFAULT 0,
         comisiones REAL DEFAULT 0,
         total REAL DEFAULT 0,
-        creado_en TEXT NOT NULL,
-        actualizado_en TEXT,
+        creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        actualizado_en TIMESTAMP,
         FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
         FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
         UNIQUE(negocio_id, trabajador_id, mes, ano)
@@ -268,42 +339,24 @@ def init_db():
     ''')
     
     # ============================================
-    # TABLA COMISIONES_TRABAJADOR - CORREGIDA
+    # TABLA CODIGOS_VERIFICACION
     # ============================================
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS comisiones_trabajador (
+    CREATE TABLE IF NOT EXISTS codigos_verificacion (
         id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        trabajador_id INTEGER NOT NULL,
-        venta_id INTEGER NOT NULL,
-        producto_id INTEGER NOT NULL,
-        monto REAL NOT NULL,
-        fecha TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
-        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+        usuario_id INTEGER NOT NULL,
+        codigo TEXT NOT NULL,
+        email TEXT NOT NULL,
+        creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expira_en TIMESTAMP NOT NULL,
+        usado INTEGER DEFAULT 0,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
     )
     ''')
     
     # ============================================
-    # TABLA FACTURAS_SECUENCIA
+    # INSERTAR MÓDULOS
     # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS facturas_secuencia (
-        id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        empresa TEXT NOT NULL,
-        ultimo_numero INTEGER DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        UNIQUE(negocio_id, empresa)
-    )
-    ''')
-    
-    # Insertar módulos - INCLUYE MAPA
     cursor.execute("SELECT COUNT(*) FROM modulos")
     if cursor.fetchone()[0] == 0:
         modulos = [
@@ -327,17 +380,19 @@ def init_db():
             'INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido) VALUES (%s, %s, %s, %s)',
             modulos
         )
-        print("✅ Módulos insertados (incluye MAPA)")
+        print("✅ Módulos insertados")
     
-    # Crear usuario admin
+    # ============================================
+    # CREAR USUARIO ADMIN
+    # ============================================
     cursor.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'admin'")
     if cursor.fetchone()[0] == 0:
         salt = bcrypt.gensalt()
         password_hash = bcrypt.hashpw('admin123'.encode('utf-8'), salt).decode('utf-8')
         fecha = datetime.now().isoformat()
         cursor.execute('''
-        INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1)
+        INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado, verificado)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1, 1)
         ''', ('admin', 'admin@aisa.com', password_hash, 'Administrador', 'admin', 'admin', fecha))
         
         admin_id = cursor.lastrowid
@@ -372,20 +427,10 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         fecha = datetime.now().isoformat()
         
         if datos_negocio and isinstance(datos_negocio, dict):
-            if 'provincia' not in datos_negocio:
-                datos_negocio['provincia'] = ''
-            if 'municipio' not in datos_negocio:
-                datos_negocio['municipio'] = ''
-            if 'nombre_negocio' not in datos_negocio:
-                datos_negocio['nombre_negocio'] = ''
-            if 'ruc' not in datos_negocio:
-                datos_negocio['ruc'] = ''
-            if 'telefono' not in datos_negocio:
-                datos_negocio['telefono'] = ''
-            if 'direccion' not in datos_negocio:
-                datos_negocio['direccion'] = ''
-            if 'descripcion' not in datos_negocio:
-                datos_negocio['descripcion'] = ''
+            # Asegurar campos mínimos
+            for key in ['provincia', 'municipio', 'nombre_negocio', 'ruc', 'telefono', 'direccion', 'descripcion', 'salario']:
+                if key not in datos_negocio:
+                    datos_negocio[key] = ''
             if 'salario' not in datos_negocio:
                 datos_negocio['salario'] = 0
             datos_negocio = json.dumps(datos_negocio, ensure_ascii=False)
@@ -394,14 +439,23 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         else:
             datos_negocio = None
         
+        # Si es trabajador, se verifica automáticamente
+        verificado = 1 if rol == 'trabajador' else 0
+        aprobado = 1 if rol == 'trabajador' else 0
+        
         cursor.execute('''
-        INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado, datos_negocio)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1, %s)
+        INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado, verificado, datos_negocio)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, 1, %s, %s, %s)
         RETURNING id
-        ''', (username, email, password_hash, nombre, rol, tipo, fecha, datos_negocio))
+        ''', (username, email, password_hash, nombre, rol, tipo, fecha, aprobado, verificado, datos_negocio))
         
         user_id = cursor.fetchone()[0]
         
+        # Si es admin, activar todo
+        if rol == 'admin':
+            cursor.execute('UPDATE usuarios SET verificado = 1, aprobado = 1 WHERE id = %s', (user_id,))
+        
+        # Asignar permisos según tipo
         if rol != 'trabajador':
             if tipo == 'negocio':
                 cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'negocio'))
@@ -415,7 +469,7 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
                 ''', (user_id, mod[0]))
         
         conn.commit()
-        print(f"✅ Usuario creado: {username} (ID: {user_id}) - Tipo: {tipo}")
+        print(f"✅ Usuario creado: {username} (ID: {user_id}) - Tipo: {tipo} - Verificado: {verificado}")
         return user_id
         
     except Exception as e:
@@ -539,6 +593,97 @@ def obtener_negocio_de_trabajador(trabajador_id):
         print(f"❌ Error en obtener_negocio_de_trabajador: {e}")
         conn.close()
         return None
+
+# ============================================
+# FUNCIONES DE VERIFICACIÓN POR CORREO
+# ============================================
+
+def generar_codigo_verificacion():
+    """Genera un código de 6 dígitos aleatorio"""
+    return ''.join(random.choices(string.digits, k=6))
+
+def guardar_codigo_verificacion(usuario_id, email, codigo):
+    """Guarda un código de verificación en la base de datos"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        expira = (datetime.now() + timedelta(minutes=15)).isoformat()
+        cursor.execute('''
+            INSERT INTO codigos_verificacion (usuario_id, email, codigo, expira_en, usado)
+            VALUES (%s, %s, %s, %s, 0)
+        ''', (usuario_id, email, codigo, expira))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error guardando código de verificación: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+def verificar_codigo(email, codigo):
+    """Verifica si un código es válido y lo marca como usado"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute('''
+            SELECT * FROM codigos_verificacion 
+            WHERE email = %s AND codigo = %s AND usado = 0 AND expira_en > %s
+            ORDER BY id DESC LIMIT 1
+        ''', (email, codigo, datetime.now().isoformat()))
+        registro = cursor.fetchone()
+        
+        if registro:
+            # Marcar como usado
+            cursor.execute('''
+                UPDATE codigos_verificacion SET usado = 1 
+                WHERE id = %s
+            ''', (registro['id'],))
+            conn.commit()
+            conn.close()
+            return registro
+        conn.close()
+        return None
+    except Exception as e:
+        print(f"❌ Error verificando código: {e}")
+        conn.close()
+        return None
+
+def marcar_usuario_verificado(user_id):
+    """Marca un usuario como verificado"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            UPDATE usuarios SET verificado = 1, aprobado = 1
+            WHERE id = %s
+        ''', (user_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error marcando usuario como verificado: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+def obtener_codigos_pendientes(email):
+    """Obtiene códigos pendientes para un email"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute('''
+            SELECT * FROM codigos_verificacion 
+            WHERE email = %s AND usado = 0 AND expira_en > %s
+            ORDER BY id DESC
+        ''', (email, datetime.now().isoformat()))
+        registros = cursor.fetchall()
+        conn.close()
+        return registros
+    except Exception as e:
+        print(f"❌ Error obteniendo códigos pendientes: {e}")
+        conn.close()
+        return []
 
 # ============================================
 # FUNCIONES DE UBICACIÓN
@@ -855,64 +1000,23 @@ def eliminar_foto_producto(producto_id):
     conn.commit()
     conn.close()
 
-def obtener_foto_producto(producto_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT foto_url, foto_public_id FROM productos WHERE id = %s', (producto_id,))
-    resultado = cursor.fetchone()
-    conn.close()
-    if resultado:
-        return {'url': resultado[0], 'public_id': resultado[1]}
-    return {'url': None, 'public_id': None}
-
 def eliminar_producto(producto_id):
     conn = get_db()
     cursor = conn.cursor()
-    
     try:
         cursor.execute('SELECT id, nombre, negocio_id FROM productos WHERE id = %s', (producto_id,))
         producto = cursor.fetchone()
-        
         if not producto:
             conn.close()
-            print(f"⚠️ Producto {producto_id} no encontrado")
             return False
         
-        print(f"🗑️ Eliminando producto: {producto[1]} (ID: {producto_id})")
-        
-        cursor.execute('SELECT id FROM productos_tienda WHERE producto_id = %s', (producto_id,))
-        tienda = cursor.fetchone()
-        if tienda:
-            print(f"⚠️ Eliminando referencia en productos_tienda para producto {producto_id}")
-            cursor.execute('DELETE FROM productos_tienda WHERE producto_id = %s', (producto_id,))
-        
-        cursor.execute('SELECT id FROM ventas WHERE producto_id = %s LIMIT 1', (producto_id,))
-        venta = cursor.fetchone()
-        if venta:
-            print(f"⚠️ El producto {producto_id} tiene ventas asociadas. No se puede eliminar.")
-            conn.close()
-            return False
-        
+        cursor.execute('DELETE FROM productos_tienda WHERE producto_id = %s', (producto_id,))
         cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
-        
-        if cursor.rowcount > 0:
-            conn.commit()
-            print(f"✅ Producto {producto_id} eliminado correctamente")
-            conn.close()
-            return True
-        else:
-            conn.rollback()
-            conn.close()
-            print(f"❌ No se eliminó ningún producto (rowcount=0)")
-            return False
-            
-    except psycopg2.Error as e:
-        print(f"❌ Error SQL en eliminar_producto: {e}")
-        conn.rollback()
+        conn.commit()
         conn.close()
-        return False
+        return True
     except Exception as e:
-        print(f"❌ Error inesperado en eliminar_producto: {e}")
+        print(f"❌ Error eliminando producto {producto_id}: {e}")
         conn.rollback()
         conn.close()
         return False
@@ -944,21 +1048,8 @@ def obtener_estadisticas_productos(negocio_id):
     cursor.execute('SELECT COALESCE(SUM(precio * stock), 0) FROM productos WHERE negocio_id = %s', (negocio_id,))
     valor_total = cursor.fetchone()[0]
     
-    cursor.execute('SELECT COALESCE(SUM(costo * stock), 0) FROM productos WHERE negocio_id = %s', (negocio_id,))
-    costo_total = cursor.fetchone()[0]
-    
-    ganancia_potencial = valor_total - costo_total
-    
     conn.close()
-    
-    return {
-        'total': total,
-        'stock_bajo': stock_bajo,
-        'agotados': agotados,
-        'valor_total': valor_total,
-        'costo_total': costo_total,
-        'ganancia_potencial': ganancia_potencial
-    }
+    return {'total': total, 'stock_bajo': stock_bajo, 'agotados': agotados, 'valor_total': valor_total}
 
 # ============================================
 # FUNCIONES PARA PRODUCTOS EN TIENDA
@@ -1204,9 +1295,7 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
             FROM ventas 
             WHERE id = %s AND negocio_id = %s
         ''', (venta_id, negocio_id))
-        
         venta = cursor.fetchone()
-        
         if not venta:
             conn.close()
             return False, "Venta no encontrada"
@@ -1220,41 +1309,20 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
                 SET stock = stock + %s, updated_at = %s 
                 WHERE id = %s
             ''', (cantidad, datetime.now().isoformat(), producto_id))
-            
             if cursor.rowcount == 0:
                 conn.rollback()
                 conn.close()
-                return False, "Error al actualizar el stock del producto"
+                return False, "Error al actualizar el stock"
         
         cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, negocio_id))
-        
-        if cursor.rowcount == 0:
-            conn.rollback()
-            conn.close()
-            return False, "Error al eliminar la venta"
-        
         conn.commit()
         conn.close()
-        
-        return True, {
-            'producto_id': producto_id, 
-            'cantidad': cantidad, 
-            'cliente': venta[3],
-            'producto': venta[4], 
-            'total': venta[2], 
-            'fecha': venta[5]
-        }
-        
-    except psycopg2.Error as e:
-        print(f"❌ Error SQL eliminando venta: {e}")
-        conn.rollback()
-        conn.close()
-        return False, f"Error de base de datos: {str(e)}"
+        return True, {'producto_id': producto_id, 'cantidad': cantidad}
     except Exception as e:
         print(f"❌ Error eliminando venta: {e}")
         conn.rollback()
         conn.close()
-        return False, f"Error: {str(e)}"
+        return False, str(e)
 
 # ============================================
 # FUNCIONES PARA SERVICIOS
@@ -1441,11 +1509,10 @@ def eliminar_contrato(contrato_id):
     conn.close()
 
 # ============================================
-# FUNCIONES PARA NÓMINA - CORREGIDAS CON VERIFICACIÓN DE TABLAS
+# FUNCIONES PARA NÓMINA Y ASISTENCIA
 # ============================================
 
 def registrar_asistencia(trabajador_id, negocio_id, fecha, presente=1, horas=8):
-    """Registra la asistencia de un trabajador"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1455,7 +1522,7 @@ def registrar_asistencia(trabajador_id, negocio_id, fecha, presente=1, horas=8):
         ON CONFLICT (trabajador_id, fecha) DO UPDATE SET
             presente = EXCLUDED.presente,
             horas_trabajadas = EXCLUDED.horas_trabajadas
-        ''', (trabajador_id, negocio_id, fecha, presente, horas, datetime.now().isoformat()))
+        ''', (trabajador_id, negocio_id, fecha, presente, horas, datetime.now()))
         conn.commit()
         conn.close()
         return True
@@ -1466,15 +1533,14 @@ def registrar_asistencia(trabajador_id, negocio_id, fecha, presente=1, horas=8):
         return False
 
 def obtener_asistencia_mes(trabajador_id, mes, ano):
-    """Obtiene todas las asistencias de un trabajador en un mes"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cursor.execute('''
             SELECT * FROM asistencia 
             WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
-            AND EXTRACT(YEAR FROM TO_DATE(fecha, 'YYYY-MM-DD')) = %s
+            AND EXTRACT(MONTH FROM fecha) = %s
+            AND EXTRACT(YEAR FROM fecha) = %s
             ORDER BY fecha ASC
         ''', (trabajador_id, mes, ano))
         asistencias = cursor.fetchall()
@@ -1486,26 +1552,14 @@ def obtener_asistencia_mes(trabajador_id, mes, ano):
         return []
 
 def obtener_dias_trabajados_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días trabajados en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
-        # Verificar si la tabla existe
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'asistencia'
-            )
-        """)
-        if not cursor.fetchone()[0]:
-            conn.close()
-            return 0
-        
         cursor.execute('''
             SELECT COUNT(*) FROM asistencia 
             WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha::date) = %s
-            AND EXTRACT(YEAR FROM fecha::date) = %s
+            AND EXTRACT(MONTH FROM fecha) = %s
+            AND EXTRACT(YEAR FROM fecha) = %s
             AND presente = 1
         ''', (trabajador_id, mes, ano))
         dias = cursor.fetchone()[0]
@@ -1517,25 +1571,14 @@ def obtener_dias_trabajados_mes(trabajador_id, mes, ano):
         return 0
 
 def obtener_dias_ausencia_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días de ausencia en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'asistencia'
-            )
-        """)
-        if not cursor.fetchone()[0]:
-            conn.close()
-            return 0
-        
         cursor.execute('''
             SELECT COUNT(*) FROM asistencia 
             WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha::date) = %s
-            AND EXTRACT(YEAR FROM fecha::date) = %s
+            AND EXTRACT(MONTH FROM fecha) = %s
+            AND EXTRACT(YEAR FROM fecha) = %s
             AND presente = 0
         ''', (trabajador_id, mes, ano))
         dias = cursor.fetchone()[0]
@@ -1547,25 +1590,14 @@ def obtener_dias_ausencia_mes(trabajador_id, mes, ano):
         return 0
 
 def obtener_dias_extras_mes(trabajador_id, mes, ano):
-    """Obtiene el conteo de días extras trabajados en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'asistencia'
-            )
-        """)
-        if not cursor.fetchone()[0]:
-            conn.close()
-            return 0
-        
         cursor.execute('''
             SELECT COUNT(*) FROM asistencia 
             WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha::date) = %s
-            AND EXTRACT(YEAR FROM fecha::date) = %s
+            AND EXTRACT(MONTH FROM fecha) = %s
+            AND EXTRACT(YEAR FROM fecha) = %s
             AND horas_trabajadas > 8
         ''', (trabajador_id, mes, ano))
         dias = cursor.fetchone()[0]
@@ -1577,14 +1609,13 @@ def obtener_dias_extras_mes(trabajador_id, mes, ano):
         return 0
 
 def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
-    """Registra una comisión generada por una venta"""
     conn = get_db()
     cursor = conn.cursor()
     try:
         cursor.execute('''
         INSERT INTO comisiones_trabajador (negocio_id, trabajador_id, venta_id, producto_id, monto, fecha, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ''', (negocio_id, trabajador_id, venta_id, producto_id, monto, datetime.now().isoformat(), datetime.now().isoformat()))
+        ''', (negocio_id, trabajador_id, venta_id, producto_id, monto, datetime.now().date(), datetime.now()))
         conn.commit()
         conn.close()
         return True
@@ -1595,82 +1626,36 @@ def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
         return False
 
 def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
-    """Obtiene las comisiones de un trabajador en un mes específico"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Verificar si la tabla existe
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'comisiones_trabajador'
-            )
-        """)
-        tabla_existe = cursor.fetchone()['exists']
-        
-        if not tabla_existe:
-            print("⚠️ Tabla comisiones_trabajador no existe")
-            conn.close()
-            return []
-        
-        # Verificar si hay comisiones para este trabajador
-        cursor.execute("""
-            SELECT COUNT(*) FROM comisiones_trabajador 
-            WHERE trabajador_id = %s
-        """, (trabajador_id,))
-        total = cursor.fetchone()['count']
-        
-        if total == 0:
-            conn.close()
-            return []
-        
         cursor.execute('''
-            SELECT 
-                c.*, 
-                p.nombre as producto_nombre, 
-                v.cliente, 
-                v.fecha as venta_fecha
+            SELECT c.*, p.nombre as producto_nombre, v.cliente, v.fecha as venta_fecha
             FROM comisiones_trabajador c
             LEFT JOIN productos p ON c.producto_id = p.id
             LEFT JOIN ventas v ON c.venta_id = v.id
             WHERE c.trabajador_id = %s 
-            AND EXTRACT(MONTH FROM c.fecha::date) = %s
-            AND EXTRACT(YEAR FROM c.fecha::date) = %s
+            AND EXTRACT(MONTH FROM c.fecha) = %s
+            AND EXTRACT(YEAR FROM c.fecha) = %s
             ORDER BY c.fecha DESC
         ''', (trabajador_id, mes, ano))
-        
         comisiones = cursor.fetchall()
         conn.close()
-        
         return comisiones
-        
     except Exception as e:
         print(f"❌ Error en obtener_comisiones_trabajador_mes: {e}")
-        import traceback
-        traceback.print_exc()
         conn.close()
         return []
 
 def obtener_total_comisiones_mes(trabajador_id, mes, ano):
-    """Obtiene el total de comisiones de un trabajador en un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'comisiones_trabajador'
-            )
-        """)
-        if not cursor.fetchone()[0]:
-            conn.close()
-            return 0
-        
         cursor.execute('''
             SELECT COALESCE(SUM(monto), 0) FROM comisiones_trabajador 
             WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha::date) = %s
-            AND EXTRACT(YEAR FROM fecha::date) = %s
+            AND EXTRACT(MONTH FROM fecha) = %s
+            AND EXTRACT(YEAR FROM fecha) = %s
         ''', (trabajador_id, mes, ano))
         total = cursor.fetchone()[0]
         conn.close()
@@ -1690,8 +1675,8 @@ def obtener_comisiones_negocio_mes(negocio_id, mes, ano):
         LEFT JOIN productos p ON c.producto_id = p.id
         LEFT JOIN ventas v ON c.venta_id = v.id
         WHERE c.negocio_id = %s 
-        AND EXTRACT(MONTH FROM c.fecha::date) = %s
-        AND EXTRACT(YEAR FROM c.fecha::date) = %s
+        AND EXTRACT(MONTH FROM c.fecha) = %s
+        AND EXTRACT(YEAR FROM c.fecha) = %s
         ORDER BY u.nombre ASC, c.fecha DESC
     ''', (negocio_id, mes, ano))
     comisiones = cursor.fetchall()
@@ -1699,67 +1684,48 @@ def obtener_comisiones_negocio_mes(negocio_id, mes, ano):
     return comisiones
 
 def calcular_nomina(negocio_id, trabajador_id, mes, ano):
-    """Calcula la nómina de un trabajador para un mes específico"""
     try:
-        import calendar
-        _, dias_mes = calendar.monthrange(ano, mes)
-        
+        _, dias_mes = monthrange(ano, mes)
         conn = get_db()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        # Obtener datos del trabajador
         cursor.execute('''
             SELECT u.id, u.nombre, u.datos_negocio
-            FROM usuarios u
-            WHERE u.id = %s
+            FROM usuarios u WHERE u.id = %s
         ''', (trabajador_id,))
         trabajador = cursor.fetchone()
-        
         if not trabajador:
             conn.close()
-            print(f"⚠️ Trabajador {trabajador_id} no encontrado")
             return None
         
-        # Obtener salario base
         datos = {}
         if trabajador['datos_negocio']:
             try:
                 datos = json.loads(trabajador['datos_negocio']) if isinstance(trabajador['datos_negocio'], str) else trabajador['datos_negocio']
             except:
                 datos = {}
-        
         salario_base = datos.get('salario', 0)
-        
         if salario_base == 0:
-            print(f"⚠️ El trabajador {trabajador['nombre']} no tiene salario asignado")
             conn.close()
             return None
         
-        # Obtener días trabajados
         dias_trabajados = obtener_dias_trabajados_mes(trabajador_id, mes, ano)
         dias_ausencia = obtener_dias_ausencia_mes(trabajador_id, mes, ano)
         dias_extras = obtener_dias_extras_mes(trabajador_id, mes, ano)
         
-        # Si no hay registros de asistencia, usar días laborables aproximados
         if dias_trabajados == 0:
-            # Calcular días laborables (lunes a viernes)
+            # Estimar días laborables
             for d in range(1, dias_mes + 1):
                 fecha = datetime(ano, mes, d)
-                if fecha.weekday() < 5:  # 0=Lunes, 4=Viernes
+                if fecha.weekday() < 5:
                     dias_trabajados += 1
-            print(f"ℹ️ No hay registros de asistencia para {trabajador['nombre']}, usando {dias_trabajados} días laborables")
         
-        # Calcular salario
         salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
         salario_devengado = salario_diario * dias_trabajados
-        
-        # Obtener comisiones
         comisiones = obtener_total_comisiones_mes(trabajador_id, mes, ano)
-        
-        # Calcular total
         total = salario_devengado + comisiones
         
-        # Guardar o actualizar nómina
+        # Guardar en tabla nomina
         cursor.execute('''
             SELECT id FROM nomina 
             WHERE negocio_id = %s AND trabajador_id = %s AND mes = %s AND ano = %s
@@ -1769,38 +1735,24 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
         if existe:
             cursor.execute('''
                 UPDATE nomina SET
-                    salario_base = %s,
-                    dias_trabajados = %s,
-                    dias_ausencia = %s,
-                    dias_extras = %s,
-                    salario_devengado = %s,
-                    comisiones = %s,
-                    total = %s,
-                    actualizado_en = %s
+                    salario_base = %s, dias_trabajados = %s, dias_ausencia = %s,
+                    dias_extras = %s, salario_devengado = %s, comisiones = %s,
+                    total = %s, actualizado_en = %s
                 WHERE id = %s
-            ''', (
-                salario_base, dias_trabajados, dias_ausencia, dias_extras,
-                salario_devengado, comisiones, total,
-                datetime.now().isoformat(),
-                existe['id']
-            ))
+            ''', (salario_base, dias_trabajados, dias_ausencia, dias_extras,
+                  salario_devengado, comisiones, total, datetime.now(), existe['id']))
         else:
             cursor.execute('''
-                INSERT INTO nomina (
-                    negocio_id, trabajador_id, mes, ano, salario_base, 
-                    dias_trabajados, dias_ausencia, dias_extras, salario_devengado, comisiones, total,
-                    creado_en
-                )
+                INSERT INTO nomina (negocio_id, trabajador_id, mes, ano, salario_base,
+                    dias_trabajados, dias_ausencia, dias_extras, salario_devengado,
+                    comisiones, total, creado_en)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (
-                negocio_id, trabajador_id, mes, ano, salario_base,
-                dias_trabajados, dias_ausencia, dias_extras, salario_devengado, comisiones, total,
-                datetime.now().isoformat()
-            ))
+            ''', (negocio_id, trabajador_id, mes, ano, salario_base,
+                  dias_trabajados, dias_ausencia, dias_extras, salario_devengado,
+                  comisiones, total, datetime.now()))
         
         conn.commit()
         conn.close()
-        
         return {
             'trabajador_id': trabajador_id,
             'nombre': trabajador['nombre'],
@@ -1814,15 +1766,11 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
             'comisiones': comisiones,
             'total': total
         }
-        
     except Exception as e:
-        print(f"❌ Error en calcular_nomina para trabajador {trabajador_id}: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Error en calcular_nomina: {e}")
         return None
 
 def obtener_nomina_mes(negocio_id, mes, ano):
-    """Obtiene la nómina de todos los trabajadores para un mes específico"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1833,21 +1781,15 @@ def obtener_nomina_mes(negocio_id, mes, ano):
             WHERE n.negocio_id = %s AND n.mes = %s AND n.ano = %s
             ORDER BY u.nombre ASC
         ''', (negocio_id, mes, ano))
-        
         nomina = cursor.fetchall()
         conn.close()
-        
         return nomina
-        
     except Exception as e:
         print(f"❌ Error en obtener_nomina_mes: {e}")
-        import traceback
-        traceback.print_exc()
         conn.close()
         return []
 
 def obtener_nomina_trabajador(trabajador_id, mes, ano):
-    """Obtiene la nómina de un trabajador específico para un mes"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1866,7 +1808,6 @@ def obtener_nomina_trabajador(trabajador_id, mes, ano):
         return None
 
 def obtener_resumen_nomina(negocio_id, mes, ano):
-    """Obtiene un resumen de la nómina para un mes"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1881,10 +1822,8 @@ def obtener_resumen_nomina(negocio_id, mes, ano):
             FROM nomina
             WHERE negocio_id = %s AND mes = %s AND ano = %s
         ''', (negocio_id, mes, ano))
-        
         resultado = cursor.fetchone()
         conn.close()
-        
         return {
             'total_trabajadores': resultado[0] or 0,
             'total_dias_trabajados': resultado[1] or 0,
@@ -1893,7 +1832,6 @@ def obtener_resumen_nomina(negocio_id, mes, ano):
             'total_comisiones': resultado[4] or 0,
             'total_nomina': resultado[5] or 0
         }
-        
     except Exception as e:
         print(f"❌ Error en obtener_resumen_nomina: {e}")
         conn.close()
@@ -1911,7 +1849,6 @@ def obtener_resumen_nomina(negocio_id, mes, ano):
 # ============================================
 
 def obtener_ultimo_numero_factura(negocio_id, empresa):
-    """Obtiene el último número de factura para una empresa"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -1930,17 +1867,16 @@ def obtener_ultimo_numero_factura(negocio_id, empresa):
         return 0
 
 def actualizar_ultimo_numero_factura(negocio_id, empresa, numero):
-    """Actualiza el último número de factura para una empresa"""
     conn = get_db()
     cursor = conn.cursor()
     try:
         cursor.execute('''
             INSERT INTO facturas_secuencia (negocio_id, empresa, ultimo_numero, created_at)
-            VALUES (%s, %s, %s, NOW())
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT (negocio_id, empresa) DO UPDATE SET 
                 ultimo_numero = EXCLUDED.ultimo_numero,
-                updated_at = NOW()
-        ''', (negocio_id, empresa, numero))
+                updated_at = %s
+        ''', (negocio_id, empresa, numero, datetime.now().isoformat(), datetime.now().isoformat()))
         conn.commit()
         conn.close()
         return True
@@ -1951,14 +1887,11 @@ def actualizar_ultimo_numero_factura(negocio_id, empresa, numero):
         return False
 
 def generar_numero_factura(negocio_id, empresa, año=None):
-    """Genera un nuevo número de factura consecutivo para una empresa"""
     if not año:
         año = datetime.now().year
-    
     ultimo = obtener_ultimo_numero_factura(negocio_id, empresa)
     nuevo = ultimo + 1
     actualizar_ultimo_numero_factura(negocio_id, empresa, nuevo)
-    
     return f"FAC-{año}-{str(nuevo).zfill(4)}"
 
 # ============================================
