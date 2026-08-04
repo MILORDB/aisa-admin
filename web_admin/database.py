@@ -529,7 +529,7 @@ def eliminar_usuario(user_id):
         print(f"🗑️ Eliminando usuario: {usuario[1]} (ID: {user_id}) - Rol: {usuario[2]}")
         
         # ============================================
-        # ELIMINAR EN ORDEN PARA RESPETAR FK
+        # ELIMINAR EN ORDEN CORRECTO PARA RESPETAR FK
         # ============================================
         
         # 1. Eliminar códigos de verificación
@@ -544,7 +544,7 @@ def eliminar_usuario(user_id):
         cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (user_id,))
         print(f"   ✅ Permisos eliminados")
         
-        # 4. Eliminar de trabajadores_negocio (si es trabajador o negocio)
+        # 4. Eliminar de trabajadores_negocio
         cursor.execute("DELETE FROM trabajadores_negocio WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
         print(f"   ✅ Trabajadores_Negocio eliminados")
         
@@ -564,17 +564,30 @@ def eliminar_usuario(user_id):
         cursor.execute("DELETE FROM contratos WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
         print(f"   ✅ Contratos eliminados")
         
-        # 9. Eliminar productos_tienda
+        # ============================================
+        # 9. ELIMINAR VENTAS ANTES QUE PRODUCTOS
+        # ============================================
+        # Primero, obtener los IDs de productos del usuario para eliminar ventas
+        cursor.execute("SELECT id FROM productos WHERE negocio_id = %s", (user_id,))
+        productos_ids = [row[0] for row in cursor.fetchall()]
+        
+        if productos_ids:
+            # Eliminar ventas que referencian a estos productos
+            placeholders = ','.join(['%s'] * len(productos_ids))
+            cursor.execute(f"DELETE FROM ventas WHERE producto_id IN ({placeholders})", productos_ids)
+            print(f"   ✅ Ventas de productos eliminadas")
+        
+        # Eliminar ventas donde el usuario es negocio o trabajador
+        cursor.execute("DELETE FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
+        print(f"   ✅ Ventas del usuario eliminadas")
+        
+        # 10. Eliminar productos_tienda
         cursor.execute("DELETE FROM productos_tienda WHERE negocio_id = %s", (user_id,))
         print(f"   ✅ Productos_Tienda eliminados")
         
-        # 10. Eliminar productos
+        # 11. Eliminar productos (ya no hay ventas que los referencien)
         cursor.execute("DELETE FROM productos WHERE negocio_id = %s", (user_id,))
         print(f"   ✅ Productos eliminados")
-        
-        # 11. Eliminar ventas
-        cursor.execute("DELETE FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        print(f"   ✅ Ventas eliminadas")
         
         # 12. Eliminar servicios
         cursor.execute("DELETE FROM servicios WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
