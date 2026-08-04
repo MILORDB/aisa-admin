@@ -1720,6 +1720,117 @@ def fix_modulos_endpoint():
         """, 500
 
 # ============================================
+# ENDPOINT DE PRUEBA PARA ELIMINAR USUARIO
+# ============================================
+@app.route('/test-eliminar-usuario/<int:user_id>', methods=['GET'])
+@admin_required
+def test_eliminar_usuario(user_id):
+    """Endpoint de prueba para eliminar un usuario"""
+    try:
+        token = request.cookies.get('token')
+        usuario_actual = obtener_usuario_sesion(token)
+        
+        if usuario_actual.get('id') == user_id:
+            return jsonify({'error': 'No puedes eliminar tu propio usuario'}), 400
+        
+        user = obtener_usuario_por_id(user_id)
+        if not user:
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+        
+        if user.get('rol') == 'admin':
+            return jsonify({'error': 'No se puede eliminar un administrador'}), 400
+        
+        # Verificar tablas relacionadas
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        relaciones = {}
+        cursor.execute("SELECT COUNT(*) FROM sesiones WHERE usuario_id = %s", (user_id,))
+        relaciones['sesiones'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM permisos_usuario WHERE usuario_id = %s", (user_id,))
+        relaciones['permisos'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM trabajadores_negocio WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
+        relaciones['trabajadores_negocio'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM contratos WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
+        relaciones['contratos'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM productos WHERE negocio_id = %s", (user_id,))
+        relaciones['productos'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
+        relaciones['ventas'] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM logs WHERE usuario_id = %s", (user_id,))
+        relaciones['logs'] = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        html = f"""
+        <html>
+            <head><title>Test Eliminar Usuario</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;">
+                <h1 style="color:#6c3ce0;">🧪 Test Eliminar Usuario</h1>
+                <div style="background:#1a1a2e;padding:20px;border-radius:8px;border:1px solid #2a2a3e;">
+                    <p><strong>👤 Usuario:</strong> {user.get('username')} (ID: {user_id})</p>
+                    <p><strong>📋 Rol:</strong> {user.get('rol')}</p>
+                    <p><strong>📌 Tipo:</strong> {user.get('tipo')}</p>
+                    <hr>
+                    <h3>📊 Datos relacionados:</h3>
+                    <ul>
+                        <li>📝 Sesiones: {relaciones['sesiones']}</li>
+                        <li>🔑 Permisos: {relaciones['permisos']}</li>
+                        <li>👥 Trabajadores/Negocio: {relaciones['trabajadores_negocio']}</li>
+                        <li>📄 Contratos: {relaciones['contratos']}</li>
+                        <li>📦 Productos: {relaciones['productos']}</li>
+                        <li>💰 Ventas: {relaciones['ventas']}</li>
+                        <li>📝 Logs: {relaciones['logs']}</li>
+                    </ul>
+                    <hr>
+                    <button onclick="eliminarUsuario({user_id})" style="background:#ff6b6b;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;">🗑️ Eliminar Usuario</button>
+                    <a href="/admin/db" style="color:#6c3ce0;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;text-decoration:none;margin-left:10px;">← Volver</a>
+                </div>
+                <script>
+                    function eliminarUsuario(id) {{
+                        if (confirm('¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.')) {{
+                            fetch('/api/usuario/' + id, {{
+                                method: 'DELETE',
+                                headers: {{ 'Content-Type': 'application/json' }}
+                            }})
+                            .then(response => response.json())
+                            .then(data => {{
+                                if (data.success) {{
+                                    alert('✅ ' + data.message);
+                                    window.location.href = '/admin/db';
+                                }} else {{
+                                    alert('❌ ' + data.error);
+                                }}
+                            }})
+                            .catch(error => {{
+                                alert('❌ Error: ' + error);
+                            }});
+                        }}
+                    }}
+                </script>
+            </body>
+        </html>
+        """
+        return html
+        
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="background:#1a1a2e;padding:20px;border-radius:8px;border:1px solid #2a2a3e;color:#aaa;">{e}</pre>
+            </body>
+        </html>
+        """
+
+# ============================================
 # RUTAS PRINCIPALES
 # ============================================
 @app.route('/')
@@ -2374,24 +2485,38 @@ def api_actualizar_tipo(user_id):
 @app.route('/api/usuario/<int:user_id>', methods=['DELETE'])
 @admin_required
 def api_eliminar_usuario(user_id):
+    """Elimina un usuario y todos sus datos relacionados"""
     token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
+    usuario_actual = obtener_usuario_sesion(token)
     
-    if usuario.get('id') == user_id:
+    if not usuario_actual:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    if usuario_actual.get('id') == user_id:
         return jsonify({'error': 'No puedes eliminar tu propio usuario'}), 400
     
+    # Verificar que el usuario existe
     user = obtener_usuario_por_id(user_id)
     if not user:
         return jsonify({'error': 'Usuario no encontrado'}), 404
     
+    # Si el usuario es admin, no se puede eliminar (protección)
+    if user.get('rol') == 'admin':
+        return jsonify({'error': 'No se puede eliminar un usuario administrador'}), 400
+    
+    # Intentar eliminar
     exito = eliminar_usuario(user_id)
     
     if not exito:
-        return jsonify({'error': 'Error al eliminar el usuario'}), 500
+        return jsonify({'error': 'Error al eliminar el usuario. Verifica que no tenga datos asociados.'}), 500
     
-    registrar_log(usuario.get('id'), 'usuario_eliminado', f'Usuario {user_id} eliminado')
+    registrar_log(usuario_actual.get('id'), 'usuario_eliminado', 
+                  f'Usuario {user.get("username")} (ID: {user_id}) eliminado')
     
-    return jsonify({'success': True, 'message': 'Usuario eliminado correctamente'})
+    return jsonify({
+        'success': True, 
+        'message': f'Usuario "{user.get("username")}" eliminado correctamente'
+    })
 
 @app.route('/api/usuario/<int:user_id>/permisos')
 @login_required
