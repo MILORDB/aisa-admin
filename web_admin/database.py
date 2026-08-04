@@ -519,58 +519,78 @@ def eliminar_usuario(user_id):
     cursor = conn.cursor()
     try:
         # Verificar si el usuario existe
-        cursor.execute("SELECT id, username FROM usuarios WHERE id = %s", (user_id,))
+        cursor.execute("SELECT id, username, rol FROM usuarios WHERE id = %s", (user_id,))
         usuario = cursor.fetchone()
         if not usuario:
             print(f"⚠️ Usuario {user_id} no encontrado")
             conn.close()
             return False
         
-        print(f"🗑️ Eliminando usuario: {usuario[1]} (ID: {user_id})")
+        print(f"🗑️ Eliminando usuario: {usuario[1]} (ID: {user_id}) - Rol: {usuario[2]}")
         
-        # Eliminar en orden para respetar las restricciones de clave foránea
+        # ============================================
+        # ELIMINAR EN ORDEN PARA RESPETAR FK
+        # ============================================
         
-        # 1. Eliminar sesiones
-        cursor.execute("DELETE FROM sesiones WHERE usuario_id = %s", (user_id,))
-        
-        # 2. Eliminar permisos
-        cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (user_id,))
-        
-        # 3. Eliminar trabajadores_negocio (si es trabajador o negocio)
-        cursor.execute("DELETE FROM trabajadores_negocio WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        
-        # 4. Eliminar comisiones_trabajador
-        cursor.execute("DELETE FROM comisiones_trabajador WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        
-        # 5. Eliminar asistencia
-        cursor.execute("DELETE FROM asistencia WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        
-        # 6. Eliminar nomina
-        cursor.execute("DELETE FROM nomina WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        
-        # 7. Eliminar contratos
-        cursor.execute("DELETE FROM contratos WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        
-        # 8. Eliminar productos_tienda
-        cursor.execute("DELETE FROM productos_tienda WHERE negocio_id = %s", (user_id,))
-        
-        # 9. Eliminar productos
-        cursor.execute("DELETE FROM productos WHERE negocio_id = %s", (user_id,))
-        
-        # 10. Eliminar ventas
-        cursor.execute("DELETE FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        
-        # 11. Eliminar servicios
-        cursor.execute("DELETE FROM servicios WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        
-        # 12. Eliminar logs (usar SET NULL o eliminar)
-        cursor.execute("DELETE FROM logs WHERE usuario_id = %s", (user_id,))
-        
-        # 13. Eliminar códigos de verificación
+        # 1. Eliminar códigos de verificación
         cursor.execute("DELETE FROM codigos_verificacion WHERE usuario_id = %s", (user_id,))
+        print(f"   ✅ Códigos de verificación eliminados")
         
-        # 14. Finalmente eliminar el usuario
+        # 2. Eliminar sesiones
+        cursor.execute("DELETE FROM sesiones WHERE usuario_id = %s", (user_id,))
+        print(f"   ✅ Sesiones eliminadas")
+        
+        # 3. Eliminar permisos
+        cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (user_id,))
+        print(f"   ✅ Permisos eliminados")
+        
+        # 4. Eliminar de trabajadores_negocio (si es trabajador o negocio)
+        cursor.execute("DELETE FROM trabajadores_negocio WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
+        print(f"   ✅ Trabajadores_Negocio eliminados")
+        
+        # 5. Eliminar comisiones_trabajador
+        cursor.execute("DELETE FROM comisiones_trabajador WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
+        print(f"   ✅ Comisiones eliminadas")
+        
+        # 6. Eliminar asistencia
+        cursor.execute("DELETE FROM asistencia WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
+        print(f"   ✅ Asistencia eliminada")
+        
+        # 7. Eliminar nomina
+        cursor.execute("DELETE FROM nomina WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
+        print(f"   ✅ Nómina eliminada")
+        
+        # 8. Eliminar contratos
+        cursor.execute("DELETE FROM contratos WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
+        print(f"   ✅ Contratos eliminados")
+        
+        # 9. Eliminar productos_tienda
+        cursor.execute("DELETE FROM productos_tienda WHERE negocio_id = %s", (user_id,))
+        print(f"   ✅ Productos_Tienda eliminados")
+        
+        # 10. Eliminar productos
+        cursor.execute("DELETE FROM productos WHERE negocio_id = %s", (user_id,))
+        print(f"   ✅ Productos eliminados")
+        
+        # 11. Eliminar ventas
+        cursor.execute("DELETE FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
+        print(f"   ✅ Ventas eliminadas")
+        
+        # 12. Eliminar servicios
+        cursor.execute("DELETE FROM servicios WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
+        print(f"   ✅ Servicios eliminados")
+        
+        # 13. Eliminar logs
+        cursor.execute("DELETE FROM logs WHERE usuario_id = %s", (user_id,))
+        print(f"   ✅ Logs eliminados")
+        
+        # 14. Eliminar facturas_secuencia
+        cursor.execute("DELETE FROM facturas_secuencia WHERE negocio_id = %s", (user_id,))
+        print(f"   ✅ Facturas secuencia eliminadas")
+        
+        # 15. FINALMENTE eliminar el usuario
         cursor.execute("DELETE FROM usuarios WHERE id = %s", (user_id,))
+        print(f"   ✅ Usuario eliminado")
         
         conn.commit()
         conn.close()
