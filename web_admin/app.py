@@ -1699,10 +1699,13 @@ def fix_modulos_endpoint():
 # ============================================
 # ENDPOINT DE EMERGENCIA PARA ELIMINAR USUARIO (FORZADO)
 # ============================================
+# ============================================
+# ENDPOINT DE EMERGENCIA PARA ELIMINAR USUARIO (SIN PERMISOS ESPECIALES)
+# ============================================
 @app.route('/eliminar-usuario-forzado/<int:user_id>', methods=['GET'])
 @admin_required
 def eliminar_usuario_forzado(user_id):
-    """Endpoint de emergencia para eliminar un usuario (FORZADO)"""
+    """Endpoint de emergencia para eliminar un usuario (SIN PERMISOS ESPECIALES)"""
     try:
         token = request.cookies.get('token')
         usuario_actual = obtener_usuario_sesion(token)
@@ -1722,76 +1725,69 @@ def eliminar_usuario_forzado(user_id):
         
         resultados = []
         
-        # Desactivar restricciones
-        cursor.execute("SET session_replication_role = 'replica';")
-        resultados.append("✅ Restricciones desactivadas")
+        # 1. Actualizar ventas para quitar referencia a productos
+        cursor.execute("UPDATE ventas SET producto_id = NULL WHERE producto_id IN (SELECT id FROM productos WHERE negocio_id = %s)", (user_id,))
+        resultados.append(f"✅ Referencias a productos actualizadas: {cursor.rowcount}")
         
-        # 1. Eliminar códigos de verificación
+        # 2. Eliminar códigos de verificación
         cursor.execute("DELETE FROM codigos_verificacion WHERE usuario_id = %s", (user_id,))
         resultados.append(f"✅ Códigos de verificación: {cursor.rowcount} eliminados")
         
-        # 2. Eliminar sesiones
+        # 3. Eliminar sesiones
         cursor.execute("DELETE FROM sesiones WHERE usuario_id = %s", (user_id,))
         resultados.append(f"✅ Sesiones: {cursor.rowcount} eliminadas")
         
-        # 3. Eliminar permisos
+        # 4. Eliminar permisos
         cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (user_id,))
         resultados.append(f"✅ Permisos: {cursor.rowcount} eliminados")
         
-        # 4. Eliminar trabajadores_negocio
+        # 5. Eliminar trabajadores_negocio
         cursor.execute("DELETE FROM trabajadores_negocio WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
         resultados.append(f"✅ Trabajadores_Negocio: {cursor.rowcount} eliminados")
         
-        # 5. Eliminar comisiones_trabajador
+        # 6. Eliminar comisiones_trabajador
         cursor.execute("DELETE FROM comisiones_trabajador WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
         resultados.append(f"✅ Comisiones: {cursor.rowcount} eliminadas")
         
-        # 6. Eliminar asistencia
+        # 7. Eliminar asistencia
         cursor.execute("DELETE FROM asistencia WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
         resultados.append(f"✅ Asistencia: {cursor.rowcount} eliminada")
         
-        # 7. Eliminar nomina
+        # 8. Eliminar nomina
         cursor.execute("DELETE FROM nomina WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
         resultados.append(f"✅ Nómina: {cursor.rowcount} eliminada")
         
-        # 8. Eliminar contratos
+        # 9. Eliminar contratos
         cursor.execute("DELETE FROM contratos WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
         resultados.append(f"✅ Contratos: {cursor.rowcount} eliminados")
         
-        # 9. Eliminar ventas (primero las que tienen producto_id)
-        cursor.execute("DELETE FROM ventas WHERE producto_id IN (SELECT id FROM productos WHERE negocio_id = %s)", (user_id,))
-        resultados.append(f"✅ Ventas por productos: {cursor.rowcount} eliminadas")
-        
+        # 10. Eliminar ventas
         cursor.execute("DELETE FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        resultados.append(f"✅ Ventas del usuario: {cursor.rowcount} eliminadas")
+        resultados.append(f"✅ Ventas: {cursor.rowcount} eliminadas")
         
-        # 10. Eliminar productos_tienda
+        # 11. Eliminar productos_tienda
         cursor.execute("DELETE FROM productos_tienda WHERE negocio_id = %s", (user_id,))
         resultados.append(f"✅ Productos_Tienda: {cursor.rowcount} eliminados")
         
-        # 11. Eliminar productos
+        # 12. Eliminar productos
         cursor.execute("DELETE FROM productos WHERE negocio_id = %s", (user_id,))
         resultados.append(f"✅ Productos: {cursor.rowcount} eliminados")
         
-        # 12. Eliminar servicios
+        # 13. Eliminar servicios
         cursor.execute("DELETE FROM servicios WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
         resultados.append(f"✅ Servicios: {cursor.rowcount} eliminados")
         
-        # 13. Eliminar logs
+        # 14. Eliminar logs
         cursor.execute("DELETE FROM logs WHERE usuario_id = %s", (user_id,))
         resultados.append(f"✅ Logs: {cursor.rowcount} eliminados")
         
-        # 14. Eliminar facturas_secuencia
+        # 15. Eliminar facturas_secuencia
         cursor.execute("DELETE FROM facturas_secuencia WHERE negocio_id = %s", (user_id,))
         resultados.append(f"✅ Facturas secuencia: {cursor.rowcount} eliminadas")
         
-        # 15. FINALMENTE eliminar el usuario
+        # 16. FINALMENTE eliminar el usuario
         cursor.execute("DELETE FROM usuarios WHERE id = %s", (user_id,))
         resultados.append(f"✅ Usuario: {cursor.rowcount} eliminado")
-        
-        # Reactivar restricciones
-        cursor.execute("SET session_replication_role = 'origin';")
-        resultados.append("✅ Restricciones reactivadas")
         
         conn.commit()
         conn.close()
