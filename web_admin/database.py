@@ -514,13 +514,74 @@ def obtener_negocios():
     return negocios
 
 def eliminar_usuario(user_id):
+    """Elimina un usuario y todos sus datos relacionados"""
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute('DELETE FROM usuarios WHERE id = %s', (user_id,))
+        # Verificar si el usuario existe
+        cursor.execute("SELECT id, username FROM usuarios WHERE id = %s", (user_id,))
+        usuario = cursor.fetchone()
+        if not usuario:
+            print(f"⚠️ Usuario {user_id} no encontrado")
+            conn.close()
+            return False
+        
+        print(f"🗑️ Eliminando usuario: {usuario[1]} (ID: {user_id})")
+        
+        # Eliminar en orden para respetar las restricciones de clave foránea
+        
+        # 1. Eliminar sesiones
+        cursor.execute("DELETE FROM sesiones WHERE usuario_id = %s", (user_id,))
+        
+        # 2. Eliminar permisos
+        cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (user_id,))
+        
+        # 3. Eliminar trabajadores_negocio (si es trabajador o negocio)
+        cursor.execute("DELETE FROM trabajadores_negocio WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
+        
+        # 4. Eliminar comisiones_trabajador
+        cursor.execute("DELETE FROM comisiones_trabajador WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
+        
+        # 5. Eliminar asistencia
+        cursor.execute("DELETE FROM asistencia WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
+        
+        # 6. Eliminar nomina
+        cursor.execute("DELETE FROM nomina WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
+        
+        # 7. Eliminar contratos
+        cursor.execute("DELETE FROM contratos WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
+        
+        # 8. Eliminar productos_tienda
+        cursor.execute("DELETE FROM productos_tienda WHERE negocio_id = %s", (user_id,))
+        
+        # 9. Eliminar productos
+        cursor.execute("DELETE FROM productos WHERE negocio_id = %s", (user_id,))
+        
+        # 10. Eliminar ventas
+        cursor.execute("DELETE FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
+        
+        # 11. Eliminar servicios
+        cursor.execute("DELETE FROM servicios WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
+        
+        # 12. Eliminar logs (usar SET NULL o eliminar)
+        cursor.execute("DELETE FROM logs WHERE usuario_id = %s", (user_id,))
+        
+        # 13. Eliminar códigos de verificación
+        cursor.execute("DELETE FROM codigos_verificacion WHERE usuario_id = %s", (user_id,))
+        
+        # 14. Finalmente eliminar el usuario
+        cursor.execute("DELETE FROM usuarios WHERE id = %s", (user_id,))
+        
         conn.commit()
         conn.close()
+        print(f"✅ Usuario {usuario[1]} (ID: {user_id}) eliminado correctamente")
         return True
+        
+    except psycopg2.Error as e:
+        print(f"❌ Error SQL eliminando usuario {user_id}: {e}")
+        conn.rollback()
+        conn.close()
+        return False
     except Exception as e:
         print(f"❌ Error eliminando usuario {user_id}: {e}")
         conn.rollback()
