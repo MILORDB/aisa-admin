@@ -14,6 +14,7 @@ from functools import wraps
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import urllib.parse
 
 # ============================================
 # CONFIGURACIÓN DE LOGGING
@@ -82,7 +83,6 @@ try:
         actualizar_ubicacion_usuario, obtener_ubicacion_usuario, obtener_negocios_con_ubicacion,
         generar_numero_factura, obtener_ultimo_numero_factura, actualizar_ultimo_numero_factura,
         registrar_asistencia,
-        # Nuevas funciones de verificación
         generar_codigo_verificacion, guardar_codigo_verificacion, 
         verificar_codigo, marcar_usuario_verificado, obtener_codigos_pendientes
     )
@@ -214,11 +214,1128 @@ def admin_required(f):
     return decorated_function
 
 # ============================================
-# ENDPOINTS DE REPARACIÓN (MANTENIDOS)
+# ENDPOINT PARA REPARAR ADMIN (URL DIRECTA)
 # ============================================
-# (Todos los endpoints /fix-* y /debug-* se mantienen igual que en la versión anterior)
-# Por brevedad, aquí se incluyen solo los nuevos endpoints de verificación.
-# Se asume que los endpoints de reparación ya están presentes en tu código.
+@app.route('/fix-admin', methods=['GET'])
+def fix_admin_endpoint():
+    """Endpoint para reparar el admin - URL directa /fix-admin"""
+    try:
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        import bcrypt
+        print("✅ Conectado a PostgreSQL - Reparando admin...")
+        
+        mensajes = []
+        
+        # 1. Verificar/Crear admin
+        cursor.execute("SELECT * FROM usuarios WHERE username = 'admin'")
+        admin = cursor.fetchone()
+        
+        if admin:
+            mensajes.append(f"✅ Admin encontrado: {admin['username']} (ID: {admin['id']})")
+            admin_id = admin['id']
+        else:
+            mensajes.append("⚠️ Admin no encontrado, creándolo...")
+            password = "admin123"
+            salt = bcrypt.gensalt()
+            password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+            fecha = datetime.now().isoformat()
+            
+            cursor.execute('''
+                INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado, verificado)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1, 1)
+                RETURNING id
+            ''', ('admin', 'admin@aisa.com', password_hash, 'Administrador', 'admin', 'admin', fecha))
+            
+            admin_id = cursor.fetchone()['id']
+            conn.commit()
+            mensajes.append(f"✅ Admin creado con ID: {admin_id}")
+        
+        # 2. FORZAR rol y tipo a 'admin'
+        cursor.execute('''
+            UPDATE usuarios 
+            SET rol = 'admin', tipo = 'admin', activo = 1, aprobado = 1, verificado = 1
+            WHERE id = %s
+        ''', (admin_id,))
+        conn.commit()
+        mensajes.append("✅ Rol y tipo forzados a 'admin'")
+        
+        # 3. Verificar módulos
+        cursor.execute("SELECT * FROM modulos")
+        modulos = cursor.fetchall()
+        
+        if not modulos:
+            mensajes.append("⚠️ No hay módulos. Creándolos...")
+            modulos_list = [
+                ('voz', 'Texto a voz y reconocimiento de voz', 1, 'ambos'),
+                ('control_pc', 'Control de mouse, teclado y programas', 1, 'negocio'),
+                ('busqueda_web', 'Búsqueda en internet con DeepSeek', 1, 'ambos'),
+                ('memoria', 'Memoria vectorial para recordar conversaciones', 1, 'ambos'),
+                ('archivos', 'Lectura de archivos PDF, Word, Excel', 1, 'negocio'),
+                ('contexto', 'Contexto de conversación', 1, 'ambos'),
+                ('android', 'Conexión con dispositivos Android', 1, 'negocio'),
+                ('inventario', 'Gestión de inventario y productos', 1, 'negocio'),
+                ('tienda', 'Tienda online para clientes', 1, 'negocio'),
+                ('trabajadores', 'Gestión de trabajadores y empleados', 1, 'negocio'),
+                ('servicios', 'Gestión de servicios ofrecidos', 1, 'negocio'),
+                ('ventas', 'Gestión de ventas y facturación', 1, 'negocio'),
+                ('contratos', 'Gestión de contratos con clientes', 1, 'negocio'),
+                ('nomina', 'Gestión de nómina y salarios', 1, 'negocio'),
+                ('mapa', 'Ubicación en mapa interactivo', 1, 'negocio'),
+            ]
+            
+            for nombre, desc, activo, tipo in modulos_list:
+                cursor.execute('''
+                    INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (nombre) DO NOTHING
+                ''', (nombre, desc, activo, tipo))
+            
+            conn.commit()
+            mensajes.append("✅ Módulos creados")
+            cursor.execute("SELECT * FROM modulos")
+            modulos = cursor.fetchall()
+        
+        mensajes.append(f"📋 Módulos encontrados: {len(modulos)}")
+        
+        # 4. Eliminar permisos antiguos
+        cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (admin_id,))
+        mensajes.append("🗑️ Permisos antiguos eliminados")
+        
+        # 5. Asignar todos los módulos al admin
+        for mod in modulos:
+            cursor.execute('''
+                INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+                VALUES (%s, %s, 1, 'aprobado')
+            ''', (admin_id, mod['id']))
+        
+        conn.commit()
+        mensajes.append(f"✅ {len(modulos)} permisos asignados al admin")
+        
+        # 6. Verificar final
+        cursor.execute("SELECT id, username, rol, tipo, activo, verificado FROM usuarios WHERE id = %s", (admin_id,))
+        admin_final = cursor.fetchone()
+        
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head>
+                <title>Admin Reparado</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                    .result-box {{ background: #0f0f1a; border-radius: 8px; padding: 12px; border: 1px solid #2a2a3e; margin-top: 12px; }}
+                    .result-box .row {{ display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #1a1a2e; }}
+                    .result-box .row:last-child {{ border-bottom: none; }}
+                    .result-box .label {{ color: #888; }}
+                    .result-box .value {{ color: #fff; font-weight: 600; }}
+                    .result-box .value.ok {{ color: #6bff6b; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Admin</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        {html_mensajes}
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Datos del Admin</h3>
+                        <div class="result-box">
+                            <div class="row">
+                                <span class="label">👤 Usuario</span>
+                                <span class="value ok">{admin_final['username']}</span>
+                            </div>
+                            <div class="row">
+                                <span class="label">🔑 Rol</span>
+                                <span class="value ok">{admin_final['rol']}</span>
+                            </div>
+                            <div class="row">
+                                <span class="label">📋 Tipo</span>
+                                <span class="value ok">{admin_final['tipo']}</span>
+                            </div>
+                            <div class="row">
+                                <span class="label">✅ Activo</span>
+                                <span class="value ok">{'Sí' if admin_final['activo'] == 1 else 'No'}</span>
+                            </div>
+                            <div class="row">
+                                <span class="label">🔐 Verificado</span>
+                                <span class="value ok">{'Sí' if admin_final['verificado'] == 1 else 'No'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <a href="/logout" class="btn btn-primary">🚪 Cerrar sesión</a>
+                        <a href="/login" class="btn btn-secondary">🔑 Iniciar sesión</a>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 16px; background: #0f0f1a; border-radius: 8px; border: 1px solid #2a2a3e;">
+                        <p style="color: #888;">👤 Usuario: <strong style="color:#6c3ce0;">admin</strong></p>
+                        <p style="color: #888;">🔑 Contraseña: <strong style="color:#6c3ce0;">admin123</strong></p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/login" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Login</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA AGREGAR COLUMNA VERIFICADO
+# ============================================
+@app.route('/fix-verificado', methods=['GET'])
+def fix_verificado():
+    """Endpoint para agregar la columna verificado a la tabla usuarios"""
+    try:
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL - Agregando columna verificado...")
+        
+        mensajes = []
+        
+        # Verificar si la columna verificado existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'usuarios' AND column_name = 'verificado'
+        """)
+        
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN verificado INTEGER DEFAULT 0")
+            mensajes.append("✅ Columna 'verificado' agregada a la tabla usuarios")
+        else:
+            mensajes.append("✅ Columna 'verificado' ya existe")
+        
+        # Verificar si la tabla codigos_verificacion existe
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'codigos_verificacion'
+            )
+        """)
+        
+        if not cursor.fetchone()[0]:
+            mensajes.append("⚠️ Tabla 'codigos_verificacion' no existe. Creándola...")
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS codigos_verificacion (
+                id SERIAL PRIMARY KEY,
+                usuario_id INTEGER NOT NULL,
+                codigo TEXT NOT NULL,
+                email TEXT NOT NULL,
+                creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expira_en TIMESTAMP NOT NULL,
+                usado INTEGER DEFAULT 0,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+            )
+            ''')
+            mensajes.append("✅ Tabla 'codigos_verificacion' creada")
+        else:
+            mensajes.append("✅ Tabla 'codigos_verificacion' ya existe")
+        
+        conn.commit()
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head>
+                <title>Columna Verificado Agregada</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Verificación</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        {html_mensajes}
+                    </div>
+                    
+                    <div>
+                        <a href="/register" class="btn btn-primary">📝 Ir a Registro</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_detalle = traceback.format_exc()
+        print(f"❌ Error: {e}")
+        
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al agregar columna</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;font-size:12px;overflow:auto;max-height:400px;">{error_detalle}</pre>
+                <div style="margin-top:16px;">
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                </div>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA REPARAR UBICACIÓN (VIA WEB)
+# ============================================
+@app.route('/fix-ubicacion', methods=['GET'])
+def fix_ubicacion():
+    """Endpoint para agregar campos de ubicación a la tabla usuarios"""
+    try:
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL - Agregando campos de ubicación...")
+        
+        mensajes = []
+        
+        # Verificar y agregar columna latitud
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'usuarios' AND column_name = 'latitud'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN latitud REAL")
+            mensajes.append("✅ Columna 'latitud' agregada")
+        else:
+            mensajes.append("✅ Columna 'latitud' ya existe")
+        
+        # Verificar y agregar columna longitud
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'usuarios' AND column_name = 'longitud'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN longitud REAL")
+            mensajes.append("✅ Columna 'longitud' agregada")
+        else:
+            mensajes.append("✅ Columna 'longitud' ya existe")
+        
+        # Verificar y agregar columna ubicacion_actualizada
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'usuarios' AND column_name = 'ubicacion_actualizada'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE usuarios ADD COLUMN ubicacion_actualizada TEXT")
+            mensajes.append("✅ Columna 'ubicacion_actualizada' agregada")
+        else:
+            mensajes.append("✅ Columna 'ubicacion_actualizada' ya existe")
+        
+        conn.commit()
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head>
+                <title>Campos de Ubicación Agregados</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Campos de Ubicación</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        {html_mensajes}
+                    </div>
+                    
+                    <div>
+                        <a href="/negocio/mapa" class="btn btn-primary">🗺️ Ir al Mapa</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA REPARAR TABLAS DE NÓMINA
+# ============================================
+@app.route('/fix-tablas-nomina', methods=['GET'])
+def fix_tablas_nomina():
+    """Endpoint para crear tablas de nómina desde el navegador"""
+    try:
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return """
+            <html>
+                <head><title>Error</title></head>
+                <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                    <h1 style="color:#ff6b6b;">❌ DATABASE_URL no está configurada</h1>
+                    <p style="color:#888;">Asegúrate de que la variable de entorno DATABASE_URL esté configurada en Render</p>
+                    <br>
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                </body>
+            </html>
+            """, 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL - Reparando tablas de nómina...")
+        
+        mensajes = []
+        
+        # 1. Crear tabla asistencia
+        print("🔧 Creando tabla asistencia...")
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS asistencia (
+            id SERIAL PRIMARY KEY,
+            trabajador_id INTEGER NOT NULL,
+            negocio_id INTEGER NOT NULL,
+            fecha DATE NOT NULL,
+            presente INTEGER DEFAULT 1,
+            horas_trabajadas REAL DEFAULT 8,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(trabajador_id, fecha)
+        )
+        ''')
+        mensajes.append("✅ Tabla 'asistencia' creada/verificada")
+        
+        # 2. Crear tabla comisiones_trabajador
+        print("🔧 Creando tabla comisiones_trabajador...")
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS comisiones_trabajador (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            trabajador_id INTEGER NOT NULL,
+            venta_id INTEGER NOT NULL,
+            producto_id INTEGER,
+            monto REAL NOT NULL DEFAULT 0,
+            fecha DATE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
+            FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+        )
+        ''')
+        mensajes.append("✅ Tabla 'comisiones_trabajador' creada/verificada")
+        
+        # 3. Verificar tabla nomina
+        print("🔧 Verificando tabla nomina...")
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS nomina (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            trabajador_id INTEGER NOT NULL,
+            mes INTEGER NOT NULL,
+            ano INTEGER NOT NULL,
+            salario_base REAL NOT NULL DEFAULT 0,
+            dias_trabajados INTEGER DEFAULT 0,
+            dias_ausencia INTEGER DEFAULT 0,
+            dias_extras INTEGER DEFAULT 0,
+            salario_devengado REAL DEFAULT 0,
+            comisiones REAL DEFAULT 0,
+            total REAL DEFAULT 0,
+            creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            actualizado_en TIMESTAMP,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(negocio_id, trabajador_id, mes, ano)
+        )
+        ''')
+        mensajes.append("✅ Tabla 'nomina' creada/verificada")
+        
+        # 4. Verificar columna comision en productos
+        print("🔧 Verificando columna comision en productos...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'productos' AND column_name = 'comision'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE productos ADD COLUMN comision REAL DEFAULT 0")
+            mensajes.append("✅ Columna 'comision' agregada a productos")
+        else:
+            mensajes.append("✅ Columna 'comision' ya existe")
+        
+        # 5. Verificar columna costo en productos
+        print("🔧 Verificando columna costo en productos...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'productos' AND column_name = 'costo'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE productos ADD COLUMN costo REAL DEFAULT 0")
+            mensajes.append("✅ Columna 'costo' agregada a productos")
+        else:
+            mensajes.append("✅ Columna 'costo' ya existe")
+        
+        # 6. Verificar columna factura en ventas
+        print("🔧 Verificando columna factura en ventas...")
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'ventas' AND column_name = 'factura'
+        """)
+        if not cursor.fetchone():
+            cursor.execute("ALTER TABLE ventas ADD COLUMN factura TEXT")
+            mensajes.append("✅ Columna 'factura' agregada a ventas")
+        else:
+            mensajes.append("✅ Columna 'factura' ya existe")
+        
+        conn.commit()
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        
+        return f"""
+        <html>
+            <head>
+                <title>Tablas de Nómina Reparadas</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                    .btn-success {{ background: #4caf50; color: #fff; }}
+                    .btn-success:hover {{ background: #3d8b40; }}
+                    ul {{ list-style: none; padding: 0; }}
+                    ul li {{ padding: 6px 0; border-bottom: 1px solid #1a1a2e; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Tablas de Nómina</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        <ul>
+                            {''.join([f'<li>✅ {m}</li>' for m in mensajes])}
+                        </ul>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Tablas Creadas/Verificadas</h3>
+                        <ul>
+                            <li>✅ <strong>asistencia</strong> - Registro de asistencia de trabajadores</li>
+                            <li>✅ <strong>comisiones_trabajador</strong> - Comisiones por ventas de trabajadores</li>
+                            <li>✅ <strong>nomina</strong> - Cálculo de nómina mensual</li>
+                            <li>✅ <strong>productos</strong> - Columnas 'costo' y 'comision' agregadas</li>
+                            <li>✅ <strong>ventas</strong> - Columna 'factura' agregada</li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 16px; background: #0f0f1a; border-radius: 8px; border: 1px solid #2a2a3e;">
+                        <p style="color: #888;">ℹ️ Si el problema persiste, reinicia el servidor en Render</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_detalle = traceback.format_exc()
+        print(f"❌ Error en fix_tablas_nomina: {e}")
+        print(error_detalle)
+        
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al reparar tablas</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;font-size:12px;overflow:auto;max-height:400px;">{error_detalle}</pre>
+                <div style="margin-top:16px;">
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                </div>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA REPARAR TODAS LAS TABLAS DE NÓMINA Y COMISIONES (COMPLETO)
+# ============================================
+@app.route('/fix-nomina-completo', methods=['GET'])
+def fix_nomina_completo():
+    """Endpoint para crear todas las tablas relacionadas con nómina y comisiones"""
+    try:
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return """
+            <html>
+                <head><title>Error</title></head>
+                <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                    <h1 style="color:#ff6b6b;">❌ DATABASE_URL no está configurada</h1>
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                </body>
+            </html>
+            """, 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor()
+        print("✅ Conectado a PostgreSQL - Reparando tablas de nómina y comisiones...")
+        
+        mensajes = []
+        errores = []
+        
+        # 1. TABLA ASISTENCIA
+        print("🔧 Creando tabla asistencia...")
+        try:
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS asistencia (
+                id SERIAL PRIMARY KEY,
+                trabajador_id INTEGER NOT NULL,
+                negocio_id INTEGER NOT NULL,
+                fecha DATE NOT NULL,
+                presente INTEGER DEFAULT 1,
+                horas_trabajadas REAL DEFAULT 8,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                UNIQUE(trabajador_id, fecha)
+            )
+            ''')
+            mensajes.append("✅ Tabla 'asistencia' creada/verificada")
+        except Exception as e:
+            errores.append(f"❌ Error creando 'asistencia': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # 2. TABLA COMISIONES_TRABAJADOR
+        print("🔧 Creando tabla comisiones_trabajador...")
+        try:
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS comisiones_trabajador (
+                id SERIAL PRIMARY KEY,
+                negocio_id INTEGER NOT NULL,
+                trabajador_id INTEGER NOT NULL,
+                venta_id INTEGER NOT NULL,
+                producto_id INTEGER,
+                monto REAL NOT NULL DEFAULT 0,
+                fecha DATE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
+                FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+            )
+            ''')
+            mensajes.append("✅ Tabla 'comisiones_trabajador' creada/verificada")
+        except Exception as e:
+            errores.append(f"❌ Error creando 'comisiones_trabajador': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # 3. TABLA NOMINA
+        print("🔧 Creando tabla nomina...")
+        try:
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS nomina (
+                id SERIAL PRIMARY KEY,
+                negocio_id INTEGER NOT NULL,
+                trabajador_id INTEGER NOT NULL,
+                mes INTEGER NOT NULL,
+                ano INTEGER NOT NULL,
+                salario_base REAL NOT NULL DEFAULT 0,
+                dias_trabajados INTEGER DEFAULT 0,
+                dias_ausencia INTEGER DEFAULT 0,
+                dias_extras INTEGER DEFAULT 0,
+                salario_devengado REAL DEFAULT 0,
+                comisiones REAL DEFAULT 0,
+                total REAL DEFAULT 0,
+                creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                actualizado_en TIMESTAMP,
+                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                UNIQUE(negocio_id, trabajador_id, mes, ano)
+            )
+            ''')
+            mensajes.append("✅ Tabla 'nomina' creada/verificada")
+        except Exception as e:
+            errores.append(f"❌ Error creando 'nomina': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # 4. VERIFICAR COLUMNA COMISION EN PRODUCTOS
+        print("🔧 Verificando columna comision en productos...")
+        try:
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'productos' AND column_name = 'comision'
+            """)
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE productos ADD COLUMN comision REAL DEFAULT 0")
+                mensajes.append("✅ Columna 'comision' agregada a productos")
+            else:
+                mensajes.append("✅ Columna 'comision' ya existe en productos")
+        except Exception as e:
+            errores.append(f"❌ Error verificando columna 'comision': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # 5. VERIFICAR COLUMNA COSTO EN PRODUCTOS
+        print("🔧 Verificando columna costo en productos...")
+        try:
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'productos' AND column_name = 'costo'
+            """)
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE productos ADD COLUMN costo REAL DEFAULT 0")
+                mensajes.append("✅ Columna 'costo' agregada a productos")
+            else:
+                mensajes.append("✅ Columna 'costo' ya existe en productos")
+        except Exception as e:
+            errores.append(f"❌ Error verificando columna 'costo': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # 6. VERIFICAR COLUMNA FACTURA EN VENTAS
+        print("🔧 Verificando columna factura en ventas...")
+        try:
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'ventas' AND column_name = 'factura'
+            """)
+            if not cursor.fetchone():
+                cursor.execute("ALTER TABLE ventas ADD COLUMN factura TEXT")
+                mensajes.append("✅ Columna 'factura' agregada a ventas")
+            else:
+                mensajes.append("✅ Columna 'factura' ya existe en ventas")
+        except Exception as e:
+            errores.append(f"❌ Error verificando columna 'factura': {str(e)}")
+            print(f"❌ Error: {e}")
+        
+        # 7. CREAR ÍNDICES
+        print("🔧 Creando índices...")
+        try:
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_asistencia_trabajador ON asistencia(trabajador_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_asistencia_fecha ON asistencia(fecha)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_comisiones_trabajador ON comisiones_trabajador(trabajador_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_comisiones_fecha ON comisiones_trabajador(fecha)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_nomina_trabajador ON nomina(trabajador_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_nomina_mes_ano ON nomina(mes, ano)")
+            mensajes.append("✅ Índices creados/verificados")
+        except Exception as e:
+            errores.append(f"⚠️ Error creando índices: {str(e)}")
+            print(f"⚠️ Error: {e}")
+        
+        conn.commit()
+        
+        # 8. VERIFICAR QUE LAS TABLAS EXISTAN
+        print("🔧 Verificando tablas...")
+        tablas_verificadas = []
+        for tabla in ['asistencia', 'comisiones_trabajador', 'nomina']:
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = %s
+                )
+            """, (tabla,))
+            existe = cursor.fetchone()[0]
+            tablas_verificadas.append(f"{tabla}: {'✅ Existe' if existe else '❌ NO EXISTE'}")
+            if not existe:
+                errores.append(f"❌ Tabla '{tabla}' NO existe después de la creación")
+        
+        conn.close()
+        
+        html_mensajes = "<br>".join(mensajes)
+        html_errores = "<br>".join(errores) if errores else "✅ Sin errores"
+        html_verificacion = "<br>".join(tablas_verificadas)
+        
+        return f"""
+        <html>
+            <head>
+                <title>Tablas de Nómina y Comisiones Reparadas</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 900px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .error {{ color: #ff6b6b; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                    .btn-success {{ background: #4caf50; color: #fff; }}
+                    .btn-success:hover {{ background: #3d8b40; }}
+                    ul {{ list-style: none; padding: 0; }}
+                    ul li {{ padding: 6px 0; border-bottom: 1px solid #1a1a2e; }}
+                    .result-box {{ background: #0f0f1a; border-radius: 8px; padding: 12px; border: 1px solid #2a2a3e; margin-top: 12px; }}
+                    .tabla-status {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+                    .tabla-status td {{ padding: 6px 12px; border-bottom: 1px solid #1a1a2e; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Tablas de Nómina y Comisiones</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        <ul>
+                            {''.join([f'<li>✅ {m}</li>' for m in mensajes])}
+                        </ul>
+                        {f'<div style="margin-top:10px;color:#ff6b6b;"><strong>❌ Errores:</strong><br>{html_errores}</div>' if errores else ''}
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Verificación de Tablas</h3>
+                        <table class="tabla-status">
+                            {''.join([f'<tr><td>📌 {t}</td></tr>' for t in tablas_verificadas])}
+                        </table>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Tablas Creadas/Verificadas</h3>
+                        <ul>
+                            <li>✅ <strong>asistencia</strong> - Registro de asistencia de trabajadores</li>
+                            <li>✅ <strong>comisiones_trabajador</strong> - Comisiones por ventas de trabajadores</li>
+                            <li>✅ <strong>nomina</strong> - Cálculo de nómina mensual</li>
+                            <li>✅ <strong>productos</strong> - Columnas 'costo' y 'comision' agregadas</li>
+                            <li>✅ <strong>ventas</strong> - Columna 'factura' agregada</li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <a href="/negocio/nomina" class="btn btn-primary">📊 Ir a Nómina</a>
+                        <a href="/negocio/ventas" class="btn btn-success">💰 Ir a Ventas</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 16px; background: #0f0f1a; border-radius: 8px; border: 1px solid #2a2a3e;">
+                        <p style="color: #888;">ℹ️ Si el problema persiste, reinicia el servidor en Render</p>
+                        <p style="color: #888;">🔧 También puedes ejecutar: <code style="color:#6c3ce0;">/fix-tablas-nomina</code></p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        import traceback
+        error_detalle = traceback.format_exc()
+        print(f"❌ Error en fix_nomina_completo: {e}")
+        print(error_detalle)
+        
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error al reparar tablas</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;font-size:12px;overflow:auto;max-height:400px;">{error_detalle}</pre>
+                <div style="margin-top:16px;">
+                    <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+                </div>
+            </body>
+        </html>
+        """, 500
+
+# ============================================
+# ENDPOINT PARA REPARAR MÓDULOS (VIA WEB)
+# ============================================
+@app.route('/fix-modulos-web', methods=['GET'])
+def fix_modulos_web():
+    """Endpoint para reparar módulos desde el navegador"""
+    try:
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        print("✅ Conectado a PostgreSQL - Reparando módulos...")
+        
+        mensajes = []
+        
+        # 1. Verificar/Crear módulo mapa
+        cursor.execute("SELECT * FROM modulos WHERE nombre = 'mapa'")
+        mapa = cursor.fetchone()
+        
+        if not mapa:
+            cursor.execute('''
+                INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido)
+                VALUES ('mapa', 'Ubicación en mapa interactivo', 1, 'negocio')
+                RETURNING id
+            ''')
+            mapa_id = cursor.fetchone()['id']
+            mensajes.append("✅ Módulo 'mapa' creado")
+        else:
+            mapa_id = mapa['id']
+            mensajes.append("✅ Módulo 'mapa' ya existe")
+        
+        # 2. Activar globalmente
+        cursor.execute("UPDATE modulos SET activo_global = 1 WHERE id = %s", (mapa_id,))
+        mensajes.append("✅ Módulo 'mapa' activado globalmente")
+        
+        # 3. Asignar a todos los usuarios
+        cursor.execute("SELECT id, username, rol, tipo FROM usuarios")
+        usuarios = cursor.fetchall()
+        
+        asignados = 0
+        for u in usuarios:
+            cursor.execute("SELECT id FROM permisos_usuario WHERE usuario_id = %s AND modulo_id = %s", (u['id'], mapa_id))
+            if not cursor.fetchone():
+                cursor.execute('''
+                    INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+                    VALUES (%s, %s, 1, 'aprobado')
+                ''', (u['id'], mapa_id))
+                asignados += 1
+        
+        conn.commit()
+        mensajes.append(f"✅ Módulo 'mapa' asignado a {asignados} usuarios")
+        
+        # 4. Verificar módulos existentes
+        cursor.execute("SELECT * FROM modulos ORDER BY nombre")
+        modulos = cursor.fetchall()
+        
+        # 5. Verificar permisos totales
+        cursor.execute("SELECT COUNT(*) FROM permisos_usuario WHERE modulo_id = %s", (mapa_id,))
+        total_permisos = cursor.fetchone()['count']
+        
+        conn.close()
+        
+        html_modulos = ""
+        for m in modulos:
+            activo = "✅ Activo" if m['activo_global'] == 1 else "❌ Inactivo"
+            html_modulos += f"<li><strong>{m['nombre']}</strong> - {m['descripcion']} - {activo}</li>"
+        
+        return f"""
+        <html>
+            <head>
+                <title>Módulos Reparados</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; text-align: center; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; text-align: left; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .success {{ color: #6bff6b; }}
+                    .warning {{ color: #ffbb33; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                    .btn-success {{ background: #4caf50; color: #fff; }}
+                    .btn-success:hover {{ background: #3d8b40; }}
+                    ul {{ list-style: none; padding: 0; }}
+                    ul li {{ padding: 4px 0; border-bottom: 1px solid #1a1a2e; }}
+                    .result-box {{ background: #0f0f1a; border-radius: 8px; padding: 12px; border: 1px solid #2a2a3e; margin-top: 12px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔧 Reparación de Módulos</h1>
+                    
+                    <div class="card">
+                        <h3>📊 Resultado</h3>
+                        <ul>
+                            {''.join([f'<li>✅ {m}</li>' for m in mensajes])}
+                        </ul>
+                        <div class="result-box">
+                            <p>📊 Total de permisos para 'mapa': <strong>{total_permisos}</strong></p>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📋 Todos los Módulos del Sistema</h3>
+                        <ul>
+                            {html_modulos}
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <a href="/admin/db" class="btn btn-primary">🗄️ Ir al Gestor DB</a>
+                        <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 16px; background: #0f0f1a; border-radius: 8px; border: 1px solid #2a2a3e;">
+                        <p style="color: #888;">ℹ️ Si el módulo 'mapa' sigue sin aparecer, recarga la página (Ctrl+F5)</p>
+                        <p style="color: #888;">🔍 Visita <a href="/debug/mis-modulos" style="color:#6c3ce0;">/debug/mis-modulos</a> para ver tus permisos</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Dashboard</a>
+            </body>
+        </html>
+        """, 500
 
 # ============================================
 # RUTAS PRINCIPALES
@@ -385,98 +1502,6 @@ def verificar():
     
     return render_template('verificar.html', email=email, user_id=user_id)
 
-# ============================================
-# API - VERIFICACIÓN DE CÓDIGO
-# ============================================
-
-@app.route('/api/verificar-codigo', methods=['POST'])
-def api_verificar_codigo():
-    """Verifica el código de activación de una cuenta"""
-    try:
-        data = request.get_json()
-        email = data.get('email')
-        codigo = data.get('codigo')
-        
-        if not email or not codigo:
-            return jsonify({'error': 'Email y código son requeridos'}), 400
-        
-        # Verificar código
-        registro = verificar_codigo(email, codigo)
-        
-        if not registro:
-            # Verificar si hay códigos pendientes
-            pendientes = obtener_codigos_pendientes(email)
-            if pendientes:
-                return jsonify({
-                    'error': 'Código inválido o expirado. Solicita un nuevo código.',
-                    'codigos_pendientes': len(pendientes)
-                }), 400
-            else:
-                return jsonify({
-                    'error': 'Código inválido o expirado. Solicita un nuevo código.'
-                }), 400
-        
-        # Marcar usuario como verificado
-        user_id = registro['usuario_id']
-        exito = marcar_usuario_verificado(user_id)
-        
-        if not exito:
-            return jsonify({'error': 'Error al activar la cuenta'}), 500
-        
-        registrar_log(user_id, 'cuenta_verificada', f'Cuenta verificada con código: {codigo}')
-        
-        return jsonify({
-            'success': True,
-            'message': 'Cuenta activada correctamente. Ya puedes iniciar sesión.',
-            'user_id': user_id
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en api_verificar_codigo: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/reenviar-codigo', methods=['POST'])
-def api_reenviar_codigo():
-    """Reenvía el código de verificación a un email"""
-    try:
-        data = request.get_json()
-        email = data.get('email')
-        
-        if not email:
-            return jsonify({'error': 'Email es requerido'}), 400
-        
-        # Buscar usuario por email
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute('SELECT id, username FROM usuarios WHERE email = %s AND verificado = 0', (email,))
-        usuario = cursor.fetchone()
-        conn.close()
-        
-        if not usuario:
-            return jsonify({'error': 'Usuario no encontrado o ya verificado'}), 404
-        
-        # Generar nuevo código
-        codigo = generar_codigo_verificacion()
-        guardar_codigo_verificacion(usuario['id'], email, codigo)
-        
-        # Enviar correo
-        enviar_correo_verificacion(email, usuario['username'], codigo)
-        
-        registrar_log(usuario['id'], 'codigo_reenviado', f'Código reenviado a {email}')
-        
-        return jsonify({
-            'success': True,
-            'message': 'Código reenviado correctamente. Revisa tu correo.'
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en api_reenviar_codigo: {e}")
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
-# DASHBOARD Y DEMÁS RUTAS (MANTENIDAS)
-# ============================================
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -545,7 +1570,7 @@ def admin_trabajadores_pendientes():
     return render_template('admin/trabajadores_pendientes.html')
 
 # ============================================
-# RUTAS DE MÓDULOS DE NEGOCIO (MANTENIDAS)
+# RUTAS DE MÓDULOS DE NEGOCIO
 # ============================================
 @app.route('/negocio/inventario')
 @login_required
@@ -604,7 +1629,7 @@ def negocio_mapa():
     return render_template('negocio/mapa.html', usuario=usuario, version=int(time.time()))
 
 # ============================================
-# API - PERFIL DE USUARIO (MANTENIDO)
+# API - PERFIL DE USUARIO
 # ============================================
 @app.route('/api/usuario/perfil', methods=['GET'])
 @login_required
@@ -784,44 +1809,89 @@ def api_perfil_password():
     return jsonify({'success': True, 'message': 'Contraseña actualizada correctamente'})
 
 # ============================================
-# API - SQL QUERY (MANTENIDO)
+# API - VERIFICACIÓN DE CÓDIGO
 # ============================================
-@app.route('/api/sql', methods=['POST'])
-@admin_required
-def api_sql():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    data = request.get_json()
-    query = data.get('query', '').strip()
-    
-    if not query:
-        return jsonify({'error': 'La consulta SQL está vacía'}), 400
-    
-    if not query.lower().startswith('select'):
-        return jsonify({'error': 'Solo se permiten consultas SELECT'}), 403
-    
+
+@app.route('/api/verificar-codigo', methods=['POST'])
+def api_verificar_codigo():
+    """Verifica el código de activación de una cuenta"""
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute(query)
+        data = request.get_json()
+        email = data.get('email')
+        codigo = data.get('codigo')
         
-        column_names = [desc[0] for desc in cursor.description] if cursor.description else []
-        rows = cursor.fetchall()
+        if not email or not codigo:
+            return jsonify({'error': 'Email y código son requeridos'}), 400
+        
+        registro = verificar_codigo(email, codigo)
+        
+        if not registro:
+            pendientes = obtener_codigos_pendientes(email)
+            if pendientes:
+                return jsonify({
+                    'error': 'Código inválido o expirado. Solicita un nuevo código.',
+                    'codigos_pendientes': len(pendientes)
+                }), 400
+            else:
+                return jsonify({
+                    'error': 'Código inválido o expirado. Solicita un nuevo código.'
+                }), 400
+        
+        user_id = registro['usuario_id']
+        exito = marcar_usuario_verificado(user_id)
+        
+        if not exito:
+            return jsonify({'error': 'Error al activar la cuenta'}), 500
+        
+        registrar_log(user_id, 'cuenta_verificada', f'Cuenta verificada con código: {codigo}')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Cuenta activada correctamente. Ya puedes iniciar sesión.',
+            'user_id': user_id
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_verificar_codigo: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reenviar-codigo', methods=['POST'])
+def api_reenviar_codigo():
+    """Reenvía el código de verificación a un email"""
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        
+        if not email:
+            return jsonify({'error': 'Email es requerido'}), 400
+        
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('SELECT id, username FROM usuarios WHERE email = %s AND verificado = 0', (email,))
+        usuario = cursor.fetchone()
         conn.close()
         
-        result = []
-        for row in rows:
-            result.append(dict(zip(column_names, row)))
+        if not usuario:
+            return jsonify({'error': 'Usuario no encontrado o ya verificado'}), 404
         
-        return jsonify({'result': result})
-    except psycopg2.Error as e:
-        return jsonify({'error': str(e)}), 400
+        codigo = generar_codigo_verificacion()
+        guardar_codigo_verificacion(usuario['id'], email, codigo)
+        enviar_correo_verificacion(email, usuario['username'], codigo)
+        
+        registrar_log(usuario['id'], 'codigo_reenviado', f'Código reenviado a {email}')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Código reenviado correctamente. Revisa tu correo.'
+        })
+        
     except Exception as e:
+        print(f"❌ Error en api_reenviar_codigo: {e}")
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - ESTADÍSTICAS (MANTENIDO)
+# API - ESTADÍSTICAS
 # ============================================
 @app.route('/api/estadisticas')
 @admin_required
@@ -867,7 +1937,7 @@ def api_estadisticas():
     })
 
 # ============================================
-# API - USUARIOS (MANTENIDO)
+# API - USUARIOS (MÓDULOS ADICIONALES)
 # ============================================
 @app.route('/api/usuarios')
 @admin_required
@@ -895,28 +1965,6 @@ def api_toggle_usuario(user_id):
     activo = data.get('activo', 1)
     toggle_usuario(user_id, activo)
     registrar_log(None, 'usuario_toggle', f'Usuario {user_id} activo={activo}')
-    return jsonify({'success': True})
-
-@app.route('/api/usuario/<int:user_id>/rol', methods=['POST'])
-@admin_required
-def api_actualizar_rol(user_id):
-    data = request.get_json()
-    rol = data.get('rol', 'usuario')
-    if rol not in ['usuario', 'admin', 'trabajador']:
-        return jsonify({'error': 'Rol inválido'}), 400
-    actualizar_rol_usuario(user_id, rol)
-    registrar_log(None, 'usuario_rol', f'Usuario {user_id} rol={rol}')
-    return jsonify({'success': True})
-
-@app.route('/api/usuario/<int:user_id>/tipo', methods=['POST'])
-@admin_required
-def api_actualizar_tipo(user_id):
-    data = request.get_json()
-    tipo = data.get('tipo', 'cliente')
-    if tipo not in ['cliente', 'negocio']:
-        return jsonify({'error': 'Tipo inválido'}), 400
-    actualizar_tipo_usuario(user_id, tipo)
-    registrar_log(None, 'usuario_tipo', f'Usuario {user_id} tipo={tipo}')
     return jsonify({'success': True})
 
 @app.route('/api/usuario/<int:user_id>', methods=['DELETE'])
@@ -962,7 +2010,7 @@ def api_asignar_permiso(user_id, modulo_id):
     return jsonify({'success': True})
 
 # ============================================
-# API - MÓDULOS (MANTENIDO)
+# API - MÓDULOS
 # ============================================
 @app.route('/api/modulo/<int:modulo_id>/toggle', methods=['POST'])
 @admin_required
@@ -1013,7 +2061,7 @@ def api_modulos():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - NEGOCIOS (MANTENIDO)
+# API - NEGOCIOS
 # ============================================
 @app.route('/api/negocios')
 @admin_required
@@ -1181,12 +2229,62 @@ def api_obtener_ubicacion():
     })
 
 # ============================================
-# API - VENTAS (MANTENIDO)
+# API - SQL QUERY
 # ============================================
-# (Se mantiene igual que en la versión anterior, solo se incluye un resumen)
-# Asegúrate de que todos los endpoints de ventas, contratos, servicios, nómina, reportes,
-# productos, tienda, trabajadores, etc. estén presentes en tu código final.
-# Aquí se omite el resto por brevedad, pero deben estar incluidos.
+@app.route('/api/sql', methods=['POST'])
+@admin_required
+def api_sql():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    
+    if not query:
+        return jsonify({'error': 'La consulta SQL está vacía'}), 400
+    
+    if not query.lower().startswith('select'):
+        return jsonify({'error': 'Solo se permiten consultas SELECT'}), 403
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(query)
+        
+        column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
+        conn.close()
+        
+        result = []
+        for row in rows:
+            result.append(dict(zip(column_names, row)))
+        
+        return jsonify({'result': result})
+    except psycopg2.Error as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - VERIFICAR USUARIO (DEBUG)
+# ============================================
+@app.route('/api/verificar-usuario/<username>', methods=['GET'])
+@admin_required
+def verificar_usuario(username):
+    usuario = obtener_usuario_por_username(username)
+    if usuario:
+        return jsonify({
+            'exists': True,
+            'usuario': {
+                'id': usuario.get('id'),
+                'username': usuario.get('username'),
+                'email': usuario.get('email'),
+                'tipo': usuario.get('tipo'),
+                'rol': usuario.get('rol'),
+                'verificado': usuario.get('verificado')
+            }
+        })
+    return jsonify({'exists': False, 'message': 'Usuario no encontrado'})
 
 # ============================================
 # INICIO DE LA APLICACIÓN
