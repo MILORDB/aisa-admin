@@ -216,8 +216,9 @@ def admin_required(f):
     return decorated_function
 
 # ============================================
-# ENDPOINT PARA REPARAR ADMIN (URL DIRECTA)
+# ENDPOINTS DE REPARACIÓN
 # ============================================
+
 @app.route('/fix-admin', methods=['GET'])
 def fix_admin_endpoint():
     """Endpoint para reparar el admin - URL directa /fix-admin"""
@@ -424,9 +425,6 @@ def fix_admin_endpoint():
         </html>
         """, 500
 
-# ============================================
-# ENDPOINT PARA AGREGAR COLUMNA VERIFICADO
-# ============================================
 @app.route('/fix-verificado', methods=['GET'])
 def fix_verificado():
     """Endpoint para agregar la columna verificado a la tabla usuarios"""
@@ -552,9 +550,6 @@ def fix_verificado():
         </html>
         """, 500
 
-# ============================================
-# ENDPOINT PARA MARCAR TODOS LOS USUARIOS COMO VERIFICADOS
-# ============================================
 @app.route('/fix-verificar-todos', methods=['GET'])
 @admin_required
 def fix_verificar_todos():
@@ -639,9 +634,6 @@ def fix_verificar_todos():
         </html>
         """, 500
 
-# ============================================
-# ENDPOINT PARA REPARAR UBICACIÓN (VIA WEB)
-# ============================================
 @app.route('/fix-ubicacion', methods=['GET'])
 def fix_ubicacion():
     """Endpoint para agregar campos de ubicación a la tabla usuarios"""
@@ -758,9 +750,6 @@ def fix_ubicacion():
         </html>
         """, 500
 
-# ============================================
-# ENDPOINT PARA REPARAR TABLAS DE NÓMINA
-# ============================================
 @app.route('/fix-tablas-nomina', methods=['GET'])
 def fix_tablas_nomina():
     """Endpoint para crear tablas de nómina desde el navegador"""
@@ -981,9 +970,6 @@ def fix_tablas_nomina():
         </html>
         """, 500
 
-# ============================================
-# ENDPOINT PARA REPARAR TODAS LAS TABLAS DE NÓMINA Y COMISIONES (COMPLETO)
-# ============================================
 @app.route('/fix-nomina-completo', methods=['GET'])
 def fix_nomina_completo():
     """Endpoint para crear todas las tablas relacionadas con nómina y comisiones"""
@@ -1273,9 +1259,6 @@ def fix_nomina_completo():
         </html>
         """, 500
 
-# ============================================
-# ENDPOINT PARA REPARAR MÓDULOS (VIA WEB)
-# ============================================
 @app.route('/fix-modulos-web', methods=['GET'])
 def fix_modulos_web():
     """Endpoint para reparar módulos desde el navegador"""
@@ -1426,9 +1409,6 @@ def fix_modulos_web():
         </html>
         """, 500
 
-# ============================================
-# ENDPOINT PARA DEBUG DE MÓDULOS DEL USUARIO
-# ============================================
 @app.route('/debug/mis-modulos', methods=['GET'])
 @login_required
 def debug_mis_modulos():
@@ -1559,9 +1539,6 @@ def debug_mis_modulos():
     
     return html
 
-# ============================================
-# ENDPOINT PARA REPARAR MÓDULOS
-# ============================================
 @app.route('/fix-modulos', methods=['GET'])
 def fix_modulos_endpoint():
     """Endpoint para reparar los módulos de todos los usuarios"""
@@ -1720,112 +1697,199 @@ def fix_modulos_endpoint():
         """, 500
 
 # ============================================
-# ENDPOINT DE PRUEBA PARA ELIMINAR USUARIO
+# ENDPOINT PARA DIAGNOSTICAR USUARIO
 # ============================================
-@app.route('/test-eliminar-usuario/<int:user_id>', methods=['GET'])
+@app.route('/diagnosticar-usuario/<int:user_id>', methods=['GET'])
 @admin_required
-def test_eliminar_usuario(user_id):
-    """Endpoint de prueba para eliminar un usuario"""
+def diagnosticar_usuario(user_id):
+    """Endpoint para ver qué datos tiene un usuario antes de eliminarlo"""
     try:
         token = request.cookies.get('token')
         usuario_actual = obtener_usuario_sesion(token)
-        
-        if usuario_actual.get('id') == user_id:
-            return jsonify({'error': 'No puedes eliminar tu propio usuario'}), 400
         
         user = obtener_usuario_por_id(user_id)
         if not user:
             return jsonify({'error': 'Usuario no encontrado'}), 404
         
-        if user.get('rol') == 'admin':
-            return jsonify({'error': 'No se puede eliminar un administrador'}), 400
-        
-        # Verificar tablas relacionadas
         conn = get_db()
         cursor = conn.cursor()
         
-        relaciones = {}
-        cursor.execute("SELECT COUNT(*) FROM sesiones WHERE usuario_id = %s", (user_id,))
-        relaciones['sesiones'] = cursor.fetchone()[0]
+        datos = {
+            'usuario': {
+                'id': user.get('id'),
+                'username': user.get('username'),
+                'email': user.get('email'),
+                'rol': user.get('rol'),
+                'tipo': user.get('tipo'),
+                'activo': user.get('activo'),
+                'verificado': user.get('verificado')
+            },
+            'tablas': {}
+        }
         
-        cursor.execute("SELECT COUNT(*) FROM permisos_usuario WHERE usuario_id = %s", (user_id,))
-        relaciones['permisos'] = cursor.fetchone()[0]
+        # Contar registros en cada tabla relacionada
+        tablas = [
+            ('sesiones', "SELECT COUNT(*) FROM sesiones WHERE usuario_id = %s", (user_id,)),
+            ('permisos_usuario', "SELECT COUNT(*) FROM permisos_usuario WHERE usuario_id = %s", (user_id,)),
+            ('trabajadores_negocio_trabajador', "SELECT COUNT(*) FROM trabajadores_negocio WHERE trabajador_id = %s", (user_id,)),
+            ('trabajadores_negocio_negocio', "SELECT COUNT(*) FROM trabajadores_negocio WHERE negocio_id = %s", (user_id,)),
+            ('comisiones_trabajador_trabajador', "SELECT COUNT(*) FROM comisiones_trabajador WHERE trabajador_id = %s", (user_id,)),
+            ('comisiones_trabajador_negocio', "SELECT COUNT(*) FROM comisiones_trabajador WHERE negocio_id = %s", (user_id,)),
+            ('asistencia_trabajador', "SELECT COUNT(*) FROM asistencia WHERE trabajador_id = %s", (user_id,)),
+            ('asistencia_negocio', "SELECT COUNT(*) FROM asistencia WHERE negocio_id = %s", (user_id,)),
+            ('nomina_trabajador', "SELECT COUNT(*) FROM nomina WHERE trabajador_id = %s", (user_id,)),
+            ('nomina_negocio', "SELECT COUNT(*) FROM nomina WHERE negocio_id = %s", (user_id,)),
+            ('contratos_negocio', "SELECT COUNT(*) FROM contratos WHERE negocio_id = %s", (user_id,)),
+            ('contratos_trabajador', "SELECT COUNT(*) FROM contratos WHERE trabajador_id = %s", (user_id,)),
+            ('productos', "SELECT COUNT(*) FROM productos WHERE negocio_id = %s", (user_id,)),
+            ('productos_tienda', "SELECT COUNT(*) FROM productos_tienda WHERE negocio_id = %s", (user_id,)),
+            ('ventas_negocio', "SELECT COUNT(*) FROM ventas WHERE negocio_id = %s", (user_id,)),
+            ('ventas_trabajador', "SELECT COUNT(*) FROM ventas WHERE trabajador_id = %s", (user_id,)),
+            ('servicios_negocio', "SELECT COUNT(*) FROM servicios WHERE negocio_id = %s", (user_id,)),
+            ('servicios_trabajador', "SELECT COUNT(*) FROM servicios WHERE trabajador_id = %s", (user_id,)),
+            ('logs', "SELECT COUNT(*) FROM logs WHERE usuario_id = %s", (user_id,)),
+            ('codigos_verificacion', "SELECT COUNT(*) FROM codigos_verificacion WHERE usuario_id = %s", (user_id,)),
+            ('facturas_secuencia', "SELECT COUNT(*) FROM facturas_secuencia WHERE negocio_id = %s", (user_id,)),
+        ]
         
-        cursor.execute("SELECT COUNT(*) FROM trabajadores_negocio WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        relaciones['trabajadores_negocio'] = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM contratos WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        relaciones['contratos'] = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM productos WHERE negocio_id = %s", (user_id,))
-        relaciones['productos'] = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        relaciones['ventas'] = cursor.fetchone()[0]
-        
-        cursor.execute("SELECT COUNT(*) FROM logs WHERE usuario_id = %s", (user_id,))
-        relaciones['logs'] = cursor.fetchone()[0]
+        total_registros = 0
+        for nombre, query, params in tablas:
+            cursor.execute(query, params)
+            count = cursor.fetchone()[0]
+            datos['tablas'][nombre] = count
+            total_registros += count
         
         conn.close()
         
+        # Generar HTML
         html = f"""
         <html>
-            <head><title>Test Eliminar Usuario</title></head>
-            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;">
-                <h1 style="color:#6c3ce0;">🧪 Test Eliminar Usuario</h1>
-                <div style="background:#1a1a2e;padding:20px;border-radius:8px;border:1px solid #2a2a3e;">
-                    <p><strong>👤 Usuario:</strong> {user.get('username')} (ID: {user_id})</p>
-                    <p><strong>📋 Rol:</strong> {user.get('rol')}</p>
-                    <p><strong>📌 Tipo:</strong> {user.get('tipo')}</p>
-                    <hr>
-                    <h3>📊 Datos relacionados:</h3>
-                    <ul>
-                        <li>📝 Sesiones: {relaciones['sesiones']}</li>
-                        <li>🔑 Permisos: {relaciones['permisos']}</li>
-                        <li>👥 Trabajadores/Negocio: {relaciones['trabajadores_negocio']}</li>
-                        <li>📄 Contratos: {relaciones['contratos']}</li>
-                        <li>📦 Productos: {relaciones['productos']}</li>
-                        <li>💰 Ventas: {relaciones['ventas']}</li>
-                        <li>📝 Logs: {relaciones['logs']}</li>
-                    </ul>
-                    <hr>
-                    <button onclick="eliminarUsuario({user_id})" style="background:#ff6b6b;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;">🗑️ Eliminar Usuario</button>
-                    <a href="/admin/db" style="color:#6c3ce0;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;text-decoration:none;margin-left:10px;">← Volver</a>
+            <head>
+                <title>Diagnóstico de Usuario</title>
+                <style>
+                    body {{ background: #0f0f1a; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; }}
+                    .container {{ max-width: 800px; margin: 0 auto; }}
+                    .card {{ background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; margin-bottom: 20px; }}
+                    .card h3 {{ color: #aaa; margin-bottom: 10px; }}
+                    .info-row {{ display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #1a1a2e; }}
+                    .info-row .label {{ color: #888; }}
+                    .info-row .value {{ color: #fff; font-weight: 600; }}
+                    .table-row {{ display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #1a1a2e; font-size: 13px; }}
+                    .table-row .name {{ color: #888; }}
+                    .table-row .count {{ color: #6c3ce0; font-weight: 700; }}
+                    .table-row .count.zero {{ color: #666; }}
+                    .btn {{ display: inline-block; padding: 10px 20px; margin: 10px 10px 10px 0; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; transition: all 0.3s; }}
+                    .btn-danger {{ background: #f44336; color: #fff; }}
+                    .btn-danger:hover {{ background: #c62828; }}
+                    .btn-primary {{ background: #6c3ce0; color: #fff; }}
+                    .btn-primary:hover {{ background: #5a2ec0; }}
+                    .btn-secondary {{ background: #2a2a3e; color: #fff; }}
+                    .btn-secondary:hover {{ background: #3a3a4e; }}
+                    .total {{ font-size: 18px; color: #6bff6b; text-align: center; padding: 10px; }}
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <h1 style="color:#6c3ce0;">🔍 Diagnóstico de Usuario</h1>
+                    
+                    <div class="card">
+                        <h3>👤 Información del Usuario</h3>
+                        <div class="info-row">
+                            <span class="label">ID</span>
+                            <span class="value">{user.get('id')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Usuario</span>
+                            <span class="value">{user.get('username')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Email</span>
+                            <span class="value">{user.get('email')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Rol</span>
+                            <span class="value">{user.get('rol')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Tipo</span>
+                            <span class="value">{user.get('tipo')}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Activo</span>
+                            <span class="value">{'✅ Sí' if user.get('activo') == 1 else '❌ No'}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="label">Verificado</span>
+                            <span class="value">{'✅ Sí' if user.get('verificado') == 1 else '❌ No'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>📊 Datos Relacionados</h3>
+        """
+        
+        for nombre, count in datos['tablas'].items():
+            clase = 'zero' if count == 0 else ''
+            html += f"""
+                        <div class="table-row">
+                            <span class="name">{nombre}</span>
+                            <span class="count {clase}">{count}</span>
+                        </div>
+            """
+        
+        html += f"""
+                        <div class="total">📌 Total de registros relacionados: <strong>{total_registros}</strong></div>
+                    </div>
+                    
+                    <div>
+                        <button onclick="eliminarUsuario({user_id})" class="btn btn-danger">🗑️ Eliminar Usuario</button>
+                        <a href="/admin/db" class="btn btn-secondary">← Volver al Gestor DB</a>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 16px; background: #0f0f1a; border-radius: 8px; border: 1px solid #2a2a3e;">
+                        <p style="color: #888; font-size: 12px;">ℹ️ Si el usuario tiene datos relacionados, se eliminarán automáticamente.</p>
+                    </div>
                 </div>
+                
                 <script>
                     function eliminarUsuario(id) {{
-                        if (confirm('¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.')) {{
-                            fetch('/api/usuario/' + id, {{
-                                method: 'DELETE',
-                                headers: {{ 'Content-Type': 'application/json' }}
-                            }})
-                            .then(response => response.json())
-                            .then(data => {{
-                                if (data.success) {{
-                                    alert('✅ ' + data.message);
-                                    window.location.href = '/admin/db';
-                                }} else {{
-                                    alert('❌ ' + data.error);
-                                }}
-                            }})
-                            .catch(error => {{
-                                alert('❌ Error: ' + error);
-                            }});
+                        if (confirm('⚠️ ¿Estás seguro de eliminar este usuario?\\n\\nEsta acción eliminará TODOS sus datos relacionados.\\nNo se puede deshacer.')) {{
+                            if (confirm('⚠️ Confirmación final: ¿Eliminar al usuario "{user.get('username')}"?')) {{
+                                fetch('/api/usuario/' + id, {{
+                                    method: 'DELETE',
+                                    headers: {{ 'Content-Type': 'application/json' }}
+                                }})
+                                .then(response => response.json())
+                                .then(data => {{
+                                    if (data.success) {{
+                                        alert('✅ ' + data.message);
+                                        window.location.href = '/admin/db';
+                                    }} else {{
+                                        alert('❌ ' + data.error);
+                                    }}
+                                }})
+                                .catch(error => {{
+                                    alert('❌ Error de conexión: ' + error);
+                                }});
+                            }}
                         }}
                     }}
                 </script>
             </body>
         </html>
         """
+        
         return html
         
     except Exception as e:
+        import traceback
         return f"""
         <html>
             <head><title>Error</title></head>
             <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;">
                 <h1 style="color:#ff6b6b;">❌ Error</h1>
-                <pre style="background:#1a1a2e;padding:20px;border-radius:8px;border:1px solid #2a2a3e;color:#aaa;">{e}</pre>
+                <pre style="background:#1a1a2e;padding:20px;border-radius:8px;border:1px solid #2a2a3e;color:#aaa;overflow:auto;max-height:400px;">{traceback.format_exc()}</pre>
+                <a href="/admin/db" style="color:#6c3ce0;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;text-decoration:none;">← Volver al Gestor DB</a>
             </body>
         </html>
         """
