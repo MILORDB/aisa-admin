@@ -514,7 +514,7 @@ def obtener_negocios():
     return negocios
 
 def eliminar_usuario(user_id):
-    """Elimina un usuario y todos sus datos relacionados (VERSIÓN FORZADA)"""
+    """Elimina un usuario y todos sus datos relacionados (VERSIÓN SIN PERMISOS ESPECIALES)"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -529,12 +529,7 @@ def eliminar_usuario(user_id):
         print(f"🗑️ Eliminando usuario: {usuario[1]} (ID: {user_id}) - Rol: {usuario[2]}")
         
         # ============================================
-        # DESACTIVAR RESTRICCIONES TEMPORALMENTE
-        # ============================================
-        cursor.execute("SET session_replication_role = 'replica';")
-        
-        # ============================================
-        # ELIMINAR TODOS LOS DATOS RELACIONADOS
+        # ELIMINAR EN ORDEN CORRECTO (SIN DESACTIVAR RESTRICCIONES)
         # ============================================
         
         # 1. Eliminar códigos de verificación
@@ -569,10 +564,12 @@ def eliminar_usuario(user_id):
         cursor.execute("DELETE FROM contratos WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
         print(f"   ✅ Contratos eliminados")
         
-        # 9. Eliminar ventas (primero las que tienen producto_id)
-        cursor.execute("DELETE FROM ventas WHERE producto_id IN (SELECT id FROM productos WHERE negocio_id = %s)", (user_id,))
-        print(f"   ✅ Ventas por productos eliminadas")
+        # 9. ELIMINAR VENTAS (PRIMERO LAS QUE TIENEN PRODUCTO_ID)
+        # Primero, actualizar ventas para quitar la referencia al producto
+        cursor.execute("UPDATE ventas SET producto_id = NULL WHERE producto_id IN (SELECT id FROM productos WHERE negocio_id = %s)", (user_id,))
+        print(f"   ✅ Referencias a productos en ventas actualizadas")
         
+        # Eliminar ventas del negocio
         cursor.execute("DELETE FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
         print(f"   ✅ Ventas del usuario eliminadas")
         
@@ -600,11 +597,6 @@ def eliminar_usuario(user_id):
         cursor.execute("DELETE FROM usuarios WHERE id = %s", (user_id,))
         print(f"   ✅ Usuario eliminado")
         
-        # ============================================
-        # REACTIVAR RESTRICCIONES
-        # ============================================
-        cursor.execute("SET session_replication_role = 'origin';")
-        
         conn.commit()
         conn.close()
         print(f"✅ Usuario {usuario[1]} (ID: {user_id}) eliminado correctamente")
@@ -612,12 +604,6 @@ def eliminar_usuario(user_id):
         
     except psycopg2.Error as e:
         print(f"❌ Error SQL eliminando usuario {user_id}: {e}")
-        # Intentar reactivar restricciones
-        try:
-            cursor.execute("SET session_replication_role = 'origin';")
-            conn.commit()
-        except:
-            pass
         conn.rollback()
         conn.close()
         return False
