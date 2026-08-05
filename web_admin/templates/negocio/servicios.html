@@ -145,7 +145,7 @@
         </div>
 
         <div id="formServicio" style="display:none;border-top:1px solid #2a2a3e;padding-top:12px;margin-top:8px;">
-            <h3 style="font-size:14px;margin-bottom:8px;">Nuevo Servicio</h3>
+            <h3 style="font-size:14px;margin-bottom:8px;" id="formTitle">📋 Nuevo Servicio</h3>
             <div class="form-row">
                 <input type="text" id="serNombre" placeholder="Nombre">
                 <select id="serCategoria">
@@ -172,7 +172,7 @@
                 <textarea id="serDescripcion" placeholder="Descripción" rows="2"></textarea>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button class="btn btn-success" onclick="guardarServicio()">💾 Guardar</button>
+                <button class="btn btn-success" onclick="guardarServicio()" id="btnGuardar">💾 Guardar</button>
                 <button class="btn btn-danger" onclick="cancelarFormulario()">✕ Cancelar</button>
             </div>
         </div>
@@ -188,6 +188,7 @@
 
     <script>
         let servicios = [];
+        let editandoId = null;
 
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
@@ -286,6 +287,10 @@
         function mostrarFormulario() {
             document.getElementById('formServicio').style.display = 'block';
             document.getElementById('serNombre').focus();
+            editandoId = null;
+            document.getElementById('formTitle').textContent = '📋 Nuevo Servicio';
+            document.getElementById('btnGuardar').textContent = '💾 Guardar';
+            document.getElementById('btnGuardar').className = 'btn btn-success';
             document.getElementById('serNombre').value = '';
             document.getElementById('serCategoria').value = '';
             document.getElementById('serPrecio').value = '';
@@ -296,6 +301,27 @@
 
         function cancelarFormulario() {
             document.getElementById('formServicio').style.display = 'none';
+            editandoId = null;
+        }
+
+        function editarServicio(id) {
+            const s = servicios.find(s => s.id === id);
+            if (!s) return;
+            
+            document.getElementById('formServicio').style.display = 'block';
+            document.getElementById('serNombre').value = s.nombre;
+            document.getElementById('serCategoria').value = s.categoria || '';
+            document.getElementById('serPrecio').value = s.precio;
+            document.getElementById('serDuracion').value = s.duracion || 60;
+            document.getElementById('serDescripcion').value = s.descripcion || '';
+            document.getElementById('serEstado').value = s.activo ? '1' : '0';
+            
+            editandoId = id;
+            document.getElementById('formTitle').textContent = '✏️ Editar Servicio';
+            document.getElementById('btnGuardar').textContent = '💾 Actualizar';
+            document.getElementById('btnGuardar').className = 'btn btn-warning';
+            
+            document.getElementById('formServicio').scrollIntoView({ behavior: 'smooth' });
         }
 
         async function guardarServicio() {
@@ -312,16 +338,24 @@
             }
 
             const data = { nombre, categoria, precio, duracion, activo, descripcion };
+            
+            const btn = document.getElementById('btnGuardar');
+            const textoOriginal = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Guardando...';
 
             try {
-                const response = await fetch('/api/servicios', {
-                    method: 'POST',
+                const url = editandoId ? `/api/servicio/${editandoId}` : '/api/servicios';
+                const method = editandoId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
                 const result = await response.json();
                 if (result.success) {
-                    mostrarMensaje(`✅ "${nombre}" agregado`, 'exito');
+                    mostrarMensaje(`✅ "${nombre}" ${editandoId ? 'actualizado' : 'agregado'}`, 'exito');
                     cancelarFormulario();
                     await cargarServicios();
                 } else {
@@ -330,6 +364,9 @@
             } catch (error) {
                 console.error('Error:', error);
                 mostrarMensaje('Error de conexión', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = textoOriginal;
             }
         }
 
