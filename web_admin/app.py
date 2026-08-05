@@ -124,71 +124,6 @@ def add_header(response):
     return response
 
 # ============================================
-# FUNCIÓN PARA ENVIAR CORREOS DE VERIFICACIÓN (ASÍNCRONA)
-# ============================================
-
-def enviar_correo_verificacion(email, username, codigo):
-    """Envía un correo con el código de verificación"""
-    try:
-        smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-        smtp_port = int(os.environ.get('SMTP_PORT', 587))
-        smtp_user = os.environ.get('SMTP_USER', '')
-        smtp_password = os.environ.get('SMTP_PASSWORD', '')
-        
-        if not smtp_user or not smtp_password:
-            print("⚠️ SMTP_USER o SMTP_PASSWORD no configurados")
-            return False
-        
-        msg = MIMEMultipart()
-        msg['From'] = smtp_user
-        msg['To'] = email
-        msg['Subject'] = "🔐 Código de verificación - AIsa"
-        
-        body = f"""
-        <html>
-        <body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #0f0f1a; color: #fff; padding: 40px; text-align: center;">
-            <div style="max-width: 500px; margin: 0 auto; background: #1a1a2e; border-radius: 12px; padding: 30px; border: 1px solid #2a2a3e;">
-                <h1 style="color: #6c3ce0; font-size: 24px;">🤖 AIsa</h1>
-                <p style="color: #aaa; font-size: 14px;">Hola <strong style="color: #6c3ce0;">{username}</strong>,</p>
-                <p style="color: #aaa; font-size: 14px;">Gracias por registrarte en AIsa. Para activar tu cuenta, ingresa el siguiente código:</p>
-                
-                <div style="background: #0f0f1a; border-radius: 8px; padding: 20px; margin: 20px 0; border: 2px solid #6c3ce0;">
-                    <span style="font-size: 36px; font-weight: 700; color: #6c3ce0; letter-spacing: 8px;">{codigo}</span>
-                </div>
-                
-                <p style="color: #666; font-size: 12px;">Este código expirará en 15 minutos.</p>
-                <p style="color: #666; font-size: 12px;">Si no solicitaste este registro, ignora este mensaje.</p>
-                
-                <hr style="border-color: #2a2a3e; margin: 20px 0;">
-                <p style="color: #444; font-size: 11px;">© 2024 AIsa - Sistema de Gestión Empresarial</p>
-            </div>
-        </body>
-        </html>
-        """
-        
-        msg.attach(MIMEText(body, 'html'))
-        
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, email, msg.as_string())
-        server.quit()
-        
-        print(f"✅ Correo de verificación enviado a {email}")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Error enviando correo: {e}")
-        return False
-
-def enviar_correo_async(email, username, codigo):
-    """Envía correo en segundo plano para no bloquear la respuesta"""
-    try:
-        enviar_correo_verificacion(email, username, codigo)
-    except Exception as e:
-        print(f"❌ Error enviando correo en background: {e}")
-
-# ============================================
 # DECORADORES
 # ============================================
 def login_required(f):
@@ -1705,148 +1640,6 @@ def fix_modulos_endpoint():
         """, 500
 
 # ============================================
-# ENDPOINTS DE PRUEBA SMTP
-# ============================================
-
-@app.route('/test-smtp', methods=['GET'])
-@admin_required
-def test_smtp():
-    """Endpoint para probar la conexión SMTP"""
-    try:
-        import smtplib
-        
-        smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-        smtp_port = int(os.environ.get('SMTP_PORT', 587))
-        smtp_user = os.environ.get('SMTP_USER', '')
-        smtp_password = os.environ.get('SMTP_PASSWORD', '')
-        
-        resultados = []
-        
-        # Verificar configuración
-        resultados.append(f"📧 SMTP Server: {smtp_server}")
-        resultados.append(f"🔌 SMTP Port: {smtp_port}")
-        resultados.append(f"👤 SMTP User: {smtp_user}")
-        resultados.append(f"🔑 SMTP Password: {'✅ Configurada' if smtp_password else '❌ NO CONFIGURADA'}")
-        
-        if not smtp_user or not smtp_password:
-            resultados.append("❌ SMTP_USER o SMTP_PASSWORD no están configurados")
-            return jsonify({
-                'success': False,
-                'message': 'SMTP no configurado',
-                'detalles': resultados
-            }), 400
-        
-        # Probar conexión
-        resultados.append("🔄 Conectando al servidor SMTP...")
-        
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.set_debuglevel(1)
-        resultados.append("✅ Conexión establecida")
-        
-        server.starttls()
-        resultados.append("✅ TLS iniciado")
-        
-        server.login(smtp_user, smtp_password)
-        resultados.append("✅ Autenticación exitosa")
-        
-        server.quit()
-        resultados.append("✅ Conexión cerrada")
-        
-        return jsonify({
-            'success': True,
-            'message': 'SMTP configurado correctamente',
-            'detalles': resultados
-        })
-        
-    except smtplib.SMTPAuthenticationError as e:
-        resultados.append(f"❌ Error de autenticación: {e}")
-        return jsonify({
-            'success': False,
-            'message': 'Error de autenticación SMTP. Verifica usuario y contraseña.',
-            'detalles': resultados
-        }), 401
-    except smtplib.SMTPException as e:
-        resultados.append(f"❌ Error SMTP: {e}")
-        return jsonify({
-            'success': False,
-            'message': f'Error SMTP: {str(e)}',
-            'detalles': resultados
-        }), 500
-    except Exception as e:
-        resultados.append(f"❌ Error: {e}")
-        return jsonify({
-            'success': False,
-            'message': str(e),
-            'detalles': resultados
-        }), 500
-
-@app.route('/test-email', methods=['GET'])
-@admin_required
-def test_email():
-    """Envía un correo de prueba"""
-    try:
-        smtp_user = os.environ.get('SMTP_USER', '')
-        if not smtp_user:
-            return jsonify({
-                'success': False,
-                'error': 'SMTP_USER no configurado'
-            }), 400
-        
-        # Enviar correo de prueba
-        msg = MIMEMultipart()
-        msg['From'] = smtp_user
-        msg['To'] = smtp_user
-        msg['Subject'] = "🧪 Prueba SMTP - AIsa"
-        
-        body = f"""
-        <html>
-        <body style="font-family: 'Segoe UI', Arial, sans-serif; background-color: #0f0f1a; color: #fff; padding: 40px; text-align: center;">
-            <div style="max-width: 500px; margin: 0 auto; background: #1a1a2e; border-radius: 12px; padding: 30px; border: 1px solid #2a2a3e;">
-                <h1 style="color: #6c3ce0; font-size: 24px;">🤖 AIsa</h1>
-                <p style="color: #aaa; font-size: 14px;">✅ Este es un correo de prueba</p>
-                <p style="color: #888; font-size: 12px;">La configuración SMTP está funcionando correctamente.</p>
-                <p style="color: #666; font-size: 11px;">Enviado: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
-            </div>
-        </body>
-        </html>
-        """
-        
-        msg.attach(MIMEText(body, 'html'))
-        
-        smtp_server = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
-        smtp_port = int(os.environ.get('SMTP_PORT', 587))
-        smtp_password = os.environ.get('SMTP_PASSWORD', '')
-        
-        if not smtp_password:
-            return jsonify({
-                'success': False,
-                'error': 'SMTP_PASSWORD no configurado'
-            }), 400
-        
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_password)
-        server.sendmail(smtp_user, smtp_user, msg.as_string())
-        server.quit()
-        
-        return jsonify({
-            'success': True,
-            'message': f'Correo de prueba enviado a {smtp_user}',
-            'details': {
-                'to': smtp_user,
-                'from': smtp_user,
-                'server': smtp_server,
-                'port': smtp_port
-            }
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-# ============================================
 # RUTAS PRINCIPALES
 # ============================================
 
@@ -1892,14 +1685,8 @@ def login():
         if not verify_password(password, usuario.get('password_hash')):
             return jsonify({'error': 'Usuario o contraseña incorrectos'}), 401
         
-        # Verificar si la cuenta está verificada (excepto admin y trabajador)
-        if usuario.get('verificado') != 1 and usuario.get('rol') != 'admin' and usuario.get('rol') != 'trabajador':
-            return jsonify({
-                'error': 'Cuenta no verificada. Revisa tu correo para activar la cuenta.',
-                'requires_verification': True,
-                'email': usuario.get('email'),
-                'user_id': usuario.get('id')
-            }), 401
+        # NOTA: La verificación de cuenta ha sido desactivada
+        # Los usuarios se registran y activan automáticamente
         
         token = crear_sesion(usuario.get('id'))
         actualizar_ultimo_acceso(usuario.get('id'))
@@ -1956,44 +1743,18 @@ def register():
         if not user_id:
             return jsonify({'error': 'Error al crear el usuario'}), 500
         
-        # Para trabajadores y admin, activar automáticamente
-        if rol == 'trabajador':
-            marcar_usuario_verificado(user_id)
-            registrar_log(user_id, 'registro_trabajador', f'Trabajador registrado: {username}')
-            return jsonify({
-                'success': True,
-                'message': 'Trabajador registrado correctamente',
-                'user_id': user_id,
-                'verificado': True
-            })
+        # ============================================
+        # ACTIVAR CUENTA AUTOMÁTICAMENTE (SIN VERIFICACIÓN)
+        # ============================================
+        marcar_usuario_verificado(user_id)
         
-        if rol == 'admin':
-            marcar_usuario_verificado(user_id)
-            registrar_log(user_id, 'registro_admin', f'Admin registrado: {username}')
-            return jsonify({
-                'success': True,
-                'message': 'Administrador registrado correctamente',
-                'user_id': user_id,
-                'verificado': True
-            })
-        
-        # Para clientes y negocios, generar código de verificación (ENVIAR EN BACKGROUND)
-        codigo = generar_codigo_verificacion()
-        guardar_codigo_verificacion(user_id, email, codigo)
-        
-        # Enviar correo en segundo plano para no bloquear
-        threading.Thread(target=enviar_correo_async, args=(email, username, codigo)).start()
-        
-        registrar_log(user_id, 'registro_pendiente', f'Usuario registrado pendiente de verificación: {username}')
+        registrar_log(user_id, 'registro', f'Usuario registrado: {username} (tipo: {tipo})')
         
         return jsonify({
             'success': True,
-            'message': 'Usuario registrado correctamente. Revisa tu correo para activar la cuenta.',
+            'message': 'Usuario registrado correctamente',
             'user_id': user_id,
-            'verificado': False,
-            'email': email,
-            'requires_verification': True,
-            'redirect_url': f'/verificar?email={email}&user_id={user_id}'
+            'verificado': True
         })
         
     except Exception as e:
@@ -2003,14 +1764,9 @@ def register():
 
 @app.route('/verificar')
 def verificar():
-    """Página de verificación de código"""
-    email = request.args.get('email')
-    user_id = request.args.get('user_id')
-    
-    if not email or not user_id:
-        return redirect(url_for('login'))
-    
-    return render_template('verificar.html', email=email, user_id=user_id)
+    """Página de verificación de código (desactivada)"""
+    # Redirigir al login si alguien intenta acceder
+    return redirect(url_for('login'))
 
 @app.route('/dashboard')
 @login_required
@@ -2139,133 +1895,582 @@ def negocio_mapa():
     return render_template('negocio/mapa.html', usuario=usuario, version=int(time.time()))
 
 # ============================================
-# API - INSTALADOR
-# ============================================
-
-@app.route('/instalar')
-def instalar_page():
-    """Página de instalación"""
-    return render_template('instalar.html')
-
-@app.route('/api/instalar/tablas', methods=['POST'])
-def api_instalar_tablas():
-    """Crea todas las tablas de la base de datos"""
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        log_messages = []
-        
-        # Crear todas las tablas (el mismo código que antes)
-        # ... (código completo de creación de tablas)
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Tablas creadas correctamente',
-            'detalles': log_messages
-        })
-        
-    except Exception as e:
-        print(f"❌ Error creando tablas: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/instalar/admin', methods=['POST'])
-def api_instalar_admin():
-    """Crea el usuario admin"""
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        # Verificar si admin ya existe
-        cursor.execute("SELECT id FROM usuarios WHERE username = 'admin'")
-        if cursor.fetchone():
-            return jsonify({
-                'success': True,
-                'message': 'El usuario admin ya existe'
-            })
-        
-        # Crear admin con contraseña admin123
-        password_hash = hash_password('admin123')
-        fecha = datetime.now().isoformat()
-        
-        cursor.execute('''
-            INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado, verificado)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1, 1)
-            RETURNING id
-        ''', ('admin', 'admin@aisa.com', password_hash, 'Administrador', 'admin', 'admin', fecha))
-        
-        admin_id = cursor.fetchone()[0]
-        
-        # Asignar todos los módulos al admin
-        cursor.execute("SELECT id FROM modulos")
-        for mod in cursor.fetchall():
-            cursor.execute('''
-                INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
-                VALUES (%s, %s, 1, 'aprobado')
-                ON CONFLICT (usuario_id, modulo_id) DO NOTHING
-            ''', (admin_id, mod[0]))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Usuario admin creado correctamente (admin/admin123)',
-            'admin_id': admin_id
-        })
-        
-    except Exception as e:
-        print(f"❌ Error creando admin: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/instalar/verificar', methods=['GET'])
-def api_instalar_verificar():
-    """Verifica el estado de la base de datos"""
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        # Contar tablas
-        cursor.execute("""
-            SELECT COUNT(*) FROM information_schema.tables 
-            WHERE table_schema = 'public'
-        """)
-        tablas = cursor.fetchone()[0]
-        
-        # Verificar admin
-        cursor.execute("SELECT username FROM usuarios WHERE username = 'admin'")
-        admin = cursor.fetchone()
-        admin_nombre = admin[0] if admin else None
-        
-        # Contar módulos
-        cursor.execute("SELECT COUNT(*) FROM modulos")
-        modulos = cursor.fetchone()[0]
-        
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'tablas': tablas,
-            'admin': admin_nombre,
-            'modulos': modulos,
-            'lista': tablas > 0 and admin_nombre and modulos > 0
-        })
-        
-    except Exception as e:
-        print(f"❌ Error verificando: {e}")
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
 # API - PERFIL DE USUARIO
 # ============================================
-# (El resto de los endpoints ya están en tu código)
-# Incluye todos los endpoints de productos, ventas, servicios, contratos, nómina, etc.
-# ... (todo el código que ya tenías)
+@app.route('/api/usuario/perfil', methods=['GET'])
+@login_required
+def api_obtener_perfil_usuario():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    datos_negocio = {}
+    if usuario.get('datos_negocio'):
+        try:
+            datos_negocio = json.loads(usuario['datos_negocio']) if isinstance(usuario['datos_negocio'], str) else usuario['datos_negocio']
+        except:
+            datos_negocio = {}
+    
+    return jsonify({
+        'success': True,
+        'usuario': {
+            'id': usuario.get('id'),
+            'username': usuario.get('username'),
+            'email': usuario.get('email'),
+            'nombre': usuario.get('nombre'),
+            'rol': usuario.get('rol'),
+            'tipo': usuario.get('tipo'),
+            'fecha_registro': usuario.get('fecha_registro'),
+            'telefono': datos_negocio.get('telefono', ''),
+            'provincia': datos_negocio.get('provincia', ''),
+            'municipio': datos_negocio.get('municipio', ''),
+            'direccion': datos_negocio.get('direccion', ''),
+            'nombre_negocio': datos_negocio.get('nombre_negocio', ''),
+            'ruc': datos_negocio.get('ruc', ''),
+            'descripcion': datos_negocio.get('descripcion', ''),
+            'salario': datos_negocio.get('salario', 0)
+        }
+    })
+
+@app.route('/api/usuario/perfil', methods=['PUT'])
+@login_required
+def api_actualizar_perfil_usuario():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    
+    nombre = data.get('nombre')
+    email = data.get('email')
+    telefono = data.get('telefono')
+    provincia = data.get('provincia')
+    municipio = data.get('municipio')
+    direccion = data.get('direccion')
+    nombre_negocio = data.get('nombre_negocio')
+    ruc = data.get('ruc')
+    descripcion = data.get('descripcion')
+    salario = data.get('salario', 0)
+    
+    if not nombre:
+        return jsonify({'error': 'El nombre es obligatorio'}), 400
+    
+    if not telefono:
+        return jsonify({'error': 'El teléfono es obligatorio'}), 400
+    
+    if not provincia or not municipio:
+        return jsonify({'error': 'Provincia y municipio son obligatorios'}), 400
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
+    result = cursor.fetchone()
+    
+    datos_negocio = {}
+    if result and result[0]:
+        try:
+            datos_negocio = json.loads(result[0]) if isinstance(result[0], str) else result[0]
+        except:
+            datos_negocio = {}
+    
+    datos_negocio.update({
+        'telefono': telefono,
+        'provincia': provincia,
+        'municipio': municipio,
+        'direccion': direccion or '',
+        'salario': salario
+    })
+    
+    if usuario.get('tipo') == 'negocio':
+        datos_negocio.update({
+            'nombre_negocio': nombre_negocio or datos_negocio.get('nombre_negocio', ''),
+            'ruc': ruc or datos_negocio.get('ruc', ''),
+            'descripcion': descripcion or datos_negocio.get('descripcion', '')
+        })
+    
+    cursor.execute('''
+        UPDATE usuarios 
+        SET nombre = %s, email = %s, datos_negocio = %s
+        WHERE id = %s
+    ''', (nombre, email, json.dumps(datos_negocio, ensure_ascii=False), usuario['id']))
+    
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'perfil_actualizado', 'Perfil de usuario actualizado')
+    
+    return jsonify({
+        'success': True,
+        'message': 'Perfil actualizado correctamente'
+    })
+
+@app.route('/api/usuario/ubicacion', methods=['GET'])
+@login_required
+def api_obtener_ubicacion_usuario():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    datos = obtener_datos_negocio(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'provincia': datos.get('provincia', ''),
+        'municipio': datos.get('municipio', ''),
+        'tiene_ubicacion': bool(datos.get('provincia') and datos.get('municipio'))
+    })
+
+@app.route('/api/perfil')
+@admin_required
+def api_perfil():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return jsonify({
+        'success': True,
+        'usuario': {
+            'id': usuario.get('id'),
+            'username': usuario.get('username'),
+            'email': usuario.get('email'),
+            'nombre': usuario.get('nombre'),
+            'rol': usuario.get('rol'),
+            'fecha_registro': usuario.get('fecha_registro')
+        }
+    })
+
+@app.route('/api/perfil/password', methods=['POST'])
+@admin_required
+def api_perfil_password():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    data = request.get_json()
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    
+    if not current_password or not new_password:
+        return jsonify({'error': 'Todos los campos son requeridos'}), 400
+    
+    if len(new_password) < 6:
+        return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
+    
+    if not verify_password(current_password, usuario.get('password_hash')):
+        return jsonify({'error': 'Contraseña actual incorrecta'}), 401
+    
+    new_hash = hash_password(new_password)
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE usuarios SET password_hash = %s WHERE id = %s', (new_hash, usuario['id']))
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'cambio_password', 'Contraseña actualizada')
+    
+    return jsonify({'success': True, 'message': 'Contraseña actualizada correctamente'})
+
+# ============================================
+# API - ESTADÍSTICAS
+# ============================================
+@app.route('/api/estadisticas')
+@admin_required
+def api_estadisticas():
+    usuarios = obtener_todos_usuarios()
+    logs = obtener_logs(100)
+    
+    total = len(usuarios)
+    activos = len([u for u in usuarios if u.get('activo') == 1])
+    trabajadores = len([u for u in usuarios if u.get('rol') == 'trabajador'])
+    
+    hoy = datetime.now().date()
+    registros_hoy = 0
+    for l in logs:
+        try:
+            if datetime.fromisoformat(l.get('fecha', '')).date() == hoy:
+                registros_hoy += 1
+        except:
+            pass
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM productos')
+    total_productos = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM ventas')
+    total_ventas = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM servicios')
+    total_servicios = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM contratos')
+    total_contratos = cursor.fetchone()[0]
+    conn.close()
+    
+    return jsonify({
+        'total_usuarios': total,
+        'usuarios_activos': activos,
+        'total_trabajadores': trabajadores,
+        'registros_hoy': registros_hoy,
+        'total_logs': len(logs),
+        'total_productos': total_productos,
+        'total_ventas': total_ventas,
+        'total_servicios': total_servicios,
+        'total_contratos': total_contratos
+    })
+
+# ============================================
+# API - USUARIOS
+# ============================================
+@app.route('/api/usuarios')
+@admin_required
+def api_usuarios():
+    usuarios = obtener_todos_usuarios()
+    return jsonify([dict(u) for u in usuarios])
+
+@app.route('/api/usuario/<int:user_id>')
+@admin_required
+def api_usuario(user_id):
+    usuario = obtener_usuario_por_id(user_id)
+    if not usuario:
+        return jsonify({'error': 'Usuario no encontrado'}), 404
+    
+    permisos = obtener_permisos_usuario(user_id)
+    return jsonify({
+        'usuario': dict(usuario),
+        'permisos': [dict(p) for p in permisos]
+    })
+
+@app.route('/api/usuario/<int:user_id>/toggle', methods=['POST'])
+@admin_required
+def api_toggle_usuario(user_id):
+    data = request.get_json()
+    activo = data.get('activo', 1)
+    toggle_usuario(user_id, activo)
+    registrar_log(None, 'usuario_toggle', f'Usuario {user_id} activo={activo}')
+    return jsonify({'success': True})
+
+@app.route('/api/usuario/<int:user_id>/rol', methods=['POST'])
+@admin_required
+def api_actualizar_rol(user_id):
+    data = request.get_json()
+    rol = data.get('rol', 'usuario')
+    if rol not in ['usuario', 'admin', 'trabajador']:
+        return jsonify({'error': 'Rol inválido'}), 400
+    actualizar_rol_usuario(user_id, rol)
+    registrar_log(None, 'usuario_rol', f'Usuario {user_id} rol={rol}')
+    return jsonify({'success': True})
+
+@app.route('/api/usuario/<int:user_id>/tipo', methods=['POST'])
+@admin_required
+def api_actualizar_tipo(user_id):
+    data = request.get_json()
+    tipo = data.get('tipo', 'cliente')
+    if tipo not in ['cliente', 'negocio']:
+        return jsonify({'error': 'Tipo inválido'}), 400
+    actualizar_tipo_usuario(user_id, tipo)
+    registrar_log(None, 'usuario_tipo', f'Usuario {user_id} tipo={tipo}')
+    return jsonify({'success': True})
+
+# NOTA: El endpoint DELETE de usuarios ha sido eliminado por seguridad
+
+@app.route('/api/usuario/<int:user_id>/permisos')
+@login_required
+def api_permisos_usuario(user_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    if not usuario or (usuario.get('id') != user_id and usuario.get('rol') != 'admin'):
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    permisos = obtener_permisos_usuario(user_id)
+    return jsonify([dict(p) for p in permisos])
+
+@app.route('/api/usuario/<int:user_id>/permiso/<int:modulo_id>', methods=['POST'])
+@admin_required
+def api_asignar_permiso(user_id, modulo_id):
+    data = request.get_json()
+    activo = data.get('activo', 1)
+    asignar_permiso_usuario(user_id, modulo_id, activo)
+    registrar_log(None, 'permiso_usuario', f'Usuario {user_id} módulo {modulo_id} activo={activo}')
+    return jsonify({'success': True})
+
+# ============================================
+# API - MÓDULOS (GLOBAL)
+# ============================================
+@app.route('/api/modulo/<int:modulo_id>/toggle', methods=['POST'])
+@admin_required
+def api_toggle_modulo_global(modulo_id):
+    try:
+        data = request.get_json()
+        activo = data.get('activo', 1)
+        exito = toggle_modulo_global(modulo_id, activo)
+        if exito:
+            registrar_log(None, 'modulo_global', f'Módulo {modulo_id} activo={activo}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al actualizar el módulo'}), 500
+    except Exception as e:
+        print(f"❌ Error en toggle_modulo_global: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/modulos')
+@login_required
+def api_modulos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        if usuario.get('rol') == 'admin':
+            modulos = obtener_modulos()
+        else:
+            tipo_usuario = usuario.get('tipo') if usuario else 'cliente'
+            modulos = obtener_modulos(tipo_usuario)
+        
+        resultado = []
+        for m in modulos:
+            resultado.append({
+                'id': m.get('id'),
+                'nombre': m.get('nombre'),
+                'descripcion': m.get('descripcion'),
+                'activo_global': m.get('activo_global'),
+                'tipo_requerido': m.get('tipo_requerido')
+            })
+        
+        return jsonify(resultado)
+    except Exception as e:
+        print(f"❌ Error en api_modulos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - NEGOCIOS
+# ============================================
+@app.route('/api/negocios')
+@admin_required
+def api_negocios():
+    negocios = obtener_negocios()
+    return jsonify([dict(n) for n in negocios])
+
+@app.route('/api/negocios/cercanos', methods=['GET'])
+@login_required
+def api_negocios_cercanos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        datos_usuario = obtener_datos_negocio(usuario['id'])
+        provincia = datos_usuario.get('provincia')
+        municipio = datos_usuario.get('municipio')
+        
+        if not provincia or not municipio:
+            return jsonify({
+                'success': True,
+                'negocios': [],
+                'message': 'Actualiza tu ubicación en el perfil para ver negocios cercanos'
+            })
+        
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute('''
+            SELECT id, username, nombre, datos_negocio, activo, fecha_registro
+            FROM usuarios 
+            WHERE tipo = 'negocio' 
+            AND activo = 1
+            AND datos_negocio IS NOT NULL
+            AND datos_negocio LIKE %s
+            AND datos_negocio LIKE %s
+            ORDER BY id DESC
+        ''', (f'%"provincia": "{provincia}"%', f'%"municipio": "{municipio}"%'))
+        
+        negocios = cursor.fetchall()
+        conn.close()
+        
+        resultado = []
+        for n in negocios:
+            datos = {}
+            if n.get('datos_negocio'):
+                try:
+                    datos = json.loads(n['datos_negocio']) if isinstance(n['datos_negocio'], str) else n['datos_negocio']
+                except:
+                    pass
+            
+            resultado.append({
+                'id': n.get('id'),
+                'username': n.get('username'),
+                'nombre': n.get('nombre') or datos.get('nombre_negocio', n.get('username')),
+                'telefono': datos.get('telefono', ''),
+                'direccion': datos.get('direccion', ''),
+                'descripcion': datos.get('descripcion', ''),
+                'activo': n.get('activo')
+            })
+        
+        return jsonify({
+            'success': True,
+            'negocios': resultado,
+            'provincia': provincia,
+            'municipio': municipio,
+            'total': len(resultado)
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_negocios_cercanos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - NEGOCIOS CON UBICACIÓN PARA MAPA
+# ============================================
+@app.route('/api/negocios/mapa', methods=['GET'])
+@login_required
+def api_negocios_mapa():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    negocio_id = None
+    if usuario.get('rol') == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+    
+    if usuario.get('tipo') == 'negocio':
+        negocios = obtener_negocios_con_ubicacion(usuario['id'])
+    else:
+        negocios = obtener_negocios_con_ubicacion()
+    
+    return jsonify({
+        'success': True,
+        'negocios': negocios
+    })
+
+# ============================================
+# API - UBICACIÓN
+# ============================================
+@app.route('/api/ubicacion/actualizar', methods=['POST'])
+@login_required
+def api_actualizar_ubicacion():
+    try:
+        token = request.cookies.get('token')
+        usuario = obtener_usuario_sesion(token)
+        
+        if not usuario:
+            return jsonify({'error': 'No autorizado'}), 401
+        
+        data = request.get_json()
+        latitud = data.get('latitud')
+        longitud = data.get('longitud')
+        
+        if latitud is None or longitud is None:
+            return jsonify({'error': 'Latitud y longitud son requeridas'}), 400
+        
+        try:
+            latitud = float(latitud)
+            longitud = float(longitud)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Coordenadas inválidas'}), 400
+        
+        if not (-90 <= latitud <= 90) or not (-180 <= longitud <= 180):
+            return jsonify({'error': 'Coordenadas fuera de rango'}), 400
+        
+        exito = actualizar_ubicacion_usuario(usuario['id'], latitud, longitud)
+        
+        if exito:
+            registrar_log(usuario['id'], 'ubicacion_actualizada', f'Lat: {latitud}, Lng: {longitud}')
+            return jsonify({'success': True, 'message': 'Ubicación actualizada correctamente'})
+        else:
+            return jsonify({'error': 'Error al actualizar la ubicación'}), 500
+            
+    except Exception as e:
+        print(f"❌ Error en api_actualizar_ubicacion: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ubicacion/obtener', methods=['GET'])
+@login_required
+def api_obtener_ubicacion():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    ubicacion = obtener_ubicacion_usuario(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'ubicacion': {
+            'latitud': ubicacion.get('latitud') if ubicacion else None,
+            'longitud': ubicacion.get('longitud') if ubicacion else None,
+            'actualizada': ubicacion.get('ubicacion_actualizada') if ubicacion else None,
+            'tiene_ubicacion': ubicacion and ubicacion.get('latitud') is not None
+        }
+    })
+
+# ============================================
+# API - SQL QUERY
+# ============================================
+@app.route('/api/sql', methods=['POST'])
+@admin_required
+def api_sql():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    
+    if not query:
+        return jsonify({'error': 'La consulta SQL está vacía'}), 400
+    
+    if not query.lower().startswith('select'):
+        return jsonify({'error': 'Solo se permiten consultas SELECT'}), 403
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(query)
+        
+        column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
+        conn.close()
+        
+        result = []
+        for row in rows:
+            result.append(dict(zip(column_names, row)))
+        
+        return jsonify({'result': result})
+    except psycopg2.Error as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - VERIFICAR USUARIO (DEBUG)
+# ============================================
+@app.route('/api/verificar-usuario/<username>', methods=['GET'])
+@admin_required
+def verificar_usuario(username):
+    usuario = obtener_usuario_por_username(username)
+    if usuario:
+        return jsonify({
+            'exists': True,
+            'usuario': {
+                'id': usuario.get('id'),
+                'username': usuario.get('username'),
+                'email': usuario.get('email'),
+                'tipo': usuario.get('tipo'),
+                'rol': usuario.get('rol'),
+                'verificado': usuario.get('verificado')
+            }
+        })
+    return jsonify({'exists': False, 'message': 'Usuario no encontrado'})
 
 # ============================================
 # INICIO DE LA APLICACIÓN
