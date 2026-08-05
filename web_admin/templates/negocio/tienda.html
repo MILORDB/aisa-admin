@@ -279,8 +279,8 @@
                         <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
                         <div class="stock ${stockClass}">${stockText}</div>
                         <div class="acciones">
-                            <button class="btn btn-warning btn-sm" onclick="toggleDestacado(${p.id}, ${p.destacado ? 0 : 1})">${p.destacado ? '⭐' : '☆'}</button>
-                            <button class="btn btn-danger btn-sm" onclick="eliminarDeTienda(${p.id})">🗑️</button>
+                            <button class="btn btn-warning btn-sm" onclick="toggleDestacado(${p.tienda_id || p.id}, ${p.destacado ? 0 : 1})">${p.destacado ? '⭐' : '☆'}</button>
+                            <button class="btn btn-danger btn-sm" onclick="eliminarDeTienda(${p.tienda_id || p.id})">🗑️</button>
                         </div>
                     </div>
                 `;
@@ -311,7 +311,7 @@
                 if (!response.ok) throw new Error('Error');
                 const productos = await response.json();
                 
-                const idsEnTienda = productosTienda.map(p => p.producto_id);
+                const idsEnTienda = productosTienda.map(p => p.producto_id || p.id);
                 productosDisponibles = productos.filter(p => !idsEnTienda.includes(p.id));
                 
                 const select = document.getElementById('selectProducto');
