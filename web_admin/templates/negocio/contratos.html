@@ -67,23 +67,6 @@
             border-color: #6c3ce0; outline: none;
         }
         .form-row label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
-        .form-row .campo-obligatorio label::after { content: " *"; color: #ff6b6b; }
-        .form-row .duracion-selector { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-        .form-row .duracion-selector select { flex: 0 0 70px; min-width: 70px; }
-        .form-row .duracion-selector span { color: #888; font-size: 12px; }
-        .form-row .numero-contrato {
-            background: #0a0a14; color: #6c3ce0; font-weight: 700; font-size: 16px;
-            text-align: center; border: 2px solid #6c3ce0;
-        }
-        .form-row .tipo-option { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
-        .form-row .tipo-option label {
-            display: flex; align-items: center; gap: 4px; font-size: 12px;
-            cursor: pointer; padding: 4px 10px; border-radius: 6px;
-            border: 1px solid #2a2a3e; transition: all 0.3s;
-        }
-        .form-row .tipo-option label:hover { border-color: #6c3ce0; }
-        .form-row .tipo-option input[type="radio"] { width: auto; accent-color: #6c3ce0; }
-        .form-row .tipo-option label.seleccionado { border-color: #6c3ce0; background: rgba(108,60,224,0.15); }
         
         .search-bar {
             display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
@@ -119,7 +102,7 @@
         .modal-overlay.show { display: flex; }
         .modal-content {
             background: #1a1a2e; padding: 16px; border-radius: 10px;
-            max-width: 550px; width: 100%; border: 1px solid #2a2a3e;
+            max-width: 500px; width: 100%; border: 1px solid #2a2a3e;
             max-height: 95vh; overflow-y: auto;
         }
         .modal-content h3 { font-size: 16px; margin-bottom: 4px; }
@@ -145,9 +128,30 @@
         .stat-item .label { font-size: 8px; color: #888; margin-top: 1px; }
         
         .acciones-cell { display: flex; gap: 4px; flex-wrap: wrap; }
+        .estado-select {
+            background: #1a1a2e; color: #fff; border: 1px solid #2a2a3e;
+            border-radius: 4px; padding: 1px 4px; font-size: 9px;
+        }
         
         .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
-        .table-wrapper table { min-width: 650px; }
+        .table-wrapper table { min-width: 700px; }
+        
+        .duracion-selector { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+        .duracion-selector select { flex: 0 0 70px; min-width: 70px; }
+        .duracion-selector span { color: #888; font-size: 12px; }
+        .numero-contrato {
+            background: #0a0a14; color: #6c3ce0; font-weight: 700; font-size: 16px;
+            text-align: center; border: 2px solid #6c3ce0;
+        }
+        .tipo-option { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
+        .tipo-option label {
+            display: flex; align-items: center; gap: 4px; font-size: 12px;
+            cursor: pointer; padding: 4px 10px; border-radius: 6px;
+            border: 1px solid #2a2a3e; transition: all 0.3s;
+        }
+        .tipo-option label:hover { border-color: #6c3ce0; }
+        .tipo-option input[type="radio"] { width: auto; accent-color: #6c3ce0; }
+        .tipo-option label.seleccionado { border-color: #6c3ce0; background: rgba(108,60,224,0.15); }
 
         @media (max-width: 600px) {
             body { padding: 8px; }
@@ -160,12 +164,13 @@
             .modal-content { padding: 12px; }
             .tabla { font-size: 11px; }
             .tabla th, .tabla td { padding: 4px 6px; }
-            .form-row .duracion-selector { flex-wrap: wrap; }
+            .duracion-selector { flex-wrap: wrap; }
+            .tipo-option { flex-wrap: wrap; }
         }
         @media (max-width: 400px) {
             .tabla { font-size: 10px; }
             .tabla th, .tabla td { padding: 3px 4px; }
-            .form-row .tipo-option label { font-size: 10px; padding: 3px 6px; }
+            .tipo-option label { font-size: 10px; padding: 3px 6px; }
         }
     </style>
 </head>
@@ -182,7 +187,6 @@
         <div class="stats-grid">
             <div class="stat-item"><span class="number" id="totalContratos">0</span><span class="label">📄 Total</span></div>
             <div class="stat-item"><span class="number" id="contratosActivos">0</span><span class="label">🟢 Activos</span></div>
-            <div class="stat-item"><span class="number" id="contratosFinalizados">0</span><span class="label">📌 Finalizados</span></div>
             <div class="stat-item"><span class="number" id="contratosVencidos">0</span><span class="label">⏰ Vencidos</span></div>
         </div>
     </div>
@@ -196,7 +200,6 @@
                 <option value="pendiente">⏳ Pendiente</option>
                 <option value="finalizado">📌 Finalizado</option>
                 <option value="cancelado">❌ Cancelado</option>
-                <option value="vencido">⏰ Vencido</option>
             </select>
             <button class="btn btn-primary" onclick="nuevoContrato()">+ Nuevo</button>
         </div>
@@ -207,9 +210,9 @@
             <h3 id="modalTitle">📄 Nuevo Contrato</h3>
             <div class="modal-subtitle">Complete los datos del contrato</div>
 
-            <div class="form-row campo-obligatorio">
+            <div class="form-row">
                 <div style="flex:1;">
-                    <label>🏢 Empresa / TCP / MIPYME</label>
+                    <label>🏢 Empresa</label>
                     <input type="text" id="contratoEmpresa" placeholder="Nombre de la empresa" required>
                 </div>
             </div>
@@ -221,14 +224,14 @@
                 </div>
             </div>
 
-            <div class="form-row campo-obligatorio">
+            <div class="form-row">
                 <div style="flex:1;">
                     <label>📅 Fecha Inicio</label>
-                    <input type="date" id="contratoFechaInicio" required>
+                    <input type="date" id="contratoFechaInicio" required onchange="calcularFechaFin()">
                 </div>
             </div>
 
-            <div class="form-row campo-obligatorio">
+            <div class="form-row">
                 <div style="flex:1;">
                     <label>⏳ Duración</label>
                     <div class="duracion-selector">
@@ -256,7 +259,7 @@
                 </div>
             </div>
 
-            <div class="form-row campo-obligatorio">
+            <div class="form-row">
                 <div style="flex:1;">
                     <label>📋 Tipo</label>
                     <div class="tipo-option">
@@ -304,7 +307,7 @@
     </div>
 
     <script>
-        let contratos = [], editandoId = null, ultimoNumeroContrato = 0, cargandoNumero = false;
+        let contratos = [], editandoId = null, ultimoNumeroContrato = 0;
 
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
@@ -339,22 +342,10 @@
                 fecha.setFullYear(fecha.getFullYear() + duracion);
                 const finStr = fecha.toISOString().split('T')[0];
                 document.getElementById('contratoFechaFin').value = finStr;
-                const hoy = new Date();
-                const dias = Math.ceil((fecha - hoy) / (1000*60*60*24));
                 const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
                 const fechaObj = new Date(finStr);
                 document.getElementById('textoFechaFin').textContent = `📅 ${fechaObj.getDate()} de ${meses[fechaObj.getMonth()]} de ${fechaObj.getFullYear()} (${duracion} año${duracion>1?'s':''})`;
-                let info = `📌 Finaliza: ${finStr} (`;
-                if (dias > 30) { info += `<span class="activo">${Math.floor(dias/30)} meses restantes</span>`; }
-                else if (dias > 0) { info += `<span class="proximo">${dias} días restantes</span>`; }
-                else if (dias === 0) { info += `<span class="proximo">⏰ Finaliza hoy</span>`; }
-                else { info += `<span class="vencido">⚠️ Vencido hace ${Math.abs(dias)} días</span>`; }
-                info += ')';
-                document.getElementById('infoFechaFin').innerHTML = info;
-            } else {
-                document.getElementById('contratoFechaFin').value = '';
-                document.getElementById('textoFechaFin').textContent = 'Fecha Fin: -';
-                document.getElementById('infoFechaFin').innerHTML = '📌 Se calcula automáticamente';
+                document.getElementById('infoFechaFin').innerHTML = `📌 Finaliza: ${finStr}`;
             }
         }
 
@@ -375,11 +366,8 @@
         }
 
         async function actualizarNumeroContrato() {
-            if (cargandoNumero) return;
-            cargandoNumero = true;
             await obtenerUltimoNumeroContrato();
             document.getElementById('contratoNumero').value = generarNumeroContrato();
-            cargandoNumero = false;
         }
 
         async function cargarContratos() {
@@ -407,40 +395,33 @@
             );
             if (estadoFiltro !== 'todos') filtrados = filtrados.filter(c => c.estado === estadoFiltro);
             if (filtrados.length === 0) { container.innerHTML = `<div class="empty">No hay contratos</div>`; return; }
-            const estados = { 'activo':'🟢 Activo','pendiente':'⏳ Pendiente','finalizado':'📌 Finalizado','cancelado':'❌ Cancelado','vencido':'⏰ Vencido' };
-            const clases = { 'activo':'activo','pendiente':'pendiente','finalizado':'finalizado','cancelado':'cancelado','vencido':'vencido' };
+            
+            const estados = { 'activo':'🟢 Activo','pendiente':'⏳ Pendiente','finalizado':'📌 Finalizado','cancelado':'❌ Cancelado' };
+            const clases = { 'activo':'activo','pendiente':'pendiente','finalizado':'finalizado','cancelado':'cancelado' };
             const tipos = { 'ventas':'<span class="badge ventas">💰 Ventas</span>','servicios':'<span class="badge servicios">📋 Servicios</span>','ambos':'<span class="badge ambos">🔄 Ambas</span>' };
+            
             let html = `<table class="tabla"><thead><tr>
-                <th>#</th><th>N° Contrato</th><th>Empresa</th><th>Inicio</th><th>Fin</th><th>Duración</th><th>Tipo</th><th>Estado</th><th>Acciones</th>
+                <th>#</th><th>N° Contrato</th><th>Empresa</th><th>Inicio</th><th>Fin</th><th>Tipo</th><th>Estado</th><th>Acciones</th>
             </tr></thead><tbody>`;
+            
             filtrados.forEach(c => {
-                let duracion = '-';
-                if (c.fecha_inicio && c.fecha_fin) {
-                    const diffYears = new Date(c.fecha_fin).getFullYear() - new Date(c.fecha_inicio).getFullYear();
-                    duracion = diffYears > 0 ? `${diffYears} año${diffYears>1?'s':''}` : '< 1 año';
-                }
-                const hoy = new Date();
-                const fechaFin = new Date(c.fecha_fin);
-                let estadoActual = c.estado;
-                if (estadoActual === 'activo' && fechaFin < hoy) estadoActual = 'vencido';
                 html += `<tr>
                     <td>#${c.id}</td>
                     <td><span class="contrato-numero">${c.numero_contrato}</span></td>
                     <td><strong>${c.empresa}</strong></td>
                     <td>${c.fecha_inicio}</td>
                     <td>${c.fecha_fin}</td>
-                    <td><span style="color:#6c3ce0;font-weight:600;">${duracion}</span></td>
                     <td>${tipos[c.tipo] || tipos['ventas']}</td>
-                    <td><span class="badge ${clases[estadoActual]}">${estados[estadoActual]}</span></td>
+                    <td><span class="badge ${clases[c.estado]}">${estados[c.estado]}</span></td>
                     <td>
                         <div class="acciones-cell">
                             <button class="btn btn-warning btn-sm" onclick="editarContrato(${c.id})">✏️</button>
                             <button class="btn btn-danger btn-sm" onclick="eliminarContrato(${c.id})">🗑️</button>
-                            <select onchange="cambiarEstado(${c.id}, this.value)" class="estado-select" style="background:#1a1a2e;color:#fff;border:1px solid #2a2a3e;border-radius:4px;padding:1px 4px;font-size:9px;">
-                                <option value="activo" ${estadoActual==='activo'?'selected':''}>Activo</option>
-                                <option value="pendiente" ${estadoActual==='pendiente'?'selected':''}>Pendiente</option>
-                                <option value="finalizado" ${estadoActual==='finalizado'?'selected':''}>Finalizado</option>
-                                <option value="cancelado" ${estadoActual==='cancelado'?'selected':''}>Cancelado</option>
+                            <select onchange="cambiarEstado(${c.id}, this.value)" class="estado-select">
+                                <option value="activo" ${c.estado==='activo'?'selected':''}>Activo</option>
+                                <option value="pendiente" ${c.estado==='pendiente'?'selected':''}>Pendiente</option>
+                                <option value="finalizado" ${c.estado==='finalizado'?'selected':''}>Finalizado</option>
+                                <option value="cancelado" ${c.estado==='cancelado'?'selected':''}>Cancelado</option>
                             </select>
                         </div>
                     </td>
@@ -453,15 +434,9 @@
         function actualizarEstadisticas() {
             const total = contratos.length;
             const activos = contratos.filter(c => c.estado === 'activo' || c.estado === 'pendiente').length;
-            const finalizados = contratos.filter(c => c.estado === 'finalizado').length;
-            const hoy = new Date();
-            const vencidos = contratos.filter(c => {
-                if (c.estado !== 'activo' && c.estado !== 'pendiente') return false;
-                return new Date(c.fecha_fin) < hoy;
-            }).length;
+            const vencidos = contratos.filter(c => c.estado === 'cancelado').length;
             document.getElementById('totalContratos').textContent = total;
             document.getElementById('contratosActivos').textContent = activos;
-            document.getElementById('contratosFinalizados').textContent = finalizados;
             document.getElementById('contratosVencidos').textContent = vencidos;
         }
 
@@ -518,16 +493,6 @@
                 if (el) { el.classList.add('seleccionado'); el.querySelector('input').checked = true; }
             }
             editandoId = id;
-            const fechaFin = new Date(c.fecha_fin);
-            const hoy = new Date();
-            const dias = Math.ceil((fechaFin - hoy) / (1000*60*60*24));
-            let info = `📌 Finaliza: ${c.fecha_fin} (`;
-            if (dias > 30) { info += `<span class="activo">${Math.floor(dias/30)} meses</span>`; }
-            else if (dias > 0) { info += `<span class="proximo">${dias} días</span>`; }
-            else if (dias === 0) { info += `<span class="proximo">⏰ Finaliza hoy</span>`; }
-            else { info += `<span class="vencido">⚠️ Vencido hace ${Math.abs(dias)} días</span>`; }
-            info += ')';
-            document.getElementById('infoFechaFin').innerHTML = info;
         }
 
         function cerrarModal() { document.getElementById('modalContrato').classList.remove('show'); }
@@ -544,9 +509,10 @@
                 const monto = parseFloat(document.getElementById('contratoMonto').value) || 0;
                 const descripcion = document.getElementById('contratoDescripcion').value.trim();
                 const tipo = document.querySelector('input[name="tipoContrato"]:checked')?.value || '';
-                if (!empresa) { mostrarMensaje('Nombre de empresa obligatorio', 'error'); btn.disabled=false; btn.textContent='💾 Guardar'; return; }
-                if (!fecha_inicio) { mostrarMensaje('Fecha de inicio obligatoria', 'error'); btn.disabled=false; btn.textContent='💾 Guardar'; return; }
-                if (!tipo) { mostrarMensaje('Selecciona el tipo', 'error'); btn.disabled=false; btn.textContent='💾 Guardar'; return; }
+                if (!empresa || !fecha_inicio || !tipo) {
+                    mostrarMensaje('Empresa, fecha inicio y tipo son obligatorios', 'error');
+                    btn.disabled=false; btn.textContent='💾 Guardar'; return;
+                }
                 const data = { empresa, numero_contrato, fecha_inicio, fecha_fin, tipo, monto, descripcion, estado:'activo' };
                 const url = editandoId ? `/api/contrato/${editandoId}` : '/api/contratos';
                 const method = editandoId ? 'PUT' : 'POST';
