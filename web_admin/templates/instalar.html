@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instalador - AIsa</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: #1a1a2e;
+            border-radius: 16px;
+            padding: 30px;
+            border: 1px solid #2a2a3e;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+        }
+        h1 { color: #6c3ce0; font-size: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+        .subtitle { color: #888; font-size: 14px; margin-bottom: 20px; }
+        .card {
+            background: #0f0f1a;
+            border-radius: 10px;
+            padding: 16px;
+            border: 1px solid #2a2a3e;
+            margin-bottom: 16px;
+        }
+        .card h3 { color: #aaa; font-size: 14px; margin-bottom: 8px; }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-success:hover { background: #3d8b40; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-danger:hover { background: #c62828; }
+        .btn-warning { background: #ff9800; color: #000; }
+        .btn-warning:hover { background: #e68900; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .mensaje {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            display: none;
+        }
+        .mensaje.exito { background: #224422; color: #6bff6b; display: block; }
+        .mensaje.error { background: #442222; color: #ff6b6b; display: block; }
+        .mensaje.info { background: #1a2a3a; color: #64b5f6; display: block; }
+        .log-box {
+            background: #0a0a14;
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            color: #aaa;
+            border: 1px solid #2a2a3e;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log-box .ok { color: #6bff6b; }
+        .log-box .error { color: #ff6b6b; }
+        .log-box .info { color: #64b5f6; }
+        .log-box .warning { color: #ffbb33; }
+        .flex { display: flex; gap: 10px; flex-wrap: wrap; }
+        .status-box {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .status-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            padding: 8px 12px;
+            text-align: center;
+        }
+        .status-item .nombre { font-size: 11px; color: #888; }
+        .status-item .estado { font-size: 13px; font-weight: 600; }
+        .status-item .estado.ok { color: #6bff6b; }
+        .status-item .estado.error { color: #ff6b6b; }
+        @media (max-width: 600px) {
+            .container { padding: 16px; }
+            .flex { flex-direction: column; }
+            .btn { width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Instalador de AIsa</h1>
+        <div class="subtitle">Crea las tablas y configura la base de datos</div>
+
+        <div id="mensaje" class="mensaje"></div>
+
+        <div class="card">
+            <h3>📋 Acciones</h3>
+            <div class="flex">
+                <button class="btn btn-primary" onclick="crearTablas()" id="btnCrearTablas">
+                    📦 Crear Tablas
+                </button>
+                <button class="btn btn-success" onclick="crearAdmin()" id="btnCrearAdmin">
+                    👤 Crear Admin
+                </button>
+                <button class="btn btn-warning" onclick="verificarTodo()" id="btnVerificar">
+                    🔍 Verificar
+                </button>
+                <button class="btn btn-danger" onclick="limpiarLog()" id="btnLimpiar">
+                    🗑️ Limpiar Log
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📊 Estado de la Base de Datos</h3>
+            <div class="status-box" id="statusBox">
+                <div class="status-item">
+                    <div class="nombre">📋 Tablas</div>
+                    <div class="estado" id="estadoTablas">⏳ Cargando...</div>
+                </div>
+                <div class="status-item">
+                    <div class="nombre">👤 Admin</div>
+                    <div class="estado" id="estadoAdmin">⏳ Cargando...</div>
+                </div>
+                <div class="status-item">
+                    <div class="nombre">🧩 Módulos</div>
+                    <div class="estado" id="estadoModulos">⏳ Cargando...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📝 Log de Ejecución</h3>
+            <div class="log-box" id="logBox">
+                <span class="info">🔍 Esperando acción...</span>
+            </div>
+        </div>
+
+        <div style="text-align:center;margin-top:16px;padding-top:16px;border-top:1px solid #2a2a3e;">
+            <a href="/login" style="color:#6c3ce0;text-decoration:none;">← Volver al Login</a>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // FUNCIONES DE LOG
+        // ============================================
+        function log(texto, tipo = 'info') {
+            const logBox = document.getElementById('logBox');
+            const clases = {
+                'ok': 'ok',
+                'error': 'error',
+                'info': 'info',
+                'warning': 'warning'
+            };
+            const timestamp = new Date().toLocaleTimeString();
+            logBox.innerHTML += `<span class="${clases[tipo] || 'info'}">[${timestamp}] ${texto}</span>\n`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function limpiarLog() {
+            document.getElementById('logBox').innerHTML = '<span class="info">🗑️ Log limpiado</span>\n';
+        }
+
+        function mostrarMensaje(texto, tipo) {
+            const el = document.getElementById('mensaje');
+            el.textContent = texto;
+            el.className = `mensaje ${tipo}`;
+            setTimeout(() => { el.className = 'mensaje'; }, 5000);
+        }
+
+        function toggleButtons(disabled) {
+            document.getElementById('btnCrearTablas').disabled = disabled;
+            document.getElementById('btnCrearAdmin').disabled = disabled;
+            document.getElementById('btnVerificar').disabled = disabled;
+        }
+
+        // ============================================
+        // CREAR TABLAS
+        // ============================================
+        async function crearTablas() {
+            if (!confirm('⚠️ ¿Crear todas las tablas de la base de datos?')) return;
+
+            toggleButtons(true);
+            document.getElementById('mensaje').className = 'mensaje';
+            log('📦 Iniciando creación de tablas...', 'info');
+
+            try {
+                const response = await fetch('/api/instalar/tablas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    log(`✅ ${data.message}`, 'ok');
+                    mostrarMensaje('✅ Tablas creadas correctamente', 'exito');
+                    verificarTodo();
+                } else {
+                    log(`❌ ${data.error || 'Error desconocido'}`, 'error');
+                    mostrarMensaje('❌ ' + (data.error || 'Error al crear tablas'), 'error');
+                }
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'error');
+                mostrarMensaje('❌ Error de conexión', 'error');
+            } finally {
+                toggleButtons(false);
+            }
+        }
+
+        // ============================================
+        // CREAR ADMIN
+        // ============================================
+        async function crearAdmin() {
+            if (!confirm('⚠️ ¿Crear usuario admin (admin/admin123)?')) return;
+
+            toggleButtons(true);
+            document.getElementById('mensaje').className = 'mensaje';
+            log('👤 Creando usuario admin...', 'info');
+
+            try {
+                const response = await fetch('/api/instalar/admin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    log(`✅ ${data.message}`, 'ok');
+                    mostrarMensaje('✅ Admin creado correctamente', 'exito');
+                    verificarTodo();
+                } else {
+                    log(`❌ ${data.error || 'Error desconocido'}`, 'error');
+                    mostrarMensaje('❌ ' + (data.error || 'Error al crear admin'), 'error');
+                }
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'error');
+                mostrarMensaje('❌ Error de conexión', 'error');
+            } finally {
+                toggleButtons(false);
+            }
+        }
+
+        // ============================================
+        // VERIFICAR TODO
+        // ============================================
+        async function verificarTodo() {
+            document.getElementById('mensaje').className = 'mensaje';
+            log('🔍 Verificando base de datos...', 'info');
+
+            try {
+                const response = await fetch('/api/instalar/verificar');
+                const data = await response.json();
+
+                // Actualizar estados
+                const estadoTablas = document.getElementById('estadoTablas');
+                const estadoAdmin = document.getElementById('estadoAdmin');
+                const estadoModulos = document.getElementById('estadoModulos');
+
+                if (data.tablas) {
+                    estadoTablas.textContent = `✅ ${data.tablas} tablas`;
+                    estadoTablas.className = 'estado ok';
+                    log(`📋 ${data.tablas} tablas encontradas`, 'ok');
+                } else {
+                    estadoTablas.textContent = '❌ Sin tablas';
+                    estadoTablas.className = 'estado error';
+                    log('❌ No hay tablas en la base de datos', 'error');
+                }
+
+                if (data.admin) {
+                    estadoAdmin.textContent = `✅ ${data.admin}`;
+                    estadoAdmin.className = 'estado ok';
+                    log(`👤 Admin: ${data.admin}`, 'ok');
+                } else {
+                    estadoAdmin.textContent = '❌ Sin admin';
+                    estadoAdmin.className = 'estado error';
+                    log('❌ No hay usuario admin', 'error');
+                }
+
+                if (data.modulos) {
+                    estadoModulos.textContent = `✅ ${data.modulos} módulos`;
+                    estadoModulos.className = 'estado ok';
+                    log(`🧩 ${data.modulos} módulos encontrados`, 'ok');
+                } else {
+                    estadoModulos.textContent = '❌ Sin módulos';
+                    estadoModulos.className = 'estado error';
+                    log('❌ No hay módulos registrados', 'error');
+                }
+
+                if (data.tablas && data.admin && data.modulos) {
+                    log('✅ ✅ ✅ Base de datos lista para usar', 'ok');
+                    mostrarMensaje('✅ Base de datos lista para usar', 'exito');
+                } else {
+                    log('⚠️ Faltan elementos. Ejecuta "Crear Tablas" y "Crear Admin"', 'warning');
+                }
+
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'error');
+                document.getElementById('estadoTablas').textContent = '❌ Error';
+                document.getElementById('estadoTablas').className = 'estado error';
+                document.getElementById('estadoAdmin').textContent = '❌ Error';
+                document.getElementById('estadoAdmin').className = 'estado error';
+                document.getElementById('estadoModulos').textContent = '❌ Error';
+                document.getElementById('estadoModulos').className = 'estado error';
+            }
+        }
+
+        // ============================================
+        // INICIO - Verificar al cargar
+        // ============================================
+        verificarTodo();
+    </script>
+</body>
+</html>
