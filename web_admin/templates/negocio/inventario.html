@@ -295,63 +295,12 @@
                 <input type="text" id="prodNombre" placeholder="Nombre">
                 <select id="prodCategoria">
                     <option value="">-- Seleccionar categoría --</option>
-                    <optgroup label="👗 Moda y Ropa">
-                        <option value="ropa_mujer">Ropa de Mujer</option>
-                        <option value="ropa_hombre">Ropa de Hombre</option>
-                        <option value="ropa_niños">Ropa de Niños y Bebés</option>
-                    </optgroup>
-                    <optgroup label="👟 Calzado y Accesorios">
-                        <option value="calzado_mujer">Calzado de Mujer</option>
-                        <option value="calzado_hombre">Calzado de Hombre</option>
-                        <option value="calzado_niños">Calzado de Niños</option>
-                        <option value="joyas">Joyas y Accesorios</option>
-                    </optgroup>
-                    <optgroup label="💻 Electrónica y Tecnología">
-                        <option value="electronica">Electrónica de Consumo</option>
-                        <option value="videojuegos">Videojuegos</option>
-                        <option value="audio">Audio</option>
-                    </optgroup>
-                    <optgroup label="🏠 Hogar y Cocina">
-                        <option value="hogar">Muebles y Hogar</option>
-                        <option value="decoracion">Decoración del Hogar</option>
-                        <option value="cocina">Cocina y Utensilios</option>
-                        <option value="almacenamiento">Almacenamiento y Organización</option>
-                        <option value="mejoras_hogar">Mejoras para el Hogar</option>
-                    </optgroup>
-                    <optgroup label="🌿 Jardín y Bricolaje">
-                        <option value="jardin">Jardín y Bricolaje</option>
-                    </optgroup>
-                    <optgroup label="💄 Belleza y Salud">
-                        <option value="belleza">Belleza y Salud</option>
-                    </optgroup>
-                    <optgroup label="🏋️ Deporte y Aire Libre">
-                        <option value="deporte">Deporte y Aire Libre</option>
-                    </optgroup>
-                    <optgroup label="🧸 Juguetes y Entretenimiento">
-                        <option value="juguetes">Juguetes y Entretenimiento</option>
-                    </optgroup>
-                    <optgroup label="🐾 Mascotas">
-                        <option value="mascotas">Mascotas</option>
-                    </optgroup>
-                    <optgroup label="📚 Oficina y Escuela">
-                        <option value="oficina">Oficina y Escuela</option>
-                    </optgroup>
-                    <optgroup label="🚗 Automotriz">
-                        <option value="automotriz">Automotriz</option>
-                    </optgroup>
-                    <optgroup label="👶 Bebé y Maternidad">
-                        <option value="bebe">Bebé y Maternidad</option>
-                    </optgroup>
-                    <optgroup label="🎵 Música e Instrumentos">
-                        <option value="musica">Música e Instrumentos</option>
-                    </optgroup>
-                    <optgroup label="🛍️ Otras Categorías">
-                        <option value="bolsas">Bolsas y Equipaje</option>
-                        <option value="manualidades">Manualidades y Arte</option>
-                        <option value="industrial">Suministros Industriales</option>
-                        <option value="coleccionables">Coleccionables</option>
-                        <option value="musica_fisica">CDs y Discos de Vinilo</option>
-                    </optgroup>
+                    <option value="electronica">Electrónica</option>
+                    <option value="ropa">Ropa</option>
+                    <option value="hogar">Hogar</option>
+                    <option value="belleza">Belleza</option>
+                    <option value="deporte">Deporte</option>
+                    <option value="otros">Otros</option>
                 </select>
             </div>
             <div class="form-row">
@@ -391,44 +340,15 @@
     </div>
 
     <script>
+        // ============================================
+        // VARIABLES GLOBALES
+        // ============================================
         let productos = [];
         let editandoId = null;
 
         // ============================================
-        // MAPA DE CATEGORÍAS PARA MOSTRAR CON ICONOS
+        // MOSTRAR MENSAJES
         // ============================================
-        const categoriasMap = {
-            'ropa_mujer': '👗 Ropa de Mujer',
-            'ropa_hombre': '👔 Ropa de Hombre',
-            'ropa_niños': '👕 Ropa de Niños',
-            'calzado_mujer': '👠 Calzado de Mujer',
-            'calzado_hombre': '👞 Calzado de Hombre',
-            'calzado_niños': '👟 Calzado de Niños',
-            'joyas': '💍 Joyas y Accesorios',
-            'electronica': '💻 Electrónica',
-            'videojuegos': '🎮 Videojuegos',
-            'audio': '🎧 Audio',
-            'hogar': '🏠 Hogar',
-            'decoracion': '🖼️ Decoración',
-            'cocina': '🍳 Cocina',
-            'almacenamiento': '📦 Almacenamiento',
-            'mejoras_hogar': '🔧 Mejoras Hogar',
-            'jardin': '🌿 Jardín',
-            'belleza': '💄 Belleza',
-            'deporte': '🏋️ Deporte',
-            'juguetes': '🧸 Juguetes',
-            'mascotas': '🐾 Mascotas',
-            'oficina': '📚 Oficina',
-            'automotriz': '🚗 Automotriz',
-            'bebe': '👶 Bebé',
-            'musica': '🎵 Música',
-            'bolsas': '🛍️ Bolsas',
-            'manualidades': '🎨 Manualidades',
-            'industrial': '🏭 Industrial',
-            'coleccionables': '🌟 Coleccionables',
-            'musica_fisica': '💿 CDs/Vinilos'
-        };
-
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
             const exitoEl = document.getElementById('mensajeExito');
@@ -484,23 +404,39 @@
 
             try {
                 const response = await fetch('/api/productos');
-                if (!response.ok) throw new Error('Error');
+                
+                // Verificar si la respuesta es JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Respuesta no JSON:', text);
+                    container.innerHTML = `<div class="empty">❌ Error del servidor. Revisa los logs.</div>`;
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
                 productos = await response.json();
+                console.log('📦 Productos cargados:', productos.length);
                 renderProductos();
                 actualizarEstadisticas();
             } catch (error) {
-                console.error('Error:', error);
-                container.innerHTML = `<div class="empty">❌ Error al cargar</div>`;
+                console.error('Error cargando productos:', error);
+                container.innerHTML = `<div class="empty">❌ Error al cargar: ${error.message}</div>`;
             }
         }
 
+        // ============================================
+        // RENDER PRODUCTOS
+        // ============================================
         function renderProductos(filtro = '') {
             const container = document.getElementById('productosContainer');
             const filtroLower = filtro.toLowerCase();
             
             const filtrados = productos.filter(p => 
                 p.nombre.toLowerCase().includes(filtroLower) ||
-                (p.categoria && categoriasMap[p.categoria] && categoriasMap[p.categoria].toLowerCase().includes(filtroLower)) ||
                 (p.categoria && p.categoria.toLowerCase().includes(filtroLower))
             );
 
@@ -528,7 +464,7 @@
                 else if (p.stock <= (p.stock_minimo || 3)) { estado = '⚠️ Bajo'; clase = 'bajo'; }
                 else { estado = '✅ Normal'; clase = 'alto'; }
                 
-                const categoriaDisplay = categoriasMap[p.categoria] || p.categoria || '-';
+                const categoriaDisplay = p.categoria || '-';
                 const costo = p.costo || 0;
                 const ganancia = p.precio - costo;
                 const porcentaje = costo > 0 ? (ganancia / costo) * 100 : 0;
@@ -571,6 +507,9 @@
             container.innerHTML = html;
         }
 
+        // ============================================
+        // ACTUALIZAR ESTADÍSTICAS
+        // ============================================
         function actualizarEstadisticas() {
             const total = productos.length;
             const bajo = productos.filter(p => p.stock > 0 && p.stock <= (p.stock_minimo || 3)).length;
@@ -587,10 +526,16 @@
             document.getElementById('gananciaPotencial').textContent = `$${gananciaPotencial.toFixed(2)}`;
         }
 
+        // ============================================
+        // FILTRAR PRODUCTOS
+        // ============================================
         function filtrarProductos() {
             renderProductos(document.getElementById('searchInput').value);
         }
 
+        // ============================================
+        // FORMULARIO
+        // ============================================
         function mostrarFormulario() {
             document.getElementById('formProducto').style.display = 'block';
             document.getElementById('prodNombre').focus();
@@ -606,6 +551,7 @@
             document.getElementById('prodStock').value = '';
             document.getElementById('prodMinimo').value = '';
             document.getElementById('gananciaPreview').classList.remove('show');
+            document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
         function cancelarFormulario() {
@@ -636,6 +582,9 @@
             document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
+        // ============================================
+        // GUARDAR PRODUCTO
+        // ============================================
         async function guardarProducto() {
             const nombre = document.getElementById('prodNombre').value.trim();
             const categoria = document.getElementById('prodCategoria').value;
@@ -651,72 +600,109 @@
             }
 
             const data = { nombre, categoria, precio, costo, comision, stock, stock_minimo };
+            
+            const btn = document.getElementById('btnGuardar');
+            const textoOriginal = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Guardando...';
 
             try {
-                let response, result;
-                if (editandoId) {
-                    response = await fetch(`/api/producto/${editandoId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
-                    result = await response.json();
-                    if (result.success) {
-                        mostrarMensaje(`✅ "${nombre}" actualizado`, 'exito');
-                    } else {
-                        mostrarMensaje(result.error || 'Error', 'error');
-                        return;
-                    }
-                } else {
-                    response = await fetch('/api/productos', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
-                    result = await response.json();
-                    if (result.success) {
-                        mostrarMensaje(`✅ "${nombre}" creado`, 'exito');
-                    } else {
-                        mostrarMensaje(result.error || 'Error', 'error');
-                        return;
-                    }
+                const url = editandoId ? `/api/producto/${editandoId}` : '/api/productos';
+                const method = editandoId ? 'PUT' : 'POST';
+                
+                console.log('📤 Enviando:', { url, method, data });
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                // Verificar si la respuesta es JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Respuesta no JSON:', text);
+                    mostrarMensaje('Error del servidor. Revisa los logs.', 'error');
+                    return;
                 }
-                cancelarFormulario();
-                await cargarProductos();
+
+                const result = await response.json();
+                console.log('📥 Respuesta:', result);
+
+                if (result.success) {
+                    mostrarMensaje(`✅ "${nombre}" ${editandoId ? 'actualizado' : 'agregado'}`, 'exito');
+                    cancelarFormulario();
+                    await cargarProductos();
+                } else {
+                    mostrarMensaje(result.error || 'Error al guardar', 'error');
+                }
             } catch (error) {
-                console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
+                console.error('❌ Error:', error);
+                mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = textoOriginal;
             }
         }
 
+        // ============================================
+        // ELIMINAR PRODUCTO
+        // ============================================
         async function eliminarProducto(id, nombre) {
             if (!confirm(`⚠️ ¿Eliminar "${nombre}"?`)) return;
             if (!confirm(`Confirmación final: ¿Eliminar "${nombre}"?`)) return;
+            
+            const btn = event?.target;
+            const textoOriginal = btn ? btn.textContent : '🗑️';
+            if (btn) { btn.textContent = '⏳...'; btn.disabled = true; }
             
             try {
                 const response = await fetch(`/api/producto/${id}`, {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' }
                 });
+
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Respuesta no JSON:', text);
+                    mostrarMensaje('Error del servidor', 'error');
+                    return;
+                }
+
                 const data = await response.json();
+                
                 if (data.success) {
                     mostrarMensaje(`✅ "${nombre}" eliminado`, 'exito');
                     await cargarProductos();
                 } else {
-                    mostrarMensaje(data.error || 'Error', 'error');
+                    mostrarMensaje(data.error || 'Error al eliminar', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
+                mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
+            } finally {
+                if (btn) { btn.textContent = textoOriginal; btn.disabled = false; }
             }
         }
 
-        // Event listener para calcular ganancia en tiempo real
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
         document.getElementById('prodPrecio').addEventListener('input', calcularGanancia);
         document.getElementById('prodCosto').addEventListener('input', calcularGanancia);
 
-        cargarProductos();
-        setInterval(cargarProductos, 30000);
+        // ============================================
+        // INICIO
+        // ============================================
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📦 Iniciando módulo de inventario...');
+            cargarProductos();
+            
+            // Actualizar cada 30 segundos
+            setInterval(cargarProductos, 30000);
+        });
     </script>
 </body>
 </html>
