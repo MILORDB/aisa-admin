@@ -1989,6 +1989,478 @@ def negocio_mapa():
     return render_template('negocio/mapa.html', usuario=usuario, version=int(time.time()))
 
 # ============================================
+# API - INSTALADOR
+# ============================================
+
+@app.route('/instalar')
+def instalar_page():
+    """Página de instalación"""
+    return render_template('instalar.html')
+
+@app.route('/api/instalar/tablas', methods=['POST'])
+def api_instalar_tablas():
+    """Crea todas las tablas de la base de datos"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        log_messages = []
+        
+        # ============================================
+        # CREAR TABLA USUARIOS
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            nombre TEXT,
+            rol TEXT DEFAULT 'usuario',
+            tipo TEXT DEFAULT 'cliente',
+            activo INTEGER DEFAULT 1,
+            aprobado INTEGER DEFAULT 1,
+            verificado INTEGER DEFAULT 0,
+            fecha_registro TEXT NOT NULL,
+            ultimo_acceso TEXT,
+            datos_negocio TEXT,
+            latitud REAL,
+            longitud REAL,
+            ubicacion_actualizada TEXT
+        )
+        ''')
+        log_messages.append("✅ Tabla 'usuarios' creada")
+        
+        # ============================================
+        # CREAR TABLA SESIONES
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS sesiones (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            fecha_creacion TEXT NOT NULL,
+            fecha_expiracion TEXT NOT NULL,
+            activo INTEGER DEFAULT 1,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+        )
+        ''')
+        log_messages.append("✅ Tabla 'sesiones' creada")
+        
+        # ============================================
+        # CREAR TABLA MODULOS
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS modulos (
+            id SERIAL PRIMARY KEY,
+            nombre TEXT UNIQUE NOT NULL,
+            descripcion TEXT,
+            activo_global INTEGER DEFAULT 1,
+            tipo_requerido TEXT DEFAULT 'ambos'
+        )
+        ''')
+        log_messages.append("✅ Tabla 'modulos' creada")
+        
+        # ============================================
+        # CREAR TABLA PERMISOS_USUARIO
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS permisos_usuario (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER NOT NULL,
+            modulo_id INTEGER NOT NULL,
+            activo INTEGER DEFAULT 1,
+            fecha_solicitud TEXT,
+            estado_solicitud TEXT DEFAULT 'aprobado',
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (modulo_id) REFERENCES modulos(id) ON DELETE CASCADE,
+            UNIQUE(usuario_id, modulo_id)
+        )
+        ''')
+        log_messages.append("✅ Tabla 'permisos_usuario' creada")
+        
+        # ============================================
+        # CREAR TABLA LOGS
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS logs (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER,
+            accion TEXT,
+            detalle TEXT,
+            fecha TEXT NOT NULL,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
+        )
+        ''')
+        log_messages.append("✅ Tabla 'logs' creada")
+        
+        # ============================================
+        # CREAR TABLA PRODUCTOS
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS productos (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            nombre TEXT NOT NULL,
+            categoria TEXT,
+            precio REAL NOT NULL,
+            costo REAL DEFAULT 0,
+            comision REAL DEFAULT 0,
+            stock INTEGER DEFAULT 0,
+            stock_minimo INTEGER DEFAULT 3,
+            foto_url TEXT,
+            foto_public_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE
+        )
+        ''')
+        log_messages.append("✅ Tabla 'productos' creada")
+        
+        # ============================================
+        # CREAR TABLA PRODUCTOS_TIENDA
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS productos_tienda (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            producto_id INTEGER NOT NULL,
+            destacado INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE
+        )
+        ''')
+        log_messages.append("✅ Tabla 'productos_tienda' creada")
+        
+        # ============================================
+        # CREAR TABLA VENTAS
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ventas (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            trabajador_id INTEGER,
+            cliente TEXT NOT NULL,
+            producto TEXT NOT NULL,
+            producto_id INTEGER,
+            cantidad INTEGER DEFAULT 1,
+            precio REAL NOT NULL,
+            total REAL NOT NULL,
+            estado TEXT DEFAULT 'pagado',
+            empresa TEXT,
+            tipo TEXT DEFAULT 'producto',
+            factura_url TEXT,
+            factura TEXT,
+            transferencia_id TEXT,
+            transferencia_cedula TEXT,
+            transferencia_banco TEXT,
+            transferencia_fecha TEXT,
+            fecha TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+            FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+        )
+        ''')
+        log_messages.append("✅ Tabla 'ventas' creada")
+        
+        # ============================================
+        # CREAR TABLA SERVICIOS
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS servicios (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            trabajador_id INTEGER,
+            nombre TEXT NOT NULL,
+            categoria TEXT,
+            precio REAL NOT NULL,
+            duracion INTEGER DEFAULT 60,
+            activo INTEGER DEFAULT 1,
+            descripcion TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE SET NULL
+        )
+        ''')
+        log_messages.append("✅ Tabla 'servicios' creada")
+        
+        # ============================================
+        # CREAR TABLA TRABAJADORES_NEGOCIO
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS trabajadores_negocio (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            trabajador_id INTEGER NOT NULL,
+            activo INTEGER DEFAULT 1,
+            cargo TEXT,
+            salario REAL DEFAULT 0,
+            fecha_contratacion TEXT NOT NULL,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(negocio_id, trabajador_id)
+        )
+        ''')
+        log_messages.append("✅ Tabla 'trabajadores_negocio' creada")
+        
+        # ============================================
+        # CREAR TABLA CONTRATOS
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS contratos (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            trabajador_id INTEGER,
+            empresa TEXT NOT NULL,
+            numero_contrato TEXT UNIQUE NOT NULL,
+            fecha_inicio TEXT NOT NULL,
+            fecha_fin TEXT NOT NULL,
+            tipo TEXT NOT NULL DEFAULT 'ventas',
+            monto REAL DEFAULT 0,
+            estado TEXT DEFAULT 'activo',
+            descripcion TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE SET NULL
+        )
+        ''')
+        log_messages.append("✅ Tabla 'contratos' creada")
+        
+        # ============================================
+        # CREAR TABLA FACTURAS_SECUENCIA
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS facturas_secuencia (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            empresa TEXT NOT NULL,
+            ultimo_numero INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(negocio_id, empresa)
+        )
+        ''')
+        log_messages.append("✅ Tabla 'facturas_secuencia' creada")
+        
+        # ============================================
+        # CREAR TABLA ASISTENCIA
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS asistencia (
+            id SERIAL PRIMARY KEY,
+            trabajador_id INTEGER NOT NULL,
+            negocio_id INTEGER NOT NULL,
+            fecha DATE NOT NULL,
+            presente INTEGER DEFAULT 1,
+            horas_trabajadas REAL DEFAULT 8,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(trabajador_id, fecha)
+        )
+        ''')
+        log_messages.append("✅ Tabla 'asistencia' creada")
+        
+        # ============================================
+        # CREAR TABLA COMISIONES_TRABAJADOR
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS comisiones_trabajador (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            trabajador_id INTEGER NOT NULL,
+            venta_id INTEGER NOT NULL,
+            producto_id INTEGER,
+            monto REAL NOT NULL DEFAULT 0,
+            fecha DATE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
+            FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+        )
+        ''')
+        log_messages.append("✅ Tabla 'comisiones_trabajador' creada")
+        
+        # ============================================
+        # CREAR TABLA NOMINA
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS nomina (
+            id SERIAL PRIMARY KEY,
+            negocio_id INTEGER NOT NULL,
+            trabajador_id INTEGER NOT NULL,
+            mes INTEGER NOT NULL,
+            ano INTEGER NOT NULL,
+            salario_base REAL NOT NULL DEFAULT 0,
+            dias_trabajados INTEGER DEFAULT 0,
+            dias_ausencia INTEGER DEFAULT 0,
+            dias_extras INTEGER DEFAULT 0,
+            salario_devengado REAL DEFAULT 0,
+            comisiones REAL DEFAULT 0,
+            total REAL DEFAULT 0,
+            creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            actualizado_en TIMESTAMP,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(negocio_id, trabajador_id, mes, ano)
+        )
+        ''')
+        log_messages.append("✅ Tabla 'nomina' creada")
+        
+        # ============================================
+        # CREAR TABLA CODIGOS_VERIFICACION
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS codigos_verificacion (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER NOT NULL,
+            codigo TEXT NOT NULL,
+            email TEXT NOT NULL,
+            creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expira_en TIMESTAMP NOT NULL,
+            usado INTEGER DEFAULT 0,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+        )
+        ''')
+        log_messages.append("✅ Tabla 'codigos_verificacion' creada")
+        
+        # ============================================
+        # INSERTAR MÓDULOS
+        # ============================================
+        modulos = [
+            ('voz', 'Texto a voz y reconocimiento de voz', 1, 'ambos'),
+            ('control_pc', 'Control de mouse, teclado y programas', 1, 'negocio'),
+            ('busqueda_web', 'Búsqueda en internet con DeepSeek', 1, 'ambos'),
+            ('memoria', 'Memoria vectorial para recordar conversaciones', 1, 'ambos'),
+            ('archivos', 'Lectura de archivos PDF, Word, Excel', 1, 'negocio'),
+            ('contexto', 'Contexto de conversación', 1, 'ambos'),
+            ('android', 'Conexión con dispositivos Android', 1, 'negocio'),
+            ('inventario', 'Gestión de inventario y productos', 1, 'negocio'),
+            ('tienda', 'Tienda online para clientes', 1, 'negocio'),
+            ('trabajadores', 'Gestión de trabajadores y empleados', 1, 'negocio'),
+            ('servicios', 'Gestión de servicios ofrecidos', 1, 'negocio'),
+            ('ventas', 'Gestión de ventas y facturación', 1, 'negocio'),
+            ('contratos', 'Gestión de contratos con clientes', 1, 'negocio'),
+            ('nomina', 'Gestión de nómina y salarios', 1, 'negocio'),
+            ('mapa', 'Ubicación en mapa interactivo', 1, 'negocio')
+        ]
+        
+        for nombre, desc, activo, tipo in modulos:
+            cursor.execute('''
+                INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (nombre) DO NOTHING
+            ''', (nombre, desc, activo, tipo))
+        log_messages.append("✅ Módulos insertados")
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'{len(log_messages)} tablas creadas/verificadas',
+            'detalles': log_messages
+        })
+        
+    except Exception as e:
+        print(f"❌ Error creando tablas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/instalar/admin', methods=['POST'])
+def api_instalar_admin():
+    """Crea el usuario admin"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verificar si admin ya existe
+        cursor.execute("SELECT id FROM usuarios WHERE username = 'admin'")
+        if cursor.fetchone():
+            return jsonify({
+                'success': True,
+                'message': 'El usuario admin ya existe'
+            })
+        
+        # Crear admin con contraseña admin123
+        password_hash = hash_password('admin123')
+        fecha = datetime.now().isoformat()
+        
+        cursor.execute('''
+            INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado, verificado)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1, 1)
+            RETURNING id
+        ''', ('admin', 'admin@aisa.com', password_hash, 'Administrador', 'admin', 'admin', fecha))
+        
+        admin_id = cursor.fetchone()[0]
+        
+        # Asignar todos los módulos al admin
+        cursor.execute("SELECT id FROM modulos")
+        for mod in cursor.fetchall():
+            cursor.execute('''
+                INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
+                VALUES (%s, %s, 1, 'aprobado')
+                ON CONFLICT (usuario_id, modulo_id) DO NOTHING
+            ''', (admin_id, mod[0]))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Usuario admin creado correctamente (admin/admin123)',
+            'admin_id': admin_id
+        })
+        
+    except Exception as e:
+        print(f"❌ Error creando admin: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/instalar/verificar', methods=['GET'])
+def api_instalar_verificar():
+    """Verifica el estado de la base de datos"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Contar tablas
+        cursor.execute("""
+            SELECT COUNT(*) FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        """)
+        tablas = cursor.fetchone()[0]
+        
+        # Verificar admin
+        cursor.execute("SELECT username FROM usuarios WHERE username = 'admin'")
+        admin = cursor.fetchone()
+        admin_nombre = admin[0] if admin else None
+        
+        # Contar módulos
+        cursor.execute("SELECT COUNT(*) FROM modulos")
+        modulos = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'tablas': tablas,
+            'admin': admin_nombre,
+            'modulos': modulos,
+            'lista': tablas > 0 and admin_nombre and modulos > 0
+        })
+        
+    except Exception as e:
+        print(f"❌ Error verificando: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
 # API - PERFIL DE USUARIO
 # ============================================
 @app.route('/api/usuario/perfil', methods=['GET'])
