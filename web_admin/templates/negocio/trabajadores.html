@@ -66,8 +66,6 @@
         }
         .tabla .badge.activo { background: #224422; color: #6bff6b; }
         .tabla .badge.inactivo { background: #442222; color: #ff6b6b; }
-        .tabla .badge.diaria { background: #1a237e; color: #fff; }
-        .tabla .badge.cada2dias { background: #ff9800; color: #000; }
         
         .form-row {
             display: flex;
@@ -87,7 +85,6 @@
         }
         .form-row input:focus, .form-row select:focus { border-color: #6c3ce0; outline: none; }
         .form-row label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
-        .form-row .help-text { font-size: 10px; color: #666; margin-top: 2px; }
         
         .search-bar {
             display: flex;
@@ -157,17 +154,6 @@
             gap: 4px;
             flex-wrap: wrap;
         }
-        .acciones-cell .btn-sm {
-            cursor: pointer;
-            border: none;
-            border-radius: 4px;
-            padding: 3px 8px;
-            font-size: 10px;
-            transition: all 0.3s;
-        }
-        .acciones-cell .btn-sm:hover {
-            transform: scale(1.05);
-        }
         .table-wrapper {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
@@ -226,121 +212,21 @@
             border: 1px solid #2a2a3e;
         }
         .modal-content .seccion-datos .seccion-titulo { font-size: 12px; color: #6c3ce0; margin-bottom: 6px; }
-        
-        /* ============================================
-           ESTILOS PROPUESTA 1 - TARJETAS CON TOGGLE
-           ============================================ */
-        .modulos-grid-tarjetas {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-            gap: 8px;
-            width: 100%;
+        .modal-content .seccion-datos .help-text { font-size: 10px; color: #666; margin-top: 4px; }
+        .modal-content .modulos-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px;
         }
-        
-        .modulo-tarjeta {
-            background: #0f0f1a;
-            border: 2px solid #2a2a3e;
-            border-radius: 8px;
-            padding: 10px 12px;
-            text-align: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
-            user-select: none;
+        .modal-content .modulos-grid .modulo-item {
+            display: flex; align-items: center; gap: 4px;
+            background: #0f0f1a; border: 1px solid #2a2a3e; border-radius: 4px;
+            padding: 4px 8px; font-size: 11px; cursor: pointer;
+            transition: all 0.3s;
         }
-        
-        .modulo-tarjeta:hover {
-            border-color: #4a4a6e;
-            transform: translateY(-2px);
-        }
-        
-        .modulo-tarjeta.seleccionado {
-            border-color: #6c3ce0;
-            background: rgba(108, 60, 224, 0.08);
-            box-shadow: 0 0 20px rgba(108, 60, 224, 0.1);
-        }
-        
-        .modulo-tarjeta .modulo-icono {
-            font-size: 22px;
-            display: block;
-            margin-bottom: 4px;
-        }
-        
-        .modulo-tarjeta .modulo-nombre {
-            font-size: 11px;
-            font-weight: 600;
-            display: block;
-            margin-bottom: 6px;
-        }
-        
-        .modulo-tarjeta .modulo-check {
-            display: none;
-        }
-        
-        /* Switch estilo iOS */
-        .modulo-tarjeta .switch-container {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 9px;
-            color: #888;
-        }
-        
-        .modulo-tarjeta .switch {
-            position: relative;
-            width: 36px;
-            height: 20px;
-            background: #333;
-            border-radius: 10px;
-            transition: background 0.3s ease;
-            flex-shrink: 0;
-        }
-        
-        .modulo-tarjeta .switch .slider {
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 16px;
-            height: 16px;
-            background: #fff;
-            border-radius: 50%;
-            transition: transform 0.3s ease;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        }
-        
-        .modulo-tarjeta.seleccionado .switch {
-            background: #6c3ce0;
-        }
-        
-        .modulo-tarjeta.seleccionado .switch .slider {
-            transform: translateX(16px);
-        }
-        
-        .modulo-tarjeta .badge-count {
-            font-size: 8px;
-            background: rgba(108,60,224,0.15);
-            color: #6c3ce0;
-            padding: 0 6px;
-            border-radius: 8px;
-            margin-left: 2px;
-        }
-        
-        .modulos-resumen {
-            margin-top: 8px;
-            font-size: 11px;
-            color: #888;
-            text-align: center;
-        }
+        .modal-content .modulos-grid .modulo-item:hover { border-color: #6c3ce0; }
+        .modal-content .modulos-grid .modulo-item.seleccionado { border-color: #6c3ce0; background: rgba(108,60,224,0.1); }
+        .modal-content .modulos-grid .modulo-item input[type="checkbox"] { accent-color: #6c3ce0; }
         
         @media (max-width: 600px) {
-            .modulos-grid-tarjetas {
-                grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-            }
-            .modulo-tarjeta .modulo-icono { font-size: 18px; }
-            .modulo-tarjeta .modulo-nombre { font-size: 10px; }
-            .modulo-tarjeta .switch { width: 30px; height: 18px; }
-            .modulo-tarjeta .switch .slider { width: 14px; height: 14px; }
-            .modulo-tarjeta.seleccionado .switch .slider { transform: translateX(12px); }
             body { padding: 8px; }
             .card { padding: 10px; }
             .stats-grid { grid-template-columns: 1fr 1fr; }
@@ -351,11 +237,12 @@
             .modal-content { padding: 14px; }
             .tabla { font-size: 11px; }
             .tabla th, .tabla td { padding: 4px 6px; }
+            .modal-content .modulos-grid { grid-template-columns: 1fr 1fr; }
         }
         @media (max-width: 400px) {
             .tabla { font-size: 10px; }
             .tabla th, .tabla td { padding: 3px 4px; }
-            .modulos-grid-tarjetas { grid-template-columns: 1fr 1fr; }
+            .modal-content .modulos-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -397,11 +284,11 @@
                 <option value="activo">🟢 Activos</option>
                 <option value="inactivo">🔴 Inactivos</option>
             </select>
-            <button class="btn btn-primary" id="btnNuevo">+ Nuevo</button>
+            <button class="btn btn-primary" onclick="mostrarFormulario()">+ Nuevo</button>
         </div>
 
         <div id="formTrabajador" style="display:none;border-top:1px solid #2a2a3e;padding-top:12px;margin-top:8px;">
-            <h3 id="modalTitle">👤 Nuevo Trabajador</h3>
+            <h3 id="formTitle">👤 Nuevo Trabajador</h3>
             <div class="modal-subtitle">Datos personales y módulos de acceso</div>
 
             <div class="seccion-datos">
@@ -433,21 +320,10 @@
                 </div>
             </div>
 
-            <!-- ============================================
-            SECCIÓN DE MÓDULOS - PROPUESTA 1
-            Tarjetas con Toggle (Moderna y Visual)
-            ============================================ -->
             <div class="seccion-datos">
                 <div class="seccion-titulo">🧩 Módulos de Acceso</div>
-                <div class="help-text" style="margin-bottom:8px;">Activa o desactiva los módulos para este trabajador</div>
-                
-                <div class="modulos-grid-tarjetas" id="modulosGrid">
-                    <!-- Los módulos se renderizan aquí -->
-                </div>
-                
-                <div class="modulos-resumen">
-                    📌 <span id="modulosCount">0</span> módulos seleccionados
-                </div>
+                <div class="help-text" style="margin-bottom:8px;">Selecciona los módulos para este trabajador</div>
+                <div class="modulos-grid" id="modulosGrid"></div>
             </div>
 
             <div class="seccion-datos">
@@ -498,18 +374,17 @@
         // ============================================
         // VARIABLES GLOBALES
         // ============================================
-        var trabajadores = [];
-        var editandoId = null;
-        var modulosDisponibles = [];
-        var trabajadorAEliminar = null;
-        var cargando = false;
+        let trabajadores = [];
+        let editandoId = null;
+        let trabajadorAEliminar = null;
+        let modulosDisponibles = [];
 
         // ============================================
         // FUNCIONES DE MENSAJES
         // ============================================
         function mostrarMensaje(texto, tipo) {
-            var errorEl = document.getElementById('mensajeError');
-            var exitoEl = document.getElementById('mensajeExito');
+            const errorEl = document.getElementById('mensajeError');
+            const exitoEl = document.getElementById('mensajeExito');
             errorEl.classList.remove('show');
             exitoEl.classList.remove('show');
             if (tipo === 'error') {
@@ -519,7 +394,7 @@
                 exitoEl.textContent = '✅ ' + texto;
                 exitoEl.classList.add('show');
             }
-            setTimeout(function() {
+            setTimeout(() => {
                 errorEl.classList.remove('show');
                 exitoEl.classList.remove('show');
             }, 4000);
@@ -530,171 +405,92 @@
         // ============================================
         async function cargarModulosDisponibles() {
             try {
-                var response = await fetch('/api/modulos');
+                const response = await fetch('/api/modulos');
                 if (!response.ok) throw new Error('Error');
-                var data = await response.json();
-                var nombresNegocio = ['inventario', 'tienda', 'trabajadores', 'servicios', 'ventas', 'contratos'];
-                modulosDisponibles = data.filter(function(m) { 
-                    return m && m.nombre && nombresNegocio.indexOf(m.nombre.toLowerCase()) !== -1; 
-                });
+                const data = await response.json();
+                const nombresNegocio = ['inventario', 'tienda', 'trabajadores', 'servicios', 'ventas', 'contratos'];
+                modulosDisponibles = data.filter(m => 
+                    m && m.nombre && nombresNegocio.includes(m.nombre.toLowerCase())
+                );
                 renderModulosCheckboxes();
             } catch (error) {
                 console.error('Error:', error);
             }
         }
 
-        // ============================================
-        // RENDER MÓDULOS - PROPUESTA 1 (TARJETAS CON TOGGLE)
-        // ============================================
         function renderModulosCheckboxes(modulosPredefinidos) {
-            var container = document.getElementById('modulosGrid');
+            const container = document.getElementById('modulosGrid');
             container.innerHTML = '';
             
-            var iconos = { 
-                'inventario': '📦', 
-                'tienda': '🛍️', 
-                'trabajadores': '👥', 
-                'servicios': '📋', 
-                'ventas': '💰', 
-                'contratos': '📄' 
+            const iconos = { 
+                'inventario': '📦', 'tienda': '🛍️', 'trabajadores': '👥', 
+                'servicios': '📋', 'ventas': '💰', 'contratos': '📄' 
+            };
+            const nombres = { 
+                'inventario': 'Inventario', 'tienda': 'Tienda', 'trabajadores': 'Trabajadores', 
+                'servicios': 'Servicios', 'ventas': 'Ventas', 'contratos': 'Contratos' 
             };
             
-            var nombres = { 
-                'inventario': 'Inventario', 
-                'tienda': 'Tienda', 
-                'trabajadores': 'Trabajadores', 
-                'servicios': 'Servicios', 
-                'ventas': 'Ventas', 
-                'contratos': 'Contratos' 
-            };
-            
-            var colores = {
-                'inventario': '#4caf50',
-                'tienda': '#ff9800',
-                'trabajadores': '#2196f3',
-                'servicios': '#9c27b0',
-                'ventas': '#f44336',
-                'contratos': '#00bcd4'
-            };
-            
-            for (var i = 0; i < modulosDisponibles.length; i++) {
-                var mod = modulosDisponibles[i];
-                var checked = modulosPredefinidos ? modulosPredefinidos.indexOf(mod.nombre) !== -1 : false;
-                var color = colores[mod.nombre] || '#6c3ce0';
+            modulosDisponibles.forEach(mod => {
+                const checked = modulosPredefinidos ? modulosPredefinidos.includes(mod.nombre) : false;
+                const div = document.createElement('div');
+                div.className = 'modulo-item' + (checked ? ' seleccionado' : '');
                 
-                var div = document.createElement('div');
-                div.className = 'modulo-tarjeta' + (checked ? ' seleccionado' : '');
-                div.dataset.modulo = mod.nombre;
-                div.style.borderColor = checked ? color : '#2a2a3e';
-                
-                div.innerHTML = `
-                    <span class="modulo-icono">${iconos[mod.nombre] || '📦'}</span>
-                    <span class="modulo-nombre">${nombres[mod.nombre] || mod.nombre}</span>
-                    <div class="switch-container">
-                        <span>${checked ? '✅' : '⬜'}</span>
-                        <div class="switch">
-                            <div class="slider"></div>
-                        </div>
-                    </div>
-                `;
-                
-                div.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    this.classList.toggle('seleccionado');
-                    var checkbox = this.querySelector('.modulo-checkbox');
-                    if (checkbox) {
-                        checkbox.checked = !checkbox.checked;
-                        checkbox.dispatchEvent(new Event('change'));
-                    }
-                    var modulo = this.dataset.modulo;
-                    var isChecked = this.classList.contains('seleccionado');
-                    this.style.borderColor = isChecked ? (colores[modulo] || '#6c3ce0') : '#2a2a3e';
-                    actualizarContadorModulos();
-                });
-                
-                // Checkbox oculto para mantener compatibilidad
-                var checkbox = document.createElement('input');
+                const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
-                checkbox.className = 'modulo-checkbox';
                 checkbox.value = mod.nombre;
                 checkbox.checked = checked;
-                checkbox.style.display = 'none';
-                checkbox.addEventListener('change', function(e) {
-                    e.stopPropagation();
-                    var parent = this.closest('.modulo-tarjeta');
-                    if (parent) {
-                        parent.classList.toggle('seleccionado', this.checked);
-                        var modulo = parent.dataset.modulo;
-                        parent.style.borderColor = this.checked ? (colores[modulo] || '#6c3ce0') : '#2a2a3e';
-                        actualizarContadorModulos();
-                    }
+                checkbox.addEventListener('change', function() {
+                    this.closest('.modulo-item').classList.toggle('seleccionado', this.checked);
                 });
-                div.appendChild(checkbox);
                 
+                const label = document.createElement('span');
+                label.textContent = `${iconos[mod.nombre] || '📦'} ${nombres[mod.nombre] || mod.nombre}`;
+                
+                div.appendChild(checkbox);
+                div.appendChild(label);
                 container.appendChild(div);
-            }
-            actualizarContadorModulos();
-        }
-
-        function actualizarContadorModulos() {
-            var count = document.querySelectorAll('.modulo-checkbox:checked').length;
-            document.getElementById('modulosCount').textContent = count;
+            });
         }
 
         function getModulosSeleccionados() {
-            var checkboxes = document.querySelectorAll('.modulo-checkbox:checked');
-            var result = [];
-            for (var i = 0; i < checkboxes.length; i++) {
-                result.push(checkboxes[i].value);
-            }
-            return result;
+            const checkboxes = document.querySelectorAll('#modulosGrid input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
         }
 
         // ============================================
         // CARGAR TRABAJADORES
         // ============================================
         async function cargarTrabajadores() {
-            if (cargando) return;
-            cargando = true;
-            
-            var container = document.getElementById('trabajadoresContainer');
+            const container = document.getElementById('trabajadoresContainer');
             container.innerHTML = '<div class="loading">Cargando...</div>';
 
             try {
-                var response = await fetch('/api/negocio/trabajadores');
+                const response = await fetch('/api/negocio/trabajadores');
                 if (!response.ok) throw new Error('Error');
                 trabajadores = await response.json();
                 renderTrabajadores();
                 actualizarEstadisticas();
             } catch (error) {
                 console.error('Error:', error);
-                container.innerHTML = '<div class="empty">❌ Error al cargar</div>';
-            } finally {
-                cargando = false;
+                container.innerHTML = `<div class="empty">❌ Error al cargar</div>`;
             }
         }
 
-        function renderTrabajadores(filtro, estadoFiltro) {
-            filtro = filtro || '';
-            estadoFiltro = estadoFiltro || 'todos';
+        function renderTrabajadores(filtro = '', estadoFiltro = 'todos') {
+            const container = document.getElementById('trabajadoresContainer');
+            const filtroLower = filtro.toLowerCase();
             
-            var container = document.getElementById('trabajadoresContainer');
-            var filtroLower = filtro.toLowerCase();
-            
-            var filtrados = [];
-            for (var i = 0; i < trabajadores.length; i++) {
-                var t = trabajadores[i];
-                var match = t.nombre.toLowerCase().indexOf(filtroLower) !== -1 ||
-                    (t.apellidos && t.apellidos.toLowerCase().indexOf(filtroLower) !== -1) ||
-                    (t.ci && t.ci.indexOf(filtroLower) !== -1);
-                if (!match) continue;
-                
-                if (estadoFiltro === 'activo') {
-                    if (!(t.activo === 1 || t.activo === true)) continue;
-                } else if (estadoFiltro === 'inactivo') {
-                    if (!(t.activo === 0 || t.activo === false)) continue;
-                }
-                filtrados.push(t);
+            let filtrados = trabajadores.filter(t => 
+                t.nombre.toLowerCase().includes(filtroLower) ||
+                (t.apellidos && t.apellidos.toLowerCase().includes(filtroLower)) ||
+                (t.ci && t.ci.includes(filtroLower))
+            );
+
+            if (estadoFiltro === 'activo') {
+                filtrados = filtrados.filter(t => t.activo === 1 || t.activo === true);
+            } else if (estadoFiltro === 'inactivo') {
+                filtrados = filtrados.filter(t => t.activo === 0 || t.activo === false);
             }
 
             if (filtrados.length === 0) {
@@ -702,154 +498,77 @@
                 return;
             }
 
-            var html = '<table class="tabla"><thead><tr>' +
-                '<th>Nombre</th><th>CI</th><th>Frecuencia</th><th>Salario</th><th>Módulos</th><th>Estado</th><th>Acciones</th>' +
-                '</tr></thead><tbody>';
+            let html = `<table class="tabla"><thead><tr>
+                <th>Nombre</th><th>CI</th><th>Cargo</th><th>Salario</th><th>Módulos</th><th>Estado</th><th>Acciones</th>
+            </tr></thead><tbody>`;
 
-            for (var i = 0; i < filtrados.length; i++) {
-                var t = filtrados[i];
-                var nombreCompleto = t.apellidos ? t.nombre + ' ' + t.apellidos : t.nombre;
-                var frecuenciaLabel = t.frecuencia === 'diaria' ? '🔄 Diaria' : '📅 Cada 2 días';
-                var frecuenciaClass = t.frecuencia === 'diaria' ? 'diaria' : 'cada2dias';
-                var estadoClass = t.activo ? 'activo' : 'inactivo';
-                var estadoLabel = t.activo ? '🟢 Activo' : '🔴 Inactivo';
+            filtrados.forEach(t => {
+                const nombreCompleto = t.apellidos ? `${t.nombre} ${t.apellidos}` : t.nombre;
+                const estadoClass = t.activo ? 'activo' : 'inactivo';
+                const estadoLabel = t.activo ? '🟢 Activo' : '🔴 Inactivo';
                 
-                var modulosHtml = '';
+                let modulosHtml = '';
                 if (t.modulos && t.modulos.length > 0) {
-                    var modulosList = Array.isArray(t.modulos) ? t.modulos : t.modulos.split(',');
-                    for (var j = 0; j < modulosList.length; j++) {
-                        var nombreMod = modulosList[j].trim();
-                        if (nombreMod) {
-                            modulosHtml += '<span class="badge" style="background:rgba(108,60,224,0.15);color:#6c3ce0;font-size:8px;margin:1px;">' + nombreMod + '</span>';
+                    const modulosList = Array.isArray(t.modulos) ? t.modulos : t.modulos.split(',');
+                    modulosList.slice(0, 3).forEach(m => {
+                        if (m.trim()) {
+                            modulosHtml += `<span class="badge" style="background:rgba(108,60,224,0.15);color:#6c3ce0;font-size:8px;margin:1px;">${m.trim()}</span>`;
                         }
+                    });
+                    if (modulosList.length > 3) {
+                        modulosHtml += `<span style="font-size:8px;color:#666;">+${modulosList.length - 3}</span>`;
                     }
                 } else {
                     modulosHtml = '<span style="color:#666;font-size:9px;">Sin módulos</span>';
                 }
                 
-                var btnEditarId = 'btnEditar_' + t.id;
-                var btnToggleId = 'btnToggle_' + t.id;
-                var btnEliminarId = 'btnEliminar_' + t.id;
-                
-                html += '<tr>' +
-                    '<td><strong>' + nombreCompleto + '</strong></td>' +
-                    '<td>' + (t.ci || '-') + '</td>' +
-                    '<td><span class="badge ' + frecuenciaClass + '">' + frecuenciaLabel + '</span></td>' +
-                    '<td>$' + (t.salario ? parseFloat(t.salario).toFixed(2) : '0.00') + '</td>' +
-                    '<td>' + modulosHtml + '</td>' +
-                    '<td><span class="badge ' + estadoClass + '">' + estadoLabel + '</span></td>' +
-                    '<td>' +
-                        '<div class="acciones-cell">' +
-                            '<button class="btn btn-warning btn-sm" id="' + btnEditarId + '">✏️</button>' +
-                            '<button class="btn ' + (t.activo ? 'btn-danger' : 'btn-success') + ' btn-sm" id="' + btnToggleId + '">' + (t.activo ? '🔴' : '🟢') + '</button>' +
-                            '<button class="btn btn-eliminar btn-sm" id="' + btnEliminarId + '">🗑️</button>' +
-                        '</div>' +
-                    '</td>' +
-                '</tr>';
-            }
+                html += `<tr>
+                    <td><strong>${nombreCompleto}</strong></td>
+                    <td>${t.ci || '-'}</td>
+                    <td>${t.cargo || '-'}</td>
+                    <td>$${(t.salario || 0).toFixed(2)}</td>
+                    <td>${modulosHtml}</td>
+                    <td><span class="badge ${estadoClass}">${estadoLabel}</span></td>
+                    <td>
+                        <div class="acciones-cell">
+                            <button class="btn btn-warning btn-sm" onclick="editarTrabajador(${t.id})">✏️</button>
+                            <button class="btn ${t.activo ? 'btn-danger' : 'btn-success'} btn-sm" onclick="toggleTrabajador(${t.id}, ${t.activo ? 0 : 1})">${t.activo ? '🔴' : '🟢'}</button>
+                            <button class="btn btn-eliminar btn-sm" onclick="abrirModalEliminar(${t.id})">🗑️</button>
+                        </div>
+                    </td>
+                </tr>`;
+            });
 
-            html += '</tbody></table>';
+            html += `</tbody></table>`;
             container.innerHTML = html;
-            
-            // ============================================
-            // AGREGAR EVENT LISTENERS CON IDs ÚNICOS
-            // ============================================
-            for (var i = 0; i < filtrados.length; i++) {
-                var t = filtrados[i];
-                
-                var btnEditar = document.getElementById('btnEditar_' + t.id);
-                if (btnEditar) {
-                    btnEditar.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        var id = parseInt(this.id.replace('btnEditar_', ''));
-                        editarTrabajador(id);
-                    });
-                }
-                
-                var btnToggle = document.getElementById('btnToggle_' + t.id);
-                if (btnToggle) {
-                    btnToggle.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        var id = parseInt(this.id.replace('btnToggle_', ''));
-                        var activo = this.classList.contains('btn-danger') ? 0 : 1;
-                        toggleTrabajador(id, activo);
-                    });
-                }
-                
-                var btnEliminar = document.getElementById('btnEliminar_' + t.id);
-                if (btnEliminar) {
-                    btnEliminar.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        var id = parseInt(this.id.replace('btnEliminar_', ''));
-                        abrirModalEliminar(id);
-                    });
-                }
-            }
         }
 
         function actualizarEstadisticas() {
-            var total = trabajadores.length;
-            var activos = 0;
-            var inactivos = 0;
-            var nomina = 0;
-            
-            for (var i = 0; i < trabajadores.length; i++) {
-                var t = trabajadores[i];
-                if (t.activo === 1 || t.activo === true) {
-                    activos++;
-                } else {
-                    inactivos++;
-                }
-                nomina += (parseFloat(t.salario) || 0);
-            }
+            const total = trabajadores.length;
+            const activos = trabajadores.filter(t => t.activo === 1 || t.activo === true).length;
+            const inactivos = total - activos;
+            const nomina = trabajadores.reduce((sum, t) => sum + (t.salario || 0), 0);
             
             document.getElementById('totalTrabajadores').textContent = total;
             document.getElementById('trabajadoresActivos').textContent = activos;
             document.getElementById('trabajadoresInactivos').textContent = inactivos;
-            document.getElementById('nominaTotal').textContent = '$' + nomina.toFixed(2);
+            document.getElementById('nominaTotal').textContent = `$${nomina.toFixed(2)}`;
         }
 
         function filtrarTrabajadores() {
-            var filtro = document.getElementById('searchInput').value;
-            var estado = document.getElementById('filtroEstado').value;
+            const filtro = document.getElementById('searchInput').value;
+            const estado = document.getElementById('filtroEstado').value;
             renderTrabajadores(filtro, estado);
         }
 
         // ============================================
         // FORMULARIO
         // ============================================
-        document.getElementById('btnNuevo').addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            mostrarFormulario();
-        });
-
-        document.getElementById('btnCancelar').addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            cancelarFormulario();
-        });
-
-        document.getElementById('btnGuardar').addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            guardarTrabajador();
-        });
-
-        document.getElementById('btnCancelarEliminar').addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            cerrarModalEliminar();
-        });
-
         function mostrarFormulario() {
             document.getElementById('formTrabajador').style.display = 'block';
             document.getElementById('traNombre').focus();
             editandoId = null;
-            document.getElementById('modalTitle').textContent = '👤 Nuevo Trabajador';
+            document.getElementById('formTitle').textContent = '👤 Nuevo Trabajador';
             document.getElementById('btnGuardar').textContent = '💾 Guardar';
             document.getElementById('btnGuardar').className = 'btn btn-success';
             document.getElementById('traId').value = '';
@@ -875,17 +594,8 @@
         }
 
         function editarTrabajador(id) {
-            var t = null;
-            for (var i = 0; i < trabajadores.length; i++) {
-                if (trabajadores[i].id === id) {
-                    t = trabajadores[i];
-                    break;
-                }
-            }
-            if (!t) {
-                mostrarMensaje('Trabajador no encontrado', 'error');
-                return;
-            }
+            const t = trabajadores.find(t => t.id === id);
+            if (!t) return;
             
             document.getElementById('formTrabajador').style.display = 'block';
             document.getElementById('traNombre').value = t.nombre || '';
@@ -901,7 +611,7 @@
             document.getElementById('traId').value = t.id;
             
             editandoId = id;
-            document.getElementById('modalTitle').textContent = '✏️ Editar Trabajador';
+            document.getElementById('formTitle').textContent = '✏️ Editar Trabajador';
             document.getElementById('btnGuardar').textContent = '💾 Actualizar';
             document.getElementById('btnGuardar').className = 'btn btn-warning';
             
@@ -912,17 +622,17 @@
         }
 
         async function guardarTrabajador() {
-            var nombre = document.getElementById('traNombre').value.trim();
-            var apellidos = document.getElementById('traApellidos').value.trim();
-            var ci = document.getElementById('traCI').value.trim();
-            var movil = document.getElementById('traMovil').value.trim();
-            var direccion = document.getElementById('traDireccion').value.trim();
-            var frecuencia = document.getElementById('traFrecuencia').value;
-            var salario = parseFloat(document.getElementById('traSalario').value);
-            var email = document.getElementById('traEmail').value.trim();
-            var usuario = document.getElementById('traUsuario').value.trim();
-            var password = document.getElementById('traPassword').value.trim();
-            var modulosSeleccionados = getModulosSeleccionados();
+            const nombre = document.getElementById('traNombre').value.trim();
+            const apellidos = document.getElementById('traApellidos').value.trim();
+            const ci = document.getElementById('traCI').value.trim();
+            const movil = document.getElementById('traMovil').value.trim();
+            const direccion = document.getElementById('traDireccion').value.trim();
+            const frecuencia = document.getElementById('traFrecuencia').value;
+            const salario = parseFloat(document.getElementById('traSalario').value);
+            const email = document.getElementById('traEmail').value.trim();
+            const usuario = document.getElementById('traUsuario').value.trim();
+            const password = document.getElementById('traPassword').value.trim();
+            const modulosSeleccionados = getModulosSeleccionados();
 
             if (!nombre || !apellidos || !ci || isNaN(salario) || !usuario) {
                 mostrarMensaje('Completa todos los campos obligatorios', 'error');
@@ -941,38 +651,31 @@
                 return;
             }
 
-            var data = {
-                nombre: nombre,
-                apellidos: apellidos,
-                ci: ci,
-                movil: movil,
-                direccion: direccion,
-                frecuencia: frecuencia,
-                salario: salario,
-                email: email,
-                usuario: usuario,
-                password: password,
+            const data = {
+                nombre, apellidos, ci, movil, direccion,
+                frecuencia, salario, email,
+                usuario, password,
                 modulos: modulosSeleccionados
             };
 
-            var btn = document.getElementById('btnGuardar');
-            var textoOriginal = btn.textContent;
+            const btn = document.getElementById('btnGuardar');
+            const textoOriginal = btn.textContent;
             btn.disabled = true;
             btn.textContent = '⏳ Guardando...';
 
             try {
-                var url = editandoId ? '/api/negocio/trabajador/' + editandoId : '/api/negocio/trabajador/crear';
-                var method = editandoId ? 'PUT' : 'POST';
+                const url = editandoId ? `/api/negocio/trabajador/${editandoId}` : '/api/negocio/trabajador/crear';
+                const method = editandoId ? 'PUT' : 'POST';
 
-                var response = await fetch(url, {
+                const response = await fetch(url, {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-                var result = await response.json();
+                const result = await response.json();
 
                 if (result.success) {
-                    mostrarMensaje('✅ ' + (editandoId ? 'Actualizado' : 'Creado') + ' "' + nombre + ' ' + apellidos + '"', 'exito');
+                    mostrarMensaje(`✅ ${editandoId ? 'Actualizado' : 'Creado'} "${nombre} ${apellidos}"`, 'exito');
                     cancelarFormulario();
                     await cargarTrabajadores();
                 } else {
@@ -989,13 +692,13 @@
 
         async function toggleTrabajador(id, activo) {
             try {
-                var response = await fetch('/api/usuario/' + id + '/toggle', {
+                const response = await fetch(`/api/usuario/${id}/toggle`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ activo: activo })
+                    body: JSON.stringify({ activo })
                 });
                 if (response.ok) {
-                    mostrarMensaje('✅ ' + (activo ? 'Activado' : 'Desactivado'), 'exito');
+                    mostrarMensaje(`✅ ${activo ? 'Activado' : 'Desactivado'}`, 'exito');
                     await cargarTrabajadores();
                 } else {
                     mostrarMensaje('Error', 'error');
@@ -1010,24 +713,15 @@
         // ELIMINAR TRABAJADOR
         // ============================================
         function abrirModalEliminar(id) {
-            var t = null;
-            for (var i = 0; i < trabajadores.length; i++) {
-                if (trabajadores[i].id === id) {
-                    t = trabajadores[i];
-                    break;
-                }
-            }
-            if (!t) {
-                mostrarMensaje('Trabajador no encontrado', 'error');
-                return;
-            }
+            const t = trabajadores.find(t => t.id === id);
+            if (!t) return;
             trabajadorAEliminar = t;
-            var nombreCompleto = t.apellidos ? t.nombre + ' ' + t.apellidos : t.nombre;
+            const nombreCompleto = t.apellidos ? `${t.nombre} ${t.apellidos}` : t.nombre;
             document.getElementById('nombreEliminar').textContent = nombreCompleto;
             document.getElementById('detalleNombre').textContent = nombreCompleto;
             document.getElementById('detalleCI').textContent = t.ci || '-';
             document.getElementById('detalleMovil').textContent = t.movil || '-';
-            document.getElementById('detalleSalario').textContent = '$' + (t.salario ? parseFloat(t.salario).toFixed(2) : '0.00');
+            document.getElementById('detalleSalario').textContent = `$${(t.salario || 0).toFixed(2)}`;
             document.getElementById('detalleEstado').textContent = t.activo ? '🟢 Activo' : '🔴 Inactivo';
             document.getElementById('modalEliminar').classList.add('show');
         }
@@ -1041,60 +735,56 @@
             if (e.target === this) { cerrarModalEliminar(); }
         });
 
-        document.getElementById('btnConfirmarEliminar').addEventListener('click', function(e) {
+        document.getElementById('btnCancelarEliminar').addEventListener('click', function(e) {
             e.preventDefault();
-            e.stopPropagation();
-            confirmarEliminar();
+            cerrarModalEliminar();
         });
 
-        async function confirmarEliminar() {
-            if (!trabajadorAEliminar) {
-                mostrarMensaje('No hay trabajador seleccionado', 'error');
-                return;
-            }
+        document.getElementById('btnConfirmarEliminar').addEventListener('click', async function(e) {
+            e.preventDefault();
+            if (!trabajadorAEliminar) return;
             
-            var btn = document.getElementById('btnConfirmarEliminar');
-            var textoOriginal = btn.textContent;
+            const btn = this;
+            const textoOriginal = btn.textContent;
             btn.disabled = true;
             btn.textContent = '⏳ Eliminando...';
             
             try {
-                var response = await fetch('/api/negocio/trabajador/' + trabajadorAEliminar.id, {
+                const response = await fetch(`/api/negocio/trabajador/${trabajadorAEliminar.id}`, {
                     method: 'DELETE'
                 });
-                
-                var data = await response.json();
+                const data = await response.json();
                 
                 if (data.success) {
-                    var nombre = trabajadorAEliminar.apellidos ? 
-                        trabajadorAEliminar.nombre + ' ' + trabajadorAEliminar.apellidos : 
+                    const nombre = trabajadorAEliminar.apellidos ? 
+                        `${trabajadorAEliminar.nombre} ${trabajadorAEliminar.apellidos}` : 
                         trabajadorAEliminar.nombre;
-                    mostrarMensaje('✅ "' + nombre + '" eliminado correctamente', 'exito');
+                    mostrarMensaje(`✅ "${nombre}" eliminado`, 'exito');
                     cerrarModalEliminar();
                     await cargarTrabajadores();
                 } else {
-                    mostrarMensaje(data.error || 'Error al eliminar el trabajador', 'error');
+                    mostrarMensaje(data.error || 'Error al eliminar', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión con el servidor: ' + error.message, 'error');
+                mostrarMensaje('Error de conexión', 'error');
             } finally {
                 btn.disabled = false;
                 btn.textContent = textoOriginal;
             }
-        }
+        });
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        document.getElementById('btnCancelar').addEventListener('click', cancelarFormulario);
 
         // ============================================
         // INICIO
         // ============================================
         cargarModulosDisponibles();
         cargarTrabajadores();
-        
-        setInterval(function() {
-            if (!cargando) {
-                cargarTrabajadores();
-            }
-        }, 30000);
+        setInterval(cargarTrabajadores, 30000);
     </script>
 </body>
 </html>
