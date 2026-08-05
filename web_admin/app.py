@@ -1,2409 +1,2534 @@
+# ============================================
+# web_admin/app.py
+# ============================================
+
+from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response
+from flask_cors import CORS
 import os
+import sys
+import logging
+import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import traceback
+import time
 from datetime import datetime, timedelta
-import bcrypt
-import json
+import io
+from functools import wraps
 import urllib.parse
 import random
 import string
-from calendar import monthrange
 
-DATABASE_URL = os.environ.get('DATABASE_URL', '')
+# ============================================
+# CONFIGURACIÓN DE LOGGING
+# ============================================
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-def get_db():
-    """Obtiene una conexión a PostgreSQL"""
-    if not DATABASE_URL:
-        raise Exception("DATABASE_URL no está configurada")
-    
-    url = DATABASE_URL.strip()
-    if not url.startswith('postgresql://') and not url.startswith('postgres://'):
-        url = 'postgresql://' + url
-    
-    parsed = urllib.parse.urlparse(url)
+# ============================================
+# CONFIGURACIÓN DE RUTAS
+# ============================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(BASE_DIR))
+
+# ============================================
+# CREAR CARPETAS PARA ARCHIVOS ESTÁTICOS
+# ============================================
+try:
+    os.makedirs(os.path.join(BASE_DIR, 'static/uploads/productos'), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, 'static/uploads/facturas'), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, 'static/img'), exist_ok=True)
+    print("📁 Carpetas de almacenamiento creadas/verificadas")
+except Exception as e:
+    print(f"⚠️ Error creando carpetas: {e}")
+
+# ============================================
+# IMPORTAR FUNCIONES DE LA BASE DE DATOS (VERSIÓN ABSOLUTA)
+# ============================================
+try:
+    from web_admin.database import (
+        init_db, crear_usuario, obtener_usuario_por_username,
+        obtener_usuario_por_id, obtener_todos_usuarios,
+        obtener_negocios, eliminar_usuario,
+        obtener_trabajadores_por_empresa, obtener_trabajador_por_id,
+        verify_password, actualizar_ultimo_acceso,
+        toggle_usuario, actualizar_rol_usuario, actualizar_tipo_usuario,
+        obtener_modulos, obtener_permisos_usuario,
+        asignar_permiso_usuario, toggle_modulo_global,
+        registrar_log, obtener_logs,
+        solicitar_modulo, obtener_solicitudes_pendientes,
+        aprobar_solicitud, rechazar_solicitud,
+        actualizar_datos_negocio, get_db,
+        hash_password,
+        crear_producto, obtener_productos, actualizar_producto, eliminar_producto,
+        obtener_todos_productos, obtener_productos_con_stock, actualizar_stock_producto,
+        obtener_productos_tienda,
+        agregar_producto_tienda, toggle_destacado_tienda, eliminar_producto_tienda,
+        crear_venta, obtener_ventas, obtener_todas_ventas, obtener_estadisticas_ventas,
+        eliminar_venta_con_reintegro,
+        actualizar_estado_venta,
+        crear_servicio, obtener_servicios, obtener_todos_servicios, toggle_servicio, eliminar_servicio,
+        obtener_estadisticas_trabajador,
+        crear_trabajador_negocio, toggle_trabajador_negocio, actualizar_trabajador_negocio,
+        obtener_trabajadores_pendientes, aprobar_trabajador, rechazar_trabajador,
+        actualizar_foto_producto, eliminar_foto_producto,
+        crear_contrato, obtener_contratos, obtener_todos_contratos,
+        actualizar_contrato, actualizar_estado_contrato, eliminar_contrato,
+        obtener_ultimo_numero_contrato, obtener_datos_negocio,
+        obtener_estadisticas_productos,
+        obtener_nomina_mes, calcular_nomina, obtener_nomina_trabajador,
+        obtener_comisiones_trabajador_mes, obtener_comisiones_negocio_mes,
+        registrar_comision, obtener_resumen_nomina,
+        obtener_negocio_de_trabajador,
+        obtener_dias_trabajados_mes, obtener_dias_ausencia_mes, obtener_dias_extras_mes,
+        obtener_total_comisiones_mes,
+        obtener_modulos_negocio, obtener_modulos_trabajador,
+        actualizar_ubicacion_usuario, obtener_ubicacion_usuario, obtener_negocios_con_ubicacion,
+        generar_numero_factura, obtener_ultimo_numero_factura, actualizar_ultimo_numero_factura,
+        registrar_asistencia,
+        generar_codigo_verificacion, guardar_codigo_verificacion,
+        verificar_codigo, marcar_usuario_verificado, obtener_codigos_pendientes,
+        obtener_productos_tienda_negocio,
+        obtener_empresas_con_contratos_activos,
+        obtener_resumen_contratos,
+        obtener_resumen_ingresos,
+        obtener_resumen_productos,
+        obtener_ventas_por_periodo,
+        obtener_productos_tienda_publica,
+        obtener_venta_por_id,
+        obtener_contrato_por_id,
+        actualizar_trabajador,
+        eliminar_trabajador_definitivo,
+        obtener_trabajador_completo,
+        obtener_asistencia_mes,
+        obtener_detalle_nomina,
+        obtener_contratos_activos_para_empresa,
+        obtener_ventas_con_filtros,
+        obtener_trabajadores_activos
+    )
+    from web_admin.auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
+    from web_admin.storage import get_storage_manager
+    from web_admin.reportes import GeneradorReportes
+    print("✅ Módulos importados correctamente")
+except ImportError as e:
+    print(f"❌ Error importando módulos: {e}")
+    traceback.print_exc()
+    # Fallback para ejecución directa
+    try:
+        from database import *
+        from auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
+        from storage import get_storage_manager
+        from reportes import GeneradorReportes
+        print("✅ Módulos importados desde local")
+    except ImportError as e2:
+        print(f"❌ Error importando desde local: {e2}")
+        traceback.print_exc()
+        # Fallback último
+        try:
+            from .database import *
+            from .auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
+            from .storage import get_storage_manager
+            from .reportes import GeneradorReportes
+            print("✅ Módulos importados desde relativo")
+        except ImportError as e3:
+            print(f"❌ Error en todos los intentos de importación: {e3}")
+            traceback.print_exc()
+
+# ============================================
+# CREAR APLICACIÓN FLASK
+# ============================================
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
+CORS(app)
+
+# ============================================
+# CONFIGURACIÓN DE CACHÉ (ANTI-CACHÉ)
+# ============================================
+@app.after_request
+def add_header(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
+
+# ============================================
+# DECORADORES
+# ============================================
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('token')
+        if not token:
+            return redirect(url_for('login'))
+        try:
+            usuario = obtener_usuario_sesion(token)
+            if not usuario:
+                return redirect(url_for('login'))
+            return f(*args, **kwargs)
+        except Exception as e:
+            print(f"❌ Error en login_required: {e}")
+            return redirect(url_for('login'))
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('token')
+        if not token:
+            return redirect(url_for('login'))
+        try:
+            usuario = obtener_usuario_sesion(token)
+            if not usuario or usuario.get('rol') != 'admin':
+                return jsonify({'error': 'Acceso denegado'}), 403
+            return f(*args, **kwargs)
+        except Exception as e:
+            print(f"❌ Error en admin_required: {e}")
+            return jsonify({'error': 'Error de autenticación'}), 401
+    return decorated_function
+
+# ============================================
+# RUTAS PRINCIPALES
+# ============================================
+
+@app.route('/')
+def index():
+    token = request.cookies.get('token')
+    if token:
+        try:
+            usuario = obtener_usuario_sesion(token)
+            if usuario:
+                return redirect(url_for('dashboard'))
+        except:
+            pass
+    return redirect(url_for('login'))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'GET':
+        return render_template('login.html')
     
     try:
-        conn = psycopg2.connect(
-            host=parsed.hostname or 'localhost',
-            port=parsed.port or 5432,
-            database=parsed.path.lstrip('/') if parsed.path else '',
-            user=parsed.username or '',
-            password=parsed.password or '',
-            sslmode='require'
-        )
-        return conn
+        if not request.is_json:
+            return jsonify({'error': 'Content-Type debe ser application/json'}), 415
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Datos inválidos'}), 400
+        
+        username = data.get('username')
+        password = data.get('password')
+        
+        if not username or not password:
+            return jsonify({'error': 'Usuario y contraseña son requeridos'}), 400
+        
+        usuario = obtener_usuario_por_username(username)
+        
+        if not usuario:
+            return jsonify({'error': 'Usuario o contraseña incorrectos'}), 401
+        
+        if usuario.get('activo') != 1:
+            return jsonify({'error': 'Usuario desactivado'}), 401
+        
+        if not verify_password(password, usuario.get('password_hash')):
+            return jsonify({'error': 'Usuario o contraseña incorrectos'}), 401
+        
+        token = crear_sesion(usuario.get('id'))
+        actualizar_ultimo_acceso(usuario.get('id'))
+        registrar_log(usuario.get('id'), 'login', 'Inicio de sesión')
+        
+        response = jsonify({
+            'success': True,
+            'usuario': {
+                'id': usuario.get('id'),
+                'username': usuario.get('username'),
+                'nombre': usuario.get('nombre'),
+                'rol': usuario.get('rol'),
+                'tipo': usuario.get('tipo')
+            }
+        })
+        response.set_cookie('token', token, httponly=True, max_age=604800)
+        return response
+        
     except Exception as e:
-        print(f"❌ Error de conexión: {e}")
-        raise
+        print(f"❌ Error en login: {e}")
+        traceback.print_exc()
+        return jsonify({'error': 'Error interno del servidor'}), 500
 
-def init_db():
-    """Inicializa la base de datos con PostgreSQL"""
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'GET':
+        return render_template('register.html')
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Datos inválidos'}), 400
+        
+        username = data.get('username')
+        email = data.get('email')
+        password = data.get('password')
+        nombre = data.get('nombre')
+        tipo = data.get('tipo', 'cliente')
+        datos_negocio = data.get('datos_negocio')
+        rol = data.get('rol', 'usuario')
+        
+        if not username or not email or not password:
+            return jsonify({'error': 'Todos los campos son requeridos'}), 400
+        
+        if len(password) < 6:
+            return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
+        
+        if obtener_usuario_por_username(username):
+            return jsonify({'error': 'El nombre de usuario ya está en uso'}), 400
+        
+        user_id = crear_usuario(username, email, password, nombre, rol, tipo, datos_negocio)
+        
+        if not user_id:
+            return jsonify({'error': 'Error al crear el usuario'}), 500
+        
+        marcar_usuario_verificado(user_id)
+        
+        registrar_log(user_id, 'registro', f'Usuario registrado: {username} (tipo: {tipo})')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Usuario registrado correctamente',
+            'user_id': user_id,
+            'verificado': True
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en register: {e}")
+        traceback.print_exc()
+        return jsonify({'error': f'Error interno del servidor: {str(e)}'}), 500
+
+@app.route('/verificar')
+def verificar():
+    return redirect(url_for('login'))
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return redirect(url_for('login'))
+    
+    try:
+        print(f"🔍 Dashboard - Usuario: {usuario.get('username')}, Rol: {usuario.get('rol')}, Tipo: {usuario.get('tipo')}")
+        
+        if usuario.get('rol') == 'admin':
+            return render_template('admin/dashboard.html', usuario=usuario)
+        elif usuario.get('rol') == 'trabajador':
+            return render_template('trabajador/dashboard.html', usuario=usuario)
+        elif usuario.get('tipo') == 'negocio':
+            return render_template('negocio/dashboard.html', usuario=usuario)
+        else:
+            return render_template('cliente/dashboard.html', usuario=usuario)
+    except Exception as e:
+        print(f"❌ Error en dashboard: {e}")
+        return render_template('login.html')
+
+@app.route('/perfil')
+@login_required
+def perfil_usuario():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return redirect(url_for('login'))
+    
+    return render_template('perfil.html', usuario=usuario)
+
+@app.route('/logout')
+def logout():
+    response = redirect(url_for('login'))
+    response.delete_cookie('token')
+    return response
+
+# ============================================
+# ADMIN - PERFIL Y GESTOR DB
+# ============================================
+@app.route('/admin/perfil')
+@admin_required
+def admin_perfil():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('admin/perfil.html', usuario=usuario)
+
+@app.route('/admin/db')
+@admin_required
+def admin_db():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('admin/db_manager.html', usuario=usuario)
+
+@app.route('/admin/trabajadores/pendientes')
+@admin_required
+def admin_trabajadores_pendientes():
+    return render_template('admin/trabajadores_pendientes.html')
+
+# ============================================
+# RUTAS DE MÓDULOS DE NEGOCIO
+# ============================================
+@app.route('/negocio/inventario')
+@login_required
+def negocio_inventario():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('negocio/inventario.html', usuario=usuario, version=int(time.time()))
+
+@app.route('/negocio/tienda')
+@login_required
+def negocio_tienda():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('negocio/tienda.html', usuario=usuario, version=int(time.time()))
+
+@app.route('/negocio/trabajadores')
+@login_required
+def negocio_trabajadores():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('negocio/trabajadores.html', usuario=usuario, version=int(time.time()))
+
+@app.route('/negocio/servicios')
+@login_required
+def negocio_servicios():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('negocio/servicios.html', usuario=usuario, version=int(time.time()))
+
+@app.route('/negocio/ventas')
+@login_required
+def negocio_ventas():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('negocio/ventas.html', usuario=usuario, version=int(time.time()))
+
+@app.route('/negocio/contratos')
+@login_required
+def negocio_contratos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('negocio/contratos.html', usuario=usuario, version=int(time.time()))
+
+@app.route('/negocio/nomina')
+@login_required
+def negocio_nomina():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('negocio/nomina.html', usuario=usuario, version=int(time.time()))
+
+@app.route('/negocio/mapa')
+@login_required
+def negocio_mapa():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('negocio/mapa.html', usuario=usuario, version=int(time.time()))
+
+# ============================================
+# API - PERFIL DE USUARIO
+# ============================================
+@app.route('/api/usuario/perfil', methods=['GET'])
+@login_required
+def api_obtener_perfil_usuario():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    datos_negocio = {}
+    if usuario.get('datos_negocio'):
+        try:
+            datos_negocio = json.loads(usuario['datos_negocio']) if isinstance(usuario['datos_negocio'], str) else usuario['datos_negocio']
+        except:
+            datos_negocio = {}
+    
+    return jsonify({
+        'success': True,
+        'usuario': {
+            'id': usuario.get('id'),
+            'username': usuario.get('username'),
+            'email': usuario.get('email'),
+            'nombre': usuario.get('nombre'),
+            'rol': usuario.get('rol'),
+            'tipo': usuario.get('tipo'),
+            'fecha_registro': usuario.get('fecha_registro'),
+            'telefono': datos_negocio.get('telefono', ''),
+            'provincia': datos_negocio.get('provincia', ''),
+            'municipio': datos_negocio.get('municipio', ''),
+            'direccion': datos_negocio.get('direccion', ''),
+            'nombre_negocio': datos_negocio.get('nombre_negocio', ''),
+            'ruc': datos_negocio.get('ruc', ''),
+            'descripcion': datos_negocio.get('descripcion', ''),
+            'salario': datos_negocio.get('salario', 0)
+        }
+    })
+
+@app.route('/api/usuario/perfil', methods=['PUT'])
+@login_required
+def api_actualizar_perfil_usuario():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    
+    nombre = data.get('nombre')
+    email = data.get('email')
+    telefono = data.get('telefono')
+    provincia = data.get('provincia')
+    municipio = data.get('municipio')
+    direccion = data.get('direccion')
+    nombre_negocio = data.get('nombre_negocio')
+    ruc = data.get('ruc')
+    descripcion = data.get('descripcion')
+    salario = data.get('salario', 0)
+    
+    if not nombre:
+        return jsonify({'error': 'El nombre es obligatorio'}), 400
+    
+    if not telefono:
+        return jsonify({'error': 'El teléfono es obligatorio'}), 400
+    
+    if not provincia or not municipio:
+        return jsonify({'error': 'Provincia y municipio son obligatorios'}), 400
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (usuario['id'],))
+    result = cursor.fetchone()
+    
+    datos_negocio = {}
+    if result and result[0]:
+        try:
+            datos_negocio = json.loads(result[0]) if isinstance(result[0], str) else result[0]
+        except:
+            datos_negocio = {}
+    
+    datos_negocio.update({
+        'telefono': telefono,
+        'provincia': provincia,
+        'municipio': municipio,
+        'direccion': direccion or '',
+        'salario': salario
+    })
+    
+    if usuario.get('tipo') == 'negocio':
+        datos_negocio.update({
+            'nombre_negocio': nombre_negocio or datos_negocio.get('nombre_negocio', ''),
+            'ruc': ruc or datos_negocio.get('ruc', ''),
+            'descripcion': descripcion or datos_negocio.get('descripcion', '')
+        })
+    
+    cursor.execute('''
+        UPDATE usuarios 
+        SET nombre = %s, email = %s, datos_negocio = %s
+        WHERE id = %s
+    ''', (nombre, email, json.dumps(datos_negocio, ensure_ascii=False), usuario['id']))
+    
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'perfil_actualizado', 'Perfil de usuario actualizado')
+    
+    return jsonify({
+        'success': True,
+        'message': 'Perfil actualizado correctamente'
+    })
+
+@app.route('/api/usuario/ubicacion', methods=['GET'])
+@login_required
+def api_obtener_ubicacion_usuario():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    datos = obtener_datos_negocio(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'provincia': datos.get('provincia', ''),
+        'municipio': datos.get('municipio', ''),
+        'tiene_ubicacion': bool(datos.get('provincia') and datos.get('municipio'))
+    })
+
+@app.route('/api/perfil')
+@admin_required
+def api_perfil():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return jsonify({
+        'success': True,
+        'usuario': {
+            'id': usuario.get('id'),
+            'username': usuario.get('username'),
+            'email': usuario.get('email'),
+            'nombre': usuario.get('nombre'),
+            'rol': usuario.get('rol'),
+            'fecha_registro': usuario.get('fecha_registro')
+        }
+    })
+
+@app.route('/api/perfil/password', methods=['POST'])
+@admin_required
+def api_perfil_password():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    data = request.get_json()
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    
+    if not current_password or not new_password:
+        return jsonify({'error': 'Todos los campos son requeridos'}), 400
+    
+    if len(new_password) < 6:
+        return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
+    
+    if not verify_password(current_password, usuario.get('password_hash')):
+        return jsonify({'error': 'Contraseña actual incorrecta'}), 401
+    
+    new_hash = hash_password(new_password)
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE usuarios SET password_hash = %s WHERE id = %s', (new_hash, usuario['id']))
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'cambio_password', 'Contraseña actualizada')
+    
+    return jsonify({'success': True, 'message': 'Contraseña actualizada correctamente'})
+
+# ============================================
+# API - ESTADÍSTICAS
+# ============================================
+@app.route('/api/estadisticas')
+@admin_required
+def api_estadisticas():
+    usuarios = obtener_todos_usuarios()
+    logs = obtener_logs(100)
+    
+    total = len(usuarios)
+    activos = len([u for u in usuarios if u.get('activo') == 1])
+    trabajadores = len([u for u in usuarios if u.get('rol') == 'trabajador'])
+    
+    hoy = datetime.now().date()
+    registros_hoy = 0
+    for l in logs:
+        try:
+            if datetime.fromisoformat(l.get('fecha', '')).date() == hoy:
+                registros_hoy += 1
+        except:
+            pass
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM productos')
+    total_productos = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM ventas')
+    total_ventas = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM servicios')
+    total_servicios = cursor.fetchone()[0]
+    cursor.execute('SELECT COUNT(*) FROM contratos')
+    total_contratos = cursor.fetchone()[0]
+    conn.close()
+    
+    return jsonify({
+        'total_usuarios': total,
+        'usuarios_activos': activos,
+        'total_trabajadores': trabajadores,
+        'registros_hoy': registros_hoy,
+        'total_logs': len(logs),
+        'total_productos': total_productos,
+        'total_ventas': total_ventas,
+        'total_servicios': total_servicios,
+        'total_contratos': total_contratos
+    })
+
+# ============================================
+# API - USUARIOS
+# ============================================
+@app.route('/api/usuarios')
+@admin_required
+def api_usuarios():
+    usuarios = obtener_todos_usuarios()
+    return jsonify([dict(u) for u in usuarios])
+
+@app.route('/api/usuario/<int:user_id>')
+@admin_required
+def api_usuario(user_id):
+    usuario = obtener_usuario_por_id(user_id)
+    if not usuario:
+        return jsonify({'error': 'Usuario no encontrado'}), 404
+    
+    permisos = obtener_permisos_usuario(user_id)
+    return jsonify({
+        'usuario': dict(usuario),
+        'permisos': [dict(p) for p in permisos]
+    })
+
+@app.route('/api/usuario/<int:user_id>/toggle', methods=['POST'])
+@admin_required
+def api_toggle_usuario(user_id):
+    data = request.get_json()
+    activo = data.get('activo', 1)
+    toggle_usuario(user_id, activo)
+    registrar_log(None, 'usuario_toggle', f'Usuario {user_id} activo={activo}')
+    return jsonify({'success': True})
+
+@app.route('/api/usuario/<int:user_id>/rol', methods=['POST'])
+@admin_required
+def api_actualizar_rol(user_id):
+    data = request.get_json()
+    rol = data.get('rol', 'usuario')
+    if rol not in ['usuario', 'admin', 'trabajador']:
+        return jsonify({'error': 'Rol inválido'}), 400
+    actualizar_rol_usuario(user_id, rol)
+    registrar_log(None, 'usuario_rol', f'Usuario {user_id} rol={rol}')
+    return jsonify({'success': True})
+
+@app.route('/api/usuario/<int:user_id>/tipo', methods=['POST'])
+@admin_required
+def api_actualizar_tipo(user_id):
+    data = request.get_json()
+    tipo = data.get('tipo', 'cliente')
+    if tipo not in ['cliente', 'negocio']:
+        return jsonify({'error': 'Tipo inválido'}), 400
+    actualizar_tipo_usuario(user_id, tipo)
+    registrar_log(None, 'usuario_tipo', f'Usuario {user_id} tipo={tipo}')
+    return jsonify({'success': True})
+
+@app.route('/api/usuario/<int:user_id>/permisos')
+@login_required
+def api_permisos_usuario(user_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    if not usuario or (usuario.get('id') != user_id and usuario.get('rol') != 'admin'):
+        return jsonify({'error': 'No autorizado'}), 403
+    
+    permisos = obtener_permisos_usuario(user_id)
+    return jsonify([dict(p) for p in permisos])
+
+@app.route('/api/usuario/<int:user_id>/permiso/<int:modulo_id>', methods=['POST'])
+@admin_required
+def api_asignar_permiso(user_id, modulo_id):
+    data = request.get_json()
+    activo = data.get('activo', 1)
+    asignar_permiso_usuario(user_id, modulo_id, activo)
+    registrar_log(None, 'permiso_usuario', f'Usuario {user_id} módulo {modulo_id} activo={activo}')
+    return jsonify({'success': True})
+
+# ============================================
+# API - MÓDULOS (GLOBAL)
+# ============================================
+@app.route('/api/modulo/<int:modulo_id>/toggle', methods=['POST'])
+@admin_required
+def api_toggle_modulo_global(modulo_id):
+    try:
+        data = request.get_json()
+        activo = data.get('activo', 1)
+        exito = toggle_modulo_global(modulo_id, activo)
+        if exito:
+            registrar_log(None, 'modulo_global', f'Módulo {modulo_id} activo={activo}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al actualizar el módulo'}), 500
+    except Exception as e:
+        print(f"❌ Error en toggle_modulo_global: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/modulos')
+@login_required
+def api_modulos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        if usuario.get('rol') == 'admin':
+            modulos = obtener_modulos()
+        else:
+            tipo_usuario = usuario.get('tipo') if usuario else 'cliente'
+            modulos = obtener_modulos(tipo_usuario)
+        
+        resultado = []
+        for m in modulos:
+            resultado.append({
+                'id': m.get('id'),
+                'nombre': m.get('nombre'),
+                'descripcion': m.get('descripcion'),
+                'activo_global': m.get('activo_global'),
+                'tipo_requerido': m.get('tipo_requerido')
+            })
+        
+        return jsonify(resultado)
+    except Exception as e:
+        print(f"❌ Error en api_modulos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - NEGOCIOS
+# ============================================
+@app.route('/api/negocios')
+@admin_required
+def api_negocios():
+    negocios = obtener_negocios()
+    return jsonify([dict(n) for n in negocios])
+
+@app.route('/api/negocios/cercanos', methods=['GET'])
+@login_required
+def api_negocios_cercanos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        datos_usuario = obtener_datos_negocio(usuario['id'])
+        provincia = datos_usuario.get('provincia')
+        municipio = datos_usuario.get('municipio')
+        
+        if not provincia or not municipio:
+            return jsonify({
+                'success': True,
+                'negocios': [],
+                'message': 'Actualiza tu ubicación en el perfil para ver negocios cercanos'
+            })
+        
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute('''
+            SELECT id, username, nombre, datos_negocio, activo, fecha_registro
+            FROM usuarios 
+            WHERE tipo = 'negocio' 
+            AND activo = 1
+            AND datos_negocio IS NOT NULL
+            AND datos_negocio LIKE %s
+            AND datos_negocio LIKE %s
+            ORDER BY id DESC
+        ''', (f'%"provincia": "{provincia}"%', f'%"municipio": "{municipio}"%'))
+        
+        negocios = cursor.fetchall()
+        conn.close()
+        
+        resultado = []
+        for n in negocios:
+            datos = {}
+            if n.get('datos_negocio'):
+                try:
+                    datos = json.loads(n['datos_negocio']) if isinstance(n['datos_negocio'], str) else n['datos_negocio']
+                except:
+                    pass
+            
+            resultado.append({
+                'id': n.get('id'),
+                'username': n.get('username'),
+                'nombre': n.get('nombre') or datos.get('nombre_negocio', n.get('username')),
+                'telefono': datos.get('telefono', ''),
+                'direccion': datos.get('direccion', ''),
+                'descripcion': datos.get('descripcion', ''),
+                'activo': n.get('activo')
+            })
+        
+        return jsonify({
+            'success': True,
+            'negocios': resultado,
+            'provincia': provincia,
+            'municipio': municipio,
+            'total': len(resultado)
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_negocios_cercanos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - NEGOCIOS CON UBICACIÓN PARA MAPA
+# ============================================
+@app.route('/api/negocios/mapa', methods=['GET'])
+@login_required
+def api_negocios_mapa():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    negocio_id = None
+    if usuario.get('rol') == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+    
+    if usuario.get('tipo') == 'negocio':
+        negocios = obtener_negocios_con_ubicacion(usuario['id'])
+    else:
+        negocios = obtener_negocios_con_ubicacion()
+    
+    return jsonify({
+        'success': True,
+        'negocios': negocios
+    })
+
+# ============================================
+# API - UBICACIÓN
+# ============================================
+@app.route('/api/ubicacion/actualizar', methods=['POST'])
+@login_required
+def api_actualizar_ubicacion():
+    try:
+        token = request.cookies.get('token')
+        usuario = obtener_usuario_sesion(token)
+        
+        if not usuario:
+            return jsonify({'error': 'No autorizado'}), 401
+        
+        data = request.get_json()
+        latitud = data.get('latitud')
+        longitud = data.get('longitud')
+        
+        if latitud is None or longitud is None:
+            return jsonify({'error': 'Latitud y longitud son requeridas'}), 400
+        
+        try:
+            latitud = float(latitud)
+            longitud = float(longitud)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Coordenadas inválidas'}), 400
+        
+        if not (-90 <= latitud <= 90) or not (-180 <= longitud <= 180):
+            return jsonify({'error': 'Coordenadas fuera de rango'}), 400
+        
+        exito = actualizar_ubicacion_usuario(usuario['id'], latitud, longitud)
+        
+        if exito:
+            registrar_log(usuario['id'], 'ubicacion_actualizada', f'Lat: {latitud}, Lng: {longitud}')
+            return jsonify({'success': True, 'message': 'Ubicación actualizada correctamente'})
+        else:
+            return jsonify({'error': 'Error al actualizar la ubicación'}), 500
+            
+    except Exception as e:
+        print(f"❌ Error en api_actualizar_ubicacion: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ubicacion/obtener', methods=['GET'])
+@login_required
+def api_obtener_ubicacion():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    ubicacion = obtener_ubicacion_usuario(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'ubicacion': {
+            'latitud': ubicacion.get('latitud') if ubicacion else None,
+            'longitud': ubicacion.get('longitud') if ubicacion else None,
+            'actualizada': ubicacion.get('ubicacion_actualizada') if ubicacion else None,
+            'tiene_ubicacion': ubicacion and ubicacion.get('latitud') is not None
+        }
+    })
+
+# ============================================
+# API - SQL QUERY
+# ============================================
+@app.route('/api/sql', methods=['POST'])
+@admin_required
+def api_sql():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    data = request.get_json()
+    query = data.get('query', '').strip()
+    
+    if not query:
+        return jsonify({'error': 'La consulta SQL está vacía'}), 400
+    
+    if not query.lower().startswith('select'):
+        return jsonify({'error': 'Solo se permiten consultas SELECT'}), 403
+    
     try:
         conn = get_db()
         cursor = conn.cursor()
-        print("✅ Conectado a PostgreSQL")
-    except Exception as e:
-        print(f"❌ Error de conexión: {e}")
-        return
-    
-    # ============================================
-    # TABLA USUARIOS (con verificado)
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS usuarios (
-        id SERIAL PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        nombre TEXT,
-        rol TEXT DEFAULT 'usuario',
-        tipo TEXT DEFAULT 'cliente',
-        activo INTEGER DEFAULT 1,
-        aprobado INTEGER DEFAULT 1,
-        verificado INTEGER DEFAULT 0,
-        fecha_registro TEXT NOT NULL,
-        ultimo_acceso TEXT,
-        datos_negocio TEXT,
-        latitud REAL,
-        longitud REAL,
-        ubicacion_actualizada TEXT
-    )
-    ''')
-    
-    # ============================================
-    # TABLA SESIONES
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS sesiones (
-        id SERIAL PRIMARY KEY,
-        usuario_id INTEGER NOT NULL,
-        token TEXT UNIQUE NOT NULL,
-        fecha_creacion TEXT NOT NULL,
-        fecha_expiracion TEXT NOT NULL,
-        activo INTEGER DEFAULT 1,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-    )
-    ''')
-    
-    # ============================================
-    # TABLA MODULOS
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS modulos (
-        id SERIAL PRIMARY KEY,
-        nombre TEXT UNIQUE NOT NULL,
-        descripcion TEXT,
-        activo_global INTEGER DEFAULT 1,
-        tipo_requerido TEXT DEFAULT 'ambos'
-    )
-    ''')
-    
-    # ============================================
-    # TABLA PERMISOS_USUARIO
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS permisos_usuario (
-        id SERIAL PRIMARY KEY,
-        usuario_id INTEGER NOT NULL,
-        modulo_id INTEGER NOT NULL,
-        activo INTEGER DEFAULT 1,
-        fecha_solicitud TEXT,
-        estado_solicitud TEXT DEFAULT 'aprobado',
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (modulo_id) REFERENCES modulos(id) ON DELETE CASCADE,
-        UNIQUE(usuario_id, modulo_id)
-    )
-    ''')
-    
-    # ============================================
-    # TABLA LOGS
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS logs (
-        id SERIAL PRIMARY KEY,
-        usuario_id INTEGER,
-        accion TEXT,
-        detalle TEXT,
-        fecha TEXT NOT NULL,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
-    )
-    ''')
-    
-    # ============================================
-    # TABLA PRODUCTOS
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS productos (
-        id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        nombre TEXT NOT NULL,
-        categoria TEXT,
-        precio REAL NOT NULL,
-        costo REAL DEFAULT 0,
-        comision REAL DEFAULT 0,
-        stock INTEGER DEFAULT 0,
-        stock_minimo INTEGER DEFAULT 3,
-        foto_url TEXT,
-        foto_public_id TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE
-    )
-    ''')
-    
-    # ============================================
-    # TABLA PRODUCTOS_TIENDA
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS productos_tienda (
-        id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        producto_id INTEGER NOT NULL,
-        destacado INTEGER DEFAULT 0,
-        created_at TEXT NOT NULL,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE CASCADE
-    )
-    ''')
-    
-    # ============================================
-    # TABLA VENTAS
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS ventas (
-        id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        trabajador_id INTEGER,
-        cliente TEXT NOT NULL,
-        producto TEXT NOT NULL,
-        producto_id INTEGER,
-        cantidad INTEGER DEFAULT 1,
-        precio REAL NOT NULL,
-        total REAL NOT NULL,
-        estado TEXT DEFAULT 'pagado',
-        empresa TEXT,
-        tipo TEXT DEFAULT 'producto',
-        factura_url TEXT,
-        factura TEXT,
-        transferencia_id TEXT,
-        transferencia_cedula TEXT,
-        transferencia_banco TEXT,
-        transferencia_fecha TEXT,
-        fecha TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE SET NULL,
-        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
-    )
-    ''')
-    
-    # ============================================
-    # TABLA SERVICIOS
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS servicios (
-        id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        trabajador_id INTEGER,
-        nombre TEXT NOT NULL,
-        categoria TEXT,
-        precio REAL NOT NULL,
-        duracion INTEGER DEFAULT 60,
-        activo INTEGER DEFAULT 1,
-        descripcion TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE SET NULL
-    )
-    ''')
-    
-    # ============================================
-    # TABLA TRABAJADORES_NEGOCIO
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS trabajadores_negocio (
-        id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        trabajador_id INTEGER NOT NULL,
-        activo INTEGER DEFAULT 1,
-        cargo TEXT,
-        salario REAL DEFAULT 0,
-        fecha_contratacion TEXT NOT NULL,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        UNIQUE(negocio_id, trabajador_id)
-    )
-    ''')
-    
-    # ============================================
-    # TABLA CONTRATOS
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS contratos (
-        id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        trabajador_id INTEGER,
-        empresa TEXT NOT NULL,
-        numero_contrato TEXT UNIQUE NOT NULL,
-        fecha_inicio TEXT NOT NULL,
-        fecha_fin TEXT NOT NULL,
-        tipo TEXT NOT NULL DEFAULT 'ventas',
-        monto REAL DEFAULT 0,
-        estado TEXT DEFAULT 'activo',
-        descripcion TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE SET NULL
-    )
-    ''')
-    
-    # ============================================
-    # TABLA FACTURAS_SECUENCIA
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS facturas_secuencia (
-        id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        empresa TEXT NOT NULL,
-        ultimo_numero INTEGER DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        UNIQUE(negocio_id, empresa)
-    )
-    ''')
-    
-    # ============================================
-    # TABLA ASISTENCIA
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS asistencia (
-        id SERIAL PRIMARY KEY,
-        trabajador_id INTEGER NOT NULL,
-        negocio_id INTEGER NOT NULL,
-        fecha DATE NOT NULL,
-        presente INTEGER DEFAULT 1,
-        horas_trabajadas REAL DEFAULT 8,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        UNIQUE(trabajador_id, fecha)
-    )
-    ''')
-    
-    # ============================================
-    # TABLA COMISIONES_TRABAJADOR
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS comisiones_trabajador (
-        id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        trabajador_id INTEGER NOT NULL,
-        venta_id INTEGER NOT NULL,
-        producto_id INTEGER,
-        monto REAL NOT NULL DEFAULT 0,
-        fecha DATE NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (venta_id) REFERENCES ventas(id) ON DELETE CASCADE,
-        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
-    )
-    ''')
-    
-    # ============================================
-    # TABLA NOMINA
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS nomina (
-        id SERIAL PRIMARY KEY,
-        negocio_id INTEGER NOT NULL,
-        trabajador_id INTEGER NOT NULL,
-        mes INTEGER NOT NULL,
-        ano INTEGER NOT NULL,
-        salario_base REAL NOT NULL DEFAULT 0,
-        dias_trabajados INTEGER DEFAULT 0,
-        dias_ausencia INTEGER DEFAULT 0,
-        dias_extras INTEGER DEFAULT 0,
-        salario_devengado REAL DEFAULT 0,
-        comisiones REAL DEFAULT 0,
-        total REAL DEFAULT 0,
-        creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        actualizado_en TIMESTAMP,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-        UNIQUE(negocio_id, trabajador_id, mes, ano)
-    )
-    ''')
-    
-    # ============================================
-    # TABLA CODIGOS_VERIFICACION
-    # ============================================
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS codigos_verificacion (
-        id SERIAL PRIMARY KEY,
-        usuario_id INTEGER NOT NULL,
-        codigo TEXT NOT NULL,
-        email TEXT NOT NULL,
-        creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        expira_en TIMESTAMP NOT NULL,
-        usado INTEGER DEFAULT 0,
-        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-    )
-    ''')
-    
-    # ============================================
-    # INSERTAR MÓDULOS
-    # ============================================
-    cursor.execute("SELECT COUNT(*) FROM modulos")
-    if cursor.fetchone()[0] == 0:
-        modulos = [
-            ('voz', 'Texto a voz y reconocimiento de voz', 1, 'ambos'),
-            ('control_pc', 'Control de mouse, teclado y programas', 1, 'negocio'),
-            ('busqueda_web', 'Búsqueda en internet con DeepSeek', 1, 'ambos'),
-            ('memoria', 'Memoria vectorial para recordar conversaciones', 1, 'ambos'),
-            ('archivos', 'Lectura de archivos PDF, Word, Excel', 1, 'negocio'),
-            ('contexto', 'Contexto de conversación', 1, 'ambos'),
-            ('android', 'Conexión con dispositivos Android', 1, 'negocio'),
-            ('inventario', 'Gestión de inventario y productos', 1, 'negocio'),
-            ('tienda', 'Tienda online para clientes', 1, 'negocio'),
-            ('trabajadores', 'Gestión de trabajadores y empleados', 1, 'negocio'),
-            ('servicios', 'Gestión de servicios ofrecidos', 1, 'negocio'),
-            ('ventas', 'Gestión de ventas y facturación', 1, 'negocio'),
-            ('contratos', 'Gestión de contratos con clientes', 1, 'negocio'),
-            ('nomina', 'Gestión de nómina y salarios', 1, 'negocio'),
-            ('mapa', 'Ubicación en mapa interactivo', 1, 'negocio'),
-        ]
-        cursor.executemany(
-            'INSERT INTO modulos (nombre, descripcion, activo_global, tipo_requerido) VALUES (%s, %s, %s, %s)',
-            modulos
-        )
-        print("✅ Módulos insertados")
-    
-    # ============================================
-    # CREAR USUARIO ADMIN
-    # ============================================
-    cursor.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'admin'")
-    if cursor.fetchone()[0] == 0:
-        salt = bcrypt.gensalt()
-        password_hash = bcrypt.hashpw('admin123'.encode('utf-8'), salt).decode('utf-8')
-        fecha = datetime.now().isoformat()
-        cursor.execute('''
-        INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado, verificado)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1, 1)
-        ''', ('admin', 'admin@aisa.com', password_hash, 'Administrador', 'admin', 'admin', fecha))
+        cursor.execute(query)
         
-        admin_id = cursor.lastrowid
-        cursor.execute("SELECT id FROM modulos")
-        for mod in cursor.fetchall():
-            cursor.execute('''
-            INSERT INTO permisos_usuario (usuario_id, modulo_id, activo)
-            VALUES (%s, %s, 1)
-            ''', (admin_id, mod[0]))
-        print("✅ Usuario admin creado (admin/admin123)")
-    
-    conn.commit()
-    conn.close()
-    print("✅ Base de datos inicializada correctamente")
-
-# ============================================
-# FUNCIONES DE USUARIOS
-# ============================================
-
-def hash_password(password):
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
-
-def verify_password(password, password_hash):
-    return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
-
-def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='cliente', datos_negocio=None):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        password_hash = hash_password(password)
-        fecha = datetime.now().isoformat()
-        
-        if datos_negocio and isinstance(datos_negocio, dict):
-            # Asegurar campos mínimos
-            for key in ['provincia', 'municipio', 'nombre_negocio', 'ruc', 'telefono', 'direccion', 'descripcion', 'salario']:
-                if key not in datos_negocio:
-                    datos_negocio[key] = ''
-            if 'salario' not in datos_negocio:
-                datos_negocio['salario'] = 0
-            datos_negocio = json.dumps(datos_negocio, ensure_ascii=False)
-        elif datos_negocio and isinstance(datos_negocio, str):
-            pass
-        else:
-            datos_negocio = None
-        
-        # Si es trabajador, se verifica automáticamente
-        verificado = 1 if rol == 'trabajador' else 0
-        aprobado = 1 if rol == 'trabajador' else 0
-        
-        cursor.execute('''
-        INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado, verificado, datos_negocio)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, 1, %s, %s, %s)
-        RETURNING id
-        ''', (username, email, password_hash, nombre, rol, tipo, fecha, aprobado, verificado, datos_negocio))
-        
-        user_id = cursor.fetchone()[0]
-        
-        # Si es admin, activar todo
-        if rol == 'admin':
-            cursor.execute('UPDATE usuarios SET verificado = 1, aprobado = 1 WHERE id = %s', (user_id,))
-        
-        # Asignar permisos según tipo
-        if rol != 'trabajador':
-            if tipo == 'negocio':
-                cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'negocio'))
-            else:
-                cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'cliente'))
-            
-            for mod in cursor.fetchall():
-                cursor.execute('''
-                INSERT INTO permisos_usuario (usuario_id, modulo_id, activo)
-                VALUES (%s, %s, 1)
-                ''', (user_id, mod[0]))
-        
-        conn.commit()
-        print(f"✅ Usuario creado: {username} (ID: {user_id}) - Tipo: {tipo} - Verificado: {verificado}")
-        return user_id
-        
-    except Exception as e:
-        print(f"❌ Error al crear usuario: {e}")
-        import traceback
-        traceback.print_exc()
-        conn.rollback()
-        return None
-    finally:
+        column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+        rows = cursor.fetchall()
         conn.close()
-
-def obtener_usuario_por_username(username):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT * FROM usuarios WHERE username = %s', (username,))
-    user = cursor.fetchone()
-    conn.close()
-    return user
-
-def obtener_usuario_por_id(user_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT * FROM usuarios WHERE id = %s', (user_id,))
-    user = cursor.fetchone()
-    conn.close()
-    return user
-
-def obtener_todos_usuarios():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT * FROM usuarios ORDER BY id')
-    usuarios = cursor.fetchall()
-    conn.close()
-    return usuarios
-
-def obtener_negocios():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT id, username, email, nombre, activo, fecha_registro, datos_negocio FROM usuarios WHERE tipo = %s', ('negocio',))
-    negocios = cursor.fetchall()
-    conn.close()
-    return negocios
-
-def eliminar_usuario(user_id):
-    """Elimina un usuario y todos sus datos relacionados"""
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        # Verificar si el usuario existe
-        cursor.execute("SELECT id, username, rol FROM usuarios WHERE id = %s", (user_id,))
-        usuario = cursor.fetchone()
-        if not usuario:
-            print(f"⚠️ Usuario {user_id} no encontrado")
-            conn.close()
-            return False
         
-        print(f"🗑️ Eliminando usuario: {usuario[1]} (ID: {user_id}) - Rol: {usuario[2]}")
+        result = []
+        for row in rows:
+            result.append(dict(zip(column_names, row)))
         
-        # ============================================
-        # ELIMINAR EN ORDEN CORRECTO
-        # ============================================
-        
-        # 1. Eliminar códigos de verificación
-        cursor.execute("DELETE FROM codigos_verificacion WHERE usuario_id = %s", (user_id,))
-        print(f"   ✅ Códigos de verificación eliminados")
-        
-        # 2. Eliminar sesiones
-        cursor.execute("DELETE FROM sesiones WHERE usuario_id = %s", (user_id,))
-        print(f"   ✅ Sesiones eliminadas")
-        
-        # 3. Eliminar permisos
-        cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (user_id,))
-        print(f"   ✅ Permisos eliminados")
-        
-        # 4. Eliminar trabajadores_negocio
-        cursor.execute("DELETE FROM trabajadores_negocio WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        print(f"   ✅ Trabajadores_Negocio eliminados")
-        
-        # 5. Eliminar comisiones_trabajador
-        cursor.execute("DELETE FROM comisiones_trabajador WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        print(f"   ✅ Comisiones eliminadas")
-        
-        # 6. Eliminar asistencia
-        cursor.execute("DELETE FROM asistencia WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        print(f"   ✅ Asistencia eliminada")
-        
-        # 7. Eliminar nomina
-        cursor.execute("DELETE FROM nomina WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        print(f"   ✅ Nómina eliminada")
-        
-        # 8. Eliminar contratos
-        cursor.execute("DELETE FROM contratos WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        print(f"   ✅ Contratos eliminados")
-        
-        # 9. ELIMINAR VENTAS
-        cursor.execute("UPDATE ventas SET producto_id = NULL WHERE producto_id IN (SELECT id FROM productos WHERE negocio_id = %s)", (user_id,))
-        cursor.execute("DELETE FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        print(f"   ✅ Ventas eliminadas")
-        
-        # 10. Eliminar productos_tienda
-        cursor.execute("DELETE FROM productos_tienda WHERE negocio_id = %s", (user_id,))
-        print(f"   ✅ Productos_Tienda eliminados")
-        
-        # 11. Eliminar productos
-        cursor.execute("DELETE FROM productos WHERE negocio_id = %s", (user_id,))
-        print(f"   ✅ Productos eliminados")
-        
-        # 12. Eliminar servicios
-        cursor.execute("DELETE FROM servicios WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        print(f"   ✅ Servicios eliminados")
-        
-        # 13. Eliminar logs
-        cursor.execute("DELETE FROM logs WHERE usuario_id = %s", (user_id,))
-        print(f"   ✅ Logs eliminados")
-        
-        # 14. Eliminar facturas_secuencia
-        cursor.execute("DELETE FROM facturas_secuencia WHERE negocio_id = %s", (user_id,))
-        print(f"   ✅ Facturas secuencia eliminadas")
-        
-        # 15. FINALMENTE eliminar el usuario
-        cursor.execute("DELETE FROM usuarios WHERE id = %s", (user_id,))
-        print(f"   ✅ Usuario eliminado")
-        
-        conn.commit()
-        conn.close()
-        print(f"✅ Usuario {usuario[1]} (ID: {user_id}) eliminado correctamente")
-        return True
-        
+        return jsonify({'result': result})
     except psycopg2.Error as e:
-        print(f"❌ Error SQL eliminando usuario {user_id}: {e}")
-        conn.rollback()
-        conn.close()
-        return False
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
-        print(f"❌ Error eliminando usuario {user_id}: {e}")
-        conn.rollback()
-        conn.close()
-        return False
-
-def actualizar_ultimo_acceso(user_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET ultimo_acceso = %s WHERE id = %s',
-                   (datetime.now().isoformat(), user_id))
-    conn.commit()
-    conn.close()
-
-def toggle_usuario(user_id, activo):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET activo = %s WHERE id = %s', (activo, user_id))
-    conn.commit()
-    conn.close()
-
-def actualizar_rol_usuario(user_id, rol):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET rol = %s WHERE id = %s', (rol, user_id))
-    conn.commit()
-    conn.close()
-
-def actualizar_tipo_usuario(user_id, tipo):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET tipo = %s WHERE id = %s', (tipo, user_id))
-    conn.commit()
-    conn.close()
-
-def actualizar_datos_negocio(user_id, datos):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET datos_negocio = %s WHERE id = %s', (json.dumps(datos, ensure_ascii=False), user_id))
-    conn.commit()
-    conn.close()
-
-def obtener_datos_negocio(user_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (user_id,))
-    result = cursor.fetchone()
-    conn.close()
-    if result and result[0]:
-        try:
-            return json.loads(result[0])
-        except:
-            return {}
-    return {}
-
-def obtener_negocio_de_trabajador(trabajador_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT negocio_id FROM trabajadores_negocio 
-            WHERE trabajador_id = %s AND activo = 1
-        ''', (trabajador_id,))
-        resultado = cursor.fetchone()
-        conn.close()
-        if resultado:
-            return resultado[0]
-        return None
-    except Exception as e:
-        print(f"❌ Error en obtener_negocio_de_trabajador: {e}")
-        conn.close()
-        return None
+        return jsonify({'error': str(e)}), 500
 
 # ============================================
-# FUNCIONES DE VERIFICACIÓN POR CORREO
+# API - VERIFICAR USUARIO (DEBUG)
 # ============================================
-
-def generar_codigo_verificacion():
-    """Genera un código de 6 dígitos aleatorio"""
-    return ''.join(random.choices(string.digits, k=6))
-
-def guardar_codigo_verificacion(usuario_id, email, codigo):
-    """Guarda un código de verificación en la base de datos"""
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        expira = (datetime.now() + timedelta(minutes=15)).isoformat()
-        cursor.execute('''
-            INSERT INTO codigos_verificacion (usuario_id, email, codigo, expira_en, usado)
-            VALUES (%s, %s, %s, %s, 0)
-        ''', (usuario_id, email, codigo, expira))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"❌ Error guardando código de verificación: {e}")
-        conn.rollback()
-        conn.close()
-        return False
-
-def verificar_codigo(email, codigo):
-    """Verifica si un código es válido y lo marca como usado"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute('''
-            SELECT * FROM codigos_verificacion 
-            WHERE email = %s AND codigo = %s AND usado = 0 AND expira_en > %s
-            ORDER BY id DESC LIMIT 1
-        ''', (email, codigo, datetime.now().isoformat()))
-        registro = cursor.fetchone()
-        
-        if registro:
-            # Marcar como usado
-            cursor.execute('''
-                UPDATE codigos_verificacion SET usado = 1 
-                WHERE id = %s
-            ''', (registro['id'],))
-            conn.commit()
-            conn.close()
-            return registro
-        conn.close()
-        return None
-    except Exception as e:
-        print(f"❌ Error verificando código: {e}")
-        conn.close()
-        return None
-
-def marcar_usuario_verificado(user_id):
-    """Marca un usuario como verificado"""
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            UPDATE usuarios SET verificado = 1, aprobado = 1
-            WHERE id = %s
-        ''', (user_id,))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"❌ Error marcando usuario como verificado: {e}")
-        conn.rollback()
-        conn.close()
-        return False
-
-def obtener_codigos_pendientes(email):
-    """Obtiene códigos pendientes para un email"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute('''
-            SELECT * FROM codigos_verificacion 
-            WHERE email = %s AND usado = 0 AND expira_en > %s
-            ORDER BY id DESC
-        ''', (email, datetime.now().isoformat()))
-        registros = cursor.fetchall()
-        conn.close()
-        return registros
-    except Exception as e:
-        print(f"❌ Error obteniendo códigos pendientes: {e}")
-        conn.close()
-        return []
-
-# ============================================
-# FUNCIONES DE UBICACIÓN
-# ============================================
-
-def actualizar_ubicacion_usuario(user_id, latitud, longitud):
-    """Actualiza la ubicación de un usuario en el mapa"""
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            UPDATE usuarios 
-            SET latitud = %s, longitud = %s, ubicacion_actualizada = %s
-            WHERE id = %s
-        ''', (latitud, longitud, datetime.now().isoformat(), user_id))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"❌ Error al actualizar ubicación: {e}")
-        conn.rollback()
-        conn.close()
-        return False
-
-def obtener_ubicacion_usuario(user_id):
-    """Obtiene la ubicación de un usuario"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-        SELECT latitud, longitud, ubicacion_actualizada, datos_negocio
-        FROM usuarios 
-        WHERE id = %s
-    ''', (user_id,))
-    resultado = cursor.fetchone()
-    conn.close()
-    return resultado
-
-def obtener_negocios_con_ubicacion(negocio_id=None):
-    """Obtiene todos los negocios con ubicación registrada"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    
-    if negocio_id:
-        cursor.execute('''
-            SELECT id, username, nombre, latitud, longitud, datos_negocio, ubicacion_actualizada
-            FROM usuarios 
-            WHERE tipo = 'negocio' AND latitud IS NOT NULL AND longitud IS NOT NULL AND id = %s
-        ''', (negocio_id,))
-    else:
-        cursor.execute('''
-            SELECT id, username, nombre, latitud, longitud, datos_negocio, ubicacion_actualizada
-            FROM usuarios 
-            WHERE tipo = 'negocio' AND latitud IS NOT NULL AND longitud IS NOT NULL
-            ORDER BY nombre ASC
-        ''')
-    
-    negocios = cursor.fetchall()
-    conn.close()
-    
-    resultado = []
-    for n in negocios:
-        datos = {}
-        if n.get('datos_negocio'):
-            try:
-                datos = json.loads(n['datos_negocio']) if isinstance(n['datos_negocio'], str) else n['datos_negocio']
-            except:
-                pass
-        
-        resultado.append({
-            'id': n['id'],
-            'username': n['username'],
-            'nombre': n['nombre'] or datos.get('nombre_negocio', n['username']),
-            'latitud': float(n['latitud']) if n['latitud'] else None,
-            'longitud': float(n['longitud']) if n['longitud'] else None,
-            'direccion': datos.get('direccion', ''),
-            'telefono': datos.get('telefono', ''),
-            'descripcion': datos.get('descripcion', ''),
-            'ubicacion_actualizada': n['ubicacion_actualizada']
+@app.route('/api/verificar-usuario/<username>', methods=['GET'])
+@admin_required
+def verificar_usuario(username):
+    usuario = obtener_usuario_por_username(username)
+    if usuario:
+        return jsonify({
+            'exists': True,
+            'usuario': {
+                'id': usuario.get('id'),
+                'username': usuario.get('username'),
+                'email': usuario.get('email'),
+                'tipo': usuario.get('tipo'),
+                'rol': usuario.get('rol'),
+                'verificado': usuario.get('verificado')
+            }
         })
+    return jsonify({'exists': False, 'message': 'Usuario no encontrado'})
+
+# ============================================
+# API - PRODUCTOS
+# ============================================
+
+@app.route('/api/productos', methods=['GET'])
+@login_required
+def api_obtener_productos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
     
-    return resultado
-
-# ============================================
-# FUNCIONES DE MÓDULOS
-# ============================================
-
-def obtener_modulos(tipo_usuario=None):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    if tipo_usuario:
-        cursor.execute('SELECT * FROM modulos WHERE tipo_requerido IN (%s, %s) ORDER BY nombre', ('ambos', tipo_usuario))
-    else:
-        cursor.execute('SELECT * FROM modulos ORDER BY nombre')
-    modulos = cursor.fetchall()
-    conn.close()
-    return modulos
-
-def obtener_permisos_usuario(user_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT m.id, m.nombre, m.descripcion, m.activo_global, m.tipo_requerido, 
-           p.activo as permiso_activo, p.estado_solicitud
-    FROM modulos m
-    LEFT JOIN permisos_usuario p ON m.id = p.modulo_id AND p.usuario_id = %s
-    ORDER BY m.nombre
-    ''', (user_id,))
-    permisos = cursor.fetchall()
-    conn.close()
-    return permisos
-
-def asignar_permiso_usuario(user_id, modulo_id, activo):
-    conn = get_db()
-    cursor = conn.cursor()
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
     try:
-        cursor.execute('''
-            INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud)
-            VALUES (%s, %s, %s, 'aprobado')
-            ON CONFLICT (usuario_id, modulo_id) DO UPDATE SET 
-                activo = %s, 
-                estado_solicitud = 'aprobado'
-        ''', (user_id, modulo_id, activo, activo))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"❌ Error en asignar_permiso_usuario: {e}")
-        conn.rollback()
-        conn.close()
-        return False
-
-def toggle_modulo_global(modulo_id, activo):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('UPDATE modulos SET activo_global = %s WHERE id = %s', (activo, modulo_id))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"❌ Error en toggle_modulo_global: {e}")
-        conn.rollback()
-        conn.close()
-        return False
-
-def solicitar_modulo(user_id, modulo_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    fecha = datetime.now().isoformat()
-    cursor.execute('''
-    INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud, fecha_solicitud)
-    VALUES (%s, %s, 0, 'pendiente', %s)
-    ON CONFLICT (usuario_id, modulo_id) DO UPDATE SET
-        activo = 0, estado_solicitud = 'pendiente', fecha_solicitud = %s
-    ''', (user_id, modulo_id, fecha, fecha))
-    conn.commit()
-    conn.close()
-
-def obtener_solicitudes_pendientes():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT p.*, u.username, u.nombre, m.nombre as modulo_nombre
-    FROM permisos_usuario p
-    JOIN usuarios u ON p.usuario_id = u.id
-    JOIN modulos m ON p.modulo_id = m.id
-    WHERE p.estado_solicitud = 'pendiente'
-    ORDER BY p.fecha_solicitud DESC
-    ''')
-    solicitudes = cursor.fetchall()
-    conn.close()
-    return solicitudes
-
-def aprobar_solicitud(permiso_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE permisos_usuario SET activo = 1, estado_solicitud = %s WHERE id = %s',
-                   ('aprobado', permiso_id))
-    conn.commit()
-    conn.close()
-
-def rechazar_solicitud(permiso_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE permisos_usuario SET activo = 0, estado_solicitud = %s WHERE id = %s',
-                   ('rechazado', permiso_id))
-    conn.commit()
-    conn.close()
-
-# ============================================
-# FUNCIONES DE LOGS
-# ============================================
-
-def registrar_log(usuario_id, accion, detalle=""):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO logs (usuario_id, accion, detalle, fecha) VALUES (%s, %s, %s, %s)',
-                   (usuario_id, accion, detalle, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-
-def obtener_logs(limit=50):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT l.*, u.username FROM logs l
-    LEFT JOIN usuarios u ON l.usuario_id = u.id
-    ORDER BY l.fecha DESC LIMIT %s
-    ''', (limit,))
-    logs = cursor.fetchall()
-    conn.close()
-    return logs
-
-# ============================================
-# FUNCIONES PARA PRODUCTOS
-# ============================================
-
-def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, stock=0, stock_minimo=3):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-        INSERT INTO productos (negocio_id, nombre, categoria, precio, costo, comision, stock, stock_minimo, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (negocio_id, nombre, categoria, precio, costo, comision, stock, stock_minimo, datetime.now().isoformat()))
-        conn.commit()
-        producto_id = cursor.lastrowid
-        conn.close()
-        return producto_id
-    except Exception as e:
-        print(f"❌ Error al crear producto: {e}")
-        conn.rollback()
-        conn.close()
-        return None
-
-def obtener_productos(negocio_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT * FROM productos WHERE negocio_id = %s ORDER BY id DESC', (negocio_id,))
-    productos = cursor.fetchall()
-    conn.close()
-    return productos
-
-def obtener_todos_productos():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT p.*, u.username as negocio_username
-    FROM productos p JOIN usuarios u ON p.negocio_id = u.id ORDER BY p.id DESC
-    ''')
-    productos = cursor.fetchall()
-    conn.close()
-    return productos
-
-def obtener_productos_con_stock(negocio_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT id, nombre, precio, costo, comision, stock FROM productos WHERE negocio_id = %s AND stock > 0 ORDER BY nombre',
-                   (negocio_id,))
-    productos = cursor.fetchall()
-    conn.close()
-    return productos
-
-def obtener_productos_tienda_publica(provincia=None, municipio=None):
-    """Obtiene productos de la tienda pública con filtro de ubicación"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    
-    query = '''
-        SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url, 
-               p.negocio_id, u.username as negocio_username, u.nombre as negocio_nombre,
-               u.datos_negocio, pt.destacado
-        FROM productos p 
-        JOIN usuarios u ON p.negocio_id = u.id
-        LEFT JOIN productos_tienda pt ON p.id = pt.producto_id AND pt.negocio_id = u.id
-        WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0
-    '''
-    
-    params = []
-    
-    if provincia and municipio:
-        query += ' AND u.datos_negocio LIKE %s AND u.datos_negocio LIKE %s'
-        params.append(f'%"provincia": "{provincia}"%')
-        params.append(f'%"municipio": "{municipio}"%')
-    elif provincia:
-        query += ' AND u.datos_negocio LIKE %s'
-        params.append(f'%"provincia": "{provincia}"%')
-    
-    query += ' ORDER BY pt.destacado DESC, p.id DESC'
-    
-    cursor.execute(query, params)
-    productos = cursor.fetchall()
-    conn.close()
-    
-    resultado = []
-    for p in productos:
-        datos = {}
-        if p.get('datos_negocio'):
-            try:
-                datos = json.loads(p['datos_negocio']) if isinstance(p['datos_negocio'], str) else p['datos_negocio']
-            except:
-                pass
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        resultado.append({
-            'id': p['id'],
-            'nombre': p['nombre'],
-            'categoria': p.get('categoria'),
-            'precio': float(p['precio']),
-            'stock': p['stock'],
-            'foto_url': p.get('foto_url'),
-            'negocio_id': p['negocio_id'],
-            'negocio_username': p.get('negocio_username'),
-            'negocio_nombre': p.get('negocio_nombre') or datos.get('nombre_negocio', p.get('negocio_username')),
-            'destacado': p.get('destacado', 0),
-            'provincia': datos.get('provincia', ''),
-            'municipio': datos.get('municipio', ''),
-            'direccion': datos.get('direccion', '')
-        })
-    
-    return resultado
-
-def obtener_productos_tienda_negocio(negocio_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT pt.id as tienda_id, p.*, pt.destacado
-    FROM productos_tienda pt
-    JOIN productos p ON pt.producto_id = p.id
-    WHERE pt.negocio_id = %s ORDER BY pt.destacado DESC, p.id DESC
-    ''', (negocio_id,))
-    productos = cursor.fetchall()
-    conn.close()
-    return productos
-
-def agregar_producto_tienda(negocio_id, producto_id, destacado=0):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-    INSERT INTO productos_tienda (negocio_id, producto_id, destacado, created_at)
-    VALUES (%s, %s, %s, %s)
-    ''', (negocio_id, producto_id, destacado, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-
-def toggle_destacado_tienda(tienda_id, destacado):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE productos_tienda SET destacado = %s WHERE id = %s', (destacado, tienda_id))
-    conn.commit()
-    conn.close()
-
-def eliminar_producto_tienda(tienda_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM productos_tienda WHERE id = %s', (tienda_id,))
-    conn.commit()
-    conn.close()
-
-def actualizar_producto(producto_id, nombre, categoria, precio, costo, comision, stock, stock_minimo):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-        UPDATE productos 
-        SET nombre = %s, categoria = %s, precio = %s, costo = %s, comision = %s,
-        stock = %s, stock_minimo = %s, updated_at = %s 
-        WHERE id = %s
-        ''', (nombre, categoria, precio, costo, comision, stock, stock_minimo, datetime.now().isoformat(), producto_id))
-        conn.commit()
-        conn.close()
-        return True
+        productos = obtener_productos(negocio_id)
+        return jsonify([dict(p) for p in productos])
     except Exception as e:
-        print(f"❌ Error al actualizar producto: {e}")
-        conn.rollback()
-        conn.close()
-        return False
+        print(f"❌ Error en api_obtener_productos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-def actualizar_foto_producto(producto_id, foto_url, foto_public_id=None):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE productos 
-        SET foto_url = %s, foto_public_id = %s, updated_at = %s 
-        WHERE id = %s
-    ''', (foto_url, foto_public_id, datetime.now().isoformat(), producto_id))
-    conn.commit()
-    conn.close()
-
-def eliminar_foto_producto(producto_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE productos 
-        SET foto_url = NULL, foto_public_id = NULL, updated_at = %s 
-        WHERE id = %s
-    ''', (datetime.now().isoformat(), producto_id))
-    conn.commit()
-    conn.close()
-
-def eliminar_producto(producto_id):
-    conn = get_db()
-    cursor = conn.cursor()
+@app.route('/api/productos', methods=['POST'])
+@login_required
+def api_crear_producto():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'admin':
+        return jsonify({'error': 'Solo los negocios pueden crear productos'}), 403
+    
+    data = request.get_json()
+    nombre = data.get('nombre')
+    categoria = data.get('categoria')
+    precio = data.get('precio')
+    costo = data.get('costo', 0)
+    comision = data.get('comision', 0)
+    stock = data.get('stock', 0)
+    stock_minimo = data.get('stock_minimo', 3)
+    
+    if not nombre or not categoria or precio is None:
+        return jsonify({'error': 'Nombre, categoría y precio son obligatorios'}), 400
+    
     try:
-        cursor.execute('SELECT id, nombre, negocio_id FROM productos WHERE id = %s', (producto_id,))
-        producto = cursor.fetchone()
-        if not producto:
-            conn.close()
-            return False
-        
-        cursor.execute('DELETE FROM productos_tienda WHERE producto_id = %s', (producto_id,))
-        cursor.execute('DELETE FROM productos WHERE id = %s', (producto_id,))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"❌ Error eliminando producto {producto_id}: {e}")
-        conn.rollback()
-        conn.close()
-        return False
-
-def actualizar_stock_producto(producto_id, cantidad):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-    UPDATE productos SET stock = stock - %s, updated_at = %s WHERE id = %s AND stock >= %s
-    ''', (cantidad, datetime.now().isoformat(), producto_id, cantidad))
-    filas = cursor.rowcount
-    conn.commit()
-    conn.close()
-    return filas > 0
-
-def obtener_estadisticas_productos(negocio_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s', (negocio_id,))
-    total = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock > 0 AND stock <= stock_minimo', (negocio_id,))
-    stock_bajo = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock = 0', (negocio_id,))
-    agotados = cursor.fetchone()[0]
-    
-    cursor.execute('SELECT COALESCE(SUM(precio * stock), 0) FROM productos WHERE negocio_id = %s', (negocio_id,))
-    valor_total = cursor.fetchone()[0]
-    
-    conn.close()
-    return {'total': total, 'stock_bajo': stock_bajo, 'agotados': agotados, 'valor_total': valor_total}
-
-# ============================================
-# FUNCIONES PARA TRABAJADORES
-# ============================================
-
-def obtener_trabajadores_por_empresa(empresa_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute('''
-            SELECT u.id, u.username, u.email, u.nombre, u.activo, 
-                   u.datos_negocio, u.fecha_registro,
-                   tn.cargo, tn.salario, tn.fecha_contratacion
-            FROM trabajadores_negocio tn
-            JOIN usuarios u ON tn.trabajador_id = u.id
-            WHERE tn.negocio_id = %s AND u.activo = 1
-            ORDER BY u.nombre ASC
-        ''', (empresa_id,))
-        trabajadores = cursor.fetchall()
-        conn.close()
-        return trabajadores
-    except Exception as e:
-        print(f"❌ Error en obtener_trabajadores_por_empresa: {e}")
-        conn.close()
-        return []
-
-def obtener_trabajador_por_id(user_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT u.id, u.username, u.email, u.nombre, u.activo, 
-           u.datos_negocio, u.fecha_registro,
-           STRING_AGG(m.nombre, ',') as modulos
-    FROM usuarios u
-    LEFT JOIN permisos_usuario p ON u.id = p.usuario_id
-    LEFT JOIN modulos m ON p.modulo_id = m.id AND p.activo = 1
-    WHERE u.id = %s AND u.rol = 'trabajador'
-    GROUP BY u.id
-    ''', (user_id,))
-    trabajador = cursor.fetchone()
-    conn.close()
-    return trabajador
-
-def obtener_trabajador_completo(user_id):
-    """Obtiene un trabajador con todos sus datos incluyendo módulos y relación con negocio"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute('''
-            SELECT u.id, u.username, u.email, u.nombre, u.activo, 
-                   u.datos_negocio, u.fecha_registro,
-                   tn.cargo, tn.salario, tn.fecha_contratacion, tn.activo as relacion_activa,
-                   tn.negocio_id
-            FROM usuarios u
-            LEFT JOIN trabajadores_negocio tn ON u.id = tn.trabajador_id
-            WHERE u.id = %s AND u.rol = 'trabajador'
-        ''', (user_id,))
-        trabajador = cursor.fetchone()
-        
-        if trabajador:
-            # Obtener módulos del trabajador
-            cursor.execute('''
-                SELECT m.nombre
-                FROM permisos_usuario p
-                JOIN modulos m ON p.modulo_id = m.id
-                WHERE p.usuario_id = %s AND p.activo = 1
-            ''', (user_id,))
-            modulos = cursor.fetchall()
-            trabajador['modulos'] = [m['nombre'] for m in modulos]
-        
-        conn.close()
-        return trabajador
-    except Exception as e:
-        print(f"❌ Error en obtener_trabajador_completo: {e}")
-        conn.close()
-        return None
-
-def obtener_trabajadores_activos(negocio_id):
-    """Obtiene trabajadores activos de un negocio"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute('''
-            SELECT u.id, u.username, u.email, u.nombre, u.activo, 
-                   u.datos_negocio,
-                   tn.cargo, tn.salario
-            FROM trabajadores_negocio tn
-            JOIN usuarios u ON tn.trabajador_id = u.id
-            WHERE tn.negocio_id = %s AND tn.activo = 1 AND u.activo = 1
-            ORDER BY u.nombre ASC
-        ''', (negocio_id,))
-        trabajadores = cursor.fetchall()
-        conn.close()
-        return trabajadores
-    except Exception as e:
-        print(f"❌ Error en obtener_trabajadores_activos: {e}")
-        conn.close()
-        return []
-
-def crear_trabajador_negocio(negocio_id, trabajador_id, cargo, salario):
-    conn = get_db()
-    cursor = conn.cursor()
-    fecha = datetime.now().isoformat()
-    cursor.execute('''
-    INSERT INTO trabajadores_negocio (negocio_id, trabajador_id, cargo, salario, fecha_contratacion, activo)
-    VALUES (%s, %s, %s, %s, %s, 1)
-    ON CONFLICT (negocio_id, trabajador_id) DO UPDATE SET
-        cargo = EXCLUDED.cargo, salario = EXCLUDED.salario,
-        fecha_contratacion = EXCLUDED.fecha_contratacion, activo = 1
-    ''', (negocio_id, trabajador_id, cargo, salario, fecha))
-    conn.commit()
-    conn.close()
-
-def toggle_trabajador_negocio(negocio_id, trabajador_id, activo):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE trabajadores_negocio SET activo = %s WHERE negocio_id = %s AND trabajador_id = %s',
-                   (activo, negocio_id, trabajador_id))
-    conn.commit()
-    conn.close()
-
-def actualizar_trabajador_negocio(negocio_id, trabajador_id, cargo, salario):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE trabajadores_negocio SET cargo = %s, salario = %s WHERE negocio_id = %s AND trabajador_id = %s',
-                   (cargo, salario, negocio_id, trabajador_id))
-    conn.commit()
-    conn.close()
-
-def actualizar_trabajador(trabajador_id, datos):
-    """Actualiza los datos de un trabajador"""
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        nombre = datos.get('nombre')
-        apellidos = datos.get('apellidos')
-        ci = datos.get('ci')
-        movil = datos.get('movil')
-        direccion = datos.get('direccion')
-        frecuencia = datos.get('frecuencia')
-        salario = datos.get('salario')
-        email = datos.get('email')
-        modulos = datos.get('modulos')
-        
-        # Actualizar datos_negocio
-        cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (trabajador_id,))
-        result = cursor.fetchone()
-        datos_negocio = {}
-        if result and result[0]:
-            try:
-                datos_negocio = json.loads(result[0]) if isinstance(result[0], str) else result[0]
-            except:
-                pass
-        
-        datos_negocio.update({
-            'nombre': nombre or datos_negocio.get('nombre', ''),
-            'apellidos': apellidos or datos_negocio.get('apellidos', ''),
-            'ci': ci or datos_negocio.get('ci', ''),
-            'movil': movil or datos_negocio.get('movil', ''),
-            'direccion': direccion or datos_negocio.get('direccion', ''),
-            'frecuencia': frecuencia or datos_negocio.get('frecuencia', 'diaria')
-        })
-        
-        cursor.execute('''
-            UPDATE usuarios 
-            SET nombre = %s, email = %s, datos_negocio = %s
-            WHERE id = %s
-        ''', (nombre, email, json.dumps(datos_negocio, ensure_ascii=False), trabajador_id))
-        
-        # Actualizar salario en trabajadores_negocio
-        if salario is not None:
-            cursor.execute('''
-                UPDATE trabajadores_negocio SET salario = %s
-                WHERE trabajador_id = %s
-            ''', (salario, trabajador_id))
-        
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"❌ Error en actualizar_trabajador: {e}")
-        conn.rollback()
-        conn.close()
-        return False
-
-def eliminar_trabajador_definitivo(trabajador_id):
-    """Elimina un trabajador de forma definitiva (usando eliminar_usuario)"""
-    return eliminar_usuario(trabajador_id)
-
-def obtener_trabajadores_pendientes():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT id, username, email, nombre, fecha_registro
-    FROM usuarios WHERE rol = 'trabajador' AND aprobado = 0 AND activo = 1
-    ORDER BY fecha_registro DESC
-    ''')
-    trabajadores = cursor.fetchall()
-    conn.close()
-    return trabajadores
-
-def aprobar_trabajador(user_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET aprobado = 1 WHERE id = %s', (user_id,))
-    conn.commit()
-    conn.close()
-
-def rechazar_trabajador(user_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE usuarios SET activo = 0 WHERE id = %s', (user_id,))
-    conn.commit()
-    conn.close()
-
-# ============================================
-# FUNCIONES PARA ESTADÍSTICAS DE TRABAJADORES
-# ============================================
-
-def obtener_estadisticas_trabajador(trabajador_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    hoy = datetime.now().date().isoformat()
-    try:
-        cursor.execute('SELECT COUNT(*) as ventas, COALESCE(SUM(total), 0) as ingresos FROM ventas WHERE trabajador_id = %s AND fecha = %s',
-                       (trabajador_id, hoy))
-        ventas = cursor.fetchone()
-        cursor.execute('SELECT COUNT(*) as servicios FROM servicios WHERE trabajador_id = %s AND activo = 1', (trabajador_id,))
-        servicios = cursor.fetchone()
-        cursor.execute('SELECT COUNT(DISTINCT cliente) as clientes FROM ventas WHERE trabajador_id = %s AND fecha = %s',
-                       (trabajador_id, hoy))
-        clientes = cursor.fetchone()
-        conn.close()
-        return {
-            'ventas': ventas[0] if ventas else 0,
-            'ingresos': ventas[1] if ventas else 0,
-            'servicios': servicios[0] if servicios else 0,
-            'clientes': clientes[0] if clientes else 0
-        }
-    except Exception as e:
-        print(f"❌ Error en obtener_estadisticas_trabajador: {e}")
-        conn.close()
-        return {'ventas': 0, 'ingresos': 0, 'servicios': 0, 'clientes': 0}
-
-# ============================================
-# FUNCIONES PARA VENTAS
-# ============================================
-
-def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, cantidad, precio, total,
-                estado='pagado', empresa=None, tipo='producto', factura_url=None,
-                factura=None, transferencia_id=None, transferencia_cedula=None,
-                transferencia_banco=None, transferencia_fecha=None):
-    conn = get_db()
-    cursor = conn.cursor()
-    fecha = datetime.now().isoformat()
-    cursor.execute('''
-    INSERT INTO ventas (negocio_id, trabajador_id, cliente, producto, producto_id,
-                        cantidad, precio, total, estado, empresa, tipo, factura_url,
-                        factura, transferencia_id, transferencia_cedula,
-                        transferencia_banco, transferencia_fecha, fecha, created_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ''', (negocio_id, trabajador_id, cliente, producto, producto_id,
-          cantidad, precio, total, estado, empresa, tipo, factura_url,
-          factura, transferencia_id, transferencia_cedula,
-          transferencia_banco, transferencia_fecha, fecha, fecha))
-    conn.commit()
-    venta_id = cursor.lastrowid
-    conn.close()
-    return venta_id
-
-def obtener_ventas(negocio_id, trabajador_id=None):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    if trabajador_id:
-        cursor.execute('''
-        SELECT * FROM ventas 
-        WHERE negocio_id = %s AND trabajador_id = %s 
-        ORDER BY id DESC
-        ''', (negocio_id, trabajador_id))
-    else:
-        cursor.execute('''
-        SELECT * FROM ventas 
-        WHERE negocio_id = %s 
-        ORDER BY id DESC
-        ''', (negocio_id,))
-    ventas = cursor.fetchall()
-    conn.close()
-    return ventas
-
-def obtener_ventas_por_periodo(negocio_id, periodo='hoy'):
-    """Obtiene ventas según el período"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    
-    hoy = datetime.now().date()
-    
-    if periodo == 'hoy':
-        fecha_inicio = hoy.isoformat()
-        fecha_fin = hoy.isoformat()
-    elif periodo == 'semana':
-        fecha_inicio = (hoy - timedelta(days=7)).isoformat()
-        fecha_fin = hoy.isoformat()
-    elif periodo == 'mes':
-        fecha_inicio = hoy.replace(day=1).isoformat()
-        fecha_fin = hoy.isoformat()
-    else:  # todos
-        fecha_inicio = '2000-01-01'
-        fecha_fin = hoy.isoformat()
-    
-    cursor.execute('''
-        SELECT * FROM ventas 
-        WHERE negocio_id = %s AND fecha >= %s AND fecha <= %s
-        ORDER BY id DESC
-    ''', (negocio_id, fecha_inicio, fecha_fin))
-    
-    ventas = cursor.fetchall()
-    total_ingresos = sum(v.get('total', 0) for v in ventas)
-    total_ventas = len(ventas)
-    
-    conn.close()
-    return ventas, total_ingresos, total_ventas
-
-def obtener_venta_por_id(venta_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT * FROM ventas WHERE id = %s', (venta_id,))
-    venta = cursor.fetchone()
-    conn.close()
-    return venta
-
-def obtener_ventas_con_filtros(negocio_id, filtros=None):
-    """Obtiene ventas con filtros"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    
-    query = 'SELECT * FROM ventas WHERE negocio_id = %s'
-    params = [negocio_id]
-    
-    if filtros:
-        if filtros.get('estado'):
-            query += ' AND estado = %s'
-            params.append(filtros['estado'])
-        if filtros.get('fecha_desde'):
-            query += ' AND fecha >= %s'
-            params.append(filtros['fecha_desde'])
-        if filtros.get('fecha_hasta'):
-            query += ' AND fecha <= %s'
-            params.append(filtros['fecha_hasta'])
-        if filtros.get('trabajador_id'):
-            query += ' AND trabajador_id = %s'
-            params.append(filtros['trabajador_id'])
-        if filtros.get('cliente'):
-            query += ' AND cliente ILIKE %s'
-            params.append(f'%{filtros["cliente"]}%')
-    
-    query += ' ORDER BY id DESC'
-    
-    cursor.execute(query, params)
-    ventas = cursor.fetchall()
-    conn.close()
-    return ventas
-
-def obtener_todas_ventas():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT v.*, u.username as negocio_username
-    FROM ventas v JOIN usuarios u ON v.negocio_id = u.id ORDER BY v.id DESC
-    ''')
-    ventas = cursor.fetchall()
-    conn.close()
-    return ventas
-
-def obtener_estadisticas_ventas(negocio_id, trabajador_id=None):
-    conn = get_db()
-    cursor = conn.cursor()
-    hoy = datetime.now().date().isoformat()
-    if trabajador_id:
-        cursor.execute('''
-        SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as ingresos
-        FROM ventas WHERE negocio_id = %s AND trabajador_id = %s AND fecha = %s
-        ''', (negocio_id, trabajador_id, hoy))
-    else:
-        cursor.execute('''
-        SELECT COUNT(*) as total, COALESCE(SUM(total), 0) as ingresos
-        FROM ventas WHERE negocio_id = %s AND fecha = %s
-        ''', (negocio_id, hoy))
-    stats = cursor.fetchone()
-    conn.close()
-    return stats
-
-def actualizar_estado_venta(venta_id, negocio_id, estado):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-    UPDATE ventas SET estado = %s
-    WHERE id = %s AND negocio_id = %s
-    ''', (estado, venta_id, negocio_id))
-    filas = cursor.rowcount
-    conn.commit()
-    conn.close()
-    return filas > 0
-
-def eliminar_venta_con_reintegro(venta_id, negocio_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT producto_id, cantidad, total, cliente, producto, fecha, empresa, tipo, 
-                   factura_url, factura, transferencia_id, transferencia_cedula, 
-                   transferencia_banco, transferencia_fecha
-            FROM ventas 
-            WHERE id = %s AND negocio_id = %s
-        ''', (venta_id, negocio_id))
-        venta = cursor.fetchone()
-        if not venta:
-            conn.close()
-            return False, "Venta no encontrada"
-        
-        producto_id = venta[0]
-        cantidad = venta[1]
+        producto_id = crear_producto(usuario['id'], nombre, categoria, float(precio), float(costo), float(comision), int(stock), int(stock_minimo))
         
         if producto_id:
-            cursor.execute('''
-                UPDATE productos 
-                SET stock = stock + %s, updated_at = %s 
-                WHERE id = %s
-            ''', (cantidad, datetime.now().isoformat(), producto_id))
-            if cursor.rowcount == 0:
-                conn.rollback()
-                conn.close()
-                return False, "Error al actualizar el stock"
-        
-        cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, negocio_id))
-        conn.commit()
-        conn.close()
-        return True, {'producto_id': producto_id, 'cantidad': cantidad}
-    except Exception as e:
-        print(f"❌ Error eliminando venta: {e}")
-        conn.rollback()
-        conn.close()
-        return False, str(e)
-
-# ============================================
-# FUNCIONES PARA SERVICIOS
-# ============================================
-
-def crear_servicio(negocio_id, trabajador_id, nombre, categoria, precio, duracion, activo=1, descripcion=''):
-    conn = get_db()
-    cursor = conn.cursor()
-    fecha = datetime.now().isoformat()
-    cursor.execute('''
-    INSERT INTO servicios (negocio_id, trabajador_id, nombre, categoria, precio, duracion, activo, descripcion, created_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ''', (negocio_id, trabajador_id, nombre, categoria, precio, duracion, activo, descripcion, fecha))
-    conn.commit()
-    servicio_id = cursor.lastrowid
-    conn.close()
-    return servicio_id
-
-def obtener_servicios(negocio_id, trabajador_id=None):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        if trabajador_id:
-            cursor.execute('''
-                SELECT * FROM servicios 
-                WHERE negocio_id = %s AND trabajador_id = %s AND activo = 1
-                ORDER BY id DESC
-            ''', (negocio_id, trabajador_id))
+            registrar_log(usuario['id'], 'producto_creado', f'Producto: {nombre}')
+            return jsonify({'success': True, 'id': producto_id})
         else:
-            cursor.execute('''
-                SELECT * FROM servicios 
-                WHERE negocio_id = %s
-                ORDER BY id DESC
-            ''', (negocio_id,))
-        servicios = cursor.fetchall()
-        conn.close()
-        return servicios
+            return jsonify({'error': 'Error al crear el producto'}), 500
     except Exception as e:
-        print(f"❌ Error en obtener_servicios: {e}")
-        conn.close()
-        return []
+        print(f"❌ Error en api_crear_producto: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-def obtener_todos_servicios():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT s.*, u.username as negocio_username
-    FROM servicios s JOIN usuarios u ON s.negocio_id = u.id ORDER BY s.id DESC
-    ''')
-    servicios = cursor.fetchall()
-    conn.close()
-    return servicios
-
-def toggle_servicio(servicio_id, activo):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE servicios SET activo = %s, updated_at = %s WHERE id = %s',
-                   (activo, datetime.now().isoformat(), servicio_id))
-    conn.commit()
-    conn.close()
-
-def eliminar_servicio(servicio_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM servicios WHERE id = %s', (servicio_id,))
-    conn.commit()
-    conn.close()
-
-# ============================================
-# FUNCIONES PARA CONTRATOS
-# ============================================
-
-def obtener_ultimo_numero_contrato(negocio_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('SELECT numero_contrato FROM contratos WHERE negocio_id = %s ORDER BY id DESC LIMIT 1', (negocio_id,))
-    resultado = cursor.fetchone()
-    conn.close()
-    if resultado:
-        partes = resultado[0].split('-')
-        if len(partes) == 3:
-            try:
-                return int(partes[2])
-            except ValueError:
-                return 0
-    return 0
-
-def crear_contrato(negocio_id, trabajador_id, empresa, numero_contrato, fecha_inicio, fecha_fin,
-                   tipo, monto=0, estado='activo', descripcion=''):
-    conn = get_db()
-    cursor = conn.cursor()
-    fecha = datetime.now().isoformat()
-    cursor.execute('''
-    INSERT INTO contratos (negocio_id, trabajador_id, empresa, numero_contrato, fecha_inicio, fecha_fin,
-                           tipo, monto, estado, descripcion, created_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ''', (negocio_id, trabajador_id, empresa, numero_contrato, fecha_inicio, fecha_fin,
-          tipo, monto, estado, descripcion, fecha))
-    conn.commit()
-    contrato_id = cursor.lastrowid
-    conn.close()
-    return contrato_id
-
-def obtener_contratos(negocio_id, trabajador_id=None):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    if trabajador_id:
-        cursor.execute('''
-        SELECT c.*, u.nombre as trabajador_nombre
-        FROM contratos c LEFT JOIN usuarios u ON c.trabajador_id = u.id
-        WHERE c.negocio_id = %s AND c.trabajador_id = %s ORDER BY c.id DESC
-        ''', (negocio_id, trabajador_id))
-    else:
-        cursor.execute('''
-        SELECT c.*, u.nombre as trabajador_nombre
-        FROM contratos c LEFT JOIN usuarios u ON c.trabajador_id = u.id
-        WHERE c.negocio_id = %s ORDER BY c.id DESC
-        ''', (negocio_id,))
-    contratos = cursor.fetchall()
-    conn.close()
-    return contratos
-
-def obtener_contrato_por_id(contrato_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT * FROM contratos WHERE id = %s', (contrato_id,))
-    contrato = cursor.fetchone()
-    conn.close()
-    return contrato
-
-def obtener_todos_contratos():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT c.*, u.nombre as trabajador_nombre, u2.username as negocio_username
-    FROM contratos c
-    JOIN usuarios u2 ON c.negocio_id = u2.id
-    LEFT JOIN usuarios u ON c.trabajador_id = u.id
-    ORDER BY c.id DESC
-    ''')
-    contratos = cursor.fetchall()
-    conn.close()
-    return contratos
-
-def actualizar_contrato(contrato_id, empresa, fecha_inicio, fecha_fin, tipo, monto, estado, descripcion):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-    UPDATE contratos SET empresa = %s, fecha_inicio = %s, fecha_fin = %s, tipo = %s, monto = %s,
-    estado = %s, descripcion = %s, updated_at = %s WHERE id = %s
-    ''', (empresa, fecha_inicio, fecha_fin, tipo, monto, estado, descripcion, datetime.now().isoformat(), contrato_id))
-    conn.commit()
-    conn.close()
-
-def actualizar_estado_contrato(contrato_id, estado):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE contratos SET estado = %s, updated_at = %s WHERE id = %s',
-                   (estado, datetime.now().isoformat(), contrato_id))
-    conn.commit()
-    conn.close()
-
-def eliminar_contrato(contrato_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM contratos WHERE id = %s', (contrato_id,))
-    conn.commit()
-    conn.close()
-
-def obtener_empresas_con_contratos_activos(negocio_id):
-    """Obtiene empresas con contratos activos para un negocio"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    hoy = datetime.now().date().isoformat()
-    cursor.execute('''
-        SELECT DISTINCT empresa, numero_contrato, tipo, fecha_fin
-        FROM contratos 
-        WHERE negocio_id = %s AND estado IN ('activo', 'pendiente') AND fecha_fin >= %s
-        ORDER BY empresa ASC
-    ''', (negocio_id, hoy))
-    empresas = cursor.fetchall()
-    conn.close()
-    return [dict(e) for e in empresas]
-
-def obtener_contratos_activos_para_empresa(negocio_id, empresa):
-    """Obtiene contratos activos para una empresa específica"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    hoy = datetime.now().date().isoformat()
-    cursor.execute('''
-        SELECT * FROM contratos 
-        WHERE negocio_id = %s AND empresa = %s AND estado IN ('activo', 'pendiente') AND fecha_fin >= %s
-        ORDER BY fecha_fin ASC
-    ''', (negocio_id, empresa, hoy))
-    contratos = cursor.fetchall()
-    conn.close()
-    return contratos
-
-# ============================================
-# FUNCIONES PARA REPORTES
-# ============================================
-
-def obtener_resumen_contratos(negocio_id):
-    """Obtiene resumen de contratos para el dashboard"""
-    conn = get_db()
-    cursor = conn.cursor()
+@app.route('/api/producto/<int:producto_id>', methods=['PUT'])
+@login_required
+def api_actualizar_producto(producto_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    nombre = data.get('nombre')
+    categoria = data.get('categoria')
+    precio = data.get('precio')
+    costo = data.get('costo', 0)
+    comision = data.get('comision', 0)
+    stock = data.get('stock', 0)
+    stock_minimo = data.get('stock_minimo', 3)
+    
+    if not nombre or not categoria or precio is None:
+        return jsonify({'error': 'Nombre, categoría y precio son obligatorios'}), 400
+    
     try:
-        cursor.execute('SELECT COUNT(*) FROM contratos WHERE negocio_id = %s', (negocio_id,))
-        total = cursor.fetchone()[0]
+        exito = actualizar_producto(producto_id, nombre, categoria, float(precio), float(costo), float(comision), int(stock), int(stock_minimo))
         
-        cursor.execute('SELECT COUNT(*) FROM contratos WHERE negocio_id = %s AND estado = %s', (negocio_id, 'activo'))
-        activos = cursor.fetchone()[0]
+        if exito:
+            registrar_log(usuario['id'], 'producto_actualizado', f'Producto ID: {producto_id}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al actualizar el producto'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_actualizar_producto: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/producto/<int:producto_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_producto(producto_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        exito = eliminar_producto(producto_id)
         
-        hoy = datetime.now().date().isoformat()
-        cursor.execute('SELECT COUNT(*) FROM contratos WHERE negocio_id = %s AND estado IN (%s, %s) AND fecha_fin < %s', 
-                      (negocio_id, 'activo', 'pendiente', hoy))
-        vencidos = cursor.fetchone()[0]
+        if exito:
+            registrar_log(usuario['id'], 'producto_eliminado', f'Producto ID: {producto_id}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al eliminar el producto'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_eliminar_producto: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/productos/stock', methods=['GET'])
+@login_required
+def api_productos_con_stock():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        cursor.execute('SELECT COALESCE(SUM(monto), 0) FROM contratos WHERE negocio_id = %s', (negocio_id,))
-        total_gastos = cursor.fetchone()[0]
+        productos = obtener_productos_con_stock(negocio_id)
+        return jsonify([dict(p) for p in productos])
+    except Exception as e:
+        print(f"❌ Error en api_productos_con_stock: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/todos/productos', methods=['GET'])
+@admin_required
+def api_todos_productos():
+    try:
+        productos = obtener_todos_productos()
+        return jsonify([dict(p) for p in productos])
+    except Exception as e:
+        print(f"❌ Error en api_todos_productos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - TIENDA
+# ============================================
+
+@app.route('/api/tienda/productos', methods=['GET'])
+@login_required
+def api_obtener_productos_tienda():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        conn.close()
-        return {
-            'total': total,
-            'activos': activos,
-            'vencidos': vencidos,
-            'total_gastos': total_gastos,
-            'tiene_contratos': total > 0
+        productos = obtener_productos_tienda_negocio(negocio_id)
+        return jsonify([dict(p) for p in productos])
+    except Exception as e:
+        print(f"❌ Error en api_obtener_productos_tienda: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tienda/producto/agregar', methods=['POST'])
+@login_required
+def api_agregar_producto_tienda():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    producto_id = data.get('producto_id')
+    destacado = data.get('destacado', 0)
+    
+    if not producto_id:
+        return jsonify({'error': 'Producto ID es requerido'}), 400
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        agregar_producto_tienda(negocio_id, producto_id, destacado)
+        registrar_log(usuario['id'], 'producto_tienda_agregado', f'Producto ID: {producto_id}')
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Error en api_agregar_producto_tienda: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tienda/producto/<int:tienda_id>/destacar', methods=['POST'])
+@login_required
+def api_toggle_destacado_tienda(tienda_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    destacado = data.get('destacado', 0)
+    
+    try:
+        toggle_destacado_tienda(tienda_id, destacado)
+        registrar_log(usuario['id'], 'producto_tienda_destacado', f'Tienda ID: {tienda_id}, Destacado: {destacado}')
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Error en api_toggle_destacado_tienda: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tienda/producto/<int:tienda_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_producto_tienda(tienda_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        eliminar_producto_tienda(tienda_id)
+        registrar_log(usuario['id'], 'producto_tienda_eliminado', f'Tienda ID: {tienda_id}')
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Error en api_eliminar_producto_tienda: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/tienda/public', methods=['GET'])
+@login_required
+def api_tienda_publica():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        datos_usuario = obtener_datos_negocio(usuario['id'])
+        provincia = datos_usuario.get('provincia')
+        municipio = datos_usuario.get('municipio')
+        
+        productos = obtener_productos_tienda_publica(provincia, municipio)
+        return jsonify([dict(p) for p in productos])
+    except Exception as e:
+        print(f"❌ Error en api_tienda_publica: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - SERVICIOS
+# ============================================
+
+@app.route('/api/servicios', methods=['GET'])
+@login_required
+def api_obtener_servicios():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            servicios = obtener_servicios(negocio_id, usuario['id'])
+        else:
+            servicios = obtener_servicios(negocio_id)
+        
+        return jsonify([dict(s) for s in servicios])
+    except Exception as e:
+        print(f"❌ Error en api_obtener_servicios: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/servicios', methods=['POST'])
+@login_required
+def api_crear_servicio():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'admin':
+        return jsonify({'error': 'Solo los negocios pueden crear servicios'}), 403
+    
+    data = request.get_json()
+    nombre = data.get('nombre')
+    categoria = data.get('categoria')
+    precio = data.get('precio')
+    duracion = data.get('duracion', 60)
+    activo = data.get('activo', True)
+    descripcion = data.get('descripcion', '')
+    
+    if not nombre or not categoria or precio is None:
+        return jsonify({'error': 'Nombre, categoría y precio son obligatorios'}), 400
+    
+    try:
+        trabajador_id = None
+        if usuario.get('rol') == 'trabajador':
+            trabajador_id = usuario['id']
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        else:
+            negocio_id = usuario['id']
+        
+        servicio_id = crear_servicio(negocio_id, trabajador_id, nombre, categoria, float(precio), int(duracion), 1 if activo else 0, descripcion)
+        
+        if servicio_id:
+            registrar_log(usuario['id'], 'servicio_creado', f'Servicio: {nombre}')
+            return jsonify({'success': True, 'id': servicio_id})
+        else:
+            return jsonify({'error': 'Error al crear el servicio'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_crear_servicio: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/servicio/<int:servicio_id>/toggle', methods=['POST'])
+@login_required
+def api_toggle_servicio(servicio_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    activo = data.get('activo', 1)
+    
+    try:
+        toggle_servicio(servicio_id, activo)
+        registrar_log(usuario['id'], 'servicio_toggle', f'Servicio ID: {servicio_id}, Activo: {activo}')
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Error en api_toggle_servicio: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/servicio/<int:servicio_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_servicio(servicio_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        eliminar_servicio(servicio_id)
+        registrar_log(usuario['id'], 'servicio_eliminado', f'Servicio ID: {servicio_id}')
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Error en api_eliminar_servicio: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/todos/servicios', methods=['GET'])
+@admin_required
+def api_todos_servicios():
+    try:
+        servicios = obtener_todos_servicios()
+        return jsonify([dict(s) for s in servicios])
+    except Exception as e:
+        print(f"❌ Error en api_todos_servicios: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - TRABAJADORES
+# ============================================
+
+@app.route('/api/negocio/trabajadores', methods=['GET'])
+@login_required
+def api_obtener_trabajadores_negocio():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        if usuario.get('rol') == 'admin':
+            trabajadores = obtener_todos_usuarios()
+            trabajadores = [t for t in trabajadores if t.get('rol') == 'trabajador']
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            trabajadores = obtener_trabajadores_por_empresa(negocio_id)
+        
+        return jsonify([dict(t) for t in trabajadores])
+    except Exception as e:
+        print(f"❌ Error en api_obtener_trabajadores_negocio: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/negocio/trabajador/crear', methods=['POST'])
+@login_required
+def api_crear_trabajador_negocio():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'admin':
+        return jsonify({'error': 'Solo los negocios pueden crear trabajadores'}), 403
+    
+    data = request.get_json()
+    nombre = data.get('nombre')
+    apellidos = data.get('apellidos')
+    ci = data.get('ci')
+    movil = data.get('movil')
+    direccion = data.get('direccion')
+    frecuencia = data.get('frecuencia', 'diaria')
+    salario = data.get('salario')
+    email = data.get('email')
+    usuario_username = data.get('usuario')
+    password = data.get('password')
+    modulos = data.get('modulos', [])
+    
+    if not nombre or not ci or salario is None or not usuario_username or not password:
+        return jsonify({'error': 'Nombre, CI, salario, usuario y contraseña son obligatorios'}), 400
+    
+    if len(password) < 6:
+        return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
+    
+    try:
+        if obtener_usuario_por_username(usuario_username):
+            return jsonify({'error': 'El nombre de usuario ya está en uso'}), 400
+        
+        datos_negocio = {
+            'nombre': nombre,
+            'apellidos': apellidos or '',
+            'ci': ci,
+            'movil': movil or '',
+            'direccion': direccion or '',
+            'frecuencia': frecuencia,
+            'salario': float(salario),
+            'negocio_id': usuario['id']
         }
-    except Exception as e:
-        print(f"❌ Error en obtener_resumen_contratos: {e}")
-        conn.close()
-        return {'total': 0, 'activos': 0, 'vencidos': 0, 'total_gastos': 0, 'tiene_contratos': False}
-
-def obtener_resumen_ingresos(negocio_id):
-    """Obtiene resumen de ingresos para el dashboard"""
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        hoy = datetime.now().date()
-        hoy_str = hoy.isoformat()
         
-        # Ingresos de hoy
-        cursor.execute('SELECT COALESCE(SUM(total), 0) FROM ventas WHERE negocio_id = %s AND fecha = %s AND estado != %s', 
-                      (negocio_id, hoy_str, 'cancelado'))
-        ingresos_hoy = cursor.fetchone()[0]
+        user_id = crear_usuario(usuario_username, email or f'{usuario_username}@trabajador.com', password, nombre, 'trabajador', 'negocio', datos_negocio)
         
-        # Ingresos de la semana
-        semana_inicio = (hoy - timedelta(days=7)).isoformat()
-        cursor.execute('SELECT COALESCE(SUM(total), 0) FROM ventas WHERE negocio_id = %s AND fecha >= %s AND estado != %s', 
-                      (negocio_id, semana_inicio, 'cancelado'))
-        ingresos_semana = cursor.fetchone()[0]
+        if not user_id:
+            return jsonify({'error': 'Error al crear el trabajador'}), 500
         
-        # Ingresos del mes
-        mes_inicio = hoy.replace(day=1).isoformat()
-        cursor.execute('SELECT COALESCE(SUM(total), 0) FROM ventas WHERE negocio_id = %s AND fecha >= %s AND estado != %s', 
-                      (negocio_id, mes_inicio, 'cancelado'))
-        ingresos_mes = cursor.fetchone()[0]
-        
-        # Total ingresos
-        cursor.execute('SELECT COALESCE(SUM(total), 0) FROM ventas WHERE negocio_id = %s AND estado != %s', 
-                      (negocio_id, 'cancelado'))
-        total_ingresos = cursor.fetchone()[0]
-        
-        # Verificar si hay ventas
-        cursor.execute('SELECT COUNT(*) FROM ventas WHERE negocio_id = %s', (negocio_id,))
-        tiene_ventas = cursor.fetchone()[0] > 0
-        
-        conn.close()
-        return {
-            'ingresos_hoy': ingresos_hoy,
-            'ingresos_semana': ingresos_semana,
-            'ingresos_mes': ingresos_mes,
-            'total_ingresos': total_ingresos,
-            'tiene_ventas': tiene_ventas
-        }
-    except Exception as e:
-        print(f"❌ Error en obtener_resumen_ingresos: {e}")
-        conn.close()
-        return {'ingresos_hoy': 0, 'ingresos_semana': 0, 'ingresos_mes': 0, 'total_ingresos': 0, 'tiene_ventas': False}
-
-def obtener_resumen_productos(negocio_id):
-    """Obtiene resumen de productos para el dashboard"""
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s', (negocio_id,))
-        total = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock = 0', (negocio_id,))
-        stock_agotado = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock > 0 AND stock <= stock_minimo', (negocio_id,))
-        stock_bajo = cursor.fetchone()[0]
-        
-        cursor.execute('SELECT COALESCE(SUM(precio * stock), 0) FROM productos WHERE negocio_id = %s', (negocio_id,))
-        valor_total = cursor.fetchone()[0]
-        
-        conn.close()
-        return {
-            'total': total,
-            'stock_agotado': stock_agotado,
-            'stock_bajo': stock_bajo,
-            'valor_total': valor_total,
-            'tiene_productos': total > 0
-        }
-    except Exception as e:
-        print(f"❌ Error en obtener_resumen_productos: {e}")
-        conn.close()
-        return {'total': 0, 'stock_agotado': 0, 'stock_bajo': 0, 'valor_total': 0, 'tiene_productos': False}
-
-# ============================================
-# FUNCIONES PARA NÓMINA Y ASISTENCIA
-# ============================================
-
-def registrar_asistencia(trabajador_id, negocio_id, fecha, presente=1, horas=8):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-        INSERT INTO asistencia (trabajador_id, negocio_id, fecha, presente, horas_trabajadas, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        ON CONFLICT (trabajador_id, fecha) DO UPDATE SET
-            presente = EXCLUDED.presente,
-            horas_trabajadas = EXCLUDED.horas_trabajadas
-        ''', (trabajador_id, negocio_id, fecha, presente, horas, datetime.now()))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"❌ Error al registrar asistencia: {e}")
-        conn.rollback()
-        conn.close()
-        return False
-
-def obtener_asistencia_mes(trabajador_id, mes, ano):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute('''
-            SELECT * FROM asistencia 
-            WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha) = %s
-            AND EXTRACT(YEAR FROM fecha) = %s
-            ORDER BY fecha ASC
-        ''', (trabajador_id, mes, ano))
-        asistencias = cursor.fetchall()
-        conn.close()
-        return asistencias
-    except Exception as e:
-        print(f"❌ Error en obtener_asistencia_mes: {e}")
-        conn.close()
-        return []
-
-def obtener_dias_trabajados_mes(trabajador_id, mes, ano):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT COUNT(*) FROM asistencia 
-            WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha) = %s
-            AND EXTRACT(YEAR FROM fecha) = %s
-            AND presente = 1
-        ''', (trabajador_id, mes, ano))
-        dias = cursor.fetchone()[0]
-        conn.close()
-        return dias
-    except Exception as e:
-        print(f"❌ Error en obtener_dias_trabajados_mes: {e}")
-        conn.close()
-        return 0
-
-def obtener_dias_ausencia_mes(trabajador_id, mes, ano):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT COUNT(*) FROM asistencia 
-            WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha) = %s
-            AND EXTRACT(YEAR FROM fecha) = %s
-            AND presente = 0
-        ''', (trabajador_id, mes, ano))
-        dias = cursor.fetchone()[0]
-        conn.close()
-        return dias
-    except Exception as e:
-        print(f"❌ Error en obtener_dias_ausencia_mes: {e}")
-        conn.close()
-        return 0
-
-def obtener_dias_extras_mes(trabajador_id, mes, ano):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT COUNT(*) FROM asistencia 
-            WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha) = %s
-            AND EXTRACT(YEAR FROM fecha) = %s
-            AND horas_trabajadas > 8
-        ''', (trabajador_id, mes, ano))
-        dias = cursor.fetchone()[0]
-        conn.close()
-        return dias
-    except Exception as e:
-        print(f"❌ Error en obtener_dias_extras_mes: {e}")
-        conn.close()
-        return 0
-
-def registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-        INSERT INTO comisiones_trabajador (negocio_id, trabajador_id, venta_id, producto_id, monto, fecha, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ''', (negocio_id, trabajador_id, venta_id, producto_id, monto, datetime.now().date(), datetime.now()))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"❌ Error al registrar comisión: {e}")
-        conn.rollback()
-        conn.close()
-        return False
-
-def obtener_comisiones_trabajador_mes(trabajador_id, mes, ano):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute('''
-            SELECT c.*, p.nombre as producto_nombre, v.cliente, v.fecha as venta_fecha
-            FROM comisiones_trabajador c
-            LEFT JOIN productos p ON c.producto_id = p.id
-            LEFT JOIN ventas v ON c.venta_id = v.id
-            WHERE c.trabajador_id = %s 
-            AND EXTRACT(MONTH FROM c.fecha) = %s
-            AND EXTRACT(YEAR FROM c.fecha) = %s
-            ORDER BY c.fecha DESC
-        ''', (trabajador_id, mes, ano))
-        comisiones = cursor.fetchall()
-        conn.close()
-        return comisiones
-    except Exception as e:
-        print(f"❌ Error en obtener_comisiones_trabajador_mes: {e}")
-        conn.close()
-        return []
-
-def obtener_total_comisiones_mes(trabajador_id, mes, ano):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT COALESCE(SUM(monto), 0) FROM comisiones_trabajador 
-            WHERE trabajador_id = %s 
-            AND EXTRACT(MONTH FROM fecha) = %s
-            AND EXTRACT(YEAR FROM fecha) = %s
-        ''', (trabajador_id, mes, ano))
-        total = cursor.fetchone()[0]
-        conn.close()
-        return float(total) if total else 0
-    except Exception as e:
-        print(f"❌ Error en obtener_total_comisiones_mes: {e}")
-        conn.close()
-        return 0
-
-def obtener_comisiones_negocio_mes(negocio_id, mes, ano):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-        SELECT c.*, u.nombre as trabajador_nombre, p.nombre as producto_nombre, v.cliente
-        FROM comisiones_trabajador c
-        JOIN usuarios u ON c.trabajador_id = u.id
-        LEFT JOIN productos p ON c.producto_id = p.id
-        LEFT JOIN ventas v ON c.venta_id = v.id
-        WHERE c.negocio_id = %s 
-        AND EXTRACT(MONTH FROM c.fecha) = %s
-        AND EXTRACT(YEAR FROM c.fecha) = %s
-        ORDER BY u.nombre ASC, c.fecha DESC
-    ''', (negocio_id, mes, ano))
-    comisiones = cursor.fetchall()
-    conn.close()
-    return comisiones
-
-def obtener_detalle_nomina(trabajador_id, mes, ano):
-    """Obtiene el detalle completo de la nómina de un trabajador en un mes"""
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        # Obtener datos del trabajador
-        cursor.execute('''
-            SELECT u.id, u.nombre, u.datos_negocio, tn.salario, tn.negocio_id
-            FROM usuarios u
-            JOIN trabajadores_negocio tn ON u.id = tn.trabajador_id
-            WHERE u.id = %s
-        ''', (trabajador_id,))
-        trabajador = cursor.fetchone()
-        
-        if not trabajador:
+        for modulo_nombre in modulos:
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute('SELECT id FROM modulos WHERE nombre = %s', (modulo_nombre,))
+            mod = cursor.fetchone()
             conn.close()
-            return None
+            if mod:
+                asignar_permiso_usuario(user_id, mod[0], 1)
         
-        datos = {}
-        if trabajador.get('datos_negocio'):
-            try:
-                datos = json.loads(trabajador['datos_negocio']) if isinstance(trabajador['datos_negocio'], str) else trabajador['datos_negocio']
-            except:
-                pass
+        crear_trabajador_negocio(usuario['id'], user_id, nombre, float(salario))
         
-        salario_base = trabajador.get('salario', 0)
-        if salario_base == 0:
-            salario_base = datos.get('salario', 0)
+        registrar_log(usuario['id'], 'trabajador_creado', f'Trabajador: {nombre} (ID: {user_id})')
         
-        # Calcular días del mes
-        _, dias_mes = monthrange(ano, mes)
+        return jsonify({
+            'success': True,
+            'message': f'Trabajador {nombre} creado correctamente',
+            'id': user_id
+        })
+    except Exception as e:
+        print(f"❌ Error en api_crear_trabajador_negocio: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['PUT'])
+@login_required
+def api_actualizar_trabajador_negocio(trabajador_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    nombre = data.get('nombre')
+    apellidos = data.get('apellidos')
+    ci = data.get('ci')
+    movil = data.get('movil')
+    direccion = data.get('direccion')
+    frecuencia = data.get('frecuencia')
+    salario = data.get('salario')
+    email = data.get('email')
+    modulos = data.get('modulos')
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        # Obtener asistencias
-        dias_trabajados = obtener_dias_trabajados_mes(trabajador_id, mes, ano)
-        dias_ausencia = obtener_dias_ausencia_mes(trabajador_id, mes, ano)
-        dias_extras = obtener_dias_extras_mes(trabajador_id, mes, ano)
+        if salario is not None:
+            actualizar_trabajador_negocio(negocio_id, trabajador_id, nombre or '', float(salario))
         
-        # Si no hay asistencias registradas, estimar días laborables
-        if dias_trabajados == 0 and dias_ausencia == 0 and dias_extras == 0:
-            # Calcular días laborables (lunes a viernes)
-            for d in range(1, dias_mes + 1):
-                fecha = datetime(ano, mes, d)
-                if fecha.weekday() < 5:
-                    if fecha <= datetime.now():
-                        dias_trabajados += 1
+        if nombre or ci or movil or direccion:
+            trabajador = obtener_trabajador_por_id(trabajador_id)
+            if trabajador:
+                datos_negocio = {}
+                if trabajador.get('datos_negocio'):
+                    try:
+                        datos_negocio = json.loads(trabajador['datos_negocio']) if isinstance(trabajador['datos_negocio'], str) else trabajador['datos_negocio']
+                    except:
+                        pass
+                
+                datos_negocio.update({
+                    'nombre': nombre or datos_negocio.get('nombre', ''),
+                    'apellidos': apellidos or datos_negocio.get('apellidos', ''),
+                    'ci': ci or datos_negocio.get('ci', ''),
+                    'movil': movil or datos_negocio.get('movil', ''),
+                    'direccion': direccion or datos_negocio.get('direccion', ''),
+                    'frecuencia': frecuencia or datos_negocio.get('frecuencia', 'diaria')
+                })
+                
+                conn = get_db()
+                cursor = conn.cursor()
+                cursor.execute('UPDATE usuarios SET datos_negocio = %s, nombre = %s, email = %s WHERE id = %s',
+                             (json.dumps(datos_negocio, ensure_ascii=False), nombre, email or trabajador.get('email'), trabajador_id))
+                conn.commit()
+                conn.close()
         
-        # Calcular salario
-        salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
-        salario_devengado = salario_diario * dias_trabajados
-        comisiones = obtener_total_comisiones_mes(trabajador_id, mes, ano)
-        total = salario_devengado + comisiones
+        if modulos is not None:
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM permisos_usuario WHERE usuario_id = %s', (trabajador_id,))
+            
+            for modulo_nombre in modulos:
+                cursor.execute('SELECT id FROM modulos WHERE nombre = %s', (modulo_nombre,))
+                mod = cursor.fetchone()
+                if mod:
+                    cursor.execute('INSERT INTO permisos_usuario (usuario_id, modulo_id, activo, estado_solicitud) VALUES (%s, %s, 1, %s)',
+                                 (trabajador_id, mod[0], 'aprobado'))
+            conn.commit()
+            conn.close()
         
-        # Obtener comisiones detalladas
-        comisiones_list = obtener_comisiones_trabajador_mes(trabajador_id, mes, ano)
+        registrar_log(usuario['id'], 'trabajador_actualizado', f'Trabajador ID: {trabajador_id}')
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Error en api_actualizar_trabajador_negocio: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_trabajador_negocio(trabajador_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        # Guardar en tabla nomina
-        cursor.execute('''
-            SELECT id FROM nomina 
-            WHERE trabajador_id = %s AND mes = %s AND ano = %s
-        ''', (trabajador_id, mes, ano))
-        existe = cursor.fetchone()
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT id FROM trabajadores_negocio WHERE negocio_id = %s AND trabajador_id = %s', (negocio_id, trabajador_id))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({'error': 'El trabajador no pertenece a tu negocio'}), 403
+        conn.close()
         
-        if existe:
-            cursor.execute('''
-                UPDATE nomina SET
-                    negocio_id = %s,
-                    salario_base = %s, dias_trabajados = %s, dias_ausencia = %s,
-                    dias_extras = %s, salario_devengado = %s, comisiones = %s,
-                    total = %s, actualizado_en = %s
-                WHERE id = %s
-            ''', (trabajador['negocio_id'], salario_base, dias_trabajados, dias_ausencia,
-                  dias_extras, salario_devengado, comisiones, total, datetime.now(), existe['id']))
+        exito = eliminar_usuario(trabajador_id)
+        
+        if exito:
+            registrar_log(usuario['id'], 'trabajador_eliminado', f'Trabajador ID: {trabajador_id}')
+            return jsonify({'success': True})
         else:
-            cursor.execute('''
-                INSERT INTO nomina (negocio_id, trabajador_id, mes, ano, salario_base,
-                    dias_trabajados, dias_ausencia, dias_extras, salario_devengado,
-                    comisiones, total, creado_en)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (trabajador['negocio_id'], trabajador_id, mes, ano, salario_base,
-                  dias_trabajados, dias_ausencia, dias_extras, salario_devengado,
-                  comisiones, total, datetime.now()))
-        
-        conn.commit()
-        conn.close()
-        
-        return {
-            'trabajador_id': trabajador_id,
-            'nombre': trabajador['nombre'],
-            'salario_base': salario_base,
-            'dias_mes': dias_mes,
-            'dias_trabajados': dias_trabajados,
-            'dias_ausencia': dias_ausencia,
-            'dias_extras': dias_extras,
-            'salario_diario': salario_diario,
-            'salario_devengado': salario_devengado,
-            'comisiones': comisiones,
-            'comisiones_list': comisiones_list,
-            'total': total
-        }
+            return jsonify({'error': 'Error al eliminar el trabajador'}), 500
     except Exception as e:
-        print(f"❌ Error en obtener_detalle_nomina: {e}")
-        conn.close()
-        return None
+        print(f"❌ Error en api_eliminar_trabajador_negocio: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-def calcular_nomina(negocio_id, trabajador_id, mes, ano):
-    """Calcula la nómina de un trabajador y la guarda en la base de datos"""
+@app.route('/api/trabajador/estadisticas', methods=['GET'])
+@login_required
+def api_trabajador_estadisticas():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    if usuario.get('rol') != 'trabajador':
+        return jsonify({'error': 'Solo para trabajadores'}), 403
+    
     try:
-        detalle = obtener_detalle_nomina(trabajador_id, mes, ano)
-        return detalle
+        stats = obtener_estadisticas_trabajador(usuario['id'])
+        return jsonify({
+            'ventas': stats.get('ventas', 0),
+            'clientes': stats.get('clientes', 0),
+            'ingresos': stats.get('ingresos', 0),
+            'servicios': stats.get('servicios', 0)
+        })
     except Exception as e:
-        print(f"❌ Error en calcular_nomina: {e}")
-        return None
-
-def obtener_nomina_mes(negocio_id, mes, ano):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute('''
-            SELECT n.*, u.nombre, u.datos_negocio
-            FROM nomina n
-            JOIN usuarios u ON n.trabajador_id = u.id
-            WHERE n.negocio_id = %s AND n.mes = %s AND n.ano = %s
-            ORDER BY u.nombre ASC
-        ''', (negocio_id, mes, ano))
-        nomina = cursor.fetchall()
-        conn.close()
-        return nomina
-    except Exception as e:
-        print(f"❌ Error en obtener_nomina_mes: {e}")
-        conn.close()
-        return []
-
-def obtener_nomina_trabajador(trabajador_id, mes, ano):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cursor.execute('''
-            SELECT n.*, u.nombre, u.datos_negocio
-            FROM nomina n
-            JOIN usuarios u ON n.trabajador_id = u.id
-            WHERE n.trabajador_id = %s AND n.mes = %s AND n.ano = %s
-        ''', (trabajador_id, mes, ano))
-        nomina = cursor.fetchone()
-        conn.close()
-        return nomina
-    except Exception as e:
-        print(f"❌ Error en obtener_nomina_trabajador: {e}")
-        conn.close()
-        return None
-
-def obtener_resumen_nomina(negocio_id, mes, ano):
-    conn = get_db()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('''
-            SELECT 
-                COUNT(*) as total_trabajadores,
-                COALESCE(SUM(dias_trabajados), 0) as total_dias_trabajados,
-                COALESCE(SUM(dias_ausencia), 0) as total_ausencias,
-                COALESCE(SUM(salario_devengado), 0) as total_salarios,
-                COALESCE(SUM(comisiones), 0) as total_comisiones,
-                COALESCE(SUM(total), 0) as total_nomina
-            FROM nomina
-            WHERE negocio_id = %s AND mes = %s AND ano = %s
-        ''', (negocio_id, mes, ano))
-        resultado = cursor.fetchone()
-        conn.close()
-        return {
-            'total_trabajadores': resultado[0] or 0,
-            'total_dias_trabajados': resultado[1] or 0,
-            'total_ausencias': resultado[2] or 0,
-            'total_salarios': resultado[3] or 0,
-            'total_comisiones': resultado[4] or 0,
-            'total_nomina': resultado[5] or 0
-        }
-    except Exception as e:
-        print(f"❌ Error en obtener_resumen_nomina: {e}")
-        conn.close()
-        return {
-            'total_trabajadores': 0,
-            'total_dias_trabajados': 0,
-            'total_ausencias': 0,
-            'total_salarios': 0,
-            'total_comisiones': 0,
-            'total_nomina': 0
-        }
+        print(f"❌ Error en api_trabajador_estadisticas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 # ============================================
-# FUNCIONES PARA SECUENCIA DE FACTURAS
+# API - VENTAS
 # ============================================
 
-def obtener_ultimo_numero_factura(negocio_id, empresa):
-    conn = get_db()
-    cursor = conn.cursor()
+@app.route('/api/ventas', methods=['GET'])
+@login_required
+def api_obtener_ventas():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
     try:
-        cursor.execute('''
-            SELECT ultimo_numero FROM facturas_secuencia 
-            WHERE negocio_id = %s AND empresa = %s
-        ''', (negocio_id, empresa))
-        resultado = cursor.fetchone()
-        conn.close()
+        trabajador_id = request.args.get('trabajador_id')
+        if trabajador_id:
+            trabajador_id = int(trabajador_id)
+        
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            if not trabajador_id:
+                trabajador_id = usuario['id']
+        
+        ventas = obtener_ventas(negocio_id, trabajador_id)
+        return jsonify([dict(v) for v in ventas])
+    except Exception as e:
+        print(f"❌ Error en api_obtener_ventas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ventas', methods=['POST'])
+@login_required
+def api_crear_venta():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    cliente = data.get('cliente')
+    producto = data.get('producto')
+    producto_id = data.get('producto_id')
+    cantidad = data.get('cantidad', 1)
+    precio = data.get('precio')
+    total = data.get('total')
+    estado = data.get('estado', 'pagado')
+    empresa = data.get('empresa')
+    tipo = data.get('tipo', 'producto')
+    factura_url = data.get('factura_url')
+    factura = data.get('factura')
+    trabajador_id = data.get('trabajador_id')
+    transferencia_id = data.get('transferencia_id')
+    transferencia_cedula = data.get('transferencia_cedula')
+    transferencia_banco = data.get('transferencia_banco')
+    transferencia_fecha = data.get('transferencia_fecha')
+    
+    if not cliente or not producto or precio is None or total is None:
+        return jsonify({'error': 'Cliente, producto, precio y total son obligatorios'}), 400
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            if not trabajador_id:
+                trabajador_id = usuario['id']
+        
+        if estado == 'oferta':
+            producto_id = None
+            factura = None
+        
+        venta_id = crear_venta(
+            negocio_id, trabajador_id, cliente, producto, producto_id,
+            cantidad, precio, total, estado, empresa, tipo, factura_url,
+            factura, transferencia_id, transferencia_cedula,
+            transferencia_banco, transferencia_fecha
+        )
+        
+        if venta_id:
+            if estado != 'oferta' and producto_id:
+                from web_admin.database import actualizar_stock_producto
+                actualizar_stock_producto(producto_id, cantidad)
+            
+            if estado != 'oferta' and trabajador_id:
+                conn = get_db()
+                cursor = conn.cursor()
+                cursor.execute('SELECT comision FROM productos WHERE id = %s', (producto_id,))
+                producto_comision = cursor.fetchone()
+                conn.close()
+                
+                if producto_comision and producto_comision[0] > 0:
+                    monto_comision = float(producto_comision[0]) * cantidad
+                    registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto_comision)
+            
+            registrar_log(usuario['id'], 'venta_creada', f'Venta ID: {venta_id}, Cliente: {cliente}')
+            
+            factura_numero = None
+            if estado != 'oferta' and empresa:
+                factura_numero = generar_numero_factura(negocio_id, empresa)
+                conn = get_db()
+                cursor = conn.cursor()
+                cursor.execute('UPDATE ventas SET factura = %s WHERE id = %s', (factura_numero, venta_id))
+                conn.commit()
+                conn.close()
+            
+            return jsonify({
+                'success': True,
+                'id': venta_id,
+                'factura': factura_numero
+            })
+        else:
+            return jsonify({'error': 'Error al crear la venta'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_crear_venta: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/venta/<int:venta_id>/estado', methods=['PUT'])
+@login_required
+def api_actualizar_estado_venta(venta_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    estado = data.get('estado')
+    
+    if not estado:
+        return jsonify({'error': 'Estado es requerido'}), 400
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        exito = actualizar_estado_venta(venta_id, negocio_id, estado)
+        
+        if exito:
+            registrar_log(usuario['id'], 'venta_estado_actualizado', f'Venta ID: {venta_id}, Estado: {estado}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al actualizar el estado'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_actualizar_estado_venta: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_venta(venta_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        exito, mensaje = eliminar_venta_con_reintegro(venta_id, negocio_id)
+        
+        if exito:
+            registrar_log(usuario['id'], 'venta_eliminada', f'Venta ID: {venta_id}')
+            return jsonify({'success': True, 'message': mensaje})
+        else:
+            return jsonify({'error': mensaje}), 500
+    except Exception as e:
+        print(f"❌ Error en api_eliminar_venta: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/venta/<int:venta_id>/factura', methods=['GET'])
+@login_required
+def api_generar_factura(venta_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        es_oferta = request.args.get('oferta', 'false').lower() == 'true'
+        
+        venta = obtener_venta_por_id(venta_id)
+        if not venta:
+            return jsonify({'error': 'Venta no encontrada'}), 404
+        
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        if venta.get('negocio_id') != negocio_id:
+            return jsonify({'error': 'No tienes permiso para acceder a esta venta'}), 403
+        
+        datos_negocio = obtener_datos_negocio(negocio_id)
+        negocio_nombre = datos_negocio.get('nombre_negocio', 'Mi Negocio')
+        negocio_telefono = datos_negocio.get('telefono', '')
+        negocio_direccion = datos_negocio.get('direccion', '')
+        
+        generador = GeneradorReportes(negocio_id, negocio_nombre, negocio_telefono, negocio_direccion)
+        
+        items = []
+        if venta.get('producto') and venta.get('cantidad', 0) > 0:
+            producto_nombre = venta.get('producto')
+            cantidad = venta.get('cantidad', 1)
+            precio_unitario = venta.get('precio', 0) / cantidad if cantidad > 0 else venta.get('precio', 0)
+            subtotal = venta.get('total', 0)
+            
+            items.append({
+                'nombre': producto_nombre,
+                'cantidad': cantidad,
+                'precio': precio_unitario,
+                'subtotal': subtotal
+            })
+        else:
+            items.append({
+                'nombre': venta.get('producto', 'Producto'),
+                'cantidad': 1,
+                'precio': venta.get('precio', 0),
+                'subtotal': venta.get('total', 0)
+            })
+        
+        pdf_bytes = generador.generar_factura_venta(venta, items, es_oferta)
+        
+        response = make_response(pdf_bytes)
+        response.headers.set('Content-Type', 'application/pdf')
+        response.headers.set('Content-Disposition', f'attachment; filename={"oferta" if es_oferta else "factura"}_{venta_id}.pdf')
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error en api_generar_factura: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/todos/ventas', methods=['GET'])
+@admin_required
+def api_todos_ventas():
+    try:
+        ventas = obtener_todas_ventas()
+        return jsonify([dict(v) for v in ventas])
+    except Exception as e:
+        print(f"❌ Error en api_todos_ventas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - CONTRATOS
+# ============================================
+
+@app.route('/api/contratos', methods=['GET'])
+@login_required
+def api_obtener_contratos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        contratos = obtener_contratos(negocio_id)
+        return jsonify([dict(c) for c in contratos])
+    except Exception as e:
+        print(f"❌ Error en api_obtener_contratos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/contratos', methods=['POST'])
+@login_required
+def api_crear_contrato():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    empresa = data.get('empresa')
+    numero_contrato = data.get('numero_contrato')
+    fecha_inicio = data.get('fecha_inicio')
+    fecha_fin = data.get('fecha_fin')
+    tipo = data.get('tipo', 'ventas')
+    monto = data.get('monto', 0)
+    estado = data.get('estado', 'activo')
+    descripcion = data.get('descripcion', '')
+    trabajador_id = data.get('trabajador_id')
+    
+    if not empresa or not numero_contrato or not fecha_inicio or not fecha_fin:
+        return jsonify({'error': 'Empresa, número de contrato, fecha inicio y fecha fin son obligatorios'}), 400
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        contrato_id = crear_contrato(negocio_id, trabajador_id, empresa, numero_contrato, fecha_inicio, fecha_fin, tipo, float(monto), estado, descripcion)
+        
+        if contrato_id:
+            registrar_log(usuario['id'], 'contrato_creado', f'Contrato: {empresa} (ID: {contrato_id})')
+            return jsonify({'success': True, 'id': contrato_id})
+        else:
+            return jsonify({'error': 'Error al crear el contrato'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_crear_contrato: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/contrato/<int:contrato_id>', methods=['PUT'])
+@login_required
+def api_actualizar_contrato(contrato_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    empresa = data.get('empresa')
+    fecha_inicio = data.get('fecha_inicio')
+    fecha_fin = data.get('fecha_fin')
+    tipo = data.get('tipo')
+    monto = data.get('monto')
+    estado = data.get('estado')
+    descripcion = data.get('descripcion')
+    
+    if not empresa or not fecha_inicio or not fecha_fin:
+        return jsonify({'error': 'Empresa, fecha inicio y fecha fin son obligatorios'}), 400
+    
+    try:
+        actualizar_contrato(contrato_id, empresa, fecha_inicio, fecha_fin, tipo, float(monto) if monto else 0, estado, descripcion)
+        registrar_log(usuario['id'], 'contrato_actualizado', f'Contrato ID: {contrato_id}')
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Error en api_actualizar_contrato: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/contrato/<int:contrato_id>/estado', methods=['PUT'])
+@login_required
+def api_actualizar_estado_contrato(contrato_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    estado = data.get('estado')
+    
+    if not estado:
+        return jsonify({'error': 'Estado es requerido'}), 400
+    
+    try:
+        actualizar_estado_contrato(contrato_id, estado)
+        registrar_log(usuario['id'], 'contrato_estado_actualizado', f'Contrato ID: {contrato_id}, Estado: {estado}')
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Error en api_actualizar_estado_contrato: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/contrato/<int:contrato_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_contrato(contrato_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        eliminar_contrato(contrato_id)
+        registrar_log(usuario['id'], 'contrato_eliminado', f'Contrato ID: {contrato_id}')
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Error en api_eliminar_contrato: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/contratos/ultimo_numero', methods=['GET'])
+@login_required
+def api_obtener_ultimo_numero_contrato():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        ultimo = obtener_ultimo_numero_contrato(negocio_id)
+        return jsonify({'ultimo_numero': ultimo})
+    except Exception as e:
+        print(f"❌ Error en api_obtener_ultimo_numero_contrato: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/contratos/empresas', methods=['GET'])
+@login_required
+def api_obtener_empresas_contratos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        empresas = obtener_empresas_con_contratos_activos(negocio_id)
+        return jsonify(empresas)
+    except Exception as e:
+        print(f"❌ Error en api_obtener_empresas_contratos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/todos/contratos', methods=['GET'])
+@admin_required
+def api_todos_contratos():
+    try:
+        contratos = obtener_todos_contratos()
+        return jsonify([dict(c) for c in contratos])
+    except Exception as e:
+        print(f"❌ Error en api_todos_contratos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - REPORTES
+# ============================================
+
+@app.route('/api/reportes/contratos/resumen', methods=['GET'])
+@login_required
+def api_reportes_contratos_resumen():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        resumen = obtener_resumen_contratos(negocio_id)
+        return jsonify(resumen)
+    except Exception as e:
+        print(f"❌ Error en api_reportes_contratos_resumen: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reportes/ingresos/resumen', methods=['GET'])
+@login_required
+def api_reportes_ingresos_resumen():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        resumen = obtener_resumen_ingresos(negocio_id)
+        return jsonify(resumen)
+    except Exception as e:
+        print(f"❌ Error en api_reportes_ingresos_resumen: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reportes/productos/resumen', methods=['GET'])
+@login_required
+def api_reportes_productos_resumen():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        resumen = obtener_resumen_productos(negocio_id)
+        return jsonify(resumen)
+    except Exception as e:
+        print(f"❌ Error en api_reportes_productos_resumen: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reportes/contratos', methods=['GET'])
+@login_required
+def api_reporte_contratos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        tipo = request.args.get('tipo', 'todos')
+        
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        contratos = obtener_contratos(negocio_id)
+        
+        if tipo == 'activos':
+            contratos = [c for c in contratos if c.get('estado') == 'activo']
+        elif tipo == 'vencidos':
+            contratos = [c for c in contratos if c.get('estado') == 'vencido']
+        
+        datos_negocio = obtener_datos_negocio(negocio_id)
+        negocio_nombre = datos_negocio.get('nombre_negocio', 'Mi Negocio')
+        negocio_telefono = datos_negocio.get('telefono', '')
+        
+        generador = GeneradorReportes(negocio_id, negocio_nombre, negocio_telefono)
+        pdf_bytes = generador.generar_reporte_contratos(contratos, tipo)
+        
+        response = make_response(pdf_bytes)
+        response.headers.set('Content-Type', 'application/pdf')
+        response.headers.set('Content-Disposition', f'attachment; filename=reporte_contratos_{tipo}.pdf')
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error en api_reporte_contratos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reportes/ingresos', methods=['GET'])
+@login_required
+def api_reporte_ingresos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        tipo = request.args.get('tipo', 'hoy')
+        
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        ventas, total_ingresos, total_ventas = obtener_ventas_por_periodo(negocio_id, tipo)
+        
+        datos_negocio = obtener_datos_negocio(negocio_id)
+        negocio_nombre = datos_negocio.get('nombre_negocio', 'Mi Negocio')
+        negocio_telefono = datos_negocio.get('telefono', '')
+        
+        generador = GeneradorReportes(negocio_id, negocio_nombre, negocio_telefono)
+        periodo = {'hoy': 'Hoy', 'semana': 'Esta Semana', 'mes': 'Este Mes', 'todos': 'Todos los períodos'}.get(tipo, '')
+        pdf_bytes = generador.generar_reporte_ingresos(ventas, total_ingresos, total_ventas, periodo)
+        
+        response = make_response(pdf_bytes)
+        response.headers.set('Content-Type', 'application/pdf')
+        response.headers.set('Content-Disposition', f'attachment; filename=reporte_ingresos_{tipo}.pdf')
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error en api_reporte_ingresos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reportes/productos', methods=['GET'])
+@login_required
+def api_reporte_productos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        productos = obtener_productos(negocio_id)
+        
+        datos_negocio = obtener_datos_negocio(negocio_id)
+        negocio_nombre = datos_negocio.get('nombre_negocio', 'Mi Negocio')
+        negocio_telefono = datos_negocio.get('telefono', '')
+        
+        generador = GeneradorReportes(negocio_id, negocio_nombre, negocio_telefono)
+        pdf_bytes = generador.generar_reporte_productos(productos)
+        
+        response = make_response(pdf_bytes)
+        response.headers.set('Content-Type', 'application/pdf')
+        response.headers.set('Content-Disposition', 'attachment; filename=reporte_inventario.pdf')
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error en api_reporte_productos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - NÓMINA
+# ============================================
+
+@app.route('/api/nomina/asistencia', methods=['POST'])
+@login_required
+def api_registrar_asistencia():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    trabajador_id = data.get('trabajador_id')
+    fecha = data.get('fecha')
+    presente = data.get('presente', 1)
+    horas = data.get('horas', 8)
+    
+    if not trabajador_id or not fecha:
+        return jsonify({'error': 'Trabajador ID y fecha son requeridos'}), 400
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        exito = registrar_asistencia(trabajador_id, negocio_id, fecha, presente, horas)
+        
+        if exito:
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al registrar asistencia'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_registrar_asistencia: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/nomina/comisiones', methods=['GET'])
+@login_required
+def api_obtener_comisiones():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    trabajador_id = request.args.get('trabajador_id')
+    mes = request.args.get('mes')
+    ano = request.args.get('ano')
+    
+    if not trabajador_id or not mes or not ano:
+        return jsonify({'error': 'trabajador_id, mes y ano son requeridos'}), 400
+    
+    try:
+        comisiones = obtener_comisiones_trabajador_mes(int(trabajador_id), int(mes), int(ano))
+        return jsonify({'comisiones': [dict(c) for c in comisiones]})
+    except Exception as e:
+        print(f"❌ Error en api_obtener_comisiones: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/nomina/calcular', methods=['POST'])
+@login_required
+def api_calcular_nomina():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    trabajador_id = data.get('trabajador_id')
+    mes = data.get('mes')
+    ano = data.get('ano')
+    dias_trabajados = data.get('dias_trabajados')
+    
+    if not trabajador_id or not mes or not ano:
+        return jsonify({'error': 'trabajador_id, mes y ano son requeridos'}), 400
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        resultado = calcular_nomina(negocio_id, int(trabajador_id), int(mes), int(ano))
+        
         if resultado:
-            return resultado[0]
-        return 0
+            return jsonify({'success': True, 'nomina': resultado})
+        else:
+            return jsonify({'error': 'Error al calcular la nómina'}), 500
     except Exception as e:
-        print(f"❌ Error en obtener_ultimo_numero_factura: {e}")
-        conn.close()
-        return 0
+        print(f"❌ Error en api_calcular_nomina: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-def actualizar_ultimo_numero_factura(negocio_id, empresa, numero):
-    conn = get_db()
-    cursor = conn.cursor()
+@app.route('/api/nomina/detalle', methods=['GET'])
+@login_required
+def api_obtener_detalle_nomina():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    trabajador_id = request.args.get('trabajador_id')
+    mes = request.args.get('mes')
+    ano = request.args.get('ano')
+    
+    if not trabajador_id or not mes or not ano:
+        return jsonify({'error': 'trabajador_id, mes y ano son requeridos'}), 400
+    
     try:
-        cursor.execute('''
-            INSERT INTO facturas_secuencia (negocio_id, empresa, ultimo_numero, created_at)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (negocio_id, empresa) DO UPDATE SET 
-                ultimo_numero = EXCLUDED.ultimo_numero,
-                updated_at = %s
-        ''', (negocio_id, empresa, numero, datetime.now().isoformat(), datetime.now().isoformat()))
-        conn.commit()
-        conn.close()
-        return True
+        detalle = obtener_detalle_nomina(int(trabajador_id), int(mes), int(ano))
+        return jsonify({'success': True, 'detalle': detalle})
     except Exception as e:
-        print(f"❌ Error en actualizar_ultimo_numero_factura: {e}")
-        conn.rollback()
-        conn.close()
-        return False
+        print(f"❌ Error en api_obtener_detalle_nomina: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-def generar_numero_factura(negocio_id, empresa, año=None):
-    if not año:
-        año = datetime.now().year
-    ultimo = obtener_ultimo_numero_factura(negocio_id, empresa)
-    nuevo = ultimo + 1
-    actualizar_ultimo_numero_factura(negocio_id, empresa, nuevo)
-    return f"FAC-{año}-{str(nuevo).zfill(4)}"
+@app.route('/api/nomina/reporte', methods=['GET'])
+@login_required
+def api_generar_reporte_nomina():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    trabajador_id = request.args.get('trabajador_id')
+    mes = request.args.get('mes')
+    ano = request.args.get('ano')
+    
+    if not trabajador_id or not mes or not ano:
+        return jsonify({'error': 'trabajador_id, mes y ano son requeridos'}), 400
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        detalle = obtener_detalle_nomina(int(trabajador_id), int(mes), int(ano))
+        
+        if not detalle:
+            return jsonify({'error': 'No se encontró nómina para este trabajador'}), 404
+        
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib import colors
+        from reportlab.lib.units import cm
+        import io
+        
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+        styles = getSampleStyleSheet()
+        elementos = []
+        
+        estilo_titulo = ParagraphStyle('Titulo', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#6c3ce0'), alignment=1)
+        elementos.append(Paragraph('Reporte de Nómina', estilo_titulo))
+        elementos.append(Spacer(1, 0.5*cm))
+        
+        meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+        elementos.append(Paragraph(f'Trabajador: {detalle.get("nombre", "")}', styles['Normal']))
+        elementos.append(Paragraph(f'Período: {meses[int(mes)-1]} {ano}', styles['Normal']))
+        elementos.append(Spacer(1, 0.5*cm))
+        
+        datos = [
+            ['Concepto', 'Valor'],
+            ['Salario Base', f'${detalle.get("salario_base", 0):.2f}'],
+            ['Días del Mes', str(detalle.get("dias_mes", 0))],
+            ['Días Trabajados', str(detalle.get("dias_trabajados", 0))],
+            ['Ausencias', str(detalle.get("dias_ausencia", 0))],
+            ['Días Extras', str(detalle.get("dias_extras", 0))],
+            ['Salario Diario', f'${detalle.get("salario_diario", 0):.2f}'],
+            ['Salario Devengado', f'${detalle.get("salario_devengado", 0):.2f}'],
+            ['Comisiones', f'${detalle.get("comisiones", 0):.2f}'],
+            ['TOTAL', f'${detalle.get("total", 0):.2f}']
+        ]
+        
+        tabla = Table(datos, colWidths=[8*cm, 6*cm])
+        tabla.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('TOPPADDING', (0, 0), (-1, 0), 6),
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('TOPPADDING', (0, 1), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+            ('BACKGROUND', (0, 8), (-1, 9), colors.HexColor('#e8e8f0')),
+        ]))
+        
+        elementos.append(tabla)
+        doc.build(elementos)
+        
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        
+        response = make_response(pdf_bytes)
+        response.headers.set('Content-Type', 'application/pdf')
+        response.headers.set('Content-Disposition', f'attachment; filename=nomina_{trabajador_id}_{mes}_{ano}.pdf')
+        return response
+        
+    except Exception as e:
+        print(f"❌ Error en api_generar_reporte_nomina: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 # ============================================
-# FUNCIONES ADICIONALES PARA MÓDULOS
+# API - LOGS
 # ============================================
 
-def obtener_modulos_negocio():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-        SELECT * FROM modulos 
-        WHERE tipo_requerido IN ('ambos', 'negocio') AND activo_global = 1
-        ORDER BY nombre
-    ''')
-    modulos = cursor.fetchall()
-    conn.close()
-    return modulos
+@app.route('/api/logs', methods=['GET'])
+@admin_required
+def api_logs():
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        logs = obtener_logs(limit)
+        return jsonify([dict(l) for l in logs])
+    except Exception as e:
+        print(f"❌ Error en api_logs: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
-def obtener_modulos_trabajador():
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-        SELECT * FROM modulos 
-        WHERE tipo_requerido IN ('ambos', 'negocio') AND activo_global = 1
-        ORDER BY nombre
-    ''')
-    modulos = cursor.fetchall()
-    conn.close()
-    return modulos
+# ============================================
+# INICIO DE LA APLICACIÓN
+# ============================================
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
