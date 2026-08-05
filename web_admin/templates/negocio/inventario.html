@@ -404,22 +404,10 @@
 
             try {
                 const response = await fetch('/api/productos');
-                
-                // Verificar si la respuesta es JSON
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const text = await response.text();
-                    console.error('Respuesta no JSON:', text);
-                    container.innerHTML = `<div class="empty">❌ Error del servidor. Revisa los logs.</div>`;
-                    return;
-                }
-
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    throw new Error(`HTTP ${response.status}`);
                 }
-
                 productos = await response.json();
-                console.log('📦 Productos cargados:', productos.length);
                 renderProductos();
                 actualizarEstadisticas();
             } catch (error) {
@@ -578,7 +566,6 @@
             document.getElementById('btnGuardar').className = 'btn btn-warning';
             
             calcularGanancia();
-            
             document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
@@ -610,25 +597,13 @@
                 const url = editandoId ? `/api/producto/${editandoId}` : '/api/productos';
                 const method = editandoId ? 'PUT' : 'POST';
                 
-                console.log('📤 Enviando:', { url, method, data });
-                
                 const response = await fetch(url, {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
 
-                // Verificar si la respuesta es JSON
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const text = await response.text();
-                    console.error('Respuesta no JSON:', text);
-                    mostrarMensaje('Error del servidor. Revisa los logs.', 'error');
-                    return;
-                }
-
                 const result = await response.json();
-                console.log('📥 Respuesta:', result);
 
                 if (result.success) {
                     mostrarMensaje(`✅ "${nombre}" ${editandoId ? 'actualizado' : 'agregado'}`, 'exito');
@@ -663,14 +638,6 @@
                     headers: { 'Content-Type': 'application/json' }
                 });
 
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    const text = await response.text();
-                    console.error('Respuesta no JSON:', text);
-                    mostrarMensaje('Error del servidor', 'error');
-                    return;
-                }
-
                 const data = await response.json();
                 
                 if (data.success) {
@@ -697,10 +664,7 @@
         // INICIO
         // ============================================
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('📦 Iniciando módulo de inventario...');
             cargarProductos();
-            
-            // Actualizar cada 30 segundos
             setInterval(cargarProductos, 30000);
         });
     </script>
