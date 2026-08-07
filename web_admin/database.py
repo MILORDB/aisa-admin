@@ -1,3 +1,5 @@
+# web_admin/database.py
+
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -427,7 +429,6 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         fecha = datetime.now().isoformat()
         
         if datos_negocio and isinstance(datos_negocio, dict):
-            # Asegurar campos mínimos
             for key in ['provincia', 'municipio', 'nombre_negocio', 'ruc', 'telefono', 'direccion', 'descripcion', 'salario']:
                 if key not in datos_negocio:
                     datos_negocio[key] = ''
@@ -439,7 +440,6 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         else:
             datos_negocio = None
         
-        # Si es trabajador, se verifica automáticamente
         verificado = 1 if rol == 'trabajador' else 0
         aprobado = 1 if rol == 'trabajador' else 0
         
@@ -451,11 +451,9 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
         
         user_id = cursor.fetchone()[0]
         
-        # Si es admin, activar todo
         if rol == 'admin':
             cursor.execute('UPDATE usuarios SET verificado = 1, aprobado = 1 WHERE id = %s', (user_id,))
         
-        # Asignar permisos según tipo
         if rol != 'trabajador':
             if tipo == 'negocio':
                 cursor.execute('SELECT id FROM modulos WHERE tipo_requerido IN (%s, %s) AND activo_global = 1', ('ambos', 'negocio'))
@@ -514,11 +512,10 @@ def obtener_negocios():
     return negocios
 
 def eliminar_usuario(user_id):
-    """Elimina un usuario y todos sus datos relacionados (VERSIÓN SIN PERMISOS ESPECIALES)"""
+    """Elimina un usuario y todos sus datos relacionados"""
     conn = get_db()
     cursor = conn.cursor()
     try:
-        # Verificar si el usuario existe
         cursor.execute("SELECT id, username, rol FROM usuarios WHERE id = %s", (user_id,))
         usuario = cursor.fetchone()
         if not usuario:
@@ -528,74 +525,22 @@ def eliminar_usuario(user_id):
         
         print(f"🗑️ Eliminando usuario: {usuario[1]} (ID: {user_id}) - Rol: {usuario[2]}")
         
-        # ============================================
-        # ELIMINAR EN ORDEN CORRECTO (SIN DESACTIVAR RESTRICCIONES)
-        # ============================================
-        
-        # 1. Eliminar códigos de verificación
         cursor.execute("DELETE FROM codigos_verificacion WHERE usuario_id = %s", (user_id,))
-        print(f"   ✅ Códigos de verificación eliminados")
-        
-        # 2. Eliminar sesiones
         cursor.execute("DELETE FROM sesiones WHERE usuario_id = %s", (user_id,))
-        print(f"   ✅ Sesiones eliminadas")
-        
-        # 3. Eliminar permisos
         cursor.execute("DELETE FROM permisos_usuario WHERE usuario_id = %s", (user_id,))
-        print(f"   ✅ Permisos eliminados")
-        
-        # 4. Eliminar trabajadores_negocio
         cursor.execute("DELETE FROM trabajadores_negocio WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        print(f"   ✅ Trabajadores_Negocio eliminados")
-        
-        # 5. Eliminar comisiones_trabajador
         cursor.execute("DELETE FROM comisiones_trabajador WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        print(f"   ✅ Comisiones eliminadas")
-        
-        # 6. Eliminar asistencia
         cursor.execute("DELETE FROM asistencia WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        print(f"   ✅ Asistencia eliminada")
-        
-        # 7. Eliminar nomina
         cursor.execute("DELETE FROM nomina WHERE trabajador_id = %s OR negocio_id = %s", (user_id, user_id))
-        print(f"   ✅ Nómina eliminada")
-        
-        # 8. Eliminar contratos
         cursor.execute("DELETE FROM contratos WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        print(f"   ✅ Contratos eliminados")
-        
-        # 9. ELIMINAR VENTAS (PRIMERO LAS QUE TIENEN PRODUCTO_ID)
-        # Primero, actualizar ventas para quitar la referencia al producto
         cursor.execute("UPDATE ventas SET producto_id = NULL WHERE producto_id IN (SELECT id FROM productos WHERE negocio_id = %s)", (user_id,))
-        print(f"   ✅ Referencias a productos en ventas actualizadas")
-        
-        # Eliminar ventas del negocio
         cursor.execute("DELETE FROM ventas WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        print(f"   ✅ Ventas del usuario eliminadas")
-        
-        # 10. Eliminar productos_tienda
         cursor.execute("DELETE FROM productos_tienda WHERE negocio_id = %s", (user_id,))
-        print(f"   ✅ Productos_Tienda eliminados")
-        
-        # 11. Eliminar productos
         cursor.execute("DELETE FROM productos WHERE negocio_id = %s", (user_id,))
-        print(f"   ✅ Productos eliminados")
-        
-        # 12. Eliminar servicios
         cursor.execute("DELETE FROM servicios WHERE negocio_id = %s OR trabajador_id = %s", (user_id, user_id))
-        print(f"   ✅ Servicios eliminados")
-        
-        # 13. Eliminar logs
         cursor.execute("DELETE FROM logs WHERE usuario_id = %s", (user_id,))
-        print(f"   ✅ Logs eliminados")
-        
-        # 14. Eliminar facturas_secuencia
         cursor.execute("DELETE FROM facturas_secuencia WHERE negocio_id = %s", (user_id,))
-        print(f"   ✅ Facturas secuencia eliminadas")
-        
-        # 15. FINALMENTE eliminar el usuario
         cursor.execute("DELETE FROM usuarios WHERE id = %s", (user_id,))
-        print(f"   ✅ Usuario eliminado")
         
         conn.commit()
         conn.close()
@@ -685,11 +630,9 @@ def obtener_negocio_de_trabajador(trabajador_id):
 # ============================================
 
 def generar_codigo_verificacion():
-    """Genera un código de 6 dígitos aleatorio"""
     return ''.join(random.choices(string.digits, k=6))
 
 def guardar_codigo_verificacion(usuario_id, email, codigo):
-    """Guarda un código de verificación en la base de datos"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -708,7 +651,6 @@ def guardar_codigo_verificacion(usuario_id, email, codigo):
         return False
 
 def verificar_codigo(email, codigo):
-    """Verifica si un código es válido y lo marca como usado"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -720,7 +662,6 @@ def verificar_codigo(email, codigo):
         registro = cursor.fetchone()
         
         if registro:
-            # Marcar como usado
             cursor.execute('''
                 UPDATE codigos_verificacion SET usado = 1 
                 WHERE id = %s
@@ -736,7 +677,6 @@ def verificar_codigo(email, codigo):
         return None
 
 def marcar_usuario_verificado(user_id):
-    """Marca un usuario como verificado"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -754,7 +694,6 @@ def marcar_usuario_verificado(user_id):
         return False
 
 def obtener_codigos_pendientes(email):
-    """Obtiene códigos pendientes para un email"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -776,7 +715,6 @@ def obtener_codigos_pendientes(email):
 # ============================================
 
 def actualizar_ubicacion_usuario(user_id, latitud, longitud):
-    """Actualiza la ubicación de un usuario en el mapa"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -795,7 +733,6 @@ def actualizar_ubicacion_usuario(user_id, latitud, longitud):
         return False
 
 def obtener_ubicacion_usuario(user_id):
-    """Obtiene la ubicación de un usuario"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -808,7 +745,6 @@ def obtener_ubicacion_usuario(user_id):
     return resultado
 
 def obtener_negocios_con_ubicacion(negocio_id=None):
-    """Obtiene todos los negocios con ubicación registrada"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
@@ -1033,17 +969,100 @@ def obtener_productos_con_stock(negocio_id):
     conn.close()
     return productos
 
-def obtener_productos_tienda():
+def obtener_productos_tienda_publica(provincia=None, municipio=None):
+    """Obtiene productos de la tienda pública con filtro de ubicación"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    query = '''
+        SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url, 
+               p.negocio_id, u.username as negocio_username, u.nombre as negocio_nombre,
+               u.datos_negocio, pt.destacado
+        FROM productos p 
+        JOIN usuarios u ON p.negocio_id = u.id
+        LEFT JOIN productos_tienda pt ON p.id = pt.producto_id AND pt.negocio_id = u.id
+        WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0
+    '''
+    
+    params = []
+    
+    if provincia and municipio:
+        query += ' AND u.datos_negocio LIKE %s AND u.datos_negocio LIKE %s'
+        params.append(f'%"provincia": "{provincia}"%')
+        params.append(f'%"municipio": "{municipio}"%')
+    elif provincia:
+        query += ' AND u.datos_negocio LIKE %s'
+        params.append(f'%"provincia": "{provincia}"%')
+    
+    query += ' ORDER BY pt.destacado DESC, p.id DESC'
+    
+    cursor.execute(query, params)
+    productos = cursor.fetchall()
+    conn.close()
+    
+    resultado = []
+    for p in productos:
+        datos = {}
+        if p.get('datos_negocio'):
+            try:
+                datos = json.loads(p['datos_negocio']) if isinstance(p['datos_negocio'], str) else p['datos_negocio']
+            except:
+                pass
+        
+        resultado.append({
+            'id': p['id'],
+            'nombre': p['nombre'],
+            'categoria': p.get('categoria'),
+            'precio': float(p['precio']),
+            'stock': p['stock'],
+            'foto_url': p.get('foto_url'),
+            'negocio_id': p['negocio_id'],
+            'negocio_username': p.get('negocio_username'),
+            'negocio_nombre': p.get('negocio_nombre') or datos.get('nombre_negocio', p.get('negocio_username')),
+            'destacado': p.get('destacado', 0),
+            'provincia': datos.get('provincia', ''),
+            'municipio': datos.get('municipio', ''),
+            'direccion': datos.get('direccion', '')
+        })
+    
+    return resultado
+
+def obtener_productos_tienda_negocio(negocio_id):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
-    SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url
-    FROM productos p JOIN usuarios u ON p.negocio_id = u.id
-    WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0 ORDER BY p.id DESC
-    ''')
+    SELECT pt.id as tienda_id, p.*, pt.destacado
+    FROM productos_tienda pt
+    JOIN productos p ON pt.producto_id = p.id
+    WHERE pt.negocio_id = %s ORDER BY pt.destacado DESC, p.id DESC
+    ''', (negocio_id,))
     productos = cursor.fetchall()
     conn.close()
     return productos
+
+def agregar_producto_tienda(negocio_id, producto_id, destacado=0):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+    INSERT INTO productos_tienda (negocio_id, producto_id, destacado, created_at)
+    VALUES (%s, %s, %s, %s)
+    ''', (negocio_id, producto_id, destacado, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+def toggle_destacado_tienda(tienda_id, destacado):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE productos_tienda SET destacado = %s WHERE id = %s', (destacado, tienda_id))
+    conn.commit()
+    conn.close()
+
+def eliminar_producto_tienda(tienda_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM productos_tienda WHERE id = %s', (tienda_id,))
+    conn.commit()
+    conn.close()
 
 def actualizar_producto(producto_id, nombre, categoria, precio, costo, comision, stock, stock_minimo):
     conn = get_db()
@@ -1138,47 +1157,6 @@ def obtener_estadisticas_productos(negocio_id):
     return {'total': total, 'stock_bajo': stock_bajo, 'agotados': agotados, 'valor_total': valor_total}
 
 # ============================================
-# FUNCIONES PARA PRODUCTOS EN TIENDA
-# ============================================
-
-def agregar_producto_tienda(negocio_id, producto_id, destacado=0):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('''
-    INSERT INTO productos_tienda (negocio_id, producto_id, destacado, created_at)
-    VALUES (%s, %s, %s, %s)
-    ''', (negocio_id, producto_id, destacado, datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
-
-def obtener_productos_tienda_negocio(negocio_id):
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('''
-    SELECT pt.id, p.nombre, p.precio, p.costo, p.comision, p.stock, p.foto_url, pt.destacado
-    FROM productos_tienda pt
-    JOIN productos p ON pt.producto_id = p.id
-    WHERE pt.negocio_id = %s ORDER BY pt.id DESC
-    ''', (negocio_id,))
-    productos = cursor.fetchall()
-    conn.close()
-    return productos
-
-def toggle_destacado_tienda(producto_tienda_id, destacado):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('UPDATE productos_tienda SET destacado = %s WHERE id = %s', (destacado, producto_tienda_id))
-    conn.commit()
-    conn.close()
-
-def eliminar_producto_tienda(producto_tienda_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute('DELETE FROM productos_tienda WHERE id = %s', (producto_tienda_id,))
-    conn.commit()
-    conn.close()
-
-# ============================================
 # FUNCIONES PARA TRABAJADORES
 # ============================================
 
@@ -1192,7 +1170,7 @@ def obtener_trabajadores_por_empresa(empresa_id):
                    tn.cargo, tn.salario, tn.fecha_contratacion
             FROM trabajadores_negocio tn
             JOIN usuarios u ON tn.trabajador_id = u.id
-            WHERE tn.negocio_id = %s AND tn.activo = 1 AND u.activo = 1
+            WHERE tn.negocio_id = %s AND u.activo = 1
             ORDER BY u.nombre ASC
         ''', (empresa_id,))
         trabajadores = cursor.fetchall()
@@ -1219,6 +1197,61 @@ def obtener_trabajador_por_id(user_id):
     trabajador = cursor.fetchone()
     conn.close()
     return trabajador
+
+def obtener_trabajador_completo(user_id):
+    """Obtiene un trabajador con todos sus datos incluyendo módulos y relación con negocio"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute('''
+            SELECT u.id, u.username, u.email, u.nombre, u.activo, 
+                   u.datos_negocio, u.fecha_registro,
+                   tn.cargo, tn.salario, tn.fecha_contratacion, tn.activo as relacion_activa,
+                   tn.negocio_id
+            FROM usuarios u
+            LEFT JOIN trabajadores_negocio tn ON u.id = tn.trabajador_id
+            WHERE u.id = %s AND u.rol = 'trabajador'
+        ''', (user_id,))
+        trabajador = cursor.fetchone()
+        
+        if trabajador:
+            cursor.execute('''
+                SELECT m.nombre
+                FROM permisos_usuario p
+                JOIN modulos m ON p.modulo_id = m.id
+                WHERE p.usuario_id = %s AND p.activo = 1
+            ''', (user_id,))
+            modulos = cursor.fetchall()
+            trabajador['modulos'] = [m['nombre'] for m in modulos]
+        
+        conn.close()
+        return trabajador
+    except Exception as e:
+        print(f"❌ Error en obtener_trabajador_completo: {e}")
+        conn.close()
+        return None
+
+def obtener_trabajadores_activos(negocio_id):
+    """Obtiene trabajadores activos de un negocio"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cursor.execute('''
+            SELECT u.id, u.username, u.email, u.nombre, u.activo, 
+                   u.datos_negocio,
+                   tn.cargo, tn.salario
+            FROM trabajadores_negocio tn
+            JOIN usuarios u ON tn.trabajador_id = u.id
+            WHERE tn.negocio_id = %s AND tn.activo = 1 AND u.activo = 1
+            ORDER BY u.nombre ASC
+        ''', (negocio_id,))
+        trabajadores = cursor.fetchall()
+        conn.close()
+        return trabajadores
+    except Exception as e:
+        print(f"❌ Error en obtener_trabajadores_activos: {e}")
+        conn.close()
+        return []
 
 def crear_trabajador_negocio(negocio_id, trabajador_id, cargo, salario):
     conn = get_db()
@@ -1250,6 +1283,64 @@ def actualizar_trabajador_negocio(negocio_id, trabajador_id, cargo, salario):
     conn.commit()
     conn.close()
 
+def actualizar_trabajador(trabajador_id, datos):
+    """Actualiza los datos de un trabajador"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        nombre = datos.get('nombre')
+        apellidos = datos.get('apellidos')
+        ci = datos.get('ci')
+        movil = datos.get('movil')
+        direccion = datos.get('direccion')
+        frecuencia = datos.get('frecuencia')
+        salario = datos.get('salario')
+        email = datos.get('email')
+        modulos = datos.get('modulos')
+        
+        cursor.execute('SELECT datos_negocio FROM usuarios WHERE id = %s', (trabajador_id,))
+        result = cursor.fetchone()
+        datos_negocio = {}
+        if result and result[0]:
+            try:
+                datos_negocio = json.loads(result[0]) if isinstance(result[0], str) else result[0]
+            except:
+                pass
+        
+        datos_negocio.update({
+            'nombre': nombre or datos_negocio.get('nombre', ''),
+            'apellidos': apellidos or datos_negocio.get('apellidos', ''),
+            'ci': ci or datos_negocio.get('ci', ''),
+            'movil': movil or datos_negocio.get('movil', ''),
+            'direccion': direccion or datos_negocio.get('direccion', ''),
+            'frecuencia': frecuencia or datos_negocio.get('frecuencia', 'diaria')
+        })
+        
+        cursor.execute('''
+            UPDATE usuarios 
+            SET nombre = %s, email = %s, datos_negocio = %s
+            WHERE id = %s
+        ''', (nombre, email, json.dumps(datos_negocio, ensure_ascii=False), trabajador_id))
+        
+        if salario is not None:
+            cursor.execute('''
+                UPDATE trabajadores_negocio SET salario = %s
+                WHERE trabajador_id = %s
+            ''', (salario, trabajador_id))
+        
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error en actualizar_trabajador: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+def eliminar_trabajador_definitivo(trabajador_id):
+    """Elimina un trabajador de forma definitiva (usando eliminar_usuario)"""
+    return eliminar_usuario(trabajador_id)
+
 def obtener_trabajadores_pendientes():
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -1275,6 +1366,35 @@ def rechazar_trabajador(user_id):
     cursor.execute('UPDATE usuarios SET activo = 0 WHERE id = %s', (user_id,))
     conn.commit()
     conn.close()
+
+# ============================================
+# FUNCIONES PARA ESTADÍSTICAS DE TRABAJADORES
+# ============================================
+
+def obtener_estadisticas_trabajador(trabajador_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    hoy = datetime.now().date().isoformat()
+    try:
+        cursor.execute('SELECT COUNT(*) as ventas, COALESCE(SUM(total), 0) as ingresos FROM ventas WHERE trabajador_id = %s AND fecha = %s',
+                       (trabajador_id, hoy))
+        ventas = cursor.fetchone()
+        cursor.execute('SELECT COUNT(*) as servicios FROM servicios WHERE trabajador_id = %s AND activo = 1', (trabajador_id,))
+        servicios = cursor.fetchone()
+        cursor.execute('SELECT COUNT(DISTINCT cliente) as clientes FROM ventas WHERE trabajador_id = %s AND fecha = %s',
+                       (trabajador_id, hoy))
+        clientes = cursor.fetchone()
+        conn.close()
+        return {
+            'ventas': ventas[0] if ventas else 0,
+            'ingresos': ventas[1] if ventas else 0,
+            'servicios': servicios[0] if servicios else 0,
+            'clientes': clientes[0] if clientes else 0
+        }
+    except Exception as e:
+        print(f"❌ Error en obtener_estadisticas_trabajador: {e}")
+        conn.close()
+        return {'ventas': 0, 'ingresos': 0, 'servicios': 0, 'clientes': 0}
 
 # ============================================
 # FUNCIONES PARA VENTAS
@@ -1307,24 +1427,90 @@ def obtener_ventas(negocio_id, trabajador_id=None):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     if trabajador_id:
         cursor.execute('''
-        SELECT id, cliente, producto, cantidad, total, fecha, estado, 
-               trabajador_id, producto_id, empresa, tipo, factura_url,
-               factura, transferencia_id, transferencia_cedula,
-               transferencia_banco, transferencia_fecha
-        FROM ventas 
+        SELECT * FROM ventas 
         WHERE negocio_id = %s AND trabajador_id = %s 
         ORDER BY id DESC
         ''', (negocio_id, trabajador_id))
     else:
         cursor.execute('''
-        SELECT id, cliente, producto, cantidad, total, fecha, estado, 
-               trabajador_id, producto_id, empresa, tipo, factura_url,
-               factura, transferencia_id, transferencia_cedula,
-               transferencia_banco, transferencia_fecha
-        FROM ventas 
+        SELECT * FROM ventas 
         WHERE negocio_id = %s 
         ORDER BY id DESC
         ''', (negocio_id,))
+    ventas = cursor.fetchall()
+    conn.close()
+    return ventas
+
+def obtener_ventas_por_periodo(negocio_id, periodo='hoy'):
+    """Obtiene ventas según el período"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    hoy = datetime.now().date()
+    
+    if periodo == 'hoy':
+        fecha_inicio = hoy.isoformat()
+        fecha_fin = hoy.isoformat()
+    elif periodo == 'semana':
+        fecha_inicio = (hoy - timedelta(days=7)).isoformat()
+        fecha_fin = hoy.isoformat()
+    elif periodo == 'mes':
+        fecha_inicio = hoy.replace(day=1).isoformat()
+        fecha_fin = hoy.isoformat()
+    else:  # todos
+        fecha_inicio = '2000-01-01'
+        fecha_fin = hoy.isoformat()
+    
+    cursor.execute('''
+        SELECT * FROM ventas 
+        WHERE negocio_id = %s AND fecha >= %s AND fecha <= %s
+        ORDER BY id DESC
+    ''', (negocio_id, fecha_inicio, fecha_fin))
+    
+    ventas = cursor.fetchall()
+    total_ingresos = sum(v.get('total', 0) for v in ventas)
+    total_ventas = len(ventas)
+    
+    conn.close()
+    return ventas, total_ingresos, total_ventas
+
+def obtener_venta_por_id(venta_id):
+    """Obtiene una venta por su ID"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('SELECT * FROM ventas WHERE id = %s', (venta_id,))
+    venta = cursor.fetchone()
+    conn.close()
+    return venta
+
+def obtener_ventas_con_filtros(negocio_id, filtros=None):
+    """Obtiene ventas con filtros"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    query = 'SELECT * FROM ventas WHERE negocio_id = %s'
+    params = [negocio_id]
+    
+    if filtros:
+        if filtros.get('estado'):
+            query += ' AND estado = %s'
+            params.append(filtros['estado'])
+        if filtros.get('fecha_desde'):
+            query += ' AND fecha >= %s'
+            params.append(filtros['fecha_desde'])
+        if filtros.get('fecha_hasta'):
+            query += ' AND fecha <= %s'
+            params.append(filtros['fecha_hasta'])
+        if filtros.get('trabajador_id'):
+            query += ' AND trabajador_id = %s'
+            params.append(filtros['trabajador_id'])
+        if filtros.get('cliente'):
+            query += ' AND cliente ILIKE %s'
+            params.append(f'%{filtros["cliente"]}%')
+    
+    query += ' ORDER BY id DESC'
+    
+    cursor.execute(query, params)
     ventas = cursor.fetchall()
     conn.close()
     return ventas
@@ -1440,7 +1626,7 @@ def obtener_servicios(negocio_id, trabajador_id=None):
         else:
             cursor.execute('''
                 SELECT * FROM servicios 
-                WHERE negocio_id = %s AND activo = 1
+                WHERE negocio_id = %s
                 ORDER BY id DESC
             ''', (negocio_id,))
         servicios = cursor.fetchall()
@@ -1476,30 +1662,6 @@ def eliminar_servicio(servicio_id):
     cursor.execute('DELETE FROM servicios WHERE id = %s', (servicio_id,))
     conn.commit()
     conn.close()
-
-# ============================================
-# FUNCIONES PARA ESTADÍSTICAS DE TRABAJADORES
-# ============================================
-
-def obtener_estadisticas_trabajador(trabajador_id):
-    conn = get_db()
-    cursor = conn.cursor()
-    hoy = datetime.now().date().isoformat()
-    cursor.execute('SELECT COUNT(*) as ventas, COALESCE(SUM(total), 0) as ingresos FROM ventas WHERE trabajador_id = %s AND fecha = %s',
-                   (trabajador_id, hoy))
-    ventas = cursor.fetchone()
-    cursor.execute('SELECT COUNT(*) as servicios FROM servicios WHERE trabajador_id = %s AND activo = 1', (trabajador_id,))
-    servicios = cursor.fetchone()
-    cursor.execute('SELECT COUNT(DISTINCT cliente) as clientes FROM ventas WHERE trabajador_id = %s AND fecha = %s',
-                   (trabajador_id, hoy))
-    clientes = cursor.fetchone()
-    conn.close()
-    return {
-        'ventas': ventas[0] if ventas else 0,
-        'ingresos': ventas[1] if ventas else 0,
-        'servicios': servicios[0] if servicios else 0,
-        'clientes': clientes[0] if clientes else 0
-    }
 
 # ============================================
 # FUNCIONES PARA CONTRATOS
@@ -1555,6 +1717,15 @@ def obtener_contratos(negocio_id, trabajador_id=None):
     conn.close()
     return contratos
 
+def obtener_contrato_por_id(contrato_id):
+    """Obtiene un contrato por su ID"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('SELECT * FROM contratos WHERE id = %s', (contrato_id,))
+    contrato = cursor.fetchone()
+    conn.close()
+    return contrato
+
 def obtener_todos_contratos():
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -1593,6 +1764,143 @@ def eliminar_contrato(contrato_id):
     cursor.execute('DELETE FROM contratos WHERE id = %s', (contrato_id,))
     conn.commit()
     conn.close()
+
+def obtener_empresas_con_contratos_activos(negocio_id):
+    """Obtiene empresas con contratos activos para un negocio"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    hoy = datetime.now().date().isoformat()
+    cursor.execute('''
+        SELECT DISTINCT empresa, numero_contrato, tipo, fecha_fin
+        FROM contratos 
+        WHERE negocio_id = %s AND estado IN ('activo', 'pendiente') AND fecha_fin >= %s
+        ORDER BY empresa ASC
+    ''', (negocio_id, hoy))
+    empresas = cursor.fetchall()
+    conn.close()
+    return [dict(e) for e in empresas]
+
+def obtener_contratos_activos_para_empresa(negocio_id, empresa):
+    """Obtiene contratos activos para una empresa específica"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    hoy = datetime.now().date().isoformat()
+    cursor.execute('''
+        SELECT * FROM contratos 
+        WHERE negocio_id = %s AND empresa = %s AND estado IN ('activo', 'pendiente') AND fecha_fin >= %s
+        ORDER BY fecha_fin ASC
+    ''', (negocio_id, empresa, hoy))
+    contratos = cursor.fetchall()
+    conn.close()
+    return contratos
+
+# ============================================
+# FUNCIONES PARA REPORTES
+# ============================================
+
+def obtener_resumen_contratos(negocio_id):
+    """Obtiene resumen de contratos para el dashboard"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT COUNT(*) FROM contratos WHERE negocio_id = %s', (negocio_id,))
+        total = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM contratos WHERE negocio_id = %s AND estado = %s', (negocio_id, 'activo'))
+        activos = cursor.fetchone()[0]
+        
+        hoy = datetime.now().date().isoformat()
+        cursor.execute('SELECT COUNT(*) FROM contratos WHERE negocio_id = %s AND estado IN (%s, %s) AND fecha_fin < %s', 
+                      (negocio_id, 'activo', 'pendiente', hoy))
+        vencidos = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COALESCE(SUM(monto), 0) FROM contratos WHERE negocio_id = %s', (negocio_id,))
+        total_gastos = cursor.fetchone()[0]
+        
+        conn.close()
+        return {
+            'total': total,
+            'activos': activos,
+            'vencidos': vencidos,
+            'total_gastos': total_gastos,
+            'tiene_contratos': total > 0
+        }
+    except Exception as e:
+        print(f"❌ Error en obtener_resumen_contratos: {e}")
+        conn.close()
+        return {'total': 0, 'activos': 0, 'vencidos': 0, 'total_gastos': 0, 'tiene_contratos': False}
+
+def obtener_resumen_ingresos(negocio_id):
+    """Obtiene resumen de ingresos para el dashboard"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        hoy = datetime.now().date()
+        hoy_str = hoy.isoformat()
+        
+        cursor.execute('SELECT COALESCE(SUM(total), 0) FROM ventas WHERE negocio_id = %s AND fecha = %s AND estado != %s', 
+                      (negocio_id, hoy_str, 'cancelado'))
+        ingresos_hoy = cursor.fetchone()[0]
+        
+        semana_inicio = (hoy - timedelta(days=7)).isoformat()
+        cursor.execute('SELECT COALESCE(SUM(total), 0) FROM ventas WHERE negocio_id = %s AND fecha >= %s AND estado != %s', 
+                      (negocio_id, semana_inicio, 'cancelado'))
+        ingresos_semana = cursor.fetchone()[0]
+        
+        mes_inicio = hoy.replace(day=1).isoformat()
+        cursor.execute('SELECT COALESCE(SUM(total), 0) FROM ventas WHERE negocio_id = %s AND fecha >= %s AND estado != %s', 
+                      (negocio_id, mes_inicio, 'cancelado'))
+        ingresos_mes = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COALESCE(SUM(total), 0) FROM ventas WHERE negocio_id = %s AND estado != %s', 
+                      (negocio_id, 'cancelado'))
+        total_ingresos = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM ventas WHERE negocio_id = %s', (negocio_id,))
+        tiene_ventas = cursor.fetchone()[0] > 0
+        
+        conn.close()
+        return {
+            'ingresos_hoy': ingresos_hoy,
+            'ingresos_semana': ingresos_semana,
+            'ingresos_mes': ingresos_mes,
+            'total_ingresos': total_ingresos,
+            'tiene_ventas': tiene_ventas
+        }
+    except Exception as e:
+        print(f"❌ Error en obtener_resumen_ingresos: {e}")
+        conn.close()
+        return {'ingresos_hoy': 0, 'ingresos_semana': 0, 'ingresos_mes': 0, 'total_ingresos': 0, 'tiene_ventas': False}
+
+def obtener_resumen_productos(negocio_id):
+    """Obtiene resumen de productos para el dashboard"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s', (negocio_id,))
+        total = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock = 0', (negocio_id,))
+        stock_agotado = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COUNT(*) FROM productos WHERE negocio_id = %s AND stock > 0 AND stock <= stock_minimo', (negocio_id,))
+        stock_bajo = cursor.fetchone()[0]
+        
+        cursor.execute('SELECT COALESCE(SUM(precio * stock), 0) FROM productos WHERE negocio_id = %s', (negocio_id,))
+        valor_total = cursor.fetchone()[0]
+        
+        conn.close()
+        return {
+            'total': total,
+            'stock_agotado': stock_agotado,
+            'stock_bajo': stock_bajo,
+            'valor_total': valor_total,
+            'tiene_productos': total > 0
+        }
+    except Exception as e:
+        print(f"❌ Error en obtener_resumen_productos: {e}")
+        conn.close()
+        return {'total': 0, 'stock_agotado': 0, 'stock_bajo': 0, 'valor_total': 0, 'tiene_productos': False}
 
 # ============================================
 # FUNCIONES PARA NÓMINA Y ASISTENCIA
@@ -1769,76 +2077,83 @@ def obtener_comisiones_negocio_mes(negocio_id, mes, ano):
     conn.close()
     return comisiones
 
-def calcular_nomina(negocio_id, trabajador_id, mes, ano):
+def obtener_detalle_nomina(trabajador_id, mes, ano):
+    """Obtiene el detalle completo de la nómina de un trabajador en un mes"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        _, dias_mes = monthrange(ano, mes)
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
         cursor.execute('''
-            SELECT u.id, u.nombre, u.datos_negocio
-            FROM usuarios u WHERE u.id = %s
+            SELECT u.id, u.nombre, u.datos_negocio, tn.salario, tn.negocio_id
+            FROM usuarios u
+            JOIN trabajadores_negocio tn ON u.id = tn.trabajador_id
+            WHERE u.id = %s
         ''', (trabajador_id,))
         trabajador = cursor.fetchone()
+        
         if not trabajador:
             conn.close()
             return None
         
         datos = {}
-        if trabajador['datos_negocio']:
+        if trabajador.get('datos_negocio'):
             try:
                 datos = json.loads(trabajador['datos_negocio']) if isinstance(trabajador['datos_negocio'], str) else trabajador['datos_negocio']
             except:
-                datos = {}
-        salario_base = datos.get('salario', 0)
+                pass
+        
+        salario_base = trabajador.get('salario', 0)
         if salario_base == 0:
-            conn.close()
-            return None
+            salario_base = datos.get('salario', 0)
+        
+        _, dias_mes = monthrange(ano, mes)
         
         dias_trabajados = obtener_dias_trabajados_mes(trabajador_id, mes, ano)
         dias_ausencia = obtener_dias_ausencia_mes(trabajador_id, mes, ano)
         dias_extras = obtener_dias_extras_mes(trabajador_id, mes, ano)
         
-        if dias_trabajados == 0:
-            # Estimar días laborables
+        if dias_trabajados == 0 and dias_ausencia == 0 and dias_extras == 0:
             for d in range(1, dias_mes + 1):
                 fecha = datetime(ano, mes, d)
                 if fecha.weekday() < 5:
-                    dias_trabajados += 1
+                    if fecha <= datetime.now():
+                        dias_trabajados += 1
         
         salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
         salario_devengado = salario_diario * dias_trabajados
         comisiones = obtener_total_comisiones_mes(trabajador_id, mes, ano)
         total = salario_devengado + comisiones
         
-        # Guardar en tabla nomina
+        comisiones_list = obtener_comisiones_trabajador_mes(trabajador_id, mes, ano)
+        
         cursor.execute('''
             SELECT id FROM nomina 
-            WHERE negocio_id = %s AND trabajador_id = %s AND mes = %s AND ano = %s
-        ''', (negocio_id, trabajador_id, mes, ano))
+            WHERE trabajador_id = %s AND mes = %s AND ano = %s
+        ''', (trabajador_id, mes, ano))
         existe = cursor.fetchone()
         
         if existe:
             cursor.execute('''
                 UPDATE nomina SET
+                    negocio_id = %s,
                     salario_base = %s, dias_trabajados = %s, dias_ausencia = %s,
                     dias_extras = %s, salario_devengado = %s, comisiones = %s,
                     total = %s, actualizado_en = %s
                 WHERE id = %s
-            ''', (salario_base, dias_trabajados, dias_ausencia, dias_extras,
-                  salario_devengado, comisiones, total, datetime.now(), existe['id']))
+            ''', (trabajador['negocio_id'], salario_base, dias_trabajados, dias_ausencia,
+                  dias_extras, salario_devengado, comisiones, total, datetime.now(), existe['id']))
         else:
             cursor.execute('''
                 INSERT INTO nomina (negocio_id, trabajador_id, mes, ano, salario_base,
                     dias_trabajados, dias_ausencia, dias_extras, salario_devengado,
                     comisiones, total, creado_en)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ''', (negocio_id, trabajador_id, mes, ano, salario_base,
+            ''', (trabajador['negocio_id'], trabajador_id, mes, ano, salario_base,
                   dias_trabajados, dias_ausencia, dias_extras, salario_devengado,
                   comisiones, total, datetime.now()))
         
         conn.commit()
         conn.close()
+        
         return {
             'trabajador_id': trabajador_id,
             'nombre': trabajador['nombre'],
@@ -1850,8 +2165,19 @@ def calcular_nomina(negocio_id, trabajador_id, mes, ano):
             'salario_diario': salario_diario,
             'salario_devengado': salario_devengado,
             'comisiones': comisiones,
+            'comisiones_list': comisiones_list,
             'total': total
         }
+    except Exception as e:
+        print(f"❌ Error en obtener_detalle_nomina: {e}")
+        conn.close()
+        return None
+
+def calcular_nomina(negocio_id, trabajador_id, mes, ano):
+    """Calcula la nómina de un trabajador y la guarda en la base de datos"""
+    try:
+        detalle = obtener_detalle_nomina(trabajador_id, mes, ano)
+        return detalle
     except Exception as e:
         print(f"❌ Error en calcular_nomina: {e}")
         return None
