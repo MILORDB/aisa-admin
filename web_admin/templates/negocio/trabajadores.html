@@ -621,6 +621,9 @@
             document.getElementById('formTrabajador').scrollIntoView({ behavior: 'smooth' });
         }
 
+        // ============================================
+        // GUARDAR TRABAJADOR (CORREGIDO)
+        // ============================================
         async function guardarTrabajador() {
             const nombre = document.getElementById('traNombre').value.trim();
             const apellidos = document.getElementById('traApellidos').value.trim();
@@ -634,16 +637,33 @@
             const password = document.getElementById('traPassword').value.trim();
             const modulosSeleccionados = getModulosSeleccionados();
 
-            if (!nombre || !apellidos || !ci || isNaN(salario) || !usuario) {
-                mostrarMensaje('Completa todos los campos obligatorios', 'error');
+            // Validaciones mejoradas
+            if (!nombre) {
+                mostrarMensaje('El nombre es obligatorio', 'error');
+                return;
+            }
+            if (!apellidos) {
+                mostrarMensaje('Los apellidos son obligatorios', 'error');
+                return;
+            }
+            if (!ci) {
+                mostrarMensaje('El CI es obligatorio', 'error');
+                return;
+            }
+            if (isNaN(salario) || salario <= 0) {
+                mostrarMensaje('El salario debe ser un número válido', 'error');
+                return;
+            }
+            if (!usuario) {
+                mostrarMensaje('El nombre de usuario es obligatorio', 'error');
                 return;
             }
             if (!editandoId && !password) {
-                mostrarMensaje('Contraseña obligatoria', 'error');
+                mostrarMensaje('La contraseña es obligatoria', 'error');
                 return;
             }
             if (password && password.length < 6) {
-                mostrarMensaje('Mínimo 6 caracteres', 'error');
+                mostrarMensaje('La contraseña debe tener al menos 6 caracteres', 'error');
                 return;
             }
             if (modulosSeleccionados.length === 0) {
@@ -652,11 +672,20 @@
             }
 
             const data = {
-                nombre, apellidos, ci, movil, direccion,
-                frecuencia, salario, email,
-                usuario, password,
+                nombre: nombre,
+                apellidos: apellidos,
+                ci: ci,
+                movil: movil,
+                direccion: direccion,
+                frecuencia: frecuencia,
+                salario: salario,
+                email: email,
+                usuario: usuario,
+                password: password,
                 modulos: modulosSeleccionados
             };
+
+            console.log('📤 Enviando datos:', data);
 
             const btn = document.getElementById('btnGuardar');
             const textoOriginal = btn.textContent;
@@ -672,18 +701,20 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
+                
                 const result = await response.json();
+                console.log('📥 Respuesta:', result);
 
                 if (result.success) {
                     mostrarMensaje(`✅ ${editandoId ? 'Actualizado' : 'Creado'} "${nombre} ${apellidos}"`, 'exito');
                     cancelarFormulario();
                     await cargarTrabajadores();
                 } else {
-                    mostrarMensaje(result.error || 'Error', 'error');
+                    mostrarMensaje(result.error || 'Error al guardar', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
+                mostrarMensaje('Error de conexión: ' + error.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.textContent = textoOriginal;
@@ -777,6 +808,7 @@
         // ============================================
         // EVENT LISTENERS
         // ============================================
+        document.getElementById('btnGuardar').addEventListener('click', guardarTrabajador);
         document.getElementById('btnCancelar').addEventListener('click', cancelarFormulario);
 
         // ============================================
