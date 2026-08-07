@@ -258,7 +258,6 @@
             <div class="stat-box"><div class="number pagado" id="totalPagado">0</div><div class="label">✅ Pagadas</div></div>
             <div class="stat-box"><div class="number pendiente" id="totalPendiente">0</div><div class="label">⏳ Pendientes</div></div>
             <div class="stat-box"><div class="number cancelado" id="totalCancelado">0</div><div class="label">❌ Canceladas</div></div>
-            <div class="stat-box"><div class="number oferta" id="totalOfertas">0</div><div class="label">📄 Ofertas</div></div>
         </div>
     </div>
 
@@ -271,7 +270,6 @@
                 <option value="pendiente">⏳ Pendiente</option>
                 <option value="cancelado">❌ Cancelado</option>
                 <option value="transferencia">💳 Transferencia</option>
-                <option value="oferta">📄 Oferta</option>
             </select>
             <button class="btn btn-primary" onclick="nuevaVenta()">+ Nueva</button>
         </div>
@@ -283,9 +281,6 @@
             <h3>💰 Nueva Venta</h3>
             <div class="modal-subtitle">Complete los datos de la venta</div>
 
-            <!-- ========================================== -->
-            <!-- CAMPO EMPRESA CON SELECT DE CONTRATOS      -->
-            <!-- ========================================== -->
             <div class="form-row campo-opcional">
                 <div style="flex:2;">
                     <label>🏢 Empresa / TCP / MIPYME <span style="color:#888;">(selecciona de contratos activos)</span></label>
@@ -294,7 +289,6 @@
                     </select>
                     <div style="font-size:10px;color:#888;margin-top:2px;">
                         <span id="infoContrato">📄 Cargando contratos...</span>
-                        <a href="#" class="contrato-link" onclick="buscarContratoManual()">Buscar contrato</a>
                         <span id="empresaInfo" style="display:none;color:#6c3ce0;margin-left:8px;"></span>
                     </div>
                 </div>
@@ -304,9 +298,6 @@
                 </div>
             </div>
 
-            <!-- ========================================== -->
-            <!-- SECCIÓN DE OFERTA (DEBAJO DE EMPRESAS)      -->
-            <!-- ========================================== -->
             <div class="oferta-section">
                 <div class="oferta-label">
                     <input type="checkbox" id="esOferta" onchange="toggleOferta()">
@@ -314,11 +305,9 @@
                 </div>
                 <div class="oferta-info">
                     ⚠️ Las ofertas no generan número de factura y no afectan el inventario.
-                    Se identifican con el badge 📄 Oferta en la lista.
                 </div>
             </div>
 
-            <!-- Productos -->
             <div class="seccion-items">
                 <div class="seccion-titulo"><span>📦 Productos</span><span class="badge-count" id="countProductos">0</span></div>
                 <div id="productosContainer"></div>
@@ -327,7 +316,6 @@
                 </div>
             </div>
 
-            <!-- Servicios -->
             <div class="seccion-items">
                 <div class="seccion-titulo"><span>📋 Servicios</span><span class="badge-count" id="countServicios">0</span></div>
                 <div id="serviciosContainer"></div>
@@ -336,7 +324,6 @@
                 </div>
             </div>
 
-            <!-- Estado de pago -->
             <div class="form-row">
                 <div style="flex:1;">
                     <label>📌 Estado</label>
@@ -345,12 +332,10 @@
                         <option value="pendiente">⏳ Pendiente</option>
                         <option value="cancelado">❌ Cancelado</option>
                         <option value="transferencia">💳 Transferencia</option>
-                        <option value="oferta">📄 Oferta</option>
                     </select>
                 </div>
             </div>
 
-            <!-- Campos Transferencia -->
             <div class="campo-transferencia" id="camposTransferencia">
                 <div class="form-row">
                     <input type="text" id="transferenciaId" placeholder="ID Transferencia">
@@ -362,7 +347,6 @@
                 </div>
             </div>
 
-            <!-- Factura Preview -->
             <div class="factura-preview" id="facturaPreview">
                 <div class="factura-titulo" id="facturaTitulo">🧾 FACTURA</div>
                 <div class="factura-fila"><span class="label">📄 N°</span><span class="value" id="facturaNumero">-</span></div>
@@ -375,8 +359,9 @@
 
             <input type="hidden" id="ventaTrabajador" value="">
             <div class="form-actions">
-                <button class="btn btn-success" onclick="guardarVenta()" id="btnGuardarVenta">💾 Guardar</button>
-                <button class="btn btn-danger" onclick="cerrarModal()">✕ Cancelar</button>
+                <!-- ELIMINÉ onclick="guardarVenta()" para evitar duplicados -->
+                <button class="btn btn-success" id="btnGuardarVenta">💾 Guardar</button>
+                <button class="btn btn-danger" id="btnCancelarVenta">✕ Cancelar</button>
             </div>
         </div>
     </div>
@@ -424,12 +409,15 @@
                 document.getElementById('ventaTrabajador').value = trabajadorId;
             }
             
+            // Asignar event listeners
+            document.getElementById('btnGuardarVenta').addEventListener('click', guardarVenta);
+            document.getElementById('btnCancelarVenta').addEventListener('click', cerrarModal);
+            
             cargarVentas();
             cargarProductos();
             cargarServicios();
             cargarEmpresasConContratos();
             
-            // Actualizar cada 30 segundos
             setInterval(() => {
                 cargarVentas();
                 cargarProductos();
@@ -510,7 +498,6 @@
                 'pendiente': '⏳ Pendiente', 
                 'cancelado': '❌ Cancelado', 
                 'transferencia': '💳 Transferencia', 
-                'oferta': '📄 Oferta' 
             };
             const clases = { 
                 'pagado': 'pagado', 
@@ -936,7 +923,6 @@
                 'pendiente':'⏳ Pendiente', 
                 'cancelado':'❌ Cancelado', 
                 'transferencia':'💳 Transferencia', 
-                'oferta':'📄 Oferta' 
             };
             document.getElementById('facturaEstado').textContent = esOferta ? '📄 Oferta' : (estados[estado] || estado);
             
@@ -995,7 +981,7 @@
         });
 
         // ============================================
-        // GUARDAR VENTA
+        // GUARDAR VENTA (CORREGIDO - SIN onclick)
         // ============================================
         async function guardarVenta() {
             const esOferta = document.getElementById('esOferta').checked;
@@ -1035,6 +1021,7 @@
                     });
                 }
             });
+            
             if (items.length === 0) { 
                 mostrarMensaje('Agrega un producto o servicio', 'error'); 
                 return; 
@@ -1077,16 +1064,24 @@
             };
             
             const btn = document.getElementById('btnGuardarVenta');
+            const textoOriginal = btn.textContent;
+            
+            // Deshabilitar el botón para evitar doble clic
             btn.disabled = true;
             btn.textContent = '⏳ Guardando...';
             
             try {
+                console.log('📤 Enviando datos de venta:', data);
+                
                 const response = await fetch('/api/ventas', { 
                     method:'POST', 
-                    headers:{'Content-Type':'application/json'}, 
+                    headers:{'Content-Type':'application/json'},
+                    credentials: 'include',
                     body:JSON.stringify(data) 
                 });
+                
                 const result = await response.json();
+                console.log('📥 Respuesta:', result);
                 
                 if (result.success) {
                     const mensajeFactura = result.factura ? `\n📄 Factura: ${result.factura}` : '';
@@ -1095,14 +1090,14 @@
                     cargarVentas(); 
                     cargarProductos();
                 } else {
-                    mostrarMensaje(result.error || 'Error', 'error');
+                    mostrarMensaje(result.error || 'Error al guardar la venta', 'error');
                 }
             } catch (error) { 
-                console.error(error); 
-                mostrarMensaje('Error de conexión', 'error'); 
+                console.error('❌ Error:', error); 
+                mostrarMensaje('Error de conexión: ' + error.message, 'error'); 
             } finally {
                 btn.disabled = false;
-                btn.textContent = '💾 Guardar';
+                btn.textContent = textoOriginal;
             }
         }
 
