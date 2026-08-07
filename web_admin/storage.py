@@ -22,11 +22,23 @@ class StorageManager:
         # 1. En Render: /etc/secrets/credentials.json
         if os.path.exists('/etc/secrets/credentials.json'):
             self.credentials_file = '/etc/secrets/credentials.json'
-            print("📁 Credenciales encontradas en Render: /etc/secrets/credentials.json")
+            print("📁 Credenciales en Render: /etc/secrets/credentials.json")
         # 2. En local: credentials.json
         elif os.path.exists('credentials.json'):
             self.credentials_file = 'credentials.json'
             print("📁 Credenciales locales: credentials.json")
+        # 3. En variable de entorno
+        elif os.environ.get('GOOGLE_CREDENTIALS_JSON'):
+            try:
+                creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+                if creds_json.startswith('{'):
+                    self.credentials_file = '/tmp/credentials.json'
+                    os.makedirs('/tmp', exist_ok=True)
+                    with open(self.credentials_file, 'w') as f:
+                        f.write(creds_json)
+                    print("📁 Credenciales desde variable de entorno")
+            except Exception as e:
+                print(f"⚠️ Error cargando credenciales desde variable: {e}")
         
         if not self.credentials_file or not os.path.exists(self.credentials_file):
             print("❌ No se encontró credentials.json")
@@ -39,6 +51,9 @@ class StorageManager:
         
         if self.drive_service:
             self._create_base_folder()
+            # IMPORTANTE: Si la autenticación fue exitosa, usar Google Drive
+            if not self.use_local:
+                print("✅ Google Drive configurado correctamente")
         else:
             self.use_local = True
     
@@ -50,6 +65,7 @@ class StorageManager:
             # Verificar que el archivo existe
             if not os.path.exists(self.credentials_file):
                 print(f"❌ Archivo no encontrado: {self.credentials_file}")
+                self.use_local = True
                 return
             
             # Cargar credenciales de Cuenta de Servicio
@@ -60,29 +76,38 @@ class StorageManager:
             
             # Construir el servicio
             self.drive_service = build('drive', 'v3', credentials=creds)
+            
+            # ✅ IMPORTANTE: Establecer use_local = False SOLO si la autenticación fue exitosa
             self.use_local = False
             
             print("✅ Autenticación exitosa con Cuenta de Servicio")
             
             # Verificar acceso
-            about = self.drive_service.about().get(fields="storageQuota").execute()
-            quota = about.get('storageQuota', {})
-            used = int(quota.get('usage', 0))
-            limit = int(quota.get('limit', 0))
-            if limit > 0:
-                free_gb = (limit - used) / (1024**3)
-                print(f"📊 Espacio disponible: {free_gb:.2f} GB")
+            try:
+                about = self.drive_service.about().get(fields="storageQuota").execute()
+                quota = about.get('storageQuota', {})
+                used = int(quota.get('usage', 0))
+                limit = int(quota.get('limit', 0))
+                if limit > 0:
+                    free_gb = (limit - used) / (1024**3)
+                    print(f"📊 Espacio disponible: {free_gb:.2f} GB")
+            except Exception as e:
+                print(f"⚠️ Error obteniendo cuota: {e}")
             
         except Exception as e:
             print(f"❌ Error en autenticación: {e}")
             self.use_local = True
+            self.drive_service = None
     
     def _create_base_folder(self):
         """Crea la carpeta base 'AIsa' en Google Drive si no existe"""
         if not self.drive_service:
+            print("⚠️ No hay servicio de Google Drive")
             return
         
         try:
+            print("📁 Buscando carpeta 'AIsa' en Google Drive...")
+            
             results = self.drive_service.files().list(
                 q="name='AIsa' and mimeType='application/vnd.google-apps.folder' and trashed=false",
                 spaces='drive',
@@ -92,6 +117,7 @@ class StorageManager:
             folders = results.get('files', [])
             
             if not folders:
+                print("📁 No se encontró 'AIsa', creando carpeta...")
                 file_metadata = {
                     'name': 'AIsa',
                     'mimeType': 'application/vnd.google-apps.folder'
@@ -101,13 +127,15 @@ class StorageManager:
                     fields='id'
                 ).execute()
                 self.base_folder_id = folder.get('id')
-                print(f"📁 Carpeta 'AIsa' creada (ID: {self.base_folder_id})")
+                print(f"✅ Carpeta 'AIsa' creada (ID: {self.base_folder_id})")
             else:
                 self.base_folder_id = folders[0]['id']
-                print(f"📁 Carpeta 'AIsa' encontrada (ID: {self.base_folder_id})")
+                print(f"✅ Carpeta 'AIsa' encontrada (ID: {self.base_folder_id})")
             
         except Exception as e:
             print(f"⚠️ Error creando carpeta base: {e}")
+            # Si hay error, seguir con local
+            self.use_local = True
     
     def _get_or_create_folder(self, path, parent_id=None):
         """Obtiene o crea una carpeta por su ruta"""
@@ -116,6 +144,10 @@ class StorageManager:
         
         if not parent_id:
             parent_id = self.base_folder_id
+        
+        if not parent_id:
+            print("⚠️ No hay carpeta base para crear subcarpetas")
+            return None
         
         try:
             parts = path.strip('/').split('/')
@@ -145,6 +177,7 @@ class StorageManager:
                         fields='id'
                     ).execute()
                     current_parent = folder.get('id')
+                    print(f"📁 Carpeta creada: {part}")
                 else:
                     current_parent = folders[0]['id']
             
@@ -167,6 +200,7 @@ class StorageManager:
             folder_id = self._get_or_create_folder(folder_path)
             
             if not folder_id:
+                print("⚠️ No se pudo crear carpeta en Google Drive, usando local")
                 return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
             
             temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/temp')
@@ -196,6 +230,7 @@ class StorageManager:
                 print(f"✅ Foto subida a Google Drive: {nombre_foto} (ID: {file_id})")
                 return True
             else:
+                print("❌ Error subiendo a Google Drive")
                 return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
                 
         except Exception as e:
