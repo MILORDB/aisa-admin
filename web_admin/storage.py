@@ -1,12 +1,8 @@
 # web_admin/storage.py
 
 import os
-import pickle
 import json
 from datetime import datetime
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -23,9 +19,11 @@ class StorageManager:
         # ============================================
         # BUSCAR CREDENCIALES
         # ============================================
+        # 1. En Render: /etc/secrets/credentials.json
         if os.path.exists('/etc/secrets/credentials.json'):
             self.credentials_file = '/etc/secrets/credentials.json'
-            print("📁 Credenciales en Render: /etc/secrets/credentials.json")
+            print("📁 Credenciales encontradas en Render: /etc/secrets/credentials.json")
+        # 2. En local: credentials.json
         elif os.path.exists('credentials.json'):
             self.credentials_file = 'credentials.json'
             print("📁 Credenciales locales: credentials.json")
@@ -36,7 +34,7 @@ class StorageManager:
             self.use_local = True
             return
         
-        # Intentar autenticar
+        # Intentar autenticar con Cuenta de Servicio
         self._authenticate()
         
         if self.drive_service:
@@ -45,71 +43,42 @@ class StorageManager:
             self.use_local = True
     
     def _authenticate(self):
-        """Autentica con Google Drive"""
+        """Autentica con Google Drive usando Cuenta de Servicio"""
         try:
-            # ============================================
-            # PRIMERO: Intentar con Cuenta de Servicio
-            # ============================================
-            try:
-                # Verificar si es una cuenta de servicio
-                with open(self.credentials_file, 'r') as f:
-                    creds_data = json.load(f)
-                
-                # Si tiene "type": "service_account", usar cuenta de servicio
-                if creds_data.get('type') == 'service_account':
-                    creds = service_account.Credentials.from_service_account_file(
-                        self.credentials_file,
-                        scopes=SCOPES
-                    )
-                    self.drive_service = build('drive', 'v3', credentials=creds)
-                    self.use_local = False
-                    print("✅ Autenticación exitosa con Cuenta de Servicio")
-                    return
-            except:
-                pass
+            print(f"🔐 Autenticando con: {self.credentials_file}")
             
-            # ============================================
-            # SEGUNDO: Intentar con OAuth 2.0 (Installed App)
-            # ============================================
-            token_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'token.pickle')
+            # Verificar que el archivo existe
+            if not os.path.exists(self.credentials_file):
+                print(f"❌ Archivo no encontrado: {self.credentials_file}")
+                return
             
-            # Buscar token en Render (Secret Files)
-            if os.path.exists('/etc/secrets/token.pickle'):
-                token_file = '/etc/secrets/token.pickle'
-                print("📁 Token encontrado en Render: /etc/secrets/token.pickle")
+            # Cargar credenciales de Cuenta de Servicio
+            creds = service_account.Credentials.from_service_account_file(
+                self.credentials_file,
+                scopes=SCOPES
+            )
             
-            if os.path.exists(token_file):
-                try:
-                    with open(token_file, 'rb') as token:
-                        creds = pickle.load(token)
-                    if creds and creds.valid:
-                        self.drive_service = build('drive', 'v3', credentials=creds)
-                        self.use_local = False
-                        print("✅ Autenticación OAuth 2.0 exitosa (token existente)")
-                        return
-                    elif creds and creds.expired and creds.refresh_token:
-                        creds.refresh(Request())
-                        self.drive_service = build('drive', 'v3', credentials=creds)
-                        self.use_local = False
-                        print("✅ Token OAuth 2.0 refrescado")
-                        return
-                except Exception as e:
-                    print(f"⚠️ Error cargando token: {e}")
+            # Construir el servicio
+            self.drive_service = build('drive', 'v3', credentials=creds)
+            self.use_local = False
             
-            # ============================================
-            # TERCERO: Si no hay token, usar flujo OAuth
-            # ============================================
-            if not self.drive_service:
-                print("🔄 No hay token válido. Se requiere autenticación OAuth.")
-                print("📌 Visita: https://tu-dominio.com/api/storage/auth")
-                self.use_local = True
-                
+            print("✅ Autenticación exitosa con Cuenta de Servicio")
+            
+            # Verificar acceso
+            about = self.drive_service.about().get(fields="storageQuota").execute()
+            quota = about.get('storageQuota', {})
+            used = int(quota.get('usage', 0))
+            limit = int(quota.get('limit', 0))
+            if limit > 0:
+                free_gb = (limit - used) / (1024**3)
+                print(f"📊 Espacio disponible: {free_gb:.2f} GB")
+            
         except Exception as e:
             print(f"❌ Error en autenticación: {e}")
             self.use_local = True
     
     def _create_base_folder(self):
-        """Crea la carpeta base 'AIsa' en Google Drive"""
+        """Crea la carpeta base 'AIsa' en Google Drive si no existe"""
         if not self.drive_service:
             return
         
