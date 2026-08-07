@@ -1,282 +1,323 @@
 # web_admin/storage.py
 
 import os
-import requests
+import pickle
 import json
-import time
-import uuid
 from datetime import datetime
-from urllib.parse import urlparse
+from pathlib import Path
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+
+# ============================================
+# CONFIGURACIÓN DE GOOGLE DRIVE
+# ============================================
+SCOPES = ['https://www.googleapis.com/auth/drive.file']
+
+# IMPORTANTE: La ruta correcta en Render
+# En desarrollo local: credentials.json
+# En Render: /etc/secrets/credentials.json
+CREDENTIALS_FILE = os.environ.get('GOOGLE_CREDENTIALS_FILE', 'credentials.json')
+
+# Si estamos en Render, usar la ruta de secret files
+if os.path.exists('/etc/secrets/credentials.json'):
+    CREDENTIALS_FILE = '/etc/secrets/credentials.json'
+
+TOKEN_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'token.pickle')
 
 class StorageManager:
-    """Gestor de almacenamiento en TeraBox para fotos de productos y facturas"""
+    """Gestor de almacenamiento en Google Drive"""
     
     def __init__(self):
-        # ============================================
-        # CONFIGURACIÓN DE TERABOX CON TUS COOKIES
-        # ============================================
-        self.cookie = os.environ.get('TERABOX_COOKIE', '')
+        self.drive_service = None
+        self.use_local = True
+        self.folder_id = None
+        self.base_folder_id = None
         
-        # Si no hay cookie en entorno, usar tus cookies directamente
-        if not self.cookie:
-            self.cookie = 'ndus=Y2duleyteHuiFgvBvNIsZwtFwvUcuQlAxWwtr6gp; Lang=es; csrfToken=fKAwNR25tDWjz3IoI7p5YT0J; browserid=Kmgc1pw1acojRXVyJFXz1vyMK2TpOubHjxhgwYQoHooiRQjqcruL1zNFkFQ='
+        print(f"📁 Buscando credenciales en: {CREDENTIALS_FILE}")
         
-        self.base_url = "https://www.terabox.com"
-        self.api_url = "https://www.terabox.com/api/v1"
-        self.use_local = not self.cookie
-        
-        # ============================================
-        # HEADERS CON TUS COOKIES
-        # ============================================
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Origin': 'https://www.terabox.com',
-            'Referer': 'https://www.terabox.com/',
-            'Cookie': self.cookie,
-            'X-CSRF-TOKEN': 'fKAwNR25tDWjz3IoI7p5YT0J'
-        }
-        
-        if self.cookie:
-            print("📁 Usando almacenamiento en TeraBox con cookie configurada")
-            # Verificar sesión
-            self._verificar_sesion()
+        # Verificar si existe el archivo de credenciales
+        if os.path.exists(CREDENTIALS_FILE):
+            print("✅ Archivo credentials.json encontrado")
+            self._authenticate()
         else:
+            print("❌ No se encontró credentials.json")
+            print("📁 Usando almacenamiento LOCAL")
             self.use_local = True
-            os.makedirs('static/uploads', exist_ok=True)
-            print("📁 Usando almacenamiento LOCAL (sin TeraBox)")
+        
+        # Crear carpeta base si existe conexión
+        if self.drive_service:
+            self._create_base_folder()
     
-    def _verificar_sesion(self):
-        """Verifica que la sesión de TeraBox sea válida con tus cookies"""
-        try:
-            # Usar el endpoint de getinfo
-            response = requests.get(
-                f"{self.base_url}/api/v1/getinfo",
-                headers=self.headers
-            )
+    def _authenticate(self):
+        """Autentica con Google Drive usando OAuth 2.0"""
+        creds = None
+        
+        # Cargar token guardado si existe
+        if os.path.exists(TOKEN_FILE):
+            try:
+                with open(TOKEN_FILE, 'rb') as token:
+                    creds = pickle.load(token)
+                print("✅ Token de Google Drive cargado")
+            except Exception as e:
+                print(f"⚠️ Error cargando token: {e}")
+                creds = None
+        
+        # Si no hay credenciales válidas, autenticar
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                try:
+                    creds.refresh(Request())
+                    print("🔄 Token refrescado")
+                except Exception as e:
+                    print(f"⚠️ Error refrescando token: {e}")
+                    creds = None
             
-            print(f"📡 Verificando sesión TeraBox... Status: {response.status_code}")
+            # Si sigue sin credenciales, pedir autenticación
+            if not creds:
+                try:
+                    if not os.path.exists(CREDENTIALS_FILE):
+                        print(f"❌ No se encontró {CREDENTIALS_FILE}")
+                        print("📁 Por favor, coloca el archivo credentials.json")
+                        return
+                    
+                    print("🔐 Iniciando autenticación OAuth...")
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        CREDENTIALS_FILE, SCOPES
+                    )
+                    creds = flow.run_local_server(port=8080, open_browser=True)
+                    print("✅ Autenticación completada")
+                except Exception as e:
+                    print(f"❌ Error en autenticación: {e}")
+                    return
             
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('errno') == 0:
-                    user_data = data.get('data', {})
-                    print(f"✅ Sesión TeraBox válida!")
-                    print(f"👤 Usuario: {user_data.get('username', 'Desconocido')}")
-                    print(f"📊 Espacio usado: {user_data.get('used', 0) / (1024**3):.2f} GB")
-                    print(f"📊 Espacio total: {user_data.get('total', 0) / (1024**3):.2f} GB")
-                    self.use_local = False
-                    return True
-                else:
-                    print(f"⚠️ Error en sesión: {data.get('errmsg', 'Error desconocido')}")
-                    self.use_local = True
-                    return False
-            else:
-                print(f"⚠️ Error HTTP: {response.status_code}")
-                print(f"📝 Respuesta: {response.text[:200]}")
-                self.use_local = True
-                return False
-        except Exception as e:
-            print(f"⚠️ Error verificando sesión: {e}")
-            self.use_local = True
-            return False
-    
-    def get_negocio_path(self, negocio_id):
-        return f"/apps/AIsa/Negocios/negocio_{negocio_id}"
-    
-    def get_productos_path(self, negocio_id):
-        return f"{self.get_negocio_path(negocio_id)}/productos"
-    
-    def get_producto_path(self, negocio_id, producto_id):
-        return f"{self.get_productos_path(negocio_id)}/producto_{producto_id}"
-    
-    def get_facturas_path(self, negocio_id):
-        return f"{self.get_negocio_path(negocio_id)}/facturas"
-    
-    def _crear_carpeta(self, path):
-        """Crea una carpeta en TeraBox si no existe"""
-        try:
-            if self.use_local:
-                return True
-            
-            clean_path = path.replace('//', '/')
-            if not clean_path.startswith('/'):
-                clean_path = '/' + clean_path
-            
-            print(f"📁 Creando carpeta: {clean_path}")
-            
-            data = {
-                'path': clean_path,
-                'is_folder': '1'
-            }
-            
-            response = requests.post(
-                f"{self.api_url}/create",
-                data=data,
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('errno') == 0:
-                    print(f"✅ Carpeta creada: {path}")
-                    return True
-                else:
-                    errmsg = result.get('errmsg', '')
-                    if 'exists' in errmsg.lower() or 'exist' in errmsg.lower():
-                        print(f"ℹ️ La carpeta ya existe: {path}")
-                        return True
-                    print(f"⚠️ Error creando carpeta: {errmsg}")
-                    return False
-            return False
-        except Exception as e:
-            print(f"⚠️ Error creando carpeta: {e}")
-            return False
-    
-    def _obtener_url_subida(self, folder_path, filename):
-        """Obtiene la URL de subida de TeraBox"""
-        try:
-            if self.use_local:
-                return None
-            
-            clean_path = folder_path.replace('//', '/')
-            if not clean_path.startswith('/'):
-                clean_path = '/' + clean_path
-            
-            full_path = f"{clean_path}/{filename}"
-            full_path = full_path.replace('//', '/')
-            
-            print(f"🔗 Solicitando URL para: {full_path}")
-            
-            data = {
-                'path': full_path,
-                'size': '0',
-                'upload_id': '0',
-                'is_renew': '0',
-                'auto_rename': '1'
-            }
-            
-            response = requests.post(
-                f"{self.api_url}/precreate",
-                data=data,
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('errno') == 0:
-                    upload_data = result.get('data', {})
-                    upload_url = upload_data.get('upload_url')
-                    if upload_url:
-                        return upload_url
-                    else:
-                        print("⚠️ No se recibió URL de subida")
-                        return None
-                else:
-                    print(f"⚠️ Error en precreate: {result.get('errmsg')}")
-                    return None
-            else:
-                print(f"⚠️ Error HTTP en precreate: {response.status_code}")
-                return None
+            # Guardar token para futuros usos
+            try:
+                with open(TOKEN_FILE, 'wb') as token:
+                    pickle.dump(creds, token)
+                print("✅ Token guardado")
+            except Exception as e:
+                print(f"⚠️ Error guardando token: {e}")
+        
+        if creds and creds.valid:
+            try:
+                self.drive_service = build('drive', 'v3', credentials=creds)
+                self.use_local = False
+                print("✅ Google Drive conectado correctamente")
                 
+                # Verificar espacio disponible
+                about = self.drive_service.about().get(fields="storageQuota").execute()
+                quota = about.get('storageQuota', {})
+                used = int(quota.get('usage', 0))
+                limit = int(quota.get('limit', 0))
+                if limit > 0:
+                    free_gb = (limit - used) / (1024**3)
+                    print(f"📊 Espacio disponible: {free_gb:.2f} GB")
+                    if free_gb < 0.5:
+                        print("⚠️ Espacio bajo en Google Drive")
+            except Exception as e:
+                print(f"❌ Error conectando a Google Drive: {e}")
+                self.drive_service = None
+                self.use_local = True
+    
+    def _create_base_folder(self):
+        """Crea la carpeta base 'AIsa' en Google Drive si no existe"""
+        if not self.drive_service:
+            return
+        
+        try:
+            results = self.drive_service.files().list(
+                q="name='AIsa' and mimeType='application/vnd.google-apps.folder' and trashed=false",
+                spaces='drive',
+                fields='files(id, name)'
+            ).execute()
+            
+            folders = results.get('files', [])
+            
+            if not folders:
+                file_metadata = {
+                    'name': 'AIsa',
+                    'mimeType': 'application/vnd.google-apps.folder'
+                }
+                folder = self.drive_service.files().create(
+                    body=file_metadata,
+                    fields='id'
+                ).execute()
+                self.base_folder_id = folder.get('id')
+                print(f"📁 Carpeta 'AIsa' creada en Google Drive (ID: {self.base_folder_id})")
+            else:
+                self.base_folder_id = folders[0]['id']
+                print(f"📁 Carpeta 'AIsa' encontrada (ID: {self.base_folder_id})")
+            
         except Exception as e:
-            print(f"❌ Error obteniendo URL de subida: {e}")
+            print(f"⚠️ Error creando carpeta base: {e}")
+    
+    def _get_or_create_folder(self, path, parent_id=None):
+        """Obtiene o crea una carpeta por su ruta"""
+        if not self.drive_service:
+            return None
+        
+        if not parent_id:
+            parent_id = self.base_folder_id
+        
+        try:
+            parts = path.strip('/').split('/')
+            current_parent = parent_id
+            
+            for part in parts:
+                if not part:
+                    continue
+                
+                query = f"name='{part}' and '{current_parent}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
+                results = self.drive_service.files().list(
+                    q=query,
+                    spaces='drive',
+                    fields='files(id, name)'
+                ).execute()
+                
+                folders = results.get('files', [])
+                
+                if not folders:
+                    file_metadata = {
+                        'name': part,
+                        'mimeType': 'application/vnd.google-apps.folder',
+                        'parents': [current_parent]
+                    }
+                    folder = self.drive_service.files().create(
+                        body=file_metadata,
+                        fields='id'
+                    ).execute()
+                    current_parent = folder.get('id')
+                else:
+                    current_parent = folders[0]['id']
+            
+            return current_parent
+            
+        except Exception as e:
+            print(f"⚠️ Error creando carpeta {path}: {e}")
             return None
     
     def subir_foto_producto(self, negocio_id, producto_id, archivo_foto, nombre_foto):
-        """Sube una foto para un producto a TeraBox"""
+        """Sube una foto de producto a Google Drive"""
+        if self.use_local or not self.drive_service:
+            print("📁 Usando almacenamiento LOCAL")
+            return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
+        
         try:
-            if self.cookie and self.use_local:
-                self._verificar_sesion()
+            folder_path = f"negocio_{negocio_id}/productos/producto_{producto_id}"
+            folder_id = self._get_or_create_folder(folder_path)
             
-            if self.use_local:
-                print("📁 Usando almacenamiento LOCAL (fallback)")
+            if not folder_id:
+                print("⚠️ No se pudo crear carpeta en Google Drive, usando local")
                 return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
             
-            print(f"📤 Subiendo {nombre_foto} a TeraBox...")
+            temp_path = os.path.join('static/temp', nombre_foto)
+            os.makedirs('static/temp', exist_ok=True)
+            archivo_foto.save(temp_path)
             
-            folder_path = self.get_producto_path(negocio_id, producto_id)
-            self._crear_carpeta(folder_path)
-            
-            upload_url = self._obtener_url_subida(folder_path, nombre_foto)
-            if not upload_url:
-                return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
-            
-            archivo_foto.seek(0)
-            files = {'file': (nombre_foto, archivo_foto.read(), 'image/jpeg')}
-            
-            upload_headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Cookie': self.cookie,
-                'Accept': '*/*',
-                'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-                'Origin': 'https://www.terabox.com',
-                'Referer': 'https://www.terabox.com/'
+            file_metadata = {
+                'name': nombre_foto,
+                'parents': [folder_id]
             }
             
-            response = requests.post(upload_url, files=files, headers=upload_headers)
+            media = MediaFileUpload(temp_path, mimetype='image/jpeg', resumable=True)
             
-            if response.status_code == 200:
-                try:
-                    result = response.json()
-                    if result.get('errno') == 0:
-                        print(f"✅ Foto subida a TeraBox: {nombre_foto}")
-                        return True
-                    else:
-                        print(f"❌ Error: {result.get('errmsg')}")
-                        return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
-                except:
-                    print(f"✅ Foto subida a TeraBox: {nombre_foto}")
-                    return True
+            file = self.drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id, webViewLink, webContentLink'
+            ).execute()
+            
+            file_id = file.get('id')
+            
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            
+            if file_id:
+                print(f"✅ Foto subida a Google Drive: {nombre_foto} (ID: {file_id})")
+                return True
             else:
-                print(f"❌ Error HTTP: {response.status_code}")
+                print("❌ Error subiendo a Google Drive")
                 return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
                 
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Error subiendo a Google Drive: {e}")
             return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
     
-    def obtener_url_foto(self, negocio_id, producto_id, nombre_foto):
+    def obtener_url_foto(self, negocio_id, producto_id, nombre_foto, file_id=None):
         """Obtiene la URL pública de una foto de producto"""
-        if self.use_local:
+        if self.use_local or not self.drive_service:
             return self._url_local(negocio_id, producto_id, nombre_foto)
         
         try:
-            path = f"{self.get_producto_path(negocio_id, producto_id)}/{nombre_foto}"
-            path = path.replace('//', '/')
-            if not path.startswith('/'):
-                path = '/' + path
+            if file_id:
+                file = self.drive_service.files().get(
+                    fileId=file_id,
+                    fields='webViewLink, webContentLink'
+                ).execute()
+                return file.get('webViewLink') or file.get('webContentLink')
+            else:
+                folder_path = f"negocio_{negocio_id}/productos/producto_{producto_id}"
+                folder_id = self._get_or_create_folder(folder_path)
+                
+                if not folder_id:
+                    return self._url_local(negocio_id, producto_id, nombre_foto)
+                
+                results = self.drive_service.files().list(
+                    q=f"name='{nombre_foto}' and '{folder_id}' in parents and trashed=false",
+                    spaces='drive',
+                    fields='files(id, webViewLink, webContentLink)'
+                ).execute()
+                
+                files = results.get('files', [])
+                
+                if files:
+                    return files[0].get('webViewLink') or files[0].get('webContentLink')
             
-            data = {
-                'path': path,
-                'period': 86400
-            }
-            
-            response = requests.post(
-                f"{self.api_url}/share/create",
-                data=data,
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('errno') == 0:
-                    share_data = result.get('data', {})
-                    url = share_data.get('url')
-                    if url:
-                        return url
             return self._url_local(negocio_id, producto_id, nombre_foto)
                 
         except Exception as e:
             print(f"❌ Error obteniendo URL: {e}")
             return self._url_local(negocio_id, producto_id, nombre_foto)
     
+    def obtener_file_id(self, negocio_id, producto_id, nombre_foto):
+        """Obtiene el ID de un archivo en Google Drive"""
+        if self.use_local or not self.drive_service:
+            return None
+        
+        try:
+            folder_path = f"negocio_{negocio_id}/productos/producto_{producto_id}"
+            folder_id = self._get_or_create_folder(folder_path)
+            
+            if not folder_id:
+                return None
+            
+            results = self.drive_service.files().list(
+                q=f"name='{nombre_foto}' and '{folder_id}' in parents and trashed=false",
+                spaces='drive',
+                fields='files(id)'
+            ).execute()
+            
+            files = results.get('files', [])
+            
+            if files:
+                return files[0]['id']
+            return None
+                
+        except Exception as e:
+            print(f"❌ Error obteniendo file ID: {e}")
+            return None
+    
     def _guardar_local(self, negocio_id, producto_id, archivo, nombre_foto):
         """Guarda la foto en el sistema de archivos local"""
         try:
-            folder_path = os.path.join('static/uploads/productos', f"negocio_{negocio_id}", f"producto_{producto_id}")
+            folder_path = os.path.join(
+                'static/uploads/productos',
+                f"negocio_{negocio_id}",
+                f"producto_{producto_id}"
+            )
             os.makedirs(folder_path, exist_ok=True)
             file_path = os.path.join(folder_path, nombre_foto)
             archivo.save(file_path)
@@ -290,34 +331,44 @@ class StorageManager:
         return f"/static/uploads/productos/negocio_{negocio_id}/producto_{producto_id}/{nombre_foto}"
     
     def guardar_factura(self, negocio_id, factura_id, archivo_pdf):
-        """Guarda una factura en TeraBox"""
+        """Guarda una factura en Google Drive"""
         nombre = f"factura_{factura_id}.pdf"
         
+        if self.use_local or not self.drive_service:
+            return self._guardar_local_factura(negocio_id, factura_id, archivo_pdf)
+        
         try:
-            if self.cookie and self.use_local:
-                self._verificar_sesion()
+            folder_path = f"negocio_{negocio_id}/facturas"
+            folder_id = self._get_or_create_folder(folder_path)
             
-            if self.use_local:
+            if not folder_id:
                 return self._guardar_local_factura(negocio_id, factura_id, archivo_pdf)
             
-            folder_path = self.get_facturas_path(negocio_id)
-            self._crear_carpeta(folder_path)
-            upload_url = self._obtener_url_subida(folder_path, nombre)
-            if not upload_url:
-                return self._guardar_local_factura(negocio_id, factura_id, archivo_pdf)
+            temp_path = os.path.join('static/temp', nombre)
+            os.makedirs('static/temp', exist_ok=True)
+            archivo_pdf.save(temp_path)
             
-            archivo_pdf.seek(0)
-            files = {'file': (nombre, archivo_pdf.read(), 'application/pdf')}
-            response = requests.post(upload_url, files=files, headers=self.headers)
+            file_metadata = {
+                'name': nombre,
+                'parents': [folder_id]
+            }
             
-            if response.status_code == 200:
-                print(f"✅ Factura subida a TeraBox: {nombre}")
-                return True
-            else:
-                return self._guardar_local_factura(negocio_id, factura_id, archivo_pdf)
-                
+            media = MediaFileUpload(temp_path, mimetype='application/pdf', resumable=True)
+            
+            file = self.drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id'
+            ).execute()
+            
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            
+            print(f"✅ Factura subida a Google Drive: {nombre}")
+            return True
+            
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Error subiendo factura: {e}")
             return self._guardar_local_factura(negocio_id, factura_id, archivo_pdf)
     
     def _guardar_local_factura(self, negocio_id, factura_id, archivo_pdf):
@@ -326,54 +377,81 @@ class StorageManager:
             os.makedirs(folder_path, exist_ok=True)
             file_path = os.path.join(folder_path, f"factura_{factura_id}.pdf")
             archivo_pdf.save(file_path)
+            print(f"✅ Factura guardada localmente: {file_path}")
             return True
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Error guardando factura local: {e}")
             return False
     
-    def eliminar_foto_producto(self, negocio_id, producto_id, nombre_foto):
-        """Elimina una foto de producto de TeraBox o local"""
+    def eliminar_foto_producto(self, negocio_id, producto_id, nombre_foto, file_id=None):
+        """Elimina una foto de producto de Google Drive y local"""
         try:
-            file_path = os.path.join('static/uploads/productos', f"negocio_{negocio_id}", f"producto_{producto_id}", nombre_foto)
+            file_path = os.path.join(
+                'static/uploads/productos',
+                f"negocio_{negocio_id}",
+                f"producto_{producto_id}",
+                nombre_foto
+            )
             if os.path.exists(file_path):
                 os.remove(file_path)
                 print(f"✅ Foto local eliminada: {file_path}")
             
-            if self.use_local:
+            if self.use_local or not self.drive_service:
                 return True
             
-            path = f"{self.get_producto_path(negocio_id, producto_id)}/{nombre_foto}"
-            path = path.replace('//', '/')
-            if not path.startswith('/'):
-                path = '/' + path
+            if file_id:
+                self.drive_service.files().delete(fileId=file_id).execute()
+                print(f"✅ Foto eliminada de Google Drive: {nombre_foto}")
+                return True
+            else:
+                folder_path = f"negocio_{negocio_id}/productos/producto_{producto_id}"
+                folder_id = self._get_or_create_folder(folder_path)
+                
+                if folder_id:
+                    results = self.drive_service.files().list(
+                        q=f"name='{nombre_foto}' and '{folder_id}' in parents and trashed=false",
+                        spaces='drive',
+                        fields='files(id)'
+                    ).execute()
+                    
+                    files = results.get('files', [])
+                    
+                    if files:
+                        self.drive_service.files().delete(fileId=files[0]['id']).execute()
+                        print(f"✅ Foto eliminada de Google Drive: {nombre_foto}")
+                        return True
             
-            data = {
-                'path_list': json.dumps([path])
-            }
-            
-            response = requests.post(
-                f"{self.api_url}/delete",
-                data=data,
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('errno') == 0:
-                    print(f"✅ Foto eliminada de TeraBox: {nombre_foto}")
-                    return True
             return True
+            
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"❌ Error eliminando foto: {e}")
             return True
     
     def obtener_estado(self):
-        return {
-            'tipo': 'TeraBox' if not self.use_local else 'Local',
-            'cookie_configurada': bool(self.cookie),
+        """Obtiene el estado del almacenamiento"""
+        estado = {
+            'tipo': 'Google Drive' if not self.use_local else 'Local',
+            'autenticado': self.drive_service is not None,
             'use_local': self.use_local,
-            'cookie_preview': self.cookie[:30] + '...' if self.cookie and len(self.cookie) > 30 else self.cookie
+            'base_folder_id': self.base_folder_id,
+            'mensaje': '✅ Conectado a Google Drive' if not self.use_local else '📁 Usando almacenamiento local'
         }
+        
+        if self.drive_service and not self.use_local:
+            try:
+                about = self.drive_service.about().get(fields="storageQuota").execute()
+                quota = about.get('storageQuota', {})
+                used = int(quota.get('usage', 0))
+                limit = int(quota.get('limit', 0))
+                if limit > 0:
+                    estado['used_gb'] = round(used / (1024**3), 2)
+                    estado['total_gb'] = round(limit / (1024**3), 2)
+                    estado['free_gb'] = round((limit - used) / (1024**3), 2)
+            except:
+                pass
+        
+        return estado
+
 
 # ============================================
 # INSTANCIA GLOBAL
@@ -386,3 +464,31 @@ def get_storage_manager():
     if _storage_instance is None:
         _storage_instance = StorageManager()
     return _storage_instance
+
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("🔍 PRUEBA DE ALMACENAMIENTO - GOOGLE DRIVE")
+    print("=" * 60)
+    
+    storage = get_storage_manager()
+    estado = storage.obtener_estado()
+    
+    print(f"\n📁 Estado del almacenamiento:")
+    print(f"   • Tipo: {estado['tipo']}")
+    print(f"   • Autenticado: {estado['autenticado']}")
+    print(f"   • Usando local: {estado['use_local']}")
+    print(f"   • Mensaje: {estado['mensaje']}")
+    if 'used_gb' in estado:
+        print(f"   • Espacio usado: {estado['used_gb']} GB")
+        print(f"   • Espacio total: {estado['total_gb']} GB")
+        print(f"   • Espacio libre: {estado['free_gb']} GB")
+    
+    if not estado['use_local']:
+        print("\n✅ Google Drive configurado correctamente!")
+        print("📤 Las fotos y facturas se subirán a Google Drive")
+    else:
+        print("\n⚠️ Google Drive NO configurado")
+        print("📁 Usando almacenamiento LOCAL")
+    
+    print("\n" + "=" * 60)
