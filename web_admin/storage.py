@@ -14,11 +14,12 @@ class StorageManager:
         self.drive_service = None
         self.use_local = True
         self.base_folder_id = None
-        self.credentials_file = None
         
         # ============================================
         # BUSCAR CREDENCIALES
         # ============================================
+        self.credentials_file = None
+        
         # 1. En Render: /etc/secrets/credentials.json
         if os.path.exists('/etc/secrets/credentials.json'):
             self.credentials_file = '/etc/secrets/credentials.json'
@@ -27,45 +28,21 @@ class StorageManager:
         elif os.path.exists('credentials.json'):
             self.credentials_file = 'credentials.json'
             print("📁 Credenciales locales: credentials.json")
-        # 3. En variable de entorno
-        elif os.environ.get('GOOGLE_CREDENTIALS_JSON'):
-            try:
-                creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
-                if creds_json.startswith('{'):
-                    self.credentials_file = '/tmp/credentials.json'
-                    os.makedirs('/tmp', exist_ok=True)
-                    with open(self.credentials_file, 'w') as f:
-                        f.write(creds_json)
-                    print("📁 Credenciales desde variable de entorno")
-            except Exception as e:
-                print(f"⚠️ Error cargando credenciales desde variable: {e}")
         
-        if not self.credentials_file or not os.path.exists(self.credentials_file):
+        if not self.credentials_file:
             print("❌ No se encontró credentials.json")
             print("📁 Usando almacenamiento LOCAL")
-            self.use_local = True
             return
         
-        # Intentar autenticar con Cuenta de Servicio
-        self._authenticate()
-        
-        if self.drive_service:
-            self._create_base_folder()
-            # IMPORTANTE: Si la autenticación fue exitosa, usar Google Drive
-            if not self.use_local:
-                print("✅ Google Drive configurado correctamente")
-        else:
-            self.use_local = True
-    
-    def _authenticate(self):
-        """Autentica con Google Drive usando Cuenta de Servicio"""
+        # ============================================
+        # AUTENTICAR
+        # ============================================
         try:
             print(f"🔐 Autenticando con: {self.credentials_file}")
             
             # Verificar que el archivo existe
             if not os.path.exists(self.credentials_file):
                 print(f"❌ Archivo no encontrado: {self.credentials_file}")
-                self.use_local = True
                 return
             
             # Cargar credenciales de Cuenta de Servicio
@@ -77,7 +54,7 @@ class StorageManager:
             # Construir el servicio
             self.drive_service = build('drive', 'v3', credentials=creds)
             
-            # ✅ IMPORTANTE: Establecer use_local = False SOLO si la autenticación fue exitosa
+            # ✅ IMPORTANTE: Marcar como exitoso
             self.use_local = False
             
             print("✅ Autenticación exitosa con Cuenta de Servicio")
@@ -94,10 +71,13 @@ class StorageManager:
             except Exception as e:
                 print(f"⚠️ Error obteniendo cuota: {e}")
             
+            # Crear carpeta base
+            self._create_base_folder()
+            
         except Exception as e:
             print(f"❌ Error en autenticación: {e}")
-            self.use_local = True
             self.drive_service = None
+            self.use_local = True
     
     def _create_base_folder(self):
         """Crea la carpeta base 'AIsa' en Google Drive si no existe"""
@@ -134,12 +114,10 @@ class StorageManager:
             
         except Exception as e:
             print(f"⚠️ Error creando carpeta base: {e}")
-            # Si hay error, seguir con local
-            self.use_local = True
     
     def _get_or_create_folder(self, path, parent_id=None):
         """Obtiene o crea una carpeta por su ruta"""
-        if not self.drive_service:
+        if not self.drive_service or self.use_local:
             return None
         
         if not parent_id:
@@ -189,6 +167,7 @@ class StorageManager:
     
     def subir_foto_producto(self, negocio_id, producto_id, archivo_foto, nombre_foto):
         """Sube una foto de producto a Google Drive"""
+        # ✅ SIEMPRE verificar use_local
         if self.use_local or not self.drive_service:
             print("📁 Usando almacenamiento LOCAL")
             return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
