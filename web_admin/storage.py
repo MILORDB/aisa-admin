@@ -28,22 +28,31 @@ class StorageManager:
         elif os.path.exists('credentials.json'):
             self.credentials_file = 'credentials.json'
             print("📁 Credenciales locales: credentials.json")
+        # 3. En variable de entorno GOOGLE_CREDENTIALS_JSON (fallback)
+        elif os.environ.get('GOOGLE_CREDENTIALS_JSON'):
+            try:
+                creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
+                if creds_json.startswith('{'):
+                    self.credentials_file = '/tmp/credentials.json'
+                    os.makedirs('/tmp', exist_ok=True)
+                    with open(self.credentials_file, 'w') as f:
+                        f.write(creds_json)
+                    print("📁 Credenciales desde variable de entorno")
+            except Exception as e:
+                print(f"⚠️ Error cargando credenciales desde variable: {e}")
         
-        if not self.credentials_file:
+        # Si no hay credenciales, usar local
+        if not self.credentials_file or not os.path.exists(self.credentials_file):
             print("❌ No se encontró credentials.json")
             print("📁 Usando almacenamiento LOCAL")
+            self.use_local = True
             return
         
         # ============================================
-        # AUTENTICAR
+        # AUTENTICAR CON CUENTA DE SERVICIO
         # ============================================
         try:
             print(f"🔐 Autenticando con: {self.credentials_file}")
-            
-            # Verificar que el archivo existe
-            if not os.path.exists(self.credentials_file):
-                print(f"❌ Archivo no encontrado: {self.credentials_file}")
-                return
             
             # Cargar credenciales de Cuenta de Servicio
             creds = service_account.Credentials.from_service_account_file(
@@ -54,12 +63,12 @@ class StorageManager:
             # Construir el servicio
             self.drive_service = build('drive', 'v3', credentials=creds)
             
-            # ✅ IMPORTANTE: Marcar como exitoso
+            # ✅ Marcar como exitoso
             self.use_local = False
             
             print("✅ Autenticación exitosa con Cuenta de Servicio")
             
-            # Verificar acceso
+            # Verificar acceso y espacio
             try:
                 about = self.drive_service.about().get(fields="storageQuota").execute()
                 quota = about.get('storageQuota', {})
@@ -68,10 +77,12 @@ class StorageManager:
                 if limit > 0:
                     free_gb = (limit - used) / (1024**3)
                     print(f"📊 Espacio disponible: {free_gb:.2f} GB")
+                else:
+                    print("📊 Espacio ilimitado o no disponible")
             except Exception as e:
                 print(f"⚠️ Error obteniendo cuota: {e}")
             
-            # Crear carpeta base
+            # ✅ CREAR CARPETA BASE
             self._create_base_folder()
             
         except Exception as e:
@@ -88,6 +99,7 @@ class StorageManager:
         try:
             print("📁 Buscando carpeta 'AIsa' en Google Drive...")
             
+            # Buscar carpeta 'AIsa'
             results = self.drive_service.files().list(
                 q="name='AIsa' and mimeType='application/vnd.google-apps.folder' and trashed=false",
                 spaces='drive',
@@ -114,9 +126,19 @@ class StorageManager:
             
         except Exception as e:
             print(f"⚠️ Error creando carpeta base: {e}")
+            # Si hay error, el sistema seguirá funcionando, pero se creará al subir archivos
     
     def _get_or_create_folder(self, path, parent_id=None):
-        """Obtiene o crea una carpeta por su ruta"""
+        """
+        Obtiene o crea una carpeta por su ruta
+        
+        Args:
+            path (str): Ruta de la carpeta (ej: "negocio_1/productos/producto_1")
+            parent_id (str): ID de la carpeta padre (opcional)
+        
+        Returns:
+            str: ID de la carpeta, o None si hay error
+        """
         if not self.drive_service or self.use_local:
             return None
         
@@ -125,7 +147,11 @@ class StorageManager:
         
         if not parent_id:
             print("⚠️ No hay carpeta base para crear subcarpetas")
-            return None
+            # Intentar crear la carpeta base
+            self._create_base_folder()
+            parent_id = self.base_folder_id
+            if not parent_id:
+                return None
         
         try:
             parts = path.strip('/').split('/')
@@ -135,6 +161,7 @@ class StorageManager:
                 if not part:
                     continue
                 
+                # Buscar carpeta con este nombre
                 query = f"name='{part}' and '{current_parent}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
                 results = self.drive_service.files().list(
                     q=query,
@@ -145,6 +172,7 @@ class StorageManager:
                 folders = results.get('files', [])
                 
                 if not folders:
+                    # Crear carpeta
                     file_metadata = {
                         'name': part,
                         'mimeType': 'application/vnd.google-apps.folder',
@@ -158,6 +186,7 @@ class StorageManager:
                     print(f"📁 Carpeta creada: {part}")
                 else:
                     current_parent = folders[0]['id']
+                    print(f"📁 Carpeta encontrada: {part} (ID: {current_parent})")
             
             return current_parent
             
@@ -166,8 +195,18 @@ class StorageManager:
             return None
     
     def subir_foto_producto(self, negocio_id, producto_id, archivo_foto, nombre_foto):
-        """Sube una foto de producto a Google Drive"""
-        # ✅ SIEMPRE verificar use_local
+        """
+        Sube una foto de producto a Google Drive
+        
+        Args:
+            negocio_id (int): ID del negocio
+            producto_id (int): ID del producto
+            archivo_foto: Archivo de imagen (objeto FileStorage)
+            nombre_foto (str): Nombre del archivo
+        
+        Returns:
+            bool: True si se subió correctamente
+        """
         if self.use_local or not self.drive_service:
             print("📁 Usando almacenamiento LOCAL")
             return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
@@ -175,6 +214,7 @@ class StorageManager:
         try:
             print(f"📤 Subiendo {nombre_foto} a Google Drive...")
             
+            # Crear estructura de carpetas
             folder_path = f"negocio_{negocio_id}/productos/producto_{producto_id}"
             folder_id = self._get_or_create_folder(folder_path)
             
@@ -182,11 +222,13 @@ class StorageManager:
                 print("⚠️ No se pudo crear carpeta en Google Drive, usando local")
                 return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
             
+            # Guardar archivo temporal
             temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/temp')
             os.makedirs(temp_dir, exist_ok=True)
             temp_path = os.path.join(temp_dir, nombre_foto)
             archivo_foto.save(temp_path)
             
+            # Subir a Google Drive
             file_metadata = {
                 'name': nombre_foto,
                 'parents': [folder_id]
@@ -202,6 +244,7 @@ class StorageManager:
             
             file_id = file.get('id')
             
+            # Eliminar archivo temporal
             if os.path.exists(temp_path):
                 os.remove(temp_path)
             
@@ -217,7 +260,18 @@ class StorageManager:
             return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
     
     def obtener_url_foto(self, negocio_id, producto_id, nombre_foto, file_id=None):
-        """Obtiene la URL pública de una foto de producto"""
+        """
+        Obtiene la URL pública de una foto de producto
+        
+        Args:
+            negocio_id (int): ID del negocio
+            producto_id (int): ID del producto
+            nombre_foto (str): Nombre del archivo
+            file_id (str): ID del archivo en Google Drive (opcional)
+        
+        Returns:
+            str: URL de la foto
+        """
         if self.use_local or not self.drive_service:
             return self._url_local(negocio_id, producto_id, nombre_foto)
         
@@ -229,6 +283,7 @@ class StorageManager:
                 ).execute()
                 return file.get('webViewLink') or file.get('webContentLink')
             else:
+                # Buscar el archivo por nombre
                 folder_path = f"negocio_{negocio_id}/productos/producto_{producto_id}"
                 folder_id = self._get_or_create_folder(folder_path)
                 
@@ -253,7 +308,17 @@ class StorageManager:
             return self._url_local(negocio_id, producto_id, nombre_foto)
     
     def obtener_file_id(self, negocio_id, producto_id, nombre_foto):
-        """Obtiene el ID de un archivo en Google Drive"""
+        """
+        Obtiene el ID de un archivo en Google Drive
+        
+        Args:
+            negocio_id (int): ID del negocio
+            producto_id (int): ID del producto
+            nombre_foto (str): Nombre del archivo
+        
+        Returns:
+            str: ID del archivo, o None si no se encuentra
+        """
         if self.use_local or not self.drive_service:
             return None
         
@@ -281,7 +346,7 @@ class StorageManager:
             return None
     
     def _guardar_local(self, negocio_id, producto_id, archivo, nombre_foto):
-        """Guarda la foto en el sistema de archivos local"""
+        """Guarda la foto en el sistema de archivos local (fallback)"""
         try:
             folder_path = os.path.join(
                 'static/uploads/productos',
@@ -298,10 +363,21 @@ class StorageManager:
             return False
     
     def _url_local(self, negocio_id, producto_id, nombre_foto):
+        """Genera la URL local de una foto"""
         return f"/static/uploads/productos/negocio_{negocio_id}/producto_{producto_id}/{nombre_foto}"
     
     def guardar_factura(self, negocio_id, factura_id, archivo_pdf):
-        """Guarda una factura en Google Drive"""
+        """
+        Guarda una factura en Google Drive
+        
+        Args:
+            negocio_id (int): ID del negocio
+            factura_id (int): ID de la factura
+            archivo_pdf: Archivo PDF (objeto FileStorage)
+        
+        Returns:
+            bool: True si se guardó correctamente
+        """
         nombre = f"factura_{factura_id}.pdf"
         
         if self.use_local or not self.drive_service:
@@ -345,6 +421,7 @@ class StorageManager:
             return self._guardar_local_factura(negocio_id, factura_id, archivo_pdf)
     
     def _guardar_local_factura(self, negocio_id, factura_id, archivo_pdf):
+        """Guarda una factura en el sistema de archivos local (fallback)"""
         try:
             folder_path = os.path.join('static/uploads/facturas', f"negocio_{negocio_id}")
             os.makedirs(folder_path, exist_ok=True)
@@ -357,8 +434,20 @@ class StorageManager:
             return False
     
     def eliminar_foto_producto(self, negocio_id, producto_id, nombre_foto, file_id=None):
-        """Elimina una foto de producto de Google Drive y local"""
+        """
+        Elimina una foto de producto de Google Drive y local
+        
+        Args:
+            negocio_id (int): ID del negocio
+            producto_id (int): ID del producto
+            nombre_foto (str): Nombre del archivo
+            file_id (str): ID del archivo en Google Drive (opcional)
+        
+        Returns:
+            bool: True si se eliminó correctamente
+        """
         try:
+            # Eliminar de local
             file_path = os.path.join(
                 'static/uploads/productos',
                 f"negocio_{negocio_id}",
@@ -372,11 +461,13 @@ class StorageManager:
             if self.use_local or not self.drive_service:
                 return True
             
+            # Eliminar de Google Drive
             if file_id:
                 self.drive_service.files().delete(fileId=file_id).execute()
                 print(f"✅ Foto eliminada de Google Drive: {nombre_foto}")
                 return True
             else:
+                # Buscar el archivo por nombre
                 folder_path = f"negocio_{negocio_id}/productos/producto_{producto_id}"
                 folder_id = self._get_or_create_folder(folder_path)
                 
@@ -401,7 +492,12 @@ class StorageManager:
             return True
     
     def obtener_estado(self):
-        """Obtiene el estado del almacenamiento"""
+        """
+        Obtiene el estado del almacenamiento
+        
+        Returns:
+            dict: Estado del almacenamiento
+        """
         estado = {
             'tipo': 'Google Drive' if not self.use_local else 'Local',
             'autenticado': self.drive_service is not None,
@@ -411,6 +507,12 @@ class StorageManager:
         }
         
         if self.drive_service and not self.use_local:
+            # Verificar si la carpeta base existe
+            if self.base_folder_id:
+                estado['mensaje'] = "✅ Conectado a Google Drive"
+            else:
+                estado['mensaje'] = "✅ Conectado a Google Drive (carpeta base pendiente)"
+            
             try:
                 about = self.drive_service.about().get(fields="storageQuota").execute()
                 quota = about.get('storageQuota', {})
@@ -437,7 +539,34 @@ class StorageManager:
 _storage_instance = None
 
 def get_storage_manager():
+    """Obtiene la instancia global del StorageManager (Singleton)"""
     global _storage_instance
     if _storage_instance is None:
         _storage_instance = StorageManager()
     return _storage_instance
+
+
+# ============================================
+# PRUEBA DIRECTA
+# ============================================
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("🔍 PRUEBA DE ALMACENAMIENTO - GOOGLE DRIVE")
+    print("=" * 60)
+    
+    storage = get_storage_manager()
+    estado = storage.obtener_estado()
+    
+    print(f"\n📁 Estado del almacenamiento:")
+    for key, value in estado.items():
+        print(f"   • {key}: {value}")
+    
+    if not estado['use_local']:
+        print("\n✅ Google Drive configurado correctamente!")
+        print("📤 Las fotos y facturas se subirán a Google Drive")
+    else:
+        print("\n⚠️ Google Drive NO configurado")
+        print("📁 Usando almacenamiento LOCAL")
+    
+    print("\n" + "=" * 60)
