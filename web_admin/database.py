@@ -969,6 +969,73 @@ def obtener_productos_con_stock(negocio_id):
     conn.close()
     return productos
 
+# ============================================
+# ⭐ FUNCIÓN FALTANTE AGREGADA: obtener_productos_tienda
+# ============================================
+
+def obtener_productos_tienda(negocio_id=None):
+    """
+    Obtiene productos de la tienda pública.
+    Si se proporciona negocio_id, obtiene solo los productos de ese negocio.
+    """
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    if negocio_id:
+        cursor.execute('''
+            SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
+                   p.negocio_id, u.username as negocio_username, u.nombre as negocio_nombre,
+                   u.datos_negocio, pt.destacado
+            FROM productos p 
+            JOIN usuarios u ON p.negocio_id = u.id
+            LEFT JOIN productos_tienda pt ON p.id = pt.producto_id AND pt.negocio_id = u.id
+            WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0 AND u.id = %s
+            ORDER BY pt.destacado DESC, p.id DESC
+        ''', (negocio_id,))
+    else:
+        cursor.execute('''
+            SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
+                   p.negocio_id, u.username as negocio_username, u.nombre as negocio_nombre,
+                   u.datos_negocio, pt.destacado
+            FROM productos p 
+            JOIN usuarios u ON p.negocio_id = u.id
+            LEFT JOIN productos_tienda pt ON p.id = pt.producto_id AND pt.negocio_id = u.id
+            WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0
+            ORDER BY pt.destacado DESC, p.id DESC
+        ''')
+    
+    productos = cursor.fetchall()
+    conn.close()
+    
+    resultado = []
+    for p in productos:
+        datos = {}
+        if p.get('datos_negocio'):
+            try:
+                datos = json.loads(p['datos_negocio']) if isinstance(p['datos_negocio'], str) else p['datos_negocio']
+            except:
+                pass
+        
+        resultado.append({
+            'id': p['id'],
+            'nombre': p['nombre'],
+            'categoria': p.get('categoria'),
+            'precio': float(p['precio']),
+            'stock': p['stock'],
+            'foto_url': p.get('foto_url'),
+            'negocio_id': p['negocio_id'],
+            'negocio_username': p.get('negocio_username'),
+            'negocio_nombre': p.get('negocio_nombre') or datos.get('nombre_negocio', p.get('negocio_username')),
+            'destacado': p.get('destacado', 0),
+            'provincia': datos.get('provincia', ''),
+            'municipio': datos.get('municipio', ''),
+            'direccion': datos.get('direccion', ''),
+            'telefono': datos.get('telefono', ''),
+            'descripcion': datos.get('descripcion', '')
+        })
+    
+    return resultado
+
 def obtener_productos_tienda_publica(provincia=None, municipio=None):
     """Obtiene productos de la tienda pública con filtro de ubicación"""
     conn = get_db()
@@ -1039,6 +1106,43 @@ def obtener_productos_tienda_negocio(negocio_id):
     productos = cursor.fetchall()
     conn.close()
     return productos
+
+def obtener_productos_tienda_por_negocio(negocio_id):
+    """
+    Obtiene los productos que un negocio tiene en su tienda.
+    """
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    cursor.execute('''
+        SELECT pt.id as tienda_id, p.*, pt.destacado
+        FROM productos_tienda pt
+        JOIN productos p ON pt.producto_id = p.id
+        WHERE pt.negocio_id = %s
+        ORDER BY pt.destacado DESC, p.nombre ASC
+    ''', (negocio_id,))
+    
+    productos = cursor.fetchall()
+    conn.close()
+    return [dict(p) for p in productos]
+
+def obtener_productos_con_stock_negocio(negocio_id):
+    """
+    Obtiene productos con stock disponible de un negocio específico.
+    """
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    cursor.execute('''
+        SELECT id, nombre, precio, costo, comision, stock, stock_minimo
+        FROM productos 
+        WHERE negocio_id = %s AND stock > 0
+        ORDER BY nombre ASC
+    ''', (negocio_id,))
+    
+    productos = cursor.fetchall()
+    conn.close()
+    return [dict(p) for p in productos]
 
 def agregar_producto_tienda(negocio_id, producto_id, destacado=0):
     conn = get_db()
@@ -1252,6 +1356,25 @@ def obtener_trabajadores_activos(negocio_id):
         print(f"❌ Error en obtener_trabajadores_activos: {e}")
         conn.close()
         return []
+
+def obtener_trabajador_negocio(trabajador_id):
+    """
+    Obtiene la información de un trabajador incluyendo su relación con el negocio.
+    """
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    cursor.execute('''
+        SELECT u.id, u.username, u.email, u.nombre, u.activo, u.datos_negocio,
+               tn.cargo, tn.salario, tn.fecha_contratacion, tn.negocio_id
+        FROM usuarios u
+        JOIN trabajadores_negocio tn ON u.id = tn.trabajador_id
+        WHERE u.id = %s
+    ''', (trabajador_id,))
+    
+    trabajador = cursor.fetchone()
+    conn.close()
+    return trabajador
 
 def crear_trabajador_negocio(negocio_id, trabajador_id, cargo, salario):
     conn = get_db()
