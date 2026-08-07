@@ -1,6 +1,4 @@
-# ============================================
 # web_admin/app.py
-# ============================================
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response
 from flask_cors import CORS
@@ -18,6 +16,7 @@ from functools import wraps
 import urllib.parse
 import random
 import string
+import uuid
 
 # ============================================
 # CONFIGURACIÓN DE LOGGING
@@ -37,13 +36,14 @@ sys.path.insert(0, os.path.dirname(BASE_DIR))
 try:
     os.makedirs(os.path.join(BASE_DIR, 'static/uploads/productos'), exist_ok=True)
     os.makedirs(os.path.join(BASE_DIR, 'static/uploads/facturas'), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, 'static/temp'), exist_ok=True)
     os.makedirs(os.path.join(BASE_DIR, 'static/img'), exist_ok=True)
     print("📁 Carpetas de almacenamiento creadas/verificadas")
 except Exception as e:
     print(f"⚠️ Error creando carpetas: {e}")
 
 # ============================================
-# IMPORTAR FUNCIONES DE LA BASE DE DATOS (VERSIÓN ABSOLUTA)
+# IMPORTAR FUNCIONES DE LA BASE DE DATOS
 # ============================================
 try:
     from web_admin.database import (
@@ -1112,6 +1112,27 @@ def api_eliminar_producto(producto_id):
         return jsonify({'error': 'No autorizado'}), 401
     
     try:
+        # Primero obtener la foto para eliminarla
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT foto_url, foto_public_id FROM productos WHERE id = %s', (producto_id,))
+        producto = cursor.fetchone()
+        conn.close()
+        
+        # Si tiene foto, eliminarla de Google Drive
+        if producto and producto[1]:
+            try:
+                from web_admin.storage import get_storage_manager
+                storage = get_storage_manager()
+                # Obtener negocio_id
+                negocio_id = usuario.get('id')
+                if usuario.get('rol') == 'trabajador':
+                    negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if negocio_id:
+                    storage.eliminar_foto_producto(negocio_id, producto_id, producto[1] or '')
+            except Exception as e:
+                print(f"⚠️ Error eliminando foto de Google Drive: {e}")
+        
         exito = eliminar_producto(producto_id)
         
         if exito:
@@ -1121,6 +1142,66 @@ def api_eliminar_producto(producto_id):
             return jsonify({'error': 'Error al eliminar el producto'}), 500
     except Exception as e:
         print(f"❌ Error en api_eliminar_producto: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/producto/<int:producto_id>/foto', methods=['POST'])
+@login_required
+def api_subir_foto_producto(producto_id):
+    """Sube una foto para un producto a Google Drive"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    if 'foto' not in request.files:
+        return jsonify({'error': 'No se envió ninguna foto'}), 400
+    
+    foto = request.files['foto']
+    if foto.filename == '':
+        return jsonify({'error': 'No se seleccionó ningún archivo'}), 400
+    
+    # Validar extensión
+    allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    extension = foto.filename.rsplit('.', 1)[1].lower() if '.' in foto.filename else ''
+    if extension not in allowed_extensions:
+        return jsonify({'error': f'Formato no permitido. Use: {", ".join(allowed_extensions)}'}), 400
+    
+    try:
+        from web_admin.storage import get_storage_manager
+        storage = get_storage_manager()
+        
+        # Generar nombre único
+        nombre_foto = f"{uuid.uuid4().hex}.{extension}"
+        
+        # Determinar negocio_id
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        # Subir a Google Drive
+        exito = storage.subir_foto_producto(negocio_id, producto_id, foto, nombre_foto)
+        
+        if exito:
+            # Guardar en la base de datos
+            if not storage.use_local:
+                # Obtener file_id de Google Drive
+                file_id = storage.obtener_file_id(negocio_id, producto_id, nombre_foto)
+                foto_url = storage.obtener_url_foto(negocio_id, producto_id, nombre_foto, file_id)
+                actualizar_foto_producto(producto_id, foto_url, file_id)
+            else:
+                foto_url = storage.obtener_url_foto(negocio_id, producto_id, nombre_foto)
+                actualizar_foto_producto(producto_id, foto_url)
+            
+            return jsonify({'success': True, 'url': foto_url})
+        else:
+            return jsonify({'error': 'Error al subir la foto'}), 500
+            
+    except Exception as e:
+        print(f"❌ Error en api_subir_foto_producto: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -2523,6 +2604,43 @@ def api_logs():
         return jsonify([dict(l) for l in logs])
     except Exception as e:
         print(f"❌ Error en api_logs: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - STORAGE (GOOGLE DRIVE)
+# ============================================
+
+@app.route('/api/storage/estado', methods=['GET'])
+@admin_required
+def api_storage_estado():
+    """Obtiene el estado del almacenamiento"""
+    try:
+        from web_admin.storage import get_storage_manager
+        storage = get_storage_manager()
+        estado = storage.obtener_estado()
+        return jsonify(estado)
+    except Exception as e:
+        print(f"❌ Error en api_storage_estado: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/storage/auth', methods=['GET'])
+@admin_required
+def api_storage_auth():
+    """Re-autenticar con Google Drive"""
+    try:
+        from web_admin.storage import get_storage_manager
+        # Eliminar token para forzar re-autenticación
+        token_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'token.pickle')
+        if os.path.exists(token_file):
+            os.remove(token_file)
+            print(f"🗑️ Token eliminado: {token_file}")
+        
+        storage = get_storage_manager()
+        estado = storage.obtener_estado()
+        return jsonify({'success': True, 'estado': estado})
+    except Exception as e:
+        print(f"❌ Error en api_storage_auth: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
