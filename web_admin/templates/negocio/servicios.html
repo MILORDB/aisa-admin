@@ -324,6 +324,9 @@
             document.getElementById('formServicio').scrollIntoView({ behavior: 'smooth' });
         }
 
+        // ============================================
+        // GUARDAR SERVICIO (CORREGIDO)
+        // ============================================
         async function guardarServicio() {
             const nombre = document.getElementById('serNombre').value.trim();
             const categoria = document.getElementById('serCategoria').value;
@@ -348,22 +351,27 @@
                 const url = editandoId ? `/api/servicio/${editandoId}` : '/api/servicios';
                 const method = editandoId ? 'PUT' : 'POST';
                 
+                console.log('📤 Enviando datos:', data);
+                
                 const response = await fetch(url, {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
+                
                 const result = await response.json();
+                console.log('📥 Respuesta:', result);
+                
                 if (result.success) {
                     mostrarMensaje(`✅ "${nombre}" ${editandoId ? 'actualizado' : 'agregado'}`, 'exito');
                     cancelarFormulario();
                     await cargarServicios();
                 } else {
-                    mostrarMensaje(result.error || 'Error', 'error');
+                    mostrarMensaje(result.error || 'Error al guardar', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
+                mostrarMensaje('Error de conexión: ' + error.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.textContent = textoOriginal;
@@ -408,6 +416,15 @@
             }
         }
 
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        document.getElementById('btnGuardar').addEventListener('click', guardarServicio);
+        document.getElementById('btnCancelar').addEventListener('click', cancelarFormulario);
+
+        // ============================================
+        // INICIO
+        // ============================================
         cargarServicios();
         setInterval(cargarServicios, 30000);
     </script>
