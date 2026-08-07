@@ -39,7 +39,7 @@ except Exception as e:
     print(f"⚠️ Error creando carpetas: {e}")
 
 # ============================================
-# IMPORTAR FUNCIONES DE LA BASE DE DATOS (ABSOLUTAS)
+# IMPORTAR FUNCIONES DE LA BASE DE DATOS
 # ============================================
 try:
     from web_admin.database import (
@@ -100,13 +100,15 @@ try:
         obtener_detalle_nomina,
         obtener_contratos_activos_para_empresa,
         obtener_ventas_con_filtros,
-        obtener_trabajadores_activos
+        obtener_trabajadores_activos,
+        obtener_productos_tienda_por_negocio,
+        obtener_productos_con_stock_negocio,
+        obtener_trabajador_negocio
     )
     print("✅ Database importada correctamente")
 except ImportError as e:
     print(f"❌ Error importando database: {e}")
     traceback.print_exc()
-    # Fallback para ejecución local
     try:
         from database import *
         print("✅ Database importada desde local")
@@ -1053,6 +1055,7 @@ def api_obtener_productos():
 @app.route('/api/productos', methods=['POST'])
 @login_required
 def api_crear_producto():
+    """Crear un nuevo producto"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1075,17 +1078,18 @@ def api_crear_producto():
         return jsonify({'error': 'Nombre, categoría y precio son obligatorios'}), 400
     
     try:
-        producto_id = crear_producto(usuario['id'], nombre, categoria, float(precio), float(costo), float(comision), int(stock), int(stock_minimo))
+        negocio_id = usuario.get('id')
+        producto_id = crear_producto(negocio_id, nombre, categoria, float(precio), float(costo), float(comision), int(stock), int(stock_minimo))
         
         if producto_id:
             registrar_log(usuario['id'], 'producto_creado', f'Producto: {nombre}')
-            return jsonify({'success': True, 'id': producto_id})
+            return jsonify({'success': True, 'id': producto_id, 'message': 'Producto creado correctamente'})
         else:
-            return jsonify({'error': 'Error al crear el producto'}), 500
+            return jsonify({'success': False, 'error': 'Error al crear el producto'}), 500
     except Exception as e:
         print(f"❌ Error en api_crear_producto: {e}")
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/producto/<int:producto_id>', methods=['PUT'])
 @login_required
@@ -1160,7 +1164,6 @@ def api_subir_foto_producto(producto_id):
     if foto.filename == '':
         return jsonify({'error': 'No se seleccionó ningún archivo'}), 400
     
-    # Validar extensión
     allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     extension = foto.filename.rsplit('.', 1)[1].lower() if '.' in foto.filename else ''
     if extension not in allowed_extensions:
@@ -1168,24 +1171,18 @@ def api_subir_foto_producto(producto_id):
     
     try:
         storage = get_storage_manager()
-        
-        # Generar nombre único
         nombre_foto = f"{uuid.uuid4().hex}.{extension}"
         
-        # Determinar negocio_id
         negocio_id = usuario.get('id')
         if usuario.get('rol') == 'trabajador':
             negocio_id = obtener_negocio_de_trabajador(usuario['id'])
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        # Subir a Google Drive
         exito = storage.subir_foto_producto(negocio_id, producto_id, foto, nombre_foto)
         
         if exito:
-            # Guardar en la base de datos
             if not storage.use_local:
-                # Obtener file_id de Google Drive
                 file_id = storage.obtener_file_id(negocio_id, producto_id, nombre_foto)
                 foto_url = storage.obtener_url_foto(negocio_id, producto_id, nombre_foto, file_id)
                 actualizar_foto_producto(producto_id, foto_url, file_id)
@@ -1386,6 +1383,7 @@ def api_obtener_servicios():
 @app.route('/api/servicios', methods=['POST'])
 @login_required
 def api_crear_servicio():
+    """Crear un nuevo servicio"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1407,26 +1405,35 @@ def api_crear_servicio():
         return jsonify({'error': 'Nombre, categoría y precio son obligatorios'}), 400
     
     try:
+        negocio_id = usuario.get('id')
         trabajador_id = None
+        
         if usuario.get('rol') == 'trabajador':
-            trabajador_id = usuario['id']
             negocio_id = obtener_negocio_de_trabajador(usuario['id'])
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        else:
-            negocio_id = usuario['id']
+            trabajador_id = usuario['id']
         
-        servicio_id = crear_servicio(negocio_id, trabajador_id, nombre, categoria, float(precio), int(duracion), 1 if activo else 0, descripcion)
+        servicio_id = crear_servicio(
+            negocio_id, 
+            trabajador_id, 
+            nombre, 
+            categoria, 
+            float(precio), 
+            int(duracion), 
+            1 if activo else 0, 
+            descripcion
+        )
         
         if servicio_id:
             registrar_log(usuario['id'], 'servicio_creado', f'Servicio: {nombre}')
-            return jsonify({'success': True, 'id': servicio_id})
+            return jsonify({'success': True, 'id': servicio_id, 'message': 'Servicio creado correctamente'})
         else:
-            return jsonify({'error': 'Error al crear el servicio'}), 500
+            return jsonify({'success': False, 'error': 'Error al crear el servicio'}), 500
     except Exception as e:
         print(f"❌ Error en api_crear_servicio: {e}")
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/servicio/<int:servicio_id>/toggle', methods=['POST'])
 @login_required
@@ -1512,6 +1519,7 @@ def api_obtener_trabajadores_negocio():
 @app.route('/api/negocio/trabajador/crear', methods=['POST'])
 @login_required
 def api_crear_trabajador_negocio():
+    """Crear un nuevo trabajador para el negocio"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1522,20 +1530,31 @@ def api_crear_trabajador_negocio():
         return jsonify({'error': 'Solo los negocios pueden crear trabajadores'}), 403
     
     data = request.get_json()
+    print(f"📝 Datos recibidos para trabajador: {data}")
+    
     nombre = data.get('nombre')
-    apellidos = data.get('apellidos')
+    apellidos = data.get('apellidos', '')
     ci = data.get('ci')
-    movil = data.get('movil')
-    direccion = data.get('direccion')
+    movil = data.get('movil', '')
+    direccion = data.get('direccion', '')
     frecuencia = data.get('frecuencia', 'diaria')
     salario = data.get('salario')
-    email = data.get('email')
+    email = data.get('email', '')
     usuario_username = data.get('usuario')
     password = data.get('password')
     modulos = data.get('modulos', [])
     
-    if not nombre or not ci or salario is None or not usuario_username or not password:
-        return jsonify({'error': 'Nombre, CI, salario, usuario y contraseña son obligatorios'}), 400
+    # Validaciones
+    if not nombre:
+        return jsonify({'error': 'El nombre es obligatorio'}), 400
+    if not ci:
+        return jsonify({'error': 'El CI es obligatorio'}), 400
+    if salario is None:
+        return jsonify({'error': 'El salario es obligatorio'}), 400
+    if not usuario_username:
+        return jsonify({'error': 'El nombre de usuario es obligatorio'}), 400
+    if not password:
+        return jsonify({'error': 'La contraseña es obligatoria'}), 400
     
     if len(password) < 6:
         return jsonify({'error': 'La contraseña debe tener al menos 6 caracteres'}), 400
@@ -1555,7 +1574,15 @@ def api_crear_trabajador_negocio():
             'negocio_id': usuario['id']
         }
         
-        user_id = crear_usuario(usuario_username, email or f'{usuario_username}@trabajador.com', password, nombre, 'trabajador', 'negocio', datos_negocio)
+        user_id = crear_usuario(
+            usuario_username, 
+            email or f'{usuario_username}@trabajador.com', 
+            password, 
+            nombre, 
+            'trabajador', 
+            'negocio', 
+            datos_negocio
+        )
         
         if not user_id:
             return jsonify({'error': 'Error al crear el trabajador'}), 500
@@ -2625,7 +2652,6 @@ def api_storage_estado():
 def api_storage_auth():
     """Re-autenticar con Google Drive"""
     try:
-        # Eliminar token para forzar re-autenticación
         token_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'token.pickle')
         if os.path.exists(token_file):
             os.remove(token_file)
@@ -2669,7 +2695,6 @@ def fix_admin_endpoint():
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         import bcrypt
         
-        # Verificar/Crear admin
         cursor.execute("SELECT * FROM usuarios WHERE username = 'admin'")
         admin = cursor.fetchone()
         
@@ -2685,14 +2710,12 @@ def fix_admin_endpoint():
             ''', ('admin', 'admin@aisa.com', password_hash, 'Administrador', 'admin', 'admin', fecha))
             conn.commit()
         
-        # Forzar admin
         cursor.execute('''
             UPDATE usuarios 
             SET rol = 'admin', tipo = 'admin', activo = 1, aprobado = 1, verificado = 1
             WHERE username = 'admin'
         ''')
         conn.commit()
-        
         conn.close()
         
         return """
