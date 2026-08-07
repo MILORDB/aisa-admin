@@ -3,193 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Servicios - AIsa Negocio</title>
+    <title>Inventario - AIsa Negocio</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #0f0f1a;
-            color: #fff;
-            min-height: 100vh;
-            padding: 12px;
-        }
-        .card {
-            background: #1a1a2e;
-            border-radius: 10px;
-            padding: 14px;
-            border: 1px solid #2a2a3e;
-            margin-bottom: 12px;
-        }
-        .card h2 { font-size: 15px; color: #6c3ce0; margin-bottom: 12px; }
-        .btn {
-            padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer;
-            font-size: 12px; transition: all 0.3s;
-        }
-        .btn-primary { background: #6c3ce0; color: #fff; }
-        .btn-primary:hover { background: #5a2ec0; }
-        .btn-success { background: #4caf50; color: #fff; }
-        .btn-success:hover { background: #3d8b40; }
-        .btn-danger { background: #f44336; color: #fff; }
-        .btn-danger:hover { background: #c62828; }
-        .btn-warning { background: #ff9800; color: #fff; }
-        .btn-warning:hover { background: #e68900; }
-        .btn-sm { padding: 3px 8px; font-size: 10px; }
-        
-        .tabla {
-            width: 100%; border-collapse: collapse; font-size: 12px;
-        }
-        .tabla th {
-            text-align: left; padding: 6px 8px; color: #888;
-            border-bottom: 1px solid #2a2a3e; font-size: 10px; text-transform: uppercase;
-        }
-        .tabla td { padding: 6px 8px; border-bottom: 1px solid #1a1a2e; vertical-align: middle; }
-        .tabla .badge {
-            padding: 1px 8px; border-radius: 10px; font-size: 9px;
-        }
-        .tabla .badge.activo { background: #224422; color: #6bff6b; }
-        .tabla .badge.inactivo { background: #442222; color: #ff6b6b; }
-        
-        .form-row {
-            display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;
-        }
-        .form-row input, .form-row select, .form-row textarea {
-            padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px;
-            background: #0f0f1a; color: #fff; font-size: 12px;
-            flex: 1; min-width: 100px;
-        }
-        .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
-            border-color: #6c3ce0; outline: none;
-        }
-        .search-bar {
-            display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
-        }
-        .search-bar input {
-            flex: 1; padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px;
-            background: #0f0f1a; color: #fff; font-size: 12px; min-width: 100px;
-        }
-        .search-bar input:focus { border-color: #6c3ce0; outline: none; }
-        
-        .empty { text-align: center; color: #888; padding: 30px; font-size: 13px; }
-        .loading { text-align: center; color: #888; padding: 20px; font-size: 13px; }
-        .mensaje-exito {
-            background: #224422; color: #6bff6b;
-            padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; display: none;
-        }
-        .mensaje-exito.show { display: block; }
-        .mensaje-error {
-            background: #442222; color: #ff6b6b;
-            padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; display: none;
-        }
-        .mensaje-error.show { display: block; }
-        
-        .stats-grid {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px;
-        }
-        .stat-item {
-            background: #0f0f1a; border: 1px solid #2a2a3e; border-radius: 6px; padding: 8px; text-align: center;
-        }
-        .stat-item .number { font-size: 18px; font-weight: 700; color: #6c3ce0; }
-        .stat-item .label { font-size: 8px; color: #888; margin-top: 1px; }
-        .categoria-tag {
-            display: inline-block; background: rgba(108,60,224,0.2);
-            color: #6c3ce0; padding: 1px 8px; border-radius: 10px; font-size: 10px;
-        }
-        .acciones-cell { display: flex; gap: 4px; flex-wrap: wrap; }
-        
-        .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
-        .table-wrapper table { min-width: 500px; }
-
-        @media (max-width: 600px) {
-            body { padding: 8px; }
-            .card { padding: 10px; }
-            .stats-grid { grid-template-columns: 1fr 1fr; }
-            .form-row { flex-direction: column; }
-            .search-bar { flex-direction: column; }
-            .acciones-cell { flex-direction: row; flex-wrap: wrap; }
-            .acciones-cell .btn-sm { flex: 1; text-align: center; min-width: 50px; }
-            .tabla { font-size: 11px; }
-            .tabla th, .tabla td { padding: 4px 6px; }
-        }
+        /* ... (mismo CSS que antes) ... */
     </style>
 </head>
 <body>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:6px;">
-        <h1 style="font-size:18px;display:flex;align-items:center;gap:8px;">📋 Servicios <span style="font-size:12px;font-weight:normal;opacity:0.7;">Gestión de servicios</span></h1>
+        <h1 style="font-size:18px;display:flex;align-items:center;gap:8px;">📦 Inventario <span style="font-size:12px;font-weight:normal;opacity:0.7;">Gestión de productos</span></h1>
+        <button class="btn btn-info btn-sm" onclick="verificarStorage()">🔍 Verificar Almacenamiento</button>
     </div>
 
     <div class="mensaje-error" id="mensajeError"></div>
     <div class="mensaje-exito" id="mensajeExito"></div>
 
-    <div class="card">
-        <div class="stats-grid">
-            <div class="stat-item">
-                <span class="number" id="totalServicios">0</span>
-                <span class="label">📋 Total</span>
-            </div>
-            <div class="stat-item">
-                <span class="number" id="serviciosActivos">0</span>
-                <span class="label">🟢 Activos</span>
-            </div>
-            <div class="stat-item">
-                <span class="number" id="serviciosInactivos">0</span>
-                <span class="label">🔴 Inactivos</span>
-            </div>
-        </div>
-    </div>
+    <!-- ... (estadísticas, etc.) ... -->
 
     <div class="card">
         <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="🔍 Buscar servicio..." oninput="filtrarServicios()">
+            <input type="text" id="searchInput" placeholder="🔍 Buscar producto..." oninput="filtrarProductos()">
             <button class="btn btn-primary" onclick="mostrarFormulario()">+ Nuevo</button>
         </div>
 
-        <div id="formServicio" style="display:none;border-top:1px solid #2a2a3e;padding-top:12px;margin-top:8px;">
-            <h3 style="font-size:14px;margin-bottom:8px;" id="formTitle">📋 Nuevo Servicio</h3>
-            <div class="form-row">
-                <input type="text" id="serNombre" placeholder="Nombre">
-                <select id="serCategoria">
-                    <option value="">-- Categoría --</option>
-                    <option value="electronica">💻 Electrónica</option>
-                    <option value="ropa">👕 Ropa</option>
-                    <option value="hogar">🏠 Hogar</option>
-                    <option value="belleza">💄 Belleza</option>
-                    <option value="deporte">🏋️ Deporte</option>
-                    <option value="educacion">📚 Educación</option>
-                    <option value="salud">🏥 Salud</option>
-                    <option value="otros">📦 Otros</option>
-                </select>
-            </div>
-            <div class="form-row">
-                <input type="number" id="serPrecio" placeholder="Precio" step="0.01">
-                <input type="number" id="serDuracion" placeholder="Duración (min)">
-                <select id="serEstado">
-                    <option value="1">Activo</option>
-                    <option value="0">Inactivo</option>
-                </select>
-            </div>
-            <div class="form-row">
-                <textarea id="serDescripcion" placeholder="Descripción" rows="2"></textarea>
-            </div>
+        <div id="formProducto" style="display:none;border-top:1px solid #2a2a3e;padding-top:12px;margin-top:8px;">
+            <!-- ... (formulario) ... -->
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button class="btn btn-success" onclick="guardarServicio()" id="btnGuardar">💾 Guardar</button>
-                <button class="btn btn-danger" onclick="cancelarFormulario()">✕ Cancelar</button>
+                <!-- ELIMINÉ onclick="guardarProducto()" -->
+                <button class="btn btn-success" id="btnGuardar">💾 Guardar</button>
+                <button class="btn btn-danger" id="btnCancelar">✕ Cancelar</button>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <div class="table-wrapper">
-            <div id="serviciosContainer">
-                <div class="loading">Cargando...</div>
-            </div>
-        </div>
-    </div>
+    <!-- ... (tabla) ... -->
 
     <script>
-        let servicios = [];
+        // ============================================
+        // VARIABLES GLOBALES
+        // ============================================
+        let productos = [];
         let editandoId = null;
 
+        // ============================================
+        // MOSTRAR MENSAJES
+        // ============================================
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
             const exitoEl = document.getElementById('mensajeExito');
@@ -208,58 +66,177 @@
             }, 4000);
         }
 
-        async function cargarServicios() {
-            const container = document.getElementById('serviciosContainer');
-            container.innerHTML = '<div class="loading">Cargando...</div>';
-
-            try {
-                const response = await fetch('/api/servicios');
-                if (!response.ok) throw new Error('Error');
-                servicios = await response.json();
-                renderServicios();
-                actualizarEstadisticas();
-            } catch (error) {
-                console.error('Error:', error);
-                container.innerHTML = `<div class="empty">❌ Error al cargar</div>`;
+        // ============================================
+        // PREVISUALIZAR FOTO
+        // ============================================
+        function previsualizarFoto(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById('fotoPreview');
+                    preview.src = e.target.result;
+                    preview.classList.add('show');
+                };
+                reader.readAsDataURL(file);
             }
         }
 
-        function renderServicios(filtro = '') {
-            const container = document.getElementById('serviciosContainer');
+        // ============================================
+        // VERIFICAR ALMACENAMIENTO
+        // ============================================
+        async function verificarStorage() {
+            try {
+                const response = await fetch('/api/storage/estado');
+                const data = await response.json();
+                console.log('📁 Estado del almacenamiento:', data);
+                
+                let mensaje = `📁 Almacenamiento: ${data.tipo || 'Desconocido'}\n`;
+                mensaje += `🔐 Autenticado: ${data.autenticado ? '✅ Sí' : '❌ No'}\n`;
+                mensaje += `📂 Usando local: ${data.use_local ? '✅ Sí' : '❌ No'}`;
+                
+                if (data.used_gb !== undefined) {
+                    mensaje += `\n📊 Espacio usado: ${data.used_gb} GB`;
+                    mensaje += `\n📊 Espacio total: ${data.total_gb} GB`;
+                    mensaje += `\n📊 Espacio libre: ${data.free_gb} GB`;
+                }
+                
+                if (data.use_local) {
+                    mostrarMensaje('⚠️ Usando almacenamiento LOCAL. Google Drive no configurado.', 'error');
+                } else {
+                    mostrarMensaje('✅ Google Drive conectado correctamente!', 'exito');
+                }
+                
+                alert(mensaje);
+            } catch (error) {
+                console.error('Error:', error);
+                mostrarMensaje('❌ Error verificando almacenamiento', 'error');
+            }
+        }
+
+        // ============================================
+        // CALCULAR GANANCIA
+        // ============================================
+        function calcularGanancia() {
+            const precio = parseFloat(document.getElementById('prodPrecio').value) || 0;
+            const costo = parseFloat(document.getElementById('prodCosto').value) || 0;
+            const preview = document.getElementById('gananciaPreview');
+            const texto = document.getElementById('gananciaTexto');
+            
+            if (costo > 0 && precio > 0) {
+                const ganancia = precio - costo;
+                const porcentaje = (ganancia / costo) * 100;
+                preview.classList.add('show');
+                let emoji = '📈';
+                let color = '#6bff6b';
+                if (porcentaje < 10) { emoji = '📉'; color = '#ff6b6b'; }
+                else if (porcentaje < 30) { emoji = '📊'; color = '#ffbb33'; }
+                texto.innerHTML = `${emoji} Ganancia: $${ganancia.toFixed(2)} (${porcentaje.toFixed(1)}%)`;
+                texto.style.color = color;
+            } else if (costo > 0 && precio === 0) {
+                preview.classList.add('show');
+                texto.innerHTML = '⚠️ Define el precio de venta';
+                texto.style.color = '#ffbb33';
+            } else {
+                preview.classList.remove('show');
+            }
+        }
+
+        // ============================================
+        // CARGAR PRODUCTOS
+        // ============================================
+        async function cargarProductos() {
+            const container = document.getElementById('productosContainer');
+            container.innerHTML = '<div class="loading">Cargando...</div>';
+
+            try {
+                const response = await fetch('/api/productos');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                productos = await response.json();
+                renderProductos();
+                actualizarEstadisticas();
+            } catch (error) {
+                console.error('Error cargando productos:', error);
+                container.innerHTML = `<div class="empty">❌ Error al cargar: ${error.message}</div>`;
+            }
+        }
+
+        // ============================================
+        // RENDER PRODUCTOS
+        // ============================================
+        function renderProductos(filtro = '') {
+            const container = document.getElementById('productosContainer');
             const filtroLower = filtro.toLowerCase();
             
-            const filtrados = servicios.filter(s => 
-                s.nombre.toLowerCase().includes(filtroLower) ||
-                (s.categoria && s.categoria.toLowerCase().includes(filtroLower))
+            const filtrados = productos.filter(p => 
+                p.nombre.toLowerCase().includes(filtroLower) ||
+                (p.categoria && p.categoria.toLowerCase().includes(filtroLower))
             );
 
             if (filtrados.length === 0) {
-                container.innerHTML = `<div class="empty">No hay servicios</div>`;
+                container.innerHTML = `<div class="empty">No hay productos</div>`;
                 return;
             }
 
             let html = `<table class="tabla">
                 <thead><tr>
-                    <th>Servicio</th>
+                    <th>Foto</th>
+                    <th>Producto</th>
                     <th>Categoría</th>
                     <th>Precio</th>
-                    <th>Duración</th>
+                    <th>Costo</th>
+                    <th>Ganancia</th>
+                    <th>Comisión</th>
+                    <th>Stock</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                 </tr></thead><tbody>`;
 
-            filtrados.forEach(s => {
+            filtrados.forEach(p => {
+                let estado, clase;
+                if (p.stock === 0) { estado = '🚫 Agotado'; clase = 'agotado'; }
+                else if (p.stock <= (p.stock_minimo || 3)) { estado = '⚠️ Bajo'; clase = 'bajo'; }
+                else { estado = '✅ Normal'; clase = 'alto'; }
+                
+                const categoriaDisplay = p.categoria || '-';
+                const costo = p.costo || 0;
+                const ganancia = p.precio - costo;
+                const porcentaje = costo > 0 ? (ganancia / costo) * 100 : 0;
+                const comision = p.comision || 0;
+                const fotoHtml = p.foto_url 
+                    ? `<img src="${p.foto_url}" class="foto-producto" alt="${p.nombre}" onerror="this.style.display='none'">`
+                    : `<span style="color:#666;font-size:20px;">📷</span>`;
+                
+                let gananciaClase = 'media';
+                let gananciaLabel = '📊';
+                if (porcentaje > 50) { gananciaClase = 'alta'; gananciaLabel = '📈'; }
+                else if (porcentaje < 10) { gananciaClase = 'baja'; gananciaLabel = '📉'; }
+                
+                const comisionDisplay = comision > 0 
+                    ? `<span class="comision-tag">💵 $${comision.toFixed(2)}</span>`
+                    : `<span class="comision-tag sin-comision">— Sin comisión</span>`;
+                
                 html += `
                     <tr>
-                        <td><strong>${s.nombre}</strong></td>
-                        <td><span class="categoria-tag">${s.categoria || '-'}</span></td>
-                        <td>$${parseFloat(s.precio).toFixed(2)}</td>
-                        <td>${s.duracion} min</td>
-                        <td><span class="badge ${s.activo ? 'activo' : 'inactivo'}">${s.activo ? '🟢 Activo' : '🔴 Inactivo'}</span></td>
+                        <td>${fotoHtml}</td>
+                        <td><strong>${p.nombre}</strong></td>
+                        <td><span class="categoria-tag">${categoriaDisplay}</span></td>
+                        <td>$${parseFloat(p.precio).toFixed(2)}</td>
+                        <td>$${costo.toFixed(2)}</td>
+                        <td>
+                            <span class="ganancia-indicador ${gananciaClase}">
+                                ${gananciaLabel} $${ganancia.toFixed(2)} (${porcentaje.toFixed(1)}%)
+                            </span>
+                        </td>
+                        <td>${comisionDisplay}</td>
+                        <td>${p.stock}</td>
+                        <td><span class="badge ${clase}">${estado}</span></td>
                         <td>
                             <div class="acciones-cell">
-                                <button class="btn btn-warning btn-sm" onclick="toggleServicio(${s.id}, ${s.activo ? 0 : 1})">${s.activo ? '🔴' : '🟢'}</button>
-                                <button class="btn btn-danger btn-sm" onclick="eliminarServicio(${s.id})">🗑️</button>
+                                <button class="btn btn-warning btn-sm" onclick="editarProducto(${p.id})">✏️</button>
+                                <button class="btn btn-danger btn-sm" onclick="eliminarProducto(${p.id}, '${p.nombre.replace(/'/g, "\\'")}')">🗑️</button>
                             </div>
                         </td>
                     </tr>
@@ -270,85 +247,117 @@
             container.innerHTML = html;
         }
 
+        // ============================================
+        // ACTUALIZAR ESTADÍSTICAS
+        // ============================================
         function actualizarEstadisticas() {
-            const total = servicios.length;
-            const activos = servicios.filter(s => s.activo === 1).length;
-            const inactivos = total - activos;
+            const total = productos.length;
+            const bajo = productos.filter(p => p.stock > 0 && p.stock <= (p.stock_minimo || 3)).length;
+            const agotados = productos.filter(p => p.stock === 0).length;
+            const valor = productos.reduce((sum, p) => sum + (parseFloat(p.precio) * p.stock), 0);
+            const costoTotal = productos.reduce((sum, p) => sum + ((p.costo || 0) * p.stock), 0);
+            const gananciaPotencial = valor - costoTotal;
             
-            document.getElementById('totalServicios').textContent = total;
-            document.getElementById('serviciosActivos').textContent = activos;
-            document.getElementById('serviciosInactivos').textContent = inactivos;
+            document.getElementById('totalProductos').textContent = total;
+            document.getElementById('productosBajo').textContent = bajo;
+            document.getElementById('productosAgotados').textContent = agotados;
+            document.getElementById('valorInventario').textContent = `$${valor.toFixed(2)}`;
+            document.getElementById('costoInventario').textContent = `$${costoTotal.toFixed(2)}`;
+            document.getElementById('gananciaPotencial').textContent = `$${gananciaPotencial.toFixed(2)}`;
         }
 
-        function filtrarServicios() {
-            renderServicios(document.getElementById('searchInput').value);
+        // ============================================
+        // FILTRAR PRODUCTOS
+        // ============================================
+        function filtrarProductos() {
+            renderProductos(document.getElementById('searchInput').value);
         }
 
+        // ============================================
+        // FORMULARIO
+        // ============================================
         function mostrarFormulario() {
-            document.getElementById('formServicio').style.display = 'block';
-            document.getElementById('serNombre').focus();
+            document.getElementById('formProducto').style.display = 'block';
+            document.getElementById('prodNombre').focus();
             editandoId = null;
-            document.getElementById('formTitle').textContent = '📋 Nuevo Servicio';
+            document.getElementById('formTitle').textContent = '📦 Nuevo Producto';
             document.getElementById('btnGuardar').textContent = '💾 Guardar';
             document.getElementById('btnGuardar').className = 'btn btn-success';
-            document.getElementById('serNombre').value = '';
-            document.getElementById('serCategoria').value = '';
-            document.getElementById('serPrecio').value = '';
-            document.getElementById('serDuracion').value = '';
-            document.getElementById('serDescripcion').value = '';
-            document.getElementById('serEstado').value = '1';
+            document.getElementById('prodNombre').value = '';
+            document.getElementById('prodCategoria').value = '';
+            document.getElementById('prodPrecio').value = '';
+            document.getElementById('prodCosto').value = '';
+            document.getElementById('prodComision').value = '';
+            document.getElementById('prodStock').value = '';
+            document.getElementById('prodMinimo').value = '';
+            document.getElementById('gananciaPreview').classList.remove('show');
+            document.getElementById('fotoPreview').classList.remove('show');
+            document.getElementById('fotoPreview').src = '';
+            document.getElementById('prodFoto').value = '';
+            document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
         function cancelarFormulario() {
-            document.getElementById('formServicio').style.display = 'none';
+            document.getElementById('formProducto').style.display = 'none';
             editandoId = null;
         }
 
-        function editarServicio(id) {
-            const s = servicios.find(s => s.id === id);
-            if (!s) return;
+        function editarProducto(id) {
+            const p = productos.find(p => p.id === id);
+            if (!p) return;
             
-            document.getElementById('formServicio').style.display = 'block';
-            document.getElementById('serNombre').value = s.nombre;
-            document.getElementById('serCategoria').value = s.categoria || '';
-            document.getElementById('serPrecio').value = s.precio;
-            document.getElementById('serDuracion').value = s.duracion || 60;
-            document.getElementById('serDescripcion').value = s.descripcion || '';
-            document.getElementById('serEstado').value = s.activo ? '1' : '0';
+            document.getElementById('formProducto').style.display = 'block';
+            document.getElementById('prodNombre').value = p.nombre;
+            document.getElementById('prodCategoria').value = p.categoria || '';
+            document.getElementById('prodPrecio').value = p.precio;
+            document.getElementById('prodCosto').value = p.costo || 0;
+            document.getElementById('prodComision').value = p.comision || 0;
+            document.getElementById('prodStock').value = p.stock;
+            document.getElementById('prodMinimo').value = p.stock_minimo || 3;
+            
+            if (p.foto_url) {
+                const preview = document.getElementById('fotoPreview');
+                preview.src = p.foto_url;
+                preview.classList.add('show');
+            }
             
             editandoId = id;
-            document.getElementById('formTitle').textContent = '✏️ Editar Servicio';
+            document.getElementById('formTitle').textContent = '✏️ Editar Producto';
             document.getElementById('btnGuardar').textContent = '💾 Actualizar';
             document.getElementById('btnGuardar').className = 'btn btn-warning';
             
-            document.getElementById('formServicio').scrollIntoView({ behavior: 'smooth' });
+            calcularGanancia();
+            document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
         // ============================================
-        // GUARDAR SERVICIO (CORREGIDO)
+        // GUARDAR PRODUCTO (CORREGIDO)
         // ============================================
-        async function guardarServicio() {
-            const nombre = document.getElementById('serNombre').value.trim();
-            const categoria = document.getElementById('serCategoria').value;
-            const precio = parseFloat(document.getElementById('serPrecio').value);
-            const duracion = parseInt(document.getElementById('serDuracion').value) || 60;
-            const activo = parseInt(document.getElementById('serEstado').value) === 1;
-            const descripcion = document.getElementById('serDescripcion').value.trim();
+        async function guardarProducto() {
+            const nombre = document.getElementById('prodNombre').value.trim();
+            const categoria = document.getElementById('prodCategoria').value;
+            const precio = parseFloat(document.getElementById('prodPrecio').value);
+            const costo = parseFloat(document.getElementById('prodCosto').value) || 0;
+            const comision = parseFloat(document.getElementById('prodComision').value) || 0;
+            const stock = parseInt(document.getElementById('prodStock').value) || 0;
+            const stock_minimo = parseInt(document.getElementById('prodMinimo').value) || 3;
 
             if (!nombre || !categoria || isNaN(precio)) {
                 mostrarMensaje('Nombre, categoría y precio son obligatorios', 'error');
                 return;
             }
 
-            const data = { nombre, categoria, precio, duracion, activo, descripcion };
+            const data = { nombre, categoria, precio, costo, comision, stock, stock_minimo };
             
             const btn = document.getElementById('btnGuardar');
             const textoOriginal = btn.textContent;
+            
+            // Deshabilitar el botón para evitar doble clic
             btn.disabled = true;
             btn.textContent = '⏳ Guardando...';
 
             try {
-                const url = editandoId ? `/api/servicio/${editandoId}` : '/api/servicios';
+                const url = editandoId ? `/api/producto/${editandoId}` : '/api/productos';
                 const method = editandoId ? 'PUT' : 'POST';
                 
                 console.log('📤 Enviando datos:', data);
@@ -358,75 +367,99 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
-                
+
                 const result = await response.json();
                 console.log('📥 Respuesta:', result);
-                
+
                 if (result.success) {
+                    const productoId = result.id || editandoId;
+                    
+                    const fotoInput = document.getElementById('prodFoto');
+                    if (fotoInput && fotoInput.files && fotoInput.files.length > 0) {
+                        const formData = new FormData();
+                        formData.append('foto', fotoInput.files[0]);
+                        
+                        try {
+                            const fotoResponse = await fetch(`/api/producto/${productoId}/foto`, {
+                                method: 'POST',
+                                body: formData
+                            });
+                            const fotoResult = await fotoResponse.json();
+                            if (!fotoResult.success) {
+                                mostrarMensaje('Producto guardado pero error al subir foto', 'warning');
+                            }
+                        } catch (fotoError) {
+                            console.error('Error subiendo foto:', fotoError);
+                            mostrarMensaje('Producto guardado pero no se pudo subir la foto', 'warning');
+                        }
+                    }
+                    
                     mostrarMensaje(`✅ "${nombre}" ${editandoId ? 'actualizado' : 'agregado'}`, 'exito');
                     cancelarFormulario();
-                    await cargarServicios();
+                    await cargarProductos();
                 } else {
                     mostrarMensaje(result.error || 'Error al guardar', 'error');
                 }
             } catch (error) {
-                console.error('Error:', error);
-                mostrarMensaje('Error de conexión: ' + error.message, 'error');
+                console.error('❌ Error:', error);
+                mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
             } finally {
                 btn.disabled = false;
                 btn.textContent = textoOriginal;
             }
         }
 
-        async function toggleServicio(id, activo) {
+        // ============================================
+        // ELIMINAR PRODUCTO
+        // ============================================
+        async function eliminarProducto(id, nombre) {
+            if (!confirm(`⚠️ ¿Eliminar "${nombre}"?`)) return;
+            if (!confirm(`Confirmación final: ¿Eliminar "${nombre}"?`)) return;
+            
+            const btn = event?.target;
+            const textoOriginal = btn ? btn.textContent : '🗑️';
+            if (btn) { btn.textContent = '⏳...'; btn.disabled = true; }
+            
             try {
-                const response = await fetch(`/api/servicio/${id}/toggle`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ activo })
+                const response = await fetch(`/api/producto/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
                 });
-                const data = await response.json();
-                if (data.success) {
-                    await cargarServicios();
-                } else {
-                    mostrarMensaje(data.error || 'Error', 'error');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
-            }
-        }
 
-        async function eliminarServicio(id) {
-            if (!confirm('¿Eliminar este servicio?')) return;
-            try {
-                const response = await fetch(`/api/servicio/${id}`, {
-                    method: 'DELETE'
-                });
                 const data = await response.json();
+                
                 if (data.success) {
-                    mostrarMensaje('✅ Eliminado', 'exito');
-                    await cargarServicios();
+                    mostrarMensaje(`✅ "${nombre}" eliminado`, 'exito');
+                    await cargarProductos();
                 } else {
-                    mostrarMensaje(data.error || 'Error', 'error');
+                    mostrarMensaje(data.error || 'Error al eliminar', 'error');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                mostrarMensaje('Error de conexión', 'error');
+                mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
+            } finally {
+                if (btn) { btn.textContent = textoOriginal; btn.disabled = false; }
             }
         }
 
         // ============================================
-        // EVENT LISTENERS
+        // EVENT LISTENERS (SOLO AQUÍ)
         // ============================================
-        document.getElementById('btnGuardar').addEventListener('click', guardarServicio);
-        document.getElementById('btnCancelar').addEventListener('click', cancelarFormulario);
-
-        // ============================================
-        // INICIO
-        // ============================================
-        cargarServicios();
-        setInterval(cargarServicios, 30000);
+        document.addEventListener('DOMContentLoaded', function() {
+            // Asignar event listeners
+            document.getElementById('btnGuardar').addEventListener('click', guardarProducto);
+            document.getElementById('btnCancelar').addEventListener('click', cancelarFormulario);
+            
+            // Input listeners
+            document.getElementById('prodPrecio').addEventListener('input', calcularGanancia);
+            document.getElementById('prodCosto').addEventListener('input', calcularGanancia);
+            
+            // Cargar productos iniciales
+            cargarProductos();
+            
+            // Actualizar cada 30 segundos
+            setInterval(cargarProductos, 30000);
+        });
     </script>
 </body>
 </html>
