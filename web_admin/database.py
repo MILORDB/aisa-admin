@@ -920,7 +920,7 @@ def obtener_logs(limit=50):
     return logs
 
 # ============================================
-# FUNCIONES PARA PRODUCTOS (CORREGIDAS)
+# FUNCIONES PARA PRODUCTOS
 # ============================================
 
 def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, stock=0, stock_minimo=3):
@@ -1579,30 +1579,105 @@ def obtener_estadisticas_trabajador(trabajador_id):
         return {'ventas': 0, 'ingresos': 0, 'servicios': 0, 'clientes': 0}
 
 # ============================================
-# FUNCIONES PARA VENTAS
+# FUNCIONES PARA VENTAS (CORREGIDO)
 # ============================================
 
 def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, cantidad, precio, total,
                 estado='pagado', empresa=None, tipo='producto', factura_url=None,
                 factura=None, transferencia_id=None, transferencia_cedula=None,
                 transferencia_banco=None, transferencia_fecha=None):
-    conn = get_db()
-    cursor = conn.cursor()
-    fecha = datetime.now().isoformat()
-    cursor.execute('''
-    INSERT INTO ventas (negocio_id, trabajador_id, cliente, producto, producto_id,
-                        cantidad, precio, total, estado, empresa, tipo, factura_url,
-                        factura, transferencia_id, transferencia_cedula,
-                        transferencia_banco, transferencia_fecha, fecha, created_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ''', (negocio_id, trabajador_id, cliente, producto, producto_id,
-          cantidad, precio, total, estado, empresa, tipo, factura_url,
-          factura, transferencia_id, transferencia_cedula,
-          transferencia_banco, transferencia_fecha, fecha, fecha))
-    conn.commit()
-    venta_id = cursor.lastrowid
-    conn.close()
-    return venta_id
+    """
+    Crea una nueva venta en la base de datos
+    
+    Args:
+        negocio_id (int): ID del negocio
+        trabajador_id (int): ID del trabajador (opcional)
+        cliente (str): Nombre del cliente
+        producto (str): Descripción del producto/servicio
+        producto_id (int): ID del producto (opcional)
+        cantidad (int): Cantidad de productos
+        precio (float): Precio unitario
+        total (float): Total de la venta
+        estado (str): Estado de la venta
+        empresa (str): Nombre de la empresa (opcional)
+        tipo (str): Tipo de venta (producto/servicio)
+        factura_url (str): URL de la factura (opcional)
+        factura (str): Número de factura (opcional)
+        transferencia_id (str): ID de transferencia (opcional)
+        transferencia_cedula (str): Cédula de la transferencia (opcional)
+        transferencia_banco (str): Banco de la transferencia (opcional)
+        transferencia_fecha (str): Fecha de la transferencia (opcional)
+    
+    Returns:
+        int: ID de la venta creada o None si hay error
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Validar que el negocio existe
+        cursor.execute('SELECT id FROM usuarios WHERE id = %s AND tipo = %s', (negocio_id, 'negocio'))
+        if not cursor.fetchone():
+            print(f"❌ Error: El negocio {negocio_id} no existe o no es de tipo negocio")
+            return None
+        
+        fecha = datetime.now().isoformat()
+        cursor.execute('''
+        INSERT INTO ventas (
+            negocio_id, trabajador_id, cliente, producto, producto_id,
+            cantidad, precio, total, estado, empresa, tipo, factura_url,
+            factura, transferencia_id, transferencia_cedula,
+            transferencia_banco, transferencia_fecha, fecha, created_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+        ''', (
+            negocio_id, 
+            trabajador_id, 
+            cliente, 
+            producto, 
+            producto_id,
+            int(cantidad), 
+            float(precio), 
+            float(total), 
+            estado, 
+            empresa, 
+            tipo, 
+            factura_url,
+            factura, 
+            transferencia_id, 
+            transferencia_cedula,
+            transferencia_banco, 
+            transferencia_fecha, 
+            fecha, 
+            fecha
+        ))
+        
+        venta_id = cursor.fetchone()[0]
+        conn.commit()
+        
+        print(f"✅ Venta creada: ID {venta_id}, Cliente: {cliente}, Total: {total}")
+        return venta_id
+        
+    except psycopg2.Error as e:
+        print(f"❌ Error PostgreSQL en crear_venta: {e}")
+        if conn:
+            conn.rollback()
+        return None
+    except Exception as e:
+        print(f"❌ Error en crear_venta: {e}")
+        import traceback
+        traceback.print_exc()
+        if conn:
+            conn.rollback()
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def obtener_ventas(negocio_id, trabajador_id=None):
     conn = get_db()
@@ -1779,7 +1854,7 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
         return False, str(e)
 
 # ============================================
-# FUNCIONES PARA SERVICIOS (CORREGIDAS)
+# FUNCIONES PARA SERVICIOS
 # ============================================
 
 def crear_servicio(negocio_id, trabajador_id, nombre, categoria, precio, duracion, activo=1, descripcion=''):
