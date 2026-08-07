@@ -920,26 +920,89 @@ def obtener_logs(limit=50):
     return logs
 
 # ============================================
-# FUNCIONES PARA PRODUCTOS
+# FUNCIONES PARA PRODUCTOS (CORREGIDAS)
 # ============================================
 
 def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, stock=0, stock_minimo=3):
-    conn = get_db()
-    cursor = conn.cursor()
+    """
+    Crea un nuevo producto en la base de datos
+    
+    Args:
+        negocio_id (int): ID del negocio
+        nombre (str): Nombre del producto
+        categoria (str): Categoría del producto
+        precio (float): Precio del producto
+        costo (float): Costo del producto (opcional)
+        comision (float): Comisión por venta (opcional)
+        stock (int): Cantidad en stock (opcional)
+        stock_minimo (int): Stock mínimo para alerta (opcional)
+    
+    Returns:
+        int: ID del producto creado o None si hay error
+    """
+    conn = None
+    cursor = None
     try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verificar que el negocio existe
+        cursor.execute('SELECT id FROM usuarios WHERE id = %s AND tipo = %s', (negocio_id, 'negocio'))
+        if not cursor.fetchone():
+            print(f"❌ Error: El negocio {negocio_id} no existe o no es de tipo negocio")
+            return None
+        
+        # Insertar el producto
+        created_at = datetime.now().isoformat()
         cursor.execute('''
-        INSERT INTO productos (negocio_id, nombre, categoria, precio, costo, comision, stock, stock_minimo, created_at)
+        INSERT INTO productos (
+            negocio_id, 
+            nombre, 
+            categoria, 
+            precio, 
+            costo, 
+            comision, 
+            stock, 
+            stock_minimo, 
+            created_at
+        )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (negocio_id, nombre, categoria, precio, costo, comision, stock, stock_minimo, datetime.now().isoformat()))
+        RETURNING id
+        ''', (
+            negocio_id, 
+            nombre, 
+            categoria, 
+            float(precio), 
+            float(costo), 
+            float(comision), 
+            int(stock), 
+            int(stock_minimo), 
+            created_at
+        ))
+        
+        producto_id = cursor.fetchone()[0]
         conn.commit()
-        producto_id = cursor.lastrowid
-        conn.close()
+        
+        print(f"✅ Producto creado: {nombre} (ID: {producto_id})")
         return producto_id
-    except Exception as e:
-        print(f"❌ Error al crear producto: {e}")
-        conn.rollback()
-        conn.close()
+        
+    except psycopg2.Error as e:
+        print(f"❌ Error PostgreSQL en crear_producto: {e}")
+        if conn:
+            conn.rollback()
         return None
+    except Exception as e:
+        print(f"❌ Error en crear_producto: {e}")
+        import traceback
+        traceback.print_exc()
+        if conn:
+            conn.rollback()
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def obtener_productos(negocio_id):
     conn = get_db()
@@ -968,73 +1031,6 @@ def obtener_productos_con_stock(negocio_id):
     productos = cursor.fetchall()
     conn.close()
     return productos
-
-# ============================================
-# ⭐ FUNCIÓN FALTANTE AGREGADA: obtener_productos_tienda
-# ============================================
-
-def obtener_productos_tienda(negocio_id=None):
-    """
-    Obtiene productos de la tienda pública.
-    Si se proporciona negocio_id, obtiene solo los productos de ese negocio.
-    """
-    conn = get_db()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    
-    if negocio_id:
-        cursor.execute('''
-            SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
-                   p.negocio_id, u.username as negocio_username, u.nombre as negocio_nombre,
-                   u.datos_negocio, pt.destacado
-            FROM productos p 
-            JOIN usuarios u ON p.negocio_id = u.id
-            LEFT JOIN productos_tienda pt ON p.id = pt.producto_id AND pt.negocio_id = u.id
-            WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0 AND u.id = %s
-            ORDER BY pt.destacado DESC, p.id DESC
-        ''', (negocio_id,))
-    else:
-        cursor.execute('''
-            SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
-                   p.negocio_id, u.username as negocio_username, u.nombre as negocio_nombre,
-                   u.datos_negocio, pt.destacado
-            FROM productos p 
-            JOIN usuarios u ON p.negocio_id = u.id
-            LEFT JOIN productos_tienda pt ON p.id = pt.producto_id AND pt.negocio_id = u.id
-            WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0
-            ORDER BY pt.destacado DESC, p.id DESC
-        ''')
-    
-    productos = cursor.fetchall()
-    conn.close()
-    
-    resultado = []
-    for p in productos:
-        datos = {}
-        if p.get('datos_negocio'):
-            try:
-                datos = json.loads(p['datos_negocio']) if isinstance(p['datos_negocio'], str) else p['datos_negocio']
-            except:
-                pass
-        
-        resultado.append({
-            'id': p['id'],
-            'nombre': p['nombre'],
-            'categoria': p.get('categoria'),
-            'precio': float(p['precio']),
-            'stock': p['stock'],
-            'foto_url': p.get('foto_url'),
-            'negocio_id': p['negocio_id'],
-            'negocio_username': p.get('negocio_username'),
-            'negocio_nombre': p.get('negocio_nombre') or datos.get('nombre_negocio', p.get('negocio_username')),
-            'destacado': p.get('destacado', 0),
-            'provincia': datos.get('provincia', ''),
-            'municipio': datos.get('municipio', ''),
-            'direccion': datos.get('direccion', ''),
-            'telefono': datos.get('telefono', ''),
-            'descripcion': datos.get('descripcion', '')
-        })
-    
-    return resultado
 
 def obtener_productos_tienda_publica(provincia=None, municipio=None):
     """Obtiene productos de la tienda pública con filtro de ubicación"""
@@ -1143,6 +1139,69 @@ def obtener_productos_con_stock_negocio(negocio_id):
     productos = cursor.fetchall()
     conn.close()
     return [dict(p) for p in productos]
+
+def obtener_productos_tienda(negocio_id=None):
+    """
+    Obtiene productos de la tienda pública.
+    Si se proporciona negocio_id, obtiene solo los productos de ese negocio.
+    """
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    if negocio_id:
+        cursor.execute('''
+            SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
+                   p.negocio_id, u.username as negocio_username, u.nombre as negocio_nombre,
+                   u.datos_negocio, pt.destacado
+            FROM productos p 
+            JOIN usuarios u ON p.negocio_id = u.id
+            LEFT JOIN productos_tienda pt ON p.id = pt.producto_id AND pt.negocio_id = u.id
+            WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0 AND u.id = %s
+            ORDER BY pt.destacado DESC, p.id DESC
+        ''', (negocio_id,))
+    else:
+        cursor.execute('''
+            SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
+                   p.negocio_id, u.username as negocio_username, u.nombre as negocio_nombre,
+                   u.datos_negocio, pt.destacado
+            FROM productos p 
+            JOIN usuarios u ON p.negocio_id = u.id
+            LEFT JOIN productos_tienda pt ON p.id = pt.producto_id AND pt.negocio_id = u.id
+            WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0
+            ORDER BY pt.destacado DESC, p.id DESC
+        ''')
+    
+    productos = cursor.fetchall()
+    conn.close()
+    
+    resultado = []
+    for p in productos:
+        datos = {}
+        if p.get('datos_negocio'):
+            try:
+                datos = json.loads(p['datos_negocio']) if isinstance(p['datos_negocio'], str) else p['datos_negocio']
+            except:
+                pass
+        
+        resultado.append({
+            'id': p['id'],
+            'nombre': p['nombre'],
+            'categoria': p.get('categoria'),
+            'precio': float(p['precio']),
+            'stock': p['stock'],
+            'foto_url': p.get('foto_url'),
+            'negocio_id': p['negocio_id'],
+            'negocio_username': p.get('negocio_username'),
+            'negocio_nombre': p.get('negocio_nombre') or datos.get('nombre_negocio', p.get('negocio_username')),
+            'destacado': p.get('destacado', 0),
+            'provincia': datos.get('provincia', ''),
+            'municipio': datos.get('municipio', ''),
+            'direccion': datos.get('direccion', ''),
+            'telefono': datos.get('telefono', ''),
+            'descripcion': datos.get('descripcion', '')
+        })
+    
+    return resultado
 
 def agregar_producto_tienda(negocio_id, producto_id, destacado=0):
     conn = get_db()
@@ -1720,21 +1779,88 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
         return False, str(e)
 
 # ============================================
-# FUNCIONES PARA SERVICIOS
+# FUNCIONES PARA SERVICIOS (CORREGIDAS)
 # ============================================
 
 def crear_servicio(negocio_id, trabajador_id, nombre, categoria, precio, duracion, activo=1, descripcion=''):
-    conn = get_db()
-    cursor = conn.cursor()
-    fecha = datetime.now().isoformat()
-    cursor.execute('''
-    INSERT INTO servicios (negocio_id, trabajador_id, nombre, categoria, precio, duracion, activo, descripcion, created_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ''', (negocio_id, trabajador_id, nombre, categoria, precio, duracion, activo, descripcion, fecha))
-    conn.commit()
-    servicio_id = cursor.lastrowid
-    conn.close()
-    return servicio_id
+    """
+    Crea un nuevo servicio en la base de datos
+    
+    Args:
+        negocio_id (int): ID del negocio
+        trabajador_id (int): ID del trabajador (opcional)
+        nombre (str): Nombre del servicio
+        categoria (str): Categoría del servicio
+        precio (float): Precio del servicio
+        duracion (int): Duración en minutos
+        activo (int): 1=activo, 0=inactivo
+        descripcion (str): Descripción del servicio
+    
+    Returns:
+        int: ID del servicio creado o None si hay error
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verificar que el negocio existe
+        cursor.execute('SELECT id FROM usuarios WHERE id = %s AND tipo = %s', (negocio_id, 'negocio'))
+        if not cursor.fetchone():
+            print(f"❌ Error: El negocio {negocio_id} no existe o no es de tipo negocio")
+            return None
+        
+        created_at = datetime.now().isoformat()
+        cursor.execute('''
+        INSERT INTO servicios (
+            negocio_id, 
+            trabajador_id, 
+            nombre, 
+            categoria, 
+            precio, 
+            duracion, 
+            activo, 
+            descripcion, 
+            created_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+        ''', (
+            negocio_id, 
+            trabajador_id, 
+            nombre, 
+            categoria, 
+            float(precio), 
+            int(duracion), 
+            int(activo), 
+            descripcion, 
+            created_at
+        ))
+        
+        servicio_id = cursor.fetchone()[0]
+        conn.commit()
+        
+        print(f"✅ Servicio creado: {nombre} (ID: {servicio_id})")
+        return servicio_id
+        
+    except psycopg2.Error as e:
+        print(f"❌ Error PostgreSQL en crear_servicio: {e}")
+        if conn:
+            conn.rollback()
+        return None
+    except Exception as e:
+        print(f"❌ Error en crear_servicio: {e}")
+        import traceback
+        traceback.print_exc()
+        if conn:
+            conn.rollback()
+        return None
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def obtener_servicios(negocio_id, trabajador_id=None):
     conn = get_db()
