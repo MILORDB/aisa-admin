@@ -7,12 +7,10 @@ from datetime import datetime
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# ============================================
-# CONFIGURACIÓN DE GOOGLE DRIVE
-# ============================================
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
 class StorageManager:
@@ -20,113 +18,98 @@ class StorageManager:
         self.drive_service = None
         self.use_local = True
         self.base_folder_id = None
+        self.credentials_file = None
         
         # ============================================
-        # RUTA CORRECTA PARA CREDENTIALS.JSON EN RENDER
+        # BUSCAR CREDENCIALES
         # ============================================
-        # En Render, el archivo se monta en /etc/secrets/credentials.json
-        self.credentials_file = '/etc/secrets/credentials.json'
-        
-        # Si no existe en Render, buscar en local (para desarrollo)
-        if not os.path.exists(self.credentials_file):
+        if os.path.exists('/etc/secrets/credentials.json'):
+            self.credentials_file = '/etc/secrets/credentials.json'
+            print("📁 Credenciales en Render: /etc/secrets/credentials.json")
+        elif os.path.exists('credentials.json'):
             self.credentials_file = 'credentials.json'
-            print(f"📁 Buscando credenciales en local: {self.credentials_file}")
-        else:
-            print(f"📁 Credenciales encontradas en Render: {self.credentials_file}")
+            print("📁 Credenciales locales: credentials.json")
         
-        # Archivo donde se guarda el token de autenticación
-        self.token_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'token.pickle')
-        
-        # Verificar si existe el archivo de credenciales
-        if os.path.exists(self.credentials_file):
-            print("✅ Archivo credentials.json encontrado")
-            self._authenticate()
-        else:
+        if not self.credentials_file or not os.path.exists(self.credentials_file):
             print("❌ No se encontró credentials.json")
-            print(f"   Buscado en: {self.credentials_file}")
             print("📁 Usando almacenamiento LOCAL")
             self.use_local = True
+            return
         
-        # Crear carpeta base si existe conexión
+        # Intentar autenticar
+        self._authenticate()
+        
         if self.drive_service:
             self._create_base_folder()
+        else:
+            self.use_local = True
     
     def _authenticate(self):
-        """Autentica con Google Drive usando OAuth 2.0"""
-        creds = None
-        
-        # Cargar token guardado si existe
-        if os.path.exists(self.token_file):
+        """Autentica con Google Drive"""
+        try:
+            # ============================================
+            # PRIMERO: Intentar con Cuenta de Servicio
+            # ============================================
             try:
-                with open(self.token_file, 'rb') as token:
-                    creds = pickle.load(token)
-                print("✅ Token de Google Drive cargado")
-            except Exception as e:
-                print(f"⚠️ Error cargando token: {e}")
-                creds = None
-        
-        # Si no hay credenciales válidas, autenticar
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                    print("🔄 Token refrescado")
-                except Exception as e:
-                    print(f"⚠️ Error refrescando token: {e}")
-                    creds = None
-            
-            # Si sigue sin credenciales, pedir autenticación
-            if not creds:
-                try:
-                    if not os.path.exists(self.credentials_file):
-                        print(f"❌ No se encontró {self.credentials_file}")
-                        print("📁 Por favor, sube el archivo credentials.json en Render")
-                        print("   En: Environment → Secret Files → credentials.json")
-                        return
-                    
-                    print("🔐 Iniciando autenticación OAuth con Google...")
-                    print(f"📁 Usando credenciales: {self.credentials_file}")
-                    
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        self.credentials_file, SCOPES
-                    )
-                    creds = flow.run_local_server(port=8080, open_browser=True)
-                    print("✅ Autenticación completada")
-                except Exception as e:
-                    print(f"❌ Error en autenticación: {e}")
-                    return
-            
-            # Guardar token para futuros usos
-            try:
-                with open(self.token_file, 'wb') as token:
-                    pickle.dump(creds, token)
-                print("✅ Token guardado en: " + self.token_file)
-            except Exception as e:
-                print(f"⚠️ Error guardando token: {e}")
-        
-        if creds and creds.valid:
-            try:
-                self.drive_service = build('drive', 'v3', credentials=creds)
-                self.use_local = False
-                print("✅ Google Drive conectado correctamente")
+                # Verificar si es una cuenta de servicio
+                with open(self.credentials_file, 'r') as f:
+                    creds_data = json.load(f)
                 
-                # Verificar espacio disponible
-                about = self.drive_service.about().get(fields="storageQuota").execute()
-                quota = about.get('storageQuota', {})
-                used = int(quota.get('usage', 0))
-                limit = int(quota.get('limit', 0))
-                if limit > 0:
-                    free_gb = (limit - used) / (1024**3)
-                    print(f"📊 Espacio disponible: {free_gb:.2f} GB")
-                    if free_gb < 0.5:
-                        print("⚠️ Espacio bajo en Google Drive")
-            except Exception as e:
-                print(f"❌ Error conectando a Google Drive: {e}")
-                self.drive_service = None
+                # Si tiene "type": "service_account", usar cuenta de servicio
+                if creds_data.get('type') == 'service_account':
+                    creds = service_account.Credentials.from_service_account_file(
+                        self.credentials_file,
+                        scopes=SCOPES
+                    )
+                    self.drive_service = build('drive', 'v3', credentials=creds)
+                    self.use_local = False
+                    print("✅ Autenticación exitosa con Cuenta de Servicio")
+                    return
+            except:
+                pass
+            
+            # ============================================
+            # SEGUNDO: Intentar con OAuth 2.0 (Installed App)
+            # ============================================
+            token_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'token.pickle')
+            
+            # Buscar token en Render (Secret Files)
+            if os.path.exists('/etc/secrets/token.pickle'):
+                token_file = '/etc/secrets/token.pickle'
+                print("📁 Token encontrado en Render: /etc/secrets/token.pickle")
+            
+            if os.path.exists(token_file):
+                try:
+                    with open(token_file, 'rb') as token:
+                        creds = pickle.load(token)
+                    if creds and creds.valid:
+                        self.drive_service = build('drive', 'v3', credentials=creds)
+                        self.use_local = False
+                        print("✅ Autenticación OAuth 2.0 exitosa (token existente)")
+                        return
+                    elif creds and creds.expired and creds.refresh_token:
+                        creds.refresh(Request())
+                        self.drive_service = build('drive', 'v3', credentials=creds)
+                        self.use_local = False
+                        print("✅ Token OAuth 2.0 refrescado")
+                        return
+                except Exception as e:
+                    print(f"⚠️ Error cargando token: {e}")
+            
+            # ============================================
+            # TERCERO: Si no hay token, usar flujo OAuth
+            # ============================================
+            if not self.drive_service:
+                print("🔄 No hay token válido. Se requiere autenticación OAuth.")
+                print("📌 Visita: https://tu-dominio.com/api/storage/auth")
                 self.use_local = True
+                
+        except Exception as e:
+            print(f"❌ Error en autenticación: {e}")
+            self.use_local = True
     
     def _create_base_folder(self):
-        """Crea la carpeta base 'AIsa' en Google Drive si no existe"""
+        """Crea la carpeta base 'AIsa' en Google Drive"""
         if not self.drive_service:
             return
         
@@ -149,7 +132,7 @@ class StorageManager:
                     fields='id'
                 ).execute()
                 self.base_folder_id = folder.get('id')
-                print(f"📁 Carpeta 'AIsa' creada en Google Drive (ID: {self.base_folder_id})")
+                print(f"📁 Carpeta 'AIsa' creada (ID: {self.base_folder_id})")
             else:
                 self.base_folder_id = folders[0]['id']
                 print(f"📁 Carpeta 'AIsa' encontrada (ID: {self.base_folder_id})")
@@ -193,7 +176,6 @@ class StorageManager:
                         fields='id'
                     ).execute()
                     current_parent = folder.get('id')
-                    print(f"📁 Carpeta creada: {part}")
                 else:
                     current_parent = folders[0]['id']
             
@@ -216,10 +198,8 @@ class StorageManager:
             folder_id = self._get_or_create_folder(folder_path)
             
             if not folder_id:
-                print("⚠️ No se pudo crear carpeta en Google Drive, usando local")
                 return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
             
-            # Guardar archivo temporalmente
             temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/temp')
             os.makedirs(temp_dir, exist_ok=True)
             temp_path = os.path.join(temp_dir, nombre_foto)
@@ -240,7 +220,6 @@ class StorageManager:
             
             file_id = file.get('id')
             
-            # Eliminar archivo temporal
             if os.path.exists(temp_path):
                 os.remove(temp_path)
             
@@ -248,7 +227,6 @@ class StorageManager:
                 print(f"✅ Foto subida a Google Drive: {nombre_foto} (ID: {file_id})")
                 return True
             else:
-                print("❌ Error subiendo a Google Drive")
                 return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
                 
         except Exception as e:
@@ -355,7 +333,6 @@ class StorageManager:
             if not folder_id:
                 return self._guardar_local_factura(negocio_id, factura_id, archivo_pdf)
             
-            # Guardar archivo temporalmente
             temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/temp')
             os.makedirs(temp_dir, exist_ok=True)
             temp_path = os.path.join(temp_dir, nombre)
@@ -374,7 +351,6 @@ class StorageManager:
                 fields='id'
             ).execute()
             
-            # Eliminar archivo temporal
             if os.path.exists(temp_path):
                 os.remove(temp_path)
             
@@ -400,7 +376,6 @@ class StorageManager:
     def eliminar_foto_producto(self, negocio_id, producto_id, nombre_foto, file_id=None):
         """Elimina una foto de producto de Google Drive y local"""
         try:
-            # Eliminar de local
             file_path = os.path.join(
                 'static/uploads/productos',
                 f"negocio_{negocio_id}",
@@ -414,7 +389,6 @@ class StorageManager:
             if self.use_local or not self.drive_service:
                 return True
             
-            # Eliminar de Google Drive
             if file_id:
                 self.drive_service.files().delete(fileId=file_id).execute()
                 print(f"✅ Foto eliminada de Google Drive: {nombre_foto}")
@@ -484,34 +458,3 @@ def get_storage_manager():
     if _storage_instance is None:
         _storage_instance = StorageManager()
     return _storage_instance
-
-
-if __name__ == "__main__":
-    print("=" * 60)
-    print("🔍 PRUEBA DE ALMACENAMIENTO - GOOGLE DRIVE")
-    print("=" * 60)
-    
-    storage = get_storage_manager()
-    estado = storage.obtener_estado()
-    
-    print(f"\n📁 Estado del almacenamiento:")
-    for key, value in estado.items():
-        print(f"   • {key}: {value}")
-    
-    if not estado['use_local']:
-        print("\n✅ Google Drive configurado correctamente!")
-        print("📤 Las fotos y facturas se subirán a Google Drive")
-    else:
-        print("\n⚠️ Google Drive NO configurado")
-        print("📁 Usando almacenamiento LOCAL")
-        print("\n📋 Para configurar Google Drive:")
-        print("   1. Ve a https://console.cloud.google.com/")
-        print("   2. Crea un proyecto y habilita Google Drive API")
-        print("   3. Crea credenciales OAuth (tipo: Aplicación de escritorio)")
-        print("   4. Descarga credentials.json")
-        print("   5. En Render: Environment → Secret Files → + Add Secret File")
-        print("   6. Filename: credentials.json")
-        print("   7. Contents: Pega el contenido del archivo")
-        print("   8. Guarda y haz deploy")
-    
-    print("=" * 60)
