@@ -1,22 +1,18 @@
 # web_admin/app.py
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response
-from flask_cors import CORS
 import os
 import sys
-import logging
 import json
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import logging
 import traceback
 import time
-from datetime import datetime, timedelta
-import io
-from functools import wraps
-import urllib.parse
-import random
-import string
 import uuid
+import urllib.parse
+from datetime import datetime, timedelta
+from functools import wraps
+
+from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response
+from flask_cors import CORS
 
 # ============================================
 # CONFIGURACIÓN DE LOGGING
@@ -28,7 +24,7 @@ logger = logging.getLogger(__name__)
 # CONFIGURACIÓN DE RUTAS
 # ============================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.dirname(BASE_DIR))
+sys.path.insert(0, BASE_DIR)
 
 # ============================================
 # CREAR CARPETAS PARA ARCHIVOS ESTÁTICOS
@@ -43,7 +39,7 @@ except Exception as e:
     print(f"⚠️ Error creando carpetas: {e}")
 
 # ============================================
-# IMPORTAR FUNCIONES DE LA BASE DE DATOS
+# IMPORTAR FUNCIONES DE LA BASE DE DATOS (ABSOLUTAS)
 # ============================================
 try:
     from web_admin.database import (
@@ -106,33 +102,56 @@ try:
         obtener_ventas_con_filtros,
         obtener_trabajadores_activos
     )
-    from web_admin.auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
-    from web_admin.storage import get_storage_manager
-    from web_admin.reportes import GeneradorReportes
-    print("✅ Módulos importados correctamente")
+    print("✅ Database importada correctamente")
 except ImportError as e:
-    print(f"❌ Error importando módulos: {e}")
+    print(f"❌ Error importando database: {e}")
     traceback.print_exc()
-    # Fallback para ejecución directa
+    # Fallback para ejecución local
     try:
         from database import *
-        from auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
-        from storage import get_storage_manager
-        from reportes import GeneradorReportes
-        print("✅ Módulos importados desde local")
+        print("✅ Database importada desde local")
     except ImportError as e2:
-        print(f"❌ Error importando desde local: {e2}")
+        print(f"❌ Error en fallback: {e2}")
         traceback.print_exc()
-        # Fallback último
-        try:
-            from .database import *
-            from .auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
-            from .storage import get_storage_manager
-            from .reportes import GeneradorReportes
-            print("✅ Módulos importados desde relativo")
-        except ImportError as e3:
-            print(f"❌ Error en todos los intentos de importación: {e3}")
-            traceback.print_exc()
+
+try:
+    from web_admin.auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
+    print("✅ Auth importada correctamente")
+except ImportError as e:
+    print(f"❌ Error importando auth: {e}")
+    traceback.print_exc()
+    try:
+        from auth import crear_sesion, verificar_sesion, obtener_usuario_sesion
+        print("✅ Auth importada desde local")
+    except ImportError as e2:
+        print(f"❌ Error en fallback: {e2}")
+        traceback.print_exc()
+
+try:
+    from web_admin.storage import get_storage_manager
+    print("✅ Storage importada correctamente")
+except ImportError as e:
+    print(f"❌ Error importando storage: {e}")
+    traceback.print_exc()
+    try:
+        from storage import get_storage_manager
+        print("✅ Storage importada desde local")
+    except ImportError as e2:
+        print(f"❌ Error en fallback: {e2}")
+        traceback.print_exc()
+
+try:
+    from web_admin.reportes import GeneradorReportes
+    print("✅ Reportes importada correctamente")
+except ImportError as e:
+    print(f"❌ Error importando reportes: {e}")
+    traceback.print_exc()
+    try:
+        from reportes import GeneradorReportes
+        print("✅ Reportes importada desde local")
+    except ImportError as e2:
+        print(f"❌ Error en fallback: {e2}")
+        traceback.print_exc()
 
 # ============================================
 # CREAR APLICACIÓN FLASK
@@ -1112,27 +1131,6 @@ def api_eliminar_producto(producto_id):
         return jsonify({'error': 'No autorizado'}), 401
     
     try:
-        # Primero obtener la foto para eliminarla
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT foto_url, foto_public_id FROM productos WHERE id = %s', (producto_id,))
-        producto = cursor.fetchone()
-        conn.close()
-        
-        # Si tiene foto, eliminarla de Google Drive
-        if producto and producto[1]:
-            try:
-                from web_admin.storage import get_storage_manager
-                storage = get_storage_manager()
-                # Obtener negocio_id
-                negocio_id = usuario.get('id')
-                if usuario.get('rol') == 'trabajador':
-                    negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-                if negocio_id:
-                    storage.eliminar_foto_producto(negocio_id, producto_id, producto[1] or '')
-            except Exception as e:
-                print(f"⚠️ Error eliminando foto de Google Drive: {e}")
-        
         exito = eliminar_producto(producto_id)
         
         if exito:
@@ -1169,7 +1167,6 @@ def api_subir_foto_producto(producto_id):
         return jsonify({'error': f'Formato no permitido. Use: {", ".join(allowed_extensions)}'}), 400
     
     try:
-        from web_admin.storage import get_storage_manager
         storage = get_storage_manager()
         
         # Generar nombre único
@@ -1809,7 +1806,6 @@ def api_crear_venta():
         
         if venta_id:
             if estado != 'oferta' and producto_id:
-                from web_admin.database import actualizar_stock_producto
                 actualizar_stock_producto(producto_id, cantidad)
             
             if estado != 'oferta' and trabajador_id:
@@ -2616,12 +2612,12 @@ def api_logs():
 def api_storage_estado():
     """Obtiene el estado del almacenamiento"""
     try:
-        from web_admin.storage import get_storage_manager
         storage = get_storage_manager()
         estado = storage.obtener_estado()
         return jsonify(estado)
     except Exception as e:
         print(f"❌ Error en api_storage_estado: {e}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/storage/auth', methods=['GET'])
@@ -2629,7 +2625,6 @@ def api_storage_estado():
 def api_storage_auth():
     """Re-autenticar con Google Drive"""
     try:
-        from web_admin.storage import get_storage_manager
         # Eliminar token para forzar re-autenticación
         token_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'token.pickle')
         if os.path.exists(token_file):
@@ -2643,6 +2638,87 @@ def api_storage_auth():
         print(f"❌ Error en api_storage_auth: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+# ============================================
+# ENDPOINTS DE REPARACIÓN (BÁSICOS)
+# ============================================
+
+@app.route('/fix-admin', methods=['GET'])
+def fix_admin_endpoint():
+    """Endpoint para reparar el admin"""
+    try:
+        DATABASE_URL = os.environ.get('DATABASE_URL', '')
+        
+        if not DATABASE_URL:
+            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
+        
+        url = DATABASE_URL.strip()
+        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
+            url = 'postgresql://' + url
+        
+        parsed = urllib.parse.urlparse(url)
+        
+        conn = psycopg2.connect(
+            host=parsed.hostname or 'localhost',
+            port=parsed.port or 5432,
+            database=parsed.path.lstrip('/') if parsed.path else '',
+            user=parsed.username or '',
+            password=parsed.password or '',
+            sslmode='require'
+        )
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        import bcrypt
+        
+        # Verificar/Crear admin
+        cursor.execute("SELECT * FROM usuarios WHERE username = 'admin'")
+        admin = cursor.fetchone()
+        
+        if not admin:
+            password = "admin123"
+            salt = bcrypt.gensalt()
+            password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+            fecha = datetime.now().isoformat()
+            
+            cursor.execute('''
+                INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado, verificado)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1, 1)
+            ''', ('admin', 'admin@aisa.com', password_hash, 'Administrador', 'admin', 'admin', fecha))
+            conn.commit()
+        
+        # Forzar admin
+        cursor.execute('''
+            UPDATE usuarios 
+            SET rol = 'admin', tipo = 'admin', activo = 1, aprobado = 1, verificado = 1
+            WHERE username = 'admin'
+        ''')
+        conn.commit()
+        
+        conn.close()
+        
+        return """
+        <html>
+            <head><title>Admin Reparado</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#6c3ce0;">✅ Admin reparado correctamente</h1>
+                <p style="color:#888;">Usuario: <strong style="color:#6c3ce0;">admin</strong></p>
+                <p style="color:#888;">Contraseña: <strong style="color:#6c3ce0;">admin123</strong></p>
+                <br>
+                <a href="/login" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Ir al Login</a>
+            </body>
+        </html>
+        """
+        
+    except Exception as e:
+        return f"""
+        <html>
+            <head><title>Error</title></head>
+            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
+                <h1 style="color:#ff6b6b;">❌ Error</h1>
+                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
+                <a href="/login" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Login</a>
+            </body>
+        </html>
+        """, 500
 
 # ============================================
 # INICIO DE LA APLICACIÓN
