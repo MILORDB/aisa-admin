@@ -661,7 +661,6 @@
             document.getElementById('prodStock').value = p.stock;
             document.getElementById('prodMinimo').value = p.stock_minimo || 3;
             
-            // Mostrar foto existente si hay
             if (p.foto_url) {
                 const preview = document.getElementById('fotoPreview');
                 preview.src = p.foto_url;
@@ -678,7 +677,7 @@
         }
 
         // ============================================
-        // GUARDAR PRODUCTO
+        // GUARDAR PRODUCTO (CORREGIDO)
         // ============================================
         async function guardarProducto() {
             const nombre = document.getElementById('prodNombre').value.trim();
@@ -705,6 +704,8 @@
                 const url = editandoId ? `/api/producto/${editandoId}` : '/api/productos';
                 const method = editandoId ? 'PUT' : 'POST';
                 
+                console.log('📤 Enviando datos:', data);
+                
                 const response = await fetch(url, {
                     method: method,
                     headers: { 'Content-Type': 'application/json' },
@@ -712,24 +713,28 @@
                 });
 
                 const result = await response.json();
+                console.log('📥 Respuesta:', result);
 
                 if (result.success) {
                     const productoId = result.id || editandoId;
                     
-                    // Si hay foto, subirla
                     const fotoInput = document.getElementById('prodFoto');
                     if (fotoInput && fotoInput.files && fotoInput.files.length > 0) {
                         const formData = new FormData();
                         formData.append('foto', fotoInput.files[0]);
                         
-                        const fotoResponse = await fetch(`/api/producto/${productoId}/foto`, {
-                            method: 'POST',
-                            body: formData
-                        });
-                        
-                        const fotoResult = await fotoResponse.json();
-                        if (!fotoResult.success) {
-                            mostrarMensaje('Producto guardado pero error al subir foto', 'error');
+                        try {
+                            const fotoResponse = await fetch(`/api/producto/${productoId}/foto`, {
+                                method: 'POST',
+                                body: formData
+                            });
+                            const fotoResult = await fotoResponse.json();
+                            if (!fotoResult.success) {
+                                mostrarMensaje('Producto guardado pero error al subir foto', 'warning');
+                            }
+                        } catch (fotoError) {
+                            console.error('Error subiendo foto:', fotoError);
+                            mostrarMensaje('Producto guardado pero no se pudo subir la foto', 'warning');
                         }
                     }
                     
