@@ -1060,12 +1060,15 @@ def api_crear_producto():
     usuario = obtener_usuario_sesion(token)
     
     if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
+        return jsonify({'success': False, 'error': 'No autorizado'}), 401
     
     if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'admin':
-        return jsonify({'error': 'Solo los negocios pueden crear productos'}), 403
+        return jsonify({'success': False, 'error': 'Solo los negocios pueden crear productos'}), 403
     
     data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'Datos inválidos'}), 400
+    
     nombre = data.get('nombre')
     categoria = data.get('categoria')
     precio = data.get('precio')
@@ -1074,8 +1077,10 @@ def api_crear_producto():
     stock = data.get('stock', 0)
     stock_minimo = data.get('stock_minimo', 3)
     
+    print(f"📝 Creando producto: {nombre}, {categoria}, {precio}")
+    
     if not nombre or not categoria or precio is None:
-        return jsonify({'error': 'Nombre, categoría y precio son obligatorios'}), 400
+        return jsonify({'success': False, 'error': 'Nombre, categoría y precio son obligatorios'}), 400
     
     try:
         negocio_id = usuario.get('id')
@@ -1085,7 +1090,7 @@ def api_crear_producto():
             registrar_log(usuario['id'], 'producto_creado', f'Producto: {nombre}')
             return jsonify({'success': True, 'id': producto_id, 'message': 'Producto creado correctamente'})
         else:
-            return jsonify({'success': False, 'error': 'Error al crear el producto'}), 500
+            return jsonify({'success': False, 'error': 'Error al crear el producto en la base de datos'}), 500
     except Exception as e:
         print(f"❌ Error en api_crear_producto: {e}")
         traceback.print_exc()
@@ -1388,12 +1393,15 @@ def api_crear_servicio():
     usuario = obtener_usuario_sesion(token)
     
     if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
+        return jsonify({'success': False, 'error': 'No autorizado'}), 401
     
     if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'admin':
-        return jsonify({'error': 'Solo los negocios pueden crear servicios'}), 403
+        return jsonify({'success': False, 'error': 'Solo los negocios pueden crear servicios'}), 403
     
     data = request.get_json()
+    if not data:
+        return jsonify({'success': False, 'error': 'Datos inválidos'}), 400
+    
     nombre = data.get('nombre')
     categoria = data.get('categoria')
     precio = data.get('precio')
@@ -1401,8 +1409,10 @@ def api_crear_servicio():
     activo = data.get('activo', True)
     descripcion = data.get('descripcion', '')
     
+    print(f"📝 Creando servicio: {nombre}, {categoria}, {precio}")
+    
     if not nombre or not categoria or precio is None:
-        return jsonify({'error': 'Nombre, categoría y precio son obligatorios'}), 400
+        return jsonify({'success': False, 'error': 'Nombre, categoría y precio son obligatorios'}), 400
     
     try:
         negocio_id = usuario.get('id')
@@ -1411,7 +1421,7 @@ def api_crear_servicio():
         if usuario.get('rol') == 'trabajador':
             negocio_id = obtener_negocio_de_trabajador(usuario['id'])
             if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+                return jsonify({'success': False, 'error': 'No estás asignado a ningún negocio'}), 403
             trabajador_id = usuario['id']
         
         servicio_id = crear_servicio(
@@ -1429,7 +1439,7 @@ def api_crear_servicio():
             registrar_log(usuario['id'], 'servicio_creado', f'Servicio: {nombre}')
             return jsonify({'success': True, 'id': servicio_id, 'message': 'Servicio creado correctamente'})
         else:
-            return jsonify({'success': False, 'error': 'Error al crear el servicio'}), 500
+            return jsonify({'success': False, 'error': 'Error al crear el servicio en la base de datos'}), 500
     except Exception as e:
         print(f"❌ Error en api_crear_servicio: {e}")
         traceback.print_exc()
@@ -1749,7 +1759,7 @@ def api_trabajador_estadisticas():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - VENTAS
+# API - VENTAS (CORREGIDO)
 # ============================================
 
 @app.route('/api/ventas', methods=['GET'])
@@ -1784,58 +1794,76 @@ def api_obtener_ventas():
 @app.route('/api/ventas', methods=['POST'])
 @login_required
 def api_crear_venta():
+    """Crear una nueva venta"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
     if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    data = request.get_json()
-    cliente = data.get('cliente')
-    producto = data.get('producto')
-    producto_id = data.get('producto_id')
-    cantidad = data.get('cantidad', 1)
-    precio = data.get('precio')
-    total = data.get('total')
-    estado = data.get('estado', 'pagado')
-    empresa = data.get('empresa')
-    tipo = data.get('tipo', 'producto')
-    factura_url = data.get('factura_url')
-    factura = data.get('factura')
-    trabajador_id = data.get('trabajador_id')
-    transferencia_id = data.get('transferencia_id')
-    transferencia_cedula = data.get('transferencia_cedula')
-    transferencia_banco = data.get('transferencia_banco')
-    transferencia_fecha = data.get('transferencia_fecha')
-    
-    if not cliente or not producto or precio is None or total is None:
-        return jsonify({'error': 'Cliente, producto, precio y total son obligatorios'}), 400
+        return jsonify({'success': False, 'error': 'No autorizado'}), 401
     
     try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Datos inválidos'}), 400
+        
+        print(f"📝 Datos de venta recibidos: {data}")
+        
+        cliente = data.get('cliente')
+        producto = data.get('producto')
+        producto_id = data.get('producto_id')
+        cantidad = data.get('cantidad', 1)
+        precio = data.get('precio')
+        total = data.get('total')
+        estado = data.get('estado', 'pagado')
+        empresa = data.get('empresa')
+        tipo = data.get('tipo', 'producto')
+        factura_url = data.get('factura_url')
+        factura = data.get('factura')
+        trabajador_id = data.get('trabajador_id')
+        transferencia_id = data.get('transferencia_id')
+        transferencia_cedula = data.get('transferencia_cedula')
+        transferencia_banco = data.get('transferencia_banco')
+        transferencia_fecha = data.get('transferencia_fecha')
+        
+        if not cliente or not producto or precio is None or total is None:
+            return jsonify({'success': False, 'error': 'Cliente, producto, precio y total son obligatorios'}), 400
+        
+        # Determinar negocio_id
         negocio_id = usuario.get('id')
         if usuario.get('rol') == 'trabajador':
             negocio_id = obtener_negocio_de_trabajador(usuario['id'])
             if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+                return jsonify({'success': False, 'error': 'No estás asignado a ningún negocio'}), 403
             if not trabajador_id:
                 trabajador_id = usuario['id']
         
+        # Si es oferta, no afecta inventario
         if estado == 'oferta':
             producto_id = None
             factura = None
         
+        # Crear la venta
         venta_id = crear_venta(
             negocio_id, trabajador_id, cliente, producto, producto_id,
-            cantidad, precio, total, estado, empresa, tipo, factura_url,
+            cantidad, float(precio), float(total), estado, empresa, tipo, factura_url,
             factura, transferencia_id, transferencia_cedula,
             transferencia_banco, transferencia_fecha
         )
         
-        if venta_id:
-            if estado != 'oferta' and producto_id:
+        if not venta_id:
+            return jsonify({'success': False, 'error': 'Error al crear la venta en la base de datos'}), 500
+        
+        # Si no es oferta y tiene producto_id, descontar stock
+        if estado != 'oferta' and producto_id:
+            try:
                 actualizar_stock_producto(producto_id, cantidad)
-            
-            if estado != 'oferta' and trabajador_id:
+            except Exception as e:
+                print(f"⚠️ Error al actualizar stock: {e}")
+                # No fallamos la venta por esto, solo logueamos
+        
+        # Registrar comisión si corresponde
+        if estado != 'oferta' and trabajador_id and producto_id:
+            try:
                 conn = get_db()
                 cursor = conn.cursor()
                 cursor.execute('SELECT comision FROM productos WHERE id = %s', (producto_id,))
@@ -1845,29 +1873,35 @@ def api_crear_venta():
                 if producto_comision and producto_comision[0] > 0:
                     monto_comision = float(producto_comision[0]) * cantidad
                     registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto_comision)
-            
-            registrar_log(usuario['id'], 'venta_creada', f'Venta ID: {venta_id}, Cliente: {cliente}')
-            
-            factura_numero = None
-            if estado != 'oferta' and empresa:
+            except Exception as e:
+                print(f"⚠️ Error al registrar comisión: {e}")
+        
+        registrar_log(usuario['id'], 'venta_creada', f'Venta ID: {venta_id}, Cliente: {cliente}')
+        
+        # Generar número de factura si no es oferta
+        factura_numero = None
+        if estado != 'oferta' and empresa:
+            try:
                 factura_numero = generar_numero_factura(negocio_id, empresa)
                 conn = get_db()
                 cursor = conn.cursor()
                 cursor.execute('UPDATE ventas SET factura = %s WHERE id = %s', (factura_numero, venta_id))
                 conn.commit()
                 conn.close()
-            
-            return jsonify({
-                'success': True,
-                'id': venta_id,
-                'factura': factura_numero
-            })
-        else:
-            return jsonify({'error': 'Error al crear la venta'}), 500
+            except Exception as e:
+                print(f"⚠️ Error al generar factura: {e}")
+        
+        return jsonify({
+            'success': True,
+            'id': venta_id,
+            'factura': factura_numero,
+            'message': 'Venta creada correctamente'
+        })
+        
     except Exception as e:
         print(f"❌ Error en api_crear_venta: {e}")
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/venta/<int:venta_id>/estado', methods=['PUT'])
 @login_required
