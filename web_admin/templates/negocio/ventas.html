@@ -400,7 +400,7 @@
         }
 
         // ============================================
-        // MOSTRAR MENSAJES (con verificación de elementos)
+        // MOSTRAR MENSAJES
         // ============================================
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
@@ -574,7 +574,7 @@
         }
 
         // ============================================
-        // ACTUALIZAR RESUMEN DE VENTAS (con verificación de elementos)
+        // ACTUALIZAR RESUMEN DE VENTAS
         // ============================================
         function actualizarResumenVentas() {
             const total = ventas.length;
@@ -1076,7 +1076,7 @@
         });
 
         // ============================================
-        // GUARDAR VENTA (CORREGIDO)
+        // GUARDAR VENTA
         // ============================================
         async function guardarVenta() {
             const esOfertaCheck = document.getElementById('esOferta');
@@ -1084,10 +1084,11 @@
             const estadoSelect = document.getElementById('ventaEstado');
             
             const esOfertaVal = esOfertaCheck ? esOfertaCheck.checked : false;
-            const empresa = esOfertaVal ? '📄 OFERTA' : (selectEmpresa ? selectEmpresa.value.trim() : '');
+            const empresa = esOfertaVal ? null : (selectEmpresa ? selectEmpresa.value.trim() : null);
             const estado = esOfertaVal ? 'oferta' : (estadoSelect ? estadoSelect.value : 'pagado');
             const factura = esOfertaVal ? null : (document.getElementById('ventaFactura') ? document.getElementById('ventaFactura').value.trim() : null);
             
+            // Recolectar items
             let items = [];
             document.querySelectorAll('#productosContainer .item-line').forEach(line => {
                 const select = line.querySelector('.select-producto');
@@ -1125,16 +1126,12 @@
                 return; 
             }
             
-            if (!esOfertaVal && estado === 'transferencia' && !empresa) {
-                mostrarMensaje('❌ Para transferencia, selecciona una empresa con contrato', 'error');
-                return;
-            }
-            
             const cliente = esOfertaVal ? '📄 OFERTA' : (empresa || 'Cliente sin empresa');
             const nombres = items.map(i => `${i.cantidad}x ${i.nombre}`).join(', ');
             const primerItem = items[0];
             const total = items.reduce((s,i) => s + i.subtotal, 0);
             
+            // Datos de transferencia
             let transId = null, transCedula = null, transBanco = null, transFecha = null;
             if (!esOfertaVal && estado === 'transferencia') {
                 transId = document.getElementById('transferenciaId') ? document.getElementById('transferenciaId').value.trim() || null : null;
@@ -1146,12 +1143,12 @@
             const data = {
                 cliente: cliente,
                 producto: nombres,
-                producto_id: primerItem.id,
+                producto_id: primerItem.id || null,
                 cantidad: items.reduce((s,i) => s + i.cantidad, 0),
-                precio: total,
-                total: total,
-                empresa: esOfertaVal ? null : (empresa || null),
-                factura: esOfertaVal ? null : (factura || null),
+                precio: parseFloat(total),
+                total: parseFloat(total),
+                empresa: empresa,
+                factura: factura,
                 tipo: items.length === 1 && items[0].tipo === 'servicio' ? 'servicio' : 'producto',
                 trabajador_id: trabajadorId || null,
                 estado: estado,
@@ -1170,17 +1167,34 @@
             }
             
             try {
-                console.log('📤 Enviando datos de venta:', data);
+                console.log('📤 Enviando datos de venta:', JSON.stringify(data));
                 
                 const response = await fetch('/api/ventas', { 
-                    method:'POST', 
-                    headers:{'Content-Type':'application/json'},
+                    method: 'POST', 
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     credentials: 'include',
-                    body:JSON.stringify(data) 
+                    body: JSON.stringify(data) 
                 });
                 
-                const result = await response.json();
-                console.log('📥 Respuesta:', result);
+                console.log('📥 Status:', response.status);
+                
+                // Leer la respuesta como texto primero para debug
+                const responseText = await response.text();
+                console.log('📥 Respuesta raw:', responseText);
+                
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error('❌ Error parseando JSON:', e);
+                    mostrarMensaje('Error del servidor: ' + responseText.substring(0, 100), 'error');
+                    if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
+                    return;
+                }
+                
+                console.log('📥 Resultado:', result);
                 
                 if (result.success) {
                     const mensajeFactura = result.factura ? `\n📄 Factura: ${result.factura}` : '';
@@ -1192,7 +1206,7 @@
                     mostrarMensaje(result.error || 'Error al guardar la venta', 'error');
                 }
             } catch (error) { 
-                console.error('❌ Error:', error); 
+                console.error('❌ Error en fetch:', error); 
                 mostrarMensaje('Error de conexión: ' + error.message, 'error'); 
             } finally {
                 if (btn) {
