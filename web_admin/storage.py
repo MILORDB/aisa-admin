@@ -2,11 +2,10 @@
 
 import os
 import json
-import io
 from datetime import datetime
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
+from googleapiclient.http import MediaFileUpload
 from googleapiclient.errors import HttpError
 
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
@@ -31,7 +30,6 @@ class StorageManager:
             self.credentials_file = 'credentials.json'
             print("📁 Credenciales locales: credentials.json")
         
-        # Si no hay credenciales, usar local
         if not self.credentials_file or not os.path.exists(self.credentials_file):
             print("❌ No se encontró credentials.json")
             print("📁 Usando almacenamiento LOCAL")
@@ -44,82 +42,44 @@ class StorageManager:
         try:
             print(f"🔐 Autenticando con: {self.credentials_file}")
             
-            # Cargar credenciales de Cuenta de Servicio
             creds = service_account.Credentials.from_service_account_file(
                 self.credentials_file,
                 scopes=SCOPES
             )
             
-            # Construir el servicio
             self.drive_service = build('drive', 'v3', credentials=creds)
-            
-            # ✅ Marcar como exitoso
             self.use_local = False
             
             print("✅ Autenticación exitosa con Cuenta de Servicio")
             
-            # Verificar acceso y espacio
+            # ============================================
+            # ⭐ SHARED DRIVE - ID DE LA UNIDAD COMPARTIDA
+            # ============================================
+            # ⚠️ REEMPLAZA ESTE ID CON EL ID DE TU UNIDAD COMPARTIDA
+            # Ejemplo: '1vEJM_yYBWv0nB2inUsLqcvnm99gDufrm'
+            # ============================================
+            self.base_folder_id = 'TU_ID_DE_UNIDAD_COMPARTIDA_AQUI'
+            
+            if self.base_folder_id and self.base_folder_id != 'TU_ID_DE_UNIDAD_COMPARTIDA_AQUI':
+                print(f"📁 Usando Shared Drive con ID: {self.base_folder_id}")
+            else:
+                print("⚠️ No se configuró Shared Drive. Usando Mi Unidad (puede fallar)")
+            
+            # Verificar acceso
             try:
                 about = self.drive_service.about().get(fields="storageQuota").execute()
-                quota = about.get('storageQuota', {})
-                used = int(quota.get('usage', 0))
-                limit = int(quota.get('limit', 0))
-                if limit > 0:
-                    free_gb = (limit - used) / (1024**3)
-                    print(f"📊 Espacio disponible: {free_gb:.2f} GB")
-                else:
-                    print("📊 Espacio ilimitado o no disponible")
+                print("✅ Acceso a Google Drive verificado")
             except Exception as e:
-                print(f"⚠️ Error obteniendo cuota: {e}")
-            
-            # ✅ CREAR CARPETA BASE
-            self._create_base_folder()
+                print(f"⚠️ Error verificando acceso: {e}")
             
         except Exception as e:
             print(f"❌ Error en autenticación: {e}")
             self.drive_service = None
             self.use_local = True
     
-    def _create_base_folder(self):
-        """Crea la carpeta base 'AIsa' en Google Drive si no existe"""
-        if not self.drive_service:
-            print("⚠️ No hay servicio de Google Drive")
-            return
-        
-        try:
-            print("📁 Buscando carpeta 'AIsa' en Google Drive...")
-            
-            # Buscar carpeta 'AIsa'
-            results = self.drive_service.files().list(
-                q="name='AIsa' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-                spaces='drive',
-                fields='files(id, name)'
-            ).execute()
-            
-            folders = results.get('files', [])
-            
-            if not folders:
-                print("📁 No se encontró 'AIsa', creando carpeta...")
-                file_metadata = {
-                    'name': 'AIsa',
-                    'mimeType': 'application/vnd.google-apps.folder'
-                }
-                folder = self.drive_service.files().create(
-                    body=file_metadata,
-                    fields='id'
-                ).execute()
-                self.base_folder_id = folder.get('id')
-                print(f"✅ Carpeta 'AIsa' creada (ID: {self.base_folder_id})")
-            else:
-                self.base_folder_id = folders[0]['id']
-                print(f"✅ Carpeta 'AIsa' encontrada (ID: {self.base_folder_id})")
-            
-        except Exception as e:
-            print(f"⚠️ Error creando carpeta base: {e}")
-    
     def _get_or_create_folder(self, path, parent_id=None):
         """
-        Obtiene o crea una carpeta por su ruta
+        Obtiene o crea una carpeta por su ruta (con soporte para Shared Drive)
         
         Args:
             path (str): Ruta de la carpeta (ej: "negocio_1/productos/producto_1")
@@ -136,10 +96,7 @@ class StorageManager:
         
         if not parent_id:
             print("⚠️ No hay carpeta base para crear subcarpetas")
-            self._create_base_folder()
-            parent_id = self.base_folder_id
-            if not parent_id:
-                return None
+            return None
         
         try:
             parts = path.strip('/').split('/')
@@ -156,7 +113,9 @@ class StorageManager:
                 results = self.drive_service.files().list(
                     q=query,
                     spaces='drive',
-                    fields='files(id, name)'
+                    fields='files(id, name)',
+                    supportsAllDrives=True,  # ⭐ SOPORTE PARA SHARED DRIVE
+                    includeItemsFromAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
                 ).execute()
                 
                 folders = results.get('files', [])
@@ -170,7 +129,8 @@ class StorageManager:
                     }
                     folder = self.drive_service.files().create(
                         body=file_metadata,
-                        fields='id'
+                        fields='id',
+                        supportsAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
                     ).execute()
                     current_parent = folder.get('id')
                     print(f"✅ Carpeta creada: {part} (ID: {current_parent})")
@@ -188,7 +148,7 @@ class StorageManager:
     
     def subir_foto_producto(self, negocio_id, producto_id, archivo_foto, nombre_foto):
         """
-        Sube una foto de producto a Google Drive
+        Sube una foto de producto a Google Drive (Shared Drive)
         
         Args:
             negocio_id (int): ID del negocio
@@ -200,15 +160,13 @@ class StorageManager:
             bool: True si se subió correctamente
         """
         print("=" * 60)
-        print("📤 INICIANDO SUBIDA DE FOTO")
+        print("📤 INICIANDO SUBIDA DE FOTO A SHARED DRIVE")
         print(f"   Negocio ID: {negocio_id}")
         print(f"   Producto ID: {producto_id}")
         print(f"   Nombre: {nombre_foto}")
-        print(f"   use_local: {self.use_local}")
-        print(f"   drive_service: {self.drive_service is not None}")
+        print(f"   Base Folder ID: {self.base_folder_id}")
         print("=" * 60)
         
-        # ✅ Verificar si estamos en modo local
         if self.use_local or not self.drive_service:
             print("📁 Usando almacenamiento LOCAL (fallback)")
             return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
@@ -238,7 +196,6 @@ class StorageManager:
             print(f"📁 Guardando archivo temporal en: {temp_path}")
             archivo_foto.save(temp_path)
             
-            # Verificar que el archivo se guardó
             if not os.path.exists(temp_path):
                 print(f"❌ Error: No se pudo guardar el archivo temporal")
                 return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
@@ -247,9 +204,8 @@ class StorageManager:
             print(f"📊 Tamaño del archivo: {file_size} bytes")
             
             # ============================================
-            # PASO 3: Subir a Google Drive
+            # PASO 3: Subir a Google Drive (Shared Drive)
             # ============================================
-            # Determinar el tipo MIME
             mime_type = 'image/jpeg'
             if nombre_foto.lower().endswith('.png'):
                 mime_type = 'image/png'
@@ -272,7 +228,8 @@ class StorageManager:
                 file = self.drive_service.files().create(
                     body=file_metadata,
                     media_body=media,
-                    fields='id, webViewLink, webContentLink'
+                    fields='id, webViewLink, webContentLink',
+                    supportsAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
                 ).execute()
                 
                 file_id = file.get('id')
@@ -296,7 +253,7 @@ class StorageManager:
                 print(f"🗑️ Archivo temporal eliminado: {temp_path}")
             
             if file_id:
-                print(f"✅ Foto subida exitosamente a Google Drive: {nombre_foto}")
+                print(f"✅ Foto subida exitosamente a Google Drive: {nombre_foto} (ID: {file_id})")
                 return True
             else:
                 print("❌ Error subiendo a Google Drive - No se recibió ID")
@@ -328,7 +285,8 @@ class StorageManager:
             if file_id:
                 file = self.drive_service.files().get(
                     fileId=file_id,
-                    fields='webViewLink, webContentLink'
+                    fields='webViewLink, webContentLink',
+                    supportsAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
                 ).execute()
                 return file.get('webViewLink') or file.get('webContentLink')
             else:
@@ -342,7 +300,9 @@ class StorageManager:
                 results = self.drive_service.files().list(
                     q=f"name='{nombre_foto}' and '{folder_id}' in parents and trashed=false",
                     spaces='drive',
-                    fields='files(id, webViewLink, webContentLink)'
+                    fields='files(id, webViewLink, webContentLink)',
+                    supportsAllDrives=True,  # ⭐ SOPORTE PARA SHARED DRIVE
+                    includeItemsFromAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
                 ).execute()
                 
                 files = results.get('files', [])
@@ -381,7 +341,9 @@ class StorageManager:
             results = self.drive_service.files().list(
                 q=f"name='{nombre_foto}' and '{folder_id}' in parents and trashed=false",
                 spaces='drive',
-                fields='files(id)'
+                fields='files(id)',
+                supportsAllDrives=True,  # ⭐ SOPORTE PARA SHARED DRIVE
+                includeItemsFromAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
             ).execute()
             
             files = results.get('files', [])
@@ -456,7 +418,8 @@ class StorageManager:
             file = self.drive_service.files().create(
                 body=file_metadata,
                 media_body=media,
-                fields='id'
+                fields='id',
+                supportsAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
             ).execute()
             
             if os.path.exists(temp_path):
@@ -512,7 +475,10 @@ class StorageManager:
             
             # Eliminar de Google Drive
             if file_id:
-                self.drive_service.files().delete(fileId=file_id).execute()
+                self.drive_service.files().delete(
+                    fileId=file_id,
+                    supportsAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
+                ).execute()
                 print(f"✅ Foto eliminada de Google Drive: {nombre_foto}")
                 return True
             else:
@@ -524,13 +490,18 @@ class StorageManager:
                     results = self.drive_service.files().list(
                         q=f"name='{nombre_foto}' and '{folder_id}' in parents and trashed=false",
                         spaces='drive',
-                        fields='files(id)'
+                        fields='files(id)',
+                        supportsAllDrives=True,  # ⭐ SOPORTE PARA SHARED DRIVE
+                        includeItemsFromAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
                     ).execute()
                     
                     files = results.get('files', [])
                     
                     if files:
-                        self.drive_service.files().delete(fileId=files[0]['id']).execute()
+                        self.drive_service.files().delete(
+                            fileId=files[0]['id'],
+                            supportsAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
+                        ).execute()
                         print(f"✅ Foto eliminada de Google Drive: {nombre_foto}")
                         return True
             
@@ -557,7 +528,7 @@ class StorageManager:
         
         if self.drive_service and not self.use_local:
             if self.base_folder_id:
-                estado['mensaje'] = "✅ Conectado a Google Drive"
+                estado['mensaje'] = "✅ Conectado a Google Drive (Shared Drive)"
             else:
                 estado['mensaje'] = "✅ Conectado a Google Drive (carpeta base pendiente)"
             
@@ -572,10 +543,10 @@ class StorageManager:
                     estado['free_gb'] = round((limit - used) / (1024**3), 2)
                     estado['mensaje'] = f"✅ Conectado a Google Drive ({estado['free_gb']} GB libres)"
                 else:
-                    estado['mensaje'] = "✅ Conectado a Google Drive"
+                    estado['mensaje'] = "✅ Conectado a Google Drive (Shared Drive)"
             except Exception as e:
                 print(f"⚠️ Error obteniendo cuota: {e}")
-                estado['mensaje'] = "✅ Conectado a Google Drive"
+                estado['mensaje'] = "✅ Conectado a Google Drive (Shared Drive)"
         
         return estado
 
@@ -592,3 +563,29 @@ def get_storage_manager():
     if _storage_instance is None:
         _storage_instance = StorageManager()
     return _storage_instance
+
+
+# ============================================
+# PRUEBA DIRECTA
+# ============================================
+
+if __name__ == "__main__":
+    print("=" * 60)
+    print("🔍 PRUEBA DE ALMACENAMIENTO - GOOGLE DRIVE SHARED DRIVE")
+    print("=" * 60)
+    
+    storage = get_storage_manager()
+    estado = storage.obtener_estado()
+    
+    print(f"\n📁 Estado del almacenamiento:")
+    for key, value in estado.items():
+        print(f"   • {key}: {value}")
+    
+    if not estado['use_local']:
+        print("\n✅ Google Drive configurado correctamente!")
+        print("📤 Las fotos y facturas se subirán al Shared Drive")
+    else:
+        print("\n⚠️ Google Drive NO configurado")
+        print("📁 Usando almacenamiento LOCAL")
+    
+    print("\n" + "=" * 60)
