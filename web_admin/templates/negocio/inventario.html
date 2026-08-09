@@ -370,8 +370,8 @@
                 </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button class="btn btn-success" onclick="guardarProducto()" id="btnGuardar">💾 Guardar</button>
-                <button class="btn btn-danger" onclick="cancelarFormulario()">✕ Cancelar</button>
+                <button class="btn btn-success" id="btnGuardar">💾 Guardar</button>
+                <button class="btn btn-danger" id="btnCancelar">✕ Cancelar</button>
             </div>
         </div>
     </div>
@@ -406,6 +406,8 @@
                 exitoEl.textContent = '✅ ' + texto;
                 exitoEl.classList.add('show');
             }
+            // También mostrar en consola para debug
+            console.log(`📝 ${tipo.toUpperCase()}: ${texto}`);
             setTimeout(() => {
                 errorEl.classList.remove('show');
                 exitoEl.classList.remove('show');
@@ -418,6 +420,7 @@
         function previsualizarFoto(event) {
             const file = event.target.files[0];
             if (file) {
+                console.log('📷 Foto seleccionada:', file.name, file.size, file.type);
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const preview = document.getElementById('fotoPreview');
@@ -501,6 +504,7 @@
                     throw new Error(`HTTP ${response.status}`);
                 }
                 productos = await response.json();
+                console.log('📦 Productos cargados:', productos.length);
                 renderProductos();
                 actualizarEstadisticas();
             } catch (error) {
@@ -677,7 +681,7 @@
         }
 
         // ============================================
-        // GUARDAR PRODUCTO (CORREGIDO)
+        // GUARDAR PRODUCTO (CON SUBIDA DE FOTO)
         // ============================================
         async function guardarProducto() {
             const nombre = document.getElementById('prodNombre').value.trim();
@@ -704,7 +708,7 @@
                 const url = editandoId ? `/api/producto/${editandoId}` : '/api/productos';
                 const method = editandoId ? 'PUT' : 'POST';
                 
-                console.log('📤 Enviando datos:', data);
+                console.log('📤 Enviando datos producto:', data);
                 
                 const response = await fetch(url, {
                     method: method,
@@ -713,36 +717,47 @@
                 });
 
                 const result = await response.json();
-                console.log('📥 Respuesta:', result);
+                console.log('📥 Respuesta producto:', result);
 
                 if (result.success) {
                     const productoId = result.id || editandoId;
                     
+                    // ============================================
+                    // SUBIR FOTO SI EXISTE
+                    // ============================================
                     const fotoInput = document.getElementById('prodFoto');
                     if (fotoInput && fotoInput.files && fotoInput.files.length > 0) {
                         const formData = new FormData();
                         formData.append('foto', fotoInput.files[0]);
+                        
+                        console.log('📤 Subiendo foto para producto:', productoId);
                         
                         try {
                             const fotoResponse = await fetch(`/api/producto/${productoId}/foto`, {
                                 method: 'POST',
                                 body: formData
                             });
+                            
                             const fotoResult = await fotoResponse.json();
-                            if (!fotoResult.success) {
-                                mostrarMensaje('Producto guardado pero error al subir foto', 'warning');
+                            console.log('📥 Respuesta foto:', fotoResult);
+                            
+                            if (fotoResult.success) {
+                                mostrarMensaje(`✅ Producto "${nombre}" guardado con foto`, 'exito');
+                            } else {
+                                mostrarMensaje(`✅ Producto guardado pero error al subir foto: ${fotoResult.error || 'Error desconocido'}`, 'warning');
                             }
                         } catch (fotoError) {
-                            console.error('Error subiendo foto:', fotoError);
+                            console.error('❌ Error subiendo foto:', fotoError);
                             mostrarMensaje('Producto guardado pero no se pudo subir la foto', 'warning');
                         }
+                    } else {
+                        mostrarMensaje(`✅ "${nombre}" ${editandoId ? 'actualizado' : 'agregado'}`, 'exito');
                     }
                     
-                    mostrarMensaje(`✅ "${nombre}" ${editandoId ? 'actualizado' : 'agregado'}`, 'exito');
                     cancelarFormulario();
                     await cargarProductos();
                 } else {
-                    mostrarMensaje(result.error || 'Error al guardar', 'error');
+                    mostrarMensaje(result.error || 'Error al guardar producto', 'error');
                 }
             } catch (error) {
                 console.error('❌ Error:', error);
@@ -789,14 +804,32 @@
         // ============================================
         // EVENT LISTENERS
         // ============================================
-        document.getElementById('prodPrecio').addEventListener('input', calcularGanancia);
-        document.getElementById('prodCosto').addEventListener('input', calcularGanancia);
-
-        // ============================================
-        // INICIO
-        // ============================================
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('📦 Módulo de inventario cargado');
+            
+            // Asignar event listeners
+            const btnGuardar = document.getElementById('btnGuardar');
+            const btnCancelar = document.getElementById('btnCancelar');
+            
+            if (btnGuardar) {
+                btnGuardar.addEventListener('click', guardarProducto);
+                console.log('✅ Event listener de guardar asignado');
+            }
+            if (btnCancelar) {
+                btnCancelar.addEventListener('click', cancelarFormulario);
+                console.log('✅ Event listener de cancelar asignado');
+            }
+            
+            // Input listeners
+            const precioInput = document.getElementById('prodPrecio');
+            const costoInput = document.getElementById('prodCosto');
+            if (precioInput) precioInput.addEventListener('input', calcularGanancia);
+            if (costoInput) costoInput.addEventListener('input', calcularGanancia);
+            
+            // Cargar productos iniciales
             cargarProductos();
+            
+            // Actualizar cada 30 segundos
             setInterval(cargarProductos, 30000);
         });
     </script>
