@@ -207,8 +207,9 @@ class StorageManager:
         Returns:
             bool: True si se subió correctamente
         """
+        # ✅ Verificar si estamos en modo local
         if self.use_local or not self.drive_service:
-            print("📁 Usando almacenamiento LOCAL")
+            print("📁 Usando almacenamiento LOCAL (fallback)")
             return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
         
         try:
