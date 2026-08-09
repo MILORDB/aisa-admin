@@ -2,10 +2,12 @@
 
 import os
 import json
+import io
 from datetime import datetime
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
+from googleapiclient.errors import HttpError
 
 SCOPES = ['https://www.googleapis.com/auth/drive.file']
 
@@ -28,18 +30,6 @@ class StorageManager:
         elif os.path.exists('credentials.json'):
             self.credentials_file = 'credentials.json'
             print("📁 Credenciales locales: credentials.json")
-        # 3. En variable de entorno GOOGLE_CREDENTIALS_JSON (fallback)
-        elif os.environ.get('GOOGLE_CREDENTIALS_JSON'):
-            try:
-                creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
-                if creds_json.startswith('{'):
-                    self.credentials_file = '/tmp/credentials.json'
-                    os.makedirs('/tmp', exist_ok=True)
-                    with open(self.credentials_file, 'w') as f:
-                        f.write(creds_json)
-                    print("📁 Credenciales desde variable de entorno")
-            except Exception as e:
-                print(f"⚠️ Error cargando credenciales desde variable: {e}")
         
         # Si no hay credenciales, usar local
         if not self.credentials_file or not os.path.exists(self.credentials_file):
@@ -126,7 +116,6 @@ class StorageManager:
             
         except Exception as e:
             print(f"⚠️ Error creando carpeta base: {e}")
-            # Si hay error, el sistema seguirá funcionando, pero se creará al subir archivos
     
     def _get_or_create_folder(self, path, parent_id=None):
         """
@@ -147,7 +136,6 @@ class StorageManager:
         
         if not parent_id:
             print("⚠️ No hay carpeta base para crear subcarpetas")
-            # Intentar crear la carpeta base
             self._create_base_folder()
             parent_id = self.base_folder_id
             if not parent_id:
@@ -160,6 +148,8 @@ class StorageManager:
             for part in parts:
                 if not part:
                     continue
+                
+                print(f"📁 Buscando/creando carpeta: {part} (padre: {current_parent})")
                 
                 # Buscar carpeta con este nombre
                 query = f"name='{part}' and '{current_parent}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false"
@@ -183,15 +173,17 @@ class StorageManager:
                         fields='id'
                     ).execute()
                     current_parent = folder.get('id')
-                    print(f"📁 Carpeta creada: {part}")
+                    print(f"✅ Carpeta creada: {part} (ID: {current_parent})")
                 else:
                     current_parent = folders[0]['id']
-                    print(f"📁 Carpeta encontrada: {part} (ID: {current_parent})")
+                    print(f"✅ Carpeta encontrada: {part} (ID: {current_parent})")
             
             return current_parent
             
         except Exception as e:
-            print(f"⚠️ Error creando carpeta {path}: {e}")
+            print(f"❌ Error creando carpeta {path}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def subir_foto_producto(self, negocio_id, producto_id, archivo_foto, nombre_foto):
@@ -207,36 +199,56 @@ class StorageManager:
         Returns:
             bool: True si se subió correctamente
         """
+        print("=" * 60)
+        print("📤 INICIANDO SUBIDA DE FOTO")
+        print(f"   Negocio ID: {negocio_id}")
+        print(f"   Producto ID: {producto_id}")
+        print(f"   Nombre: {nombre_foto}")
+        print(f"   use_local: {self.use_local}")
+        print(f"   drive_service: {self.drive_service is not None}")
+        print("=" * 60)
+        
         # ✅ Verificar si estamos en modo local
         if self.use_local or not self.drive_service:
             print("📁 Usando almacenamiento LOCAL (fallback)")
             return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
         
         try:
-            print(f"📤 Subiendo {nombre_foto} a Google Drive...")
-            print(f"   Negocio ID: {negocio_id}, Producto ID: {producto_id}")
-            
-            # Crear estructura de carpetas
+            # ============================================
+            # PASO 1: Crear estructura de carpetas
+            # ============================================
             folder_path = f"negocio_{negocio_id}/productos/producto_{producto_id}"
+            print(f"📁 Creando estructura de carpetas: {folder_path}")
+            
             folder_id = self._get_or_create_folder(folder_path)
             
             if not folder_id:
-                print("⚠️ No se pudo crear carpeta en Google Drive, usando local")
+                print("❌ No se pudo crear carpeta en Google Drive, usando local")
                 return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
             
-            # Guardar archivo temporal
+            print(f"✅ Carpeta destino ID: {folder_id}")
+            
+            # ============================================
+            # PASO 2: Guardar archivo temporalmente
+            # ============================================
             temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/temp')
             os.makedirs(temp_dir, exist_ok=True)
             temp_path = os.path.join(temp_dir, nombre_foto)
+            
+            print(f"📁 Guardando archivo temporal en: {temp_path}")
             archivo_foto.save(temp_path)
-            print(f"📁 Archivo temporal guardado: {temp_path}")
             
-            # Subir a Google Drive
-            file_metadata = {
-                'name': nombre_foto,
-                'parents': [folder_id]
-            }
+            # Verificar que el archivo se guardó
+            if not os.path.exists(temp_path):
+                print(f"❌ Error: No se pudo guardar el archivo temporal")
+                return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
             
+            file_size = os.path.getsize(temp_path)
+            print(f"📊 Tamaño del archivo: {file_size} bytes")
+            
+            # ============================================
+            # PASO 3: Subir a Google Drive
+            # ============================================
             # Determinar el tipo MIME
             mime_type = 'image/jpeg'
             if nombre_foto.lower().endswith('.png'):
@@ -246,23 +258,45 @@ class StorageManager:
             elif nombre_foto.lower().endswith('.webp'):
                 mime_type = 'image/webp'
             
+            print(f"📤 Subiendo archivo a Google Drive...")
+            print(f"   MIME Type: {mime_type}")
+            
+            file_metadata = {
+                'name': nombre_foto,
+                'parents': [folder_id]
+            }
+            
             media = MediaFileUpload(temp_path, mimetype=mime_type, resumable=True)
             
-            file = self.drive_service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id, webViewLink, webContentLink'
-            ).execute()
+            try:
+                file = self.drive_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, webViewLink, webContentLink'
+                ).execute()
+                
+                file_id = file.get('id')
+                print(f"✅ Archivo subido a Google Drive (ID: {file_id})")
+                
+            except HttpError as e:
+                print(f"❌ Error HTTP en Google Drive: {e}")
+                print(f"   Respuesta: {e.content}")
+                return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
+            except Exception as e:
+                print(f"❌ Error en subida a Google Drive: {e}")
+                import traceback
+                traceback.print_exc()
+                return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
             
-            file_id = file.get('id')
-            
-            # Eliminar archivo temporal
+            # ============================================
+            # PASO 4: Eliminar archivo temporal
+            # ============================================
             if os.path.exists(temp_path):
                 os.remove(temp_path)
                 print(f"🗑️ Archivo temporal eliminado: {temp_path}")
             
             if file_id:
-                print(f"✅ Foto subida a Google Drive: {nombre_foto} (ID: {file_id})")
+                print(f"✅ Foto subida exitosamente a Google Drive: {nombre_foto}")
                 return True
             else:
                 print("❌ Error subiendo a Google Drive - No se recibió ID")
@@ -558,29 +592,3 @@ def get_storage_manager():
     if _storage_instance is None:
         _storage_instance = StorageManager()
     return _storage_instance
-
-
-# ============================================
-# PRUEBA DIRECTA
-# ============================================
-
-if __name__ == "__main__":
-    print("=" * 60)
-    print("🔍 PRUEBA DE ALMACENAMIENTO - GOOGLE DRIVE")
-    print("=" * 60)
-    
-    storage = get_storage_manager()
-    estado = storage.obtener_estado()
-    
-    print(f"\n📁 Estado del almacenamiento:")
-    for key, value in estado.items():
-        print(f"   • {key}: {value}")
-    
-    if not estado['use_local']:
-        print("\n✅ Google Drive configurado correctamente!")
-        print("📤 Las fotos y facturas se subirán a Google Drive")
-    else:
-        print("\n⚠️ Google Drive NO configurado")
-        print("📁 Usando almacenamiento LOCAL")
-    
-    print("\n" + "=" * 60)
