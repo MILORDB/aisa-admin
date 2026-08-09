@@ -1208,7 +1208,7 @@ def api_subir_foto_producto(producto_id):
             
             return jsonify({'success': True, 'url': foto_url})
         else:
-            return jsonify({'error': 'Error al subir la foto'}), 500
+            return jsonify({'error': 'Error al subir la foto a Google Drive'}), 500
             
     except Exception as e:
         print(f"❌ Error en api_subir_foto_producto: {e}")
