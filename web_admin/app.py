@@ -1169,31 +1169,51 @@ def api_subir_foto_producto(producto_id):
     if foto.filename == '':
         return jsonify({'error': 'No se seleccionó ningún archivo'}), 400
     
+    # Validar extensión
     allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     extension = foto.filename.rsplit('.', 1)[1].lower() if '.' in foto.filename else ''
     if extension not in allowed_extensions:
         return jsonify({'error': f'Formato no permitido. Use: {", ".join(allowed_extensions)}'}), 400
     
     try:
+        from web_admin.storage import get_storage_manager
         storage = get_storage_manager()
+        
+        # Generar nombre único
+        import uuid
         nombre_foto = f"{uuid.uuid4().hex}.{extension}"
         
+        # Determinar negocio_id
         negocio_id = usuario.get('id')
         if usuario.get('rol') == 'trabajador':
             negocio_id = obtener_negocio_de_trabajador(usuario['id'])
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
+        print(f"📤 Subiendo foto: {nombre_foto}, negocio: {negocio_id}, producto: {producto_id}")
+        
+        # Subir a Google Drive
         exito = storage.subir_foto_producto(negocio_id, producto_id, foto, nombre_foto)
         
         if exito:
+            # Guardar en la base de datos
             if not storage.use_local:
                 file_id = storage.obtener_file_id(negocio_id, producto_id, nombre_foto)
                 foto_url = storage.obtener_url_foto(negocio_id, producto_id, nombre_foto, file_id)
                 actualizar_foto_producto(producto_id, foto_url, file_id)
+                print(f"✅ Foto guardada en BD: {foto_url}")
             else:
                 foto_url = storage.obtener_url_foto(negocio_id, producto_id, nombre_foto)
                 actualizar_foto_producto(producto_id, foto_url)
+            
+            return jsonify({'success': True, 'url': foto_url})
+        else:
+            return jsonify({'error': 'Error al subir la foto'}), 500
+            
+    except Exception as e:
+        print(f"❌ Error en api_subir_foto_producto: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500      actualizar_foto_producto(producto_id, foto_url)
             
             return jsonify({'success': True, 'url': foto_url})
         else:
