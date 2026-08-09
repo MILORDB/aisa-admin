@@ -1213,15 +1213,6 @@ def api_subir_foto_producto(producto_id):
     except Exception as e:
         print(f"❌ Error en api_subir_foto_producto: {e}")
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500      actualizar_foto_producto(producto_id, foto_url)
-            
-            return jsonify({'success': True, 'url': foto_url})
-        else:
-            return jsonify({'error': 'Error al subir la foto'}), 500
-            
-    except Exception as e:
-        print(f"❌ Error en api_subir_foto_producto: {e}")
-        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/productos/stock', methods=['GET'])
@@ -1779,7 +1770,7 @@ def api_trabajador_estadisticas():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - VENTAS (CORREGIDO)
+# API - VENTAS
 # ============================================
 
 @app.route('/api/ventas', methods=['GET'])
