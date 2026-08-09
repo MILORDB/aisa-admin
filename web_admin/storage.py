@@ -213,6 +213,7 @@ class StorageManager:
         
         try:
             print(f"📤 Subiendo {nombre_foto} a Google Drive...")
+            print(f"   Negocio ID: {negocio_id}, Producto ID: {producto_id}")
             
             # Crear estructura de carpetas
             folder_path = f"negocio_{negocio_id}/productos/producto_{producto_id}"
@@ -227,6 +228,7 @@ class StorageManager:
             os.makedirs(temp_dir, exist_ok=True)
             temp_path = os.path.join(temp_dir, nombre_foto)
             archivo_foto.save(temp_path)
+            print(f"📁 Archivo temporal guardado: {temp_path}")
             
             # Subir a Google Drive
             file_metadata = {
@@ -234,7 +236,16 @@ class StorageManager:
                 'parents': [folder_id]
             }
             
-            media = MediaFileUpload(temp_path, mimetype='image/jpeg', resumable=True)
+            # Determinar el tipo MIME
+            mime_type = 'image/jpeg'
+            if nombre_foto.lower().endswith('.png'):
+                mime_type = 'image/png'
+            elif nombre_foto.lower().endswith('.gif'):
+                mime_type = 'image/gif'
+            elif nombre_foto.lower().endswith('.webp'):
+                mime_type = 'image/webp'
+            
+            media = MediaFileUpload(temp_path, mimetype=mime_type, resumable=True)
             
             file = self.drive_service.files().create(
                 body=file_metadata,
@@ -247,16 +258,19 @@ class StorageManager:
             # Eliminar archivo temporal
             if os.path.exists(temp_path):
                 os.remove(temp_path)
+                print(f"🗑️ Archivo temporal eliminado: {temp_path}")
             
             if file_id:
                 print(f"✅ Foto subida a Google Drive: {nombre_foto} (ID: {file_id})")
                 return True
             else:
-                print("❌ Error subiendo a Google Drive")
+                print("❌ Error subiendo a Google Drive - No se recibió ID")
                 return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
                 
         except Exception as e:
             print(f"❌ Error subiendo a Google Drive: {e}")
+            import traceback
+            traceback.print_exc()
             return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
     
     def obtener_url_foto(self, negocio_id, producto_id, nombre_foto, file_id=None):
@@ -507,7 +521,6 @@ class StorageManager:
         }
         
         if self.drive_service and not self.use_local:
-            # Verificar si la carpeta base existe
             if self.base_folder_id:
                 estado['mensaje'] = "✅ Conectado a Google Drive"
             else:
