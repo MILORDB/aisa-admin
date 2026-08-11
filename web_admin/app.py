@@ -103,7 +103,17 @@ try:
         obtener_trabajadores_activos,
         obtener_productos_tienda_por_negocio,
         obtener_productos_con_stock_negocio,
-        obtener_trabajador_negocio
+        obtener_trabajador_negocio,
+        # Nuevas funciones de notificaciones
+        suscribir_usuario, desuscribir_usuario, esta_suscrito,
+        obtener_suscriptores, obtener_suscripciones_usuario,
+        registrar_notificacion, registrar_notificacion_negocio,
+        obtener_notificaciones_usuario, contar_notificaciones_no_leidas,
+        marcar_notificacion_leida, marcar_todas_notificaciones_leidas,
+        generar_notificaciones_stock, generar_notificacion_producto_nuevo,
+        generar_notificacion_stock_actualizado,
+        obtener_producto_por_id, obtener_preferencias_notificaciones,
+        actualizar_preferencias_notificaciones
     )
     print("✅ Database importada correctamente")
 except ImportError as e:
@@ -1088,6 +1098,13 @@ def api_crear_producto():
         
         if producto_id:
             registrar_log(usuario['id'], 'producto_creado', f'Producto: {nombre}')
+            
+            # 🔔 GENERAR NOTIFICACIÓN DE PRODUCTO NUEVO
+            generar_notificacion_producto_nuevo(negocio_id, producto_id)
+            
+            # 🔔 VERIFICAR STOCK BAJO
+            generar_notificaciones_stock(negocio_id)
+            
             return jsonify({'success': True, 'id': producto_id, 'message': 'Producto creado correctamente'})
         else:
             return jsonify({'success': False, 'error': 'Error al crear el producto en la base de datos'}), 500
@@ -1118,10 +1135,27 @@ def api_actualizar_producto(producto_id):
         return jsonify({'error': 'Nombre, categoría y precio son obligatorios'}), 400
     
     try:
+        # Obtener stock anterior para generar notificación
+        producto_anterior = obtener_producto_por_id(producto_id)
+        stock_anterior = producto_anterior.get('stock', 0) if producto_anterior else 0
+        
         exito = actualizar_producto(producto_id, nombre, categoria, float(precio), float(costo), float(comision), int(stock), int(stock_minimo))
         
         if exito:
             registrar_log(usuario['id'], 'producto_actualizado', f'Producto ID: {producto_id}')
+            
+            # 🔔 GENERAR NOTIFICACIÓN DE STOCK ACTUALIZADO
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            
+            if negocio_id and stock_anterior != stock:
+                generar_notificacion_stock_actualizado(negocio_id, producto_id, stock_anterior, stock)
+            
+            # 🔔 VERIFICAR STOCK BAJO
+            if negocio_id:
+                generar_notificaciones_stock(negocio_id)
+            
             return jsonify({'success': True})
         else:
             return jsonify({'error': 'Error al actualizar el producto'}), 500
@@ -1169,46 +1203,35 @@ def api_subir_foto_producto(producto_id):
     if foto.filename == '':
         return jsonify({'error': 'No se seleccionó ningún archivo'}), 400
     
-    # Validar extensión
     allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
     extension = foto.filename.rsplit('.', 1)[1].lower() if '.' in foto.filename else ''
     if extension not in allowed_extensions:
         return jsonify({'error': f'Formato no permitido. Use: {", ".join(allowed_extensions)}'}), 400
     
     try:
-        from web_admin.storage import get_storage_manager
         storage = get_storage_manager()
-        
-        # Generar nombre único
-        import uuid
         nombre_foto = f"{uuid.uuid4().hex}.{extension}"
         
-        # Determinar negocio_id
         negocio_id = usuario.get('id')
         if usuario.get('rol') == 'trabajador':
             negocio_id = obtener_negocio_de_trabajador(usuario['id'])
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        print(f"📤 Subiendo foto: {nombre_foto}, negocio: {negocio_id}, producto: {producto_id}")
-        
-        # Subir a Google Drive
         exito = storage.subir_foto_producto(negocio_id, producto_id, foto, nombre_foto)
         
         if exito:
-            # Guardar en la base de datos
             if not storage.use_local:
                 file_id = storage.obtener_file_id(negocio_id, producto_id, nombre_foto)
                 foto_url = storage.obtener_url_foto(negocio_id, producto_id, nombre_foto, file_id)
                 actualizar_foto_producto(producto_id, foto_url, file_id)
-                print(f"✅ Foto guardada en BD: {foto_url}")
             else:
                 foto_url = storage.obtener_url_foto(negocio_id, producto_id, nombre_foto)
                 actualizar_foto_producto(producto_id, foto_url)
             
             return jsonify({'success': True, 'url': foto_url})
         else:
-            return jsonify({'error': 'Error al subir la foto a Google Drive'}), 500
+            return jsonify({'error': 'Error al subir la foto'}), 500
             
     except Exception as e:
         print(f"❌ Error en api_subir_foto_producto: {e}")
@@ -1868,9 +1891,11 @@ def api_crear_venta():
         if estado != 'oferta' and producto_id:
             try:
                 actualizar_stock_producto(producto_id, cantidad)
+                
+                # 🔔 VERIFICAR STOCK BAJO DESPUÉS DE VENTA
+                generar_notificaciones_stock(negocio_id)
             except Exception as e:
                 print(f"⚠️ Error al actualizar stock: {e}")
-                # No fallamos la venta por esto, solo logueamos
         
         # Registrar comisión si corresponde
         if estado != 'oferta' and trabajador_id and producto_id:
@@ -2711,7 +2736,7 @@ def api_storage_auth():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# ENDPOINTS DE REPARACIÓN (BÁSICOS)
+# ENDPOINTS DE REPARACIÓN
 # ============================================
 
 @app.route('/fix-admin', methods=['GET'])
@@ -2789,8 +2814,465 @@ def fix_admin_endpoint():
         """, 500
 
 # ============================================
+# ENDPOINTS DE INSTALACIÓN - NOTIFICACIONES
+# ============================================
+
+@app.route('/fix-notificaciones')
+@admin_required
+def fix_notificaciones():
+    """Página de instalación de notificaciones"""
+    return render_template('fix-notificaciones.html')
+
+@app.route('/api/instalar/tablas-notificaciones', methods=['POST'])
+@admin_required
+def api_instalar_tablas_notificaciones():
+    """Crea las tablas de notificaciones y suscripciones"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        tablas_creadas = []
+        
+        # 1. Tabla suscripciones
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS suscripciones (
+                id SERIAL PRIMARY KEY,
+                usuario_id INTEGER NOT NULL,
+                negocio_id INTEGER NOT NULL,
+                fecha_suscripcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                activo INTEGER DEFAULT 1,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                UNIQUE(usuario_id, negocio_id)
+            )
+        ''')
+        tablas_creadas.append({'nombre': 'suscripciones', 'existe': True})
+        print("✅ Tabla suscripciones creada/verificada")
+        
+        # 2. Tabla notificaciones
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS notificaciones (
+                id SERIAL PRIMARY KEY,
+                usuario_id INTEGER NOT NULL,
+                negocio_id INTEGER NOT NULL,
+                tipo TEXT NOT NULL,
+                titulo TEXT NOT NULL,
+                mensaje TEXT NOT NULL,
+                leido INTEGER DEFAULT 0,
+                fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                url TEXT,
+                producto_id INTEGER,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+            )
+        ''')
+        tablas_creadas.append({'nombre': 'notificaciones', 'existe': True})
+        print("✅ Tabla notificaciones creada/verificada")
+        
+        # 3. Tabla preferencias_notificaciones
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS preferencias_notificaciones (
+                id SERIAL PRIMARY KEY,
+                usuario_id INTEGER NOT NULL,
+                notificaciones_email INTEGER DEFAULT 1,
+                notificaciones_push INTEGER DEFAULT 1,
+                notificaciones_in_app INTEGER DEFAULT 1,
+                alerta_stock_bajo INTEGER DEFAULT 1,
+                alerta_producto_nuevo INTEGER DEFAULT 1,
+                alerta_stock_actualizado INTEGER DEFAULT 0,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                UNIQUE(usuario_id)
+            )
+        ''')
+        tablas_creadas.append({'nombre': 'preferencias_notificaciones', 'existe': True})
+        print("✅ Tabla preferencias_notificaciones creada/verificada")
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Tablas de notificaciones creadas correctamente',
+            'tablas': tablas_creadas
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_instalar_tablas_notificaciones: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/instalar/verificar-notificaciones', methods=['GET'])
+@admin_required
+def api_instalar_verificar_notificaciones():
+    """Verifica si las tablas de notificaciones existen"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        tablas = {}
+        
+        # Verificar suscripciones
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'suscripciones'
+            )
+        """)
+        tablas['suscripciones'] = cursor.fetchone()[0]
+        
+        # Verificar notificaciones
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'notificaciones'
+            )
+        """)
+        tablas['notificaciones'] = cursor.fetchone()[0]
+        
+        # Verificar preferencias_notificaciones
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'preferencias_notificaciones'
+            )
+        """)
+        tablas['preferencias'] = cursor.fetchone()[0]
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'tablas': tablas
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_instalar_verificar_notificaciones: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/instalar/preferencias-usuarios', methods=['POST'])
+@admin_required
+def api_instalar_preferencias_usuarios():
+    """Crea preferencias de notificaciones para todos los usuarios que no tengan"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Obtener usuarios sin preferencias
+        cursor.execute('''
+            SELECT u.id FROM usuarios u
+            LEFT JOIN preferencias_notificaciones p ON u.id = p.usuario_id
+            WHERE p.id IS NULL
+        ''')
+        usuarios = cursor.fetchall()
+        
+        procesados = 0
+        for u in usuarios:
+            cursor.execute('''
+                INSERT INTO preferencias_notificaciones (usuario_id)
+                VALUES (%s)
+            ''', (u[0],))
+            procesados += 1
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Preferencias creadas para {procesados} usuarios',
+            'usuarios_procesados': procesados
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_instalar_preferencias_usuarios: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - SUSCRIPCIONES
+# ============================================
+
+@app.route('/api/suscribir/<int:negocio_id>', methods=['POST'])
+@login_required
+def api_suscribir(negocio_id):
+    """Suscribe al usuario autenticado a un negocio"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    if usuario.get('id') == negocio_id:
+        return jsonify({'error': 'No puedes suscribirte a tu propio negocio'}), 400
+    
+    # Verificar que el negocio existe
+    negocio = obtener_usuario_por_id(negocio_id)
+    if not negocio or negocio.get('tipo') != 'negocio':
+        return jsonify({'error': 'El negocio no existe'}), 404
+    
+    # Verificar si ya está suscrito
+    if esta_suscrito(usuario['id'], negocio_id):
+        return jsonify({
+            'success': True,
+            'message': 'Ya estás suscrito a este negocio',
+            'suscrito': True
+        })
+    
+    exito = suscribir_usuario(usuario['id'], negocio_id)
+    
+    if exito:
+        registrar_log(usuario['id'], 'suscripcion', f'Usuario suscrito al negocio {negocio_id}')
+        return jsonify({
+            'success': True,
+            'message': '✅ Te has suscrito correctamente',
+            'suscrito': True
+        })
+    else:
+        return jsonify({'error': 'Error al suscribirse'}), 500
+
+@app.route('/api/desuscribir/<int:negocio_id>', methods=['POST'])
+@login_required
+def api_desuscribir(negocio_id):
+    """Desuscribe al usuario autenticado de un negocio"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    if not esta_suscrito(usuario['id'], negocio_id):
+        return jsonify({
+            'success': True,
+            'message': 'No estás suscrito a este negocio',
+            'suscrito': False
+        })
+    
+    exito = desuscribir_usuario(usuario['id'], negocio_id)
+    
+    if exito:
+        registrar_log(usuario['id'], 'desuscripcion', f'Usuario desuscrito del negocio {negocio_id}')
+        return jsonify({
+            'success': True,
+            'message': '✅ Te has desuscrito correctamente',
+            'suscrito': False
+        })
+    else:
+        return jsonify({'error': 'Error al desuscribirse'}), 500
+
+@app.route('/api/esta-suscrito/<int:negocio_id>', methods=['GET'])
+@login_required
+def api_esta_suscrito(negocio_id):
+    """Verifica si el usuario está suscrito a un negocio"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    suscrito = esta_suscrito(usuario['id'], negocio_id)
+    
+    return jsonify({
+        'success': True,
+        'suscrito': suscrito
+    })
+
+@app.route('/api/mis-suscripciones', methods=['GET'])
+@login_required
+def api_mis_suscripciones():
+    """Obtiene todos los negocios a los que el usuario está suscrito"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    suscripciones = obtener_suscripciones_usuario(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'suscripciones': [dict(s) for s in suscripciones]
+    })
+
+@app.route('/api/negocio/suscriptores', methods=['GET'])
+@login_required
+def api_negocio_suscriptores():
+    """Obtiene los suscriptores del negocio del usuario"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    negocio_id = usuario.get('id')
+    if usuario.get('rol') == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+    
+    suscriptores = obtener_suscriptores(negocio_id)
+    
+    return jsonify({
+        'success': True,
+        'suscriptores': [dict(s) for s in suscriptores],
+        'total': len(suscriptores)
+    })
+
+# ============================================
+# API - NOTIFICACIONES
+# ============================================
+
+@app.route('/api/notificaciones', methods=['GET'])
+@login_required
+def api_notificaciones():
+    """Obtiene las notificaciones del usuario autenticado"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    limite = request.args.get('limite', 50, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    
+    notificaciones = obtener_notificaciones_usuario(usuario['id'], limite, offset)
+    no_leidas = contar_notificaciones_no_leidas(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'notificaciones': [dict(n) for n in notificaciones],
+        'no_leidas': no_leidas,
+        'total': len(notificaciones)
+    })
+
+@app.route('/api/notificaciones/no-leidas', methods=['GET'])
+@login_required
+def api_notificaciones_no_leidas():
+    """Obtiene el número de notificaciones no leídas"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    no_leidas = contar_notificaciones_no_leidas(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'no_leidas': no_leidas
+    })
+
+@app.route('/api/notificacion/<int:notificacion_id>/leer', methods=['POST'])
+@login_required
+def api_marcar_notificacion_leida(notificacion_id):
+    """Marca una notificación como leída"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    marcar_notificacion_leida(notificacion_id, usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'message': 'Notificación marcada como leída'
+    })
+
+@app.route('/api/notificaciones/leer-todas', methods=['POST'])
+@login_required
+def api_marcar_todas_notificaciones_leidas():
+    """Marca todas las notificaciones como leídas"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    marcar_todas_notificaciones_leidas(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'message': 'Todas las notificaciones marcadas como leídas'
+    })
+
+@app.route('/api/notificaciones/generar-stock', methods=['POST'])
+@login_required
+def api_generar_notificaciones_stock():
+    """Genera notificaciones de stock bajo para el negocio del usuario"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    negocio_id = usuario.get('id')
+    if usuario.get('rol') == 'trabajador':
+        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        if not negocio_id:
+            return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+    
+    generar_notificaciones_stock(negocio_id)
+    
+    return jsonify({
+        'success': True,
+        'message': 'Notificaciones de stock generadas'
+    })
+
+# ============================================
+# API - PREFERENCIAS DE NOTIFICACIONES
+# ============================================
+
+@app.route('/api/preferencias-notificaciones', methods=['GET'])
+@login_required
+def api_obtener_preferencias_notificaciones():
+    """Obtiene las preferencias de notificaciones del usuario"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    preferencias = obtener_preferencias_notificaciones(usuario['id'])
+    
+    return jsonify({
+        'success': True,
+        'preferencias': preferencias
+    })
+
+@app.route('/api/preferencias-notificaciones', methods=['PUT'])
+@login_required
+def api_actualizar_preferencias_notificaciones():
+    """Actualiza las preferencias de notificaciones del usuario"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    
+    preferencias = {
+        'notificaciones_email': data.get('notificaciones_email', 1),
+        'notificaciones_push': data.get('notificaciones_push', 1),
+        'notificaciones_in_app': data.get('notificaciones_in_app', 1),
+        'alerta_stock_bajo': data.get('alerta_stock_bajo', 1),
+        'alerta_producto_nuevo': data.get('alerta_producto_nuevo', 1),
+        'alerta_stock_actualizado': data.get('alerta_stock_actualizado', 0)
+    }
+    
+    actualizar_preferencias_notificaciones(usuario['id'], preferencias)
+    
+    registrar_log(usuario['id'], 'preferencias_notificaciones', 'Preferencias actualizadas')
+    
+    return jsonify({
+        'success': True,
+        'message': '✅ Preferencias actualizadas correctamente'
+    })
+
+# ============================================
 # INICIO DE LA APLICACIÓN
 # ============================================
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
