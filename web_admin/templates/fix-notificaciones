@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instalador - Notificaciones AIsa</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: #1a1a2e;
+            border-radius: 16px;
+            padding: 30px;
+            border: 1px solid #2a2a3e;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+        }
+        h1 { color: #6c3ce0; font-size: 24px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
+        .subtitle { color: #888; font-size: 14px; margin-bottom: 20px; }
+        .card {
+            background: #0f0f1a;
+            border-radius: 10px;
+            padding: 16px;
+            border: 1px solid #2a2a3e;
+            margin-bottom: 16px;
+        }
+        .card h3 { color: #aaa; font-size: 14px; margin-bottom: 8px; }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-success:hover { background: #3d8b40; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-danger:hover { background: #c62828; }
+        .btn-warning { background: #ff9800; color: #000; }
+        .btn-warning:hover { background: #e68900; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .mensaje {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            display: none;
+        }
+        .mensaje.exito { background: #224422; color: #6bff6b; display: block; }
+        .mensaje.error { background: #442222; color: #ff6b6b; display: block; }
+        .mensaje.info { background: #1a2a3a; color: #64b5f6; display: block; }
+        .log-box {
+            background: #0a0a14;
+            border-radius: 6px;
+            padding: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            color: #aaa;
+            border: 1px solid #2a2a3e;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log-box .ok { color: #6bff6b; }
+        .log-box .error { color: #ff6b6b; }
+        .log-box .info { color: #64b5f6; }
+        .log-box .warning { color: #ffbb33; }
+        .flex { display: flex; gap: 10px; flex-wrap: wrap; }
+        .status-box {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .status-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            padding: 8px 12px;
+            text-align: center;
+        }
+        .status-item .nombre { font-size: 11px; color: #888; }
+        .status-item .estado { font-size: 13px; font-weight: 600; }
+        .status-item .estado.ok { color: #6bff6b; }
+        .status-item .estado.error { color: #ff6b6b; }
+        .status-item .estado.warning { color: #ffbb33; }
+        .tablas-creadas {
+            margin-top: 10px;
+            padding: 10px;
+            background: #0a0a14;
+            border-radius: 6px;
+            border: 1px solid #2a2a3e;
+        }
+        .tablas-creadas .tabla-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #1a1a2e;
+        }
+        .tablas-creadas .tabla-item:last-child { border-bottom: none; }
+        .tablas-creadas .tabla-item .nombre { color: #aaa; }
+        .tablas-creadas .tabla-item .estado { font-weight: 600; }
+        .tablas-creadas .tabla-item .estado.ok { color: #6bff6b; }
+        .tablas-creadas .tabla-item .estado.error { color: #ff6b6b; }
+        @media (max-width: 600px) {
+            .container { padding: 16px; }
+            .flex { flex-direction: column; }
+            .btn { width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔔 Instalador de Notificaciones AIsa</h1>
+        <div class="subtitle">Crea las tablas de suscripciones, notificaciones y preferencias</div>
+
+        <div id="mensaje" class="mensaje"></div>
+
+        <div class="card">
+            <h3>📋 Acciones</h3>
+            <div class="flex">
+                <button class="btn btn-primary" onclick="crearTablas()" id="btnCrearTablas">
+                    📦 Crear Tablas
+                </button>
+                <button class="btn btn-success" onclick="verificarTablas()" id="btnVerificar">
+                    🔍 Verificar
+                </button>
+                <button class="btn btn-warning" onclick="crearPreferencias()" id="btnPreferencias">
+                    ⚙️ Crear Preferencias Usuarios
+                </button>
+                <button class="btn btn-danger" onclick="limpiarLog()" id="btnLimpiar">
+                    🗑️ Limpiar Log
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📊 Estado de la Base de Datos</h3>
+            <div class="status-box" id="statusBox">
+                <div class="status-item">
+                    <div class="nombre">📋 suscripciones</div>
+                    <div class="estado" id="estadoSuscripciones">⏳ Cargando...</div>
+                </div>
+                <div class="status-item">
+                    <div class="nombre">📋 notificaciones</div>
+                    <div class="estado" id="estadoNotificaciones">⏳ Cargando...</div>
+                </div>
+                <div class="status-item">
+                    <div class="nombre">📋 preferencias_notificaciones</div>
+                    <div class="estado" id="estadoPreferencias">⏳ Cargando...</div>
+                </div>
+            </div>
+            <div class="tablas-creadas" id="tablasDetalle" style="display:none;">
+                <h4 style="color:#888;font-size:12px;margin-bottom:6px;">📋 Detalle de tablas:</h4>
+                <div id="tablasLista"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📝 Log de Ejecución</h3>
+            <div class="log-box" id="logBox">
+                <span class="info">🔍 Esperando acción...</span>
+            </div>
+        </div>
+
+        <div style="text-align:center;margin-top:16px;padding-top:16px;border-top:1px solid #2a2a3e;">
+            <a href="/dashboard" style="color:#6c3ce0;text-decoration:none;">← Volver al Dashboard</a>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // FUNCIONES DE LOG
+        // ============================================
+        function log(texto, tipo = 'info') {
+            const logBox = document.getElementById('logBox');
+            const clases = {
+                'ok': 'ok',
+                'error': 'error',
+                'info': 'info',
+                'warning': 'warning'
+            };
+            const timestamp = new Date().toLocaleTimeString();
+            logBox.innerHTML += `<span class="${clases[tipo] || 'info'}">[${timestamp}] ${texto}</span>\n`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function limpiarLog() {
+            document.getElementById('logBox').innerHTML = '<span class="info">🗑️ Log limpiado</span>\n';
+        }
+
+        function mostrarMensaje(texto, tipo) {
+            const el = document.getElementById('mensaje');
+            el.textContent = texto;
+            el.className = `mensaje ${tipo}`;
+            setTimeout(() => { el.className = 'mensaje'; }, 5000);
+        }
+
+        function toggleButtons(disabled) {
+            document.getElementById('btnCrearTablas').disabled = disabled;
+            document.getElementById('btnVerificar').disabled = disabled;
+            document.getElementById('btnPreferencias').disabled = disabled;
+        }
+
+        // ============================================
+        // CREAR TABLAS
+        // ============================================
+        async function crearTablas() {
+            if (!confirm('⚠️ ¿Crear las tablas de notificaciones y suscripciones?')) return;
+
+            toggleButtons(true);
+            document.getElementById('mensaje').className = 'mensaje';
+            log('📦 Iniciando creación de tablas...', 'info');
+
+            try {
+                const response = await fetch('/api/instalar/tablas-notificaciones', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    log(`✅ ${data.message}`, 'ok');
+                    mostrarMensaje('✅ Tablas creadas correctamente', 'exito');
+                    
+                    // Mostrar detalle de tablas
+                    if (data.tablas) {
+                        mostrarDetalleTablas(data.tablas);
+                    }
+                    
+                    verificarTablas();
+                } else {
+                    log(`❌ ${data.error || 'Error desconocido'}`, 'error');
+                    mostrarMensaje('❌ ' + (data.error || 'Error al crear tablas'), 'error');
+                }
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'error');
+                mostrarMensaje('❌ Error de conexión', 'error');
+            } finally {
+                toggleButtons(false);
+            }
+        }
+
+        function mostrarDetalleTablas(tablas) {
+            const container = document.getElementById('tablasDetalle');
+            const lista = document.getElementById('tablasLista');
+            container.style.display = 'block';
+            
+            let html = '';
+            tablas.forEach(t => {
+                const estadoClass = t.existe ? 'ok' : 'error';
+                const estadoText = t.existe ? '✅ Creada' : '❌ No existe';
+                html += `
+                    <div class="tabla-item">
+                        <span class="nombre">${t.nombre}</span>
+                        <span class="estado ${estadoClass}">${estadoText}</span>
+                    </div>
+                `;
+            });
+            lista.innerHTML = html;
+        }
+
+        // ============================================
+        // CREAR PREFERENCIAS PARA USUARIOS
+        // ============================================
+        async function crearPreferencias() {
+            if (!confirm('⚠️ ¿Crear preferencias de notificaciones para todos los usuarios?')) return;
+
+            toggleButtons(true);
+            document.getElementById('mensaje').className = 'mensaje';
+            log('⚙️ Creando preferencias para usuarios...', 'info');
+
+            try {
+                const response = await fetch('/api/instalar/preferencias-usuarios', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    log(`✅ ${data.message} (${data.usuarios_procesados} usuarios)`, 'ok');
+                    mostrarMensaje('✅ Preferencias creadas correctamente', 'exito');
+                } else {
+                    log(`❌ ${data.error || 'Error desconocido'}`, 'error');
+                    mostrarMensaje('❌ ' + (data.error || 'Error al crear preferencias'), 'error');
+                }
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'error');
+                mostrarMensaje('❌ Error de conexión', 'error');
+            } finally {
+                toggleButtons(false);
+            }
+        }
+
+        // ============================================
+        // VERIFICAR TABLAS
+        // ============================================
+        async function verificarTablas() {
+            document.getElementById('mensaje').className = 'mensaje';
+            log('🔍 Verificando tablas...', 'info');
+
+            try {
+                const response = await fetch('/api/instalar/verificar-notificaciones');
+                const data = await response.json();
+
+                // Actualizar estados
+                const estadoSuscripciones = document.getElementById('estadoSuscripciones');
+                const estadoNotificaciones = document.getElementById('estadoNotificaciones');
+                const estadoPreferencias = document.getElementById('estadoPreferencias');
+
+                if (data.tablas) {
+                    const tablas = data.tablas;
+                    
+                    // suscripciones
+                    if (tablas.suscripciones) {
+                        estadoSuscripciones.textContent = '✅ Existe';
+                        estadoSuscripciones.className = 'estado ok';
+                        log('✅ Tabla suscripciones: OK', 'ok');
+                    } else {
+                        estadoSuscripciones.textContent = '❌ No existe';
+                        estadoSuscripciones.className = 'estado error';
+                        log('❌ Tabla suscripciones: No existe', 'error');
+                    }
+                    
+                    // notificaciones
+                    if (tablas.notificaciones) {
+                        estadoNotificaciones.textContent = '✅ Existe';
+                        estadoNotificaciones.className = 'estado ok';
+                        log('✅ Tabla notificaciones: OK', 'ok');
+                    } else {
+                        estadoNotificaciones.textContent = '❌ No existe';
+                        estadoNotificaciones.className = 'estado error';
+                        log('❌ Tabla notificaciones: No existe', 'error');
+                    }
+                    
+                    // preferencias_notificaciones
+                    if (tablas.preferencias) {
+                        estadoPreferencias.textContent = '✅ Existe';
+                        estadoPreferencias.className = 'estado ok';
+                        log('✅ Tabla preferencias_notificaciones: OK', 'ok');
+                    } else {
+                        estadoPreferencias.textContent = '❌ No existe';
+                        estadoPreferencias.className = 'estado error';
+                        log('❌ Tabla preferencias_notificaciones: No existe', 'error');
+                    }
+
+                    // Mostrar detalle
+                    const tablasList = [
+                        { nombre: 'suscripciones', existe: tablas.suscripciones },
+                        { nombre: 'notificaciones', existe: tablas.notificaciones },
+                        { nombre: 'preferencias_notificaciones', existe: tablas.preferencias }
+                    ];
+                    mostrarDetalleTablas(tablasList);
+
+                    if (tablas.suscripciones && tablas.notificaciones && tablas.preferencias) {
+                        log('✅ ✅ ✅ Todas las tablas están creadas', 'ok');
+                        mostrarMensaje('✅ Todas las tablas están listas', 'exito');
+                    } else {
+                        log('⚠️ Faltan tablas. Ejecuta "Crear Tablas"', 'warning');
+                        mostrarMensaje('⚠️ Faltan tablas por crear', 'error');
+                    }
+                }
+
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'error');
+                document.getElementById('estadoSuscripciones').textContent = '❌ Error';
+                document.getElementById('estadoSuscripciones').className = 'estado error';
+                document.getElementById('estadoNotificaciones').textContent = '❌ Error';
+                document.getElementById('estadoNotificaciones').className = 'estado error';
+                document.getElementById('estadoPreferencias').textContent = '❌ Error';
+                document.getElementById('estadoPreferencias').className = 'estado error';
+            }
+        }
+
+        // ============================================
+        // INICIO - Verificar al cargar
+        // ============================================
+        verificarTablas();
+    </script>
+</body>
+</html>
