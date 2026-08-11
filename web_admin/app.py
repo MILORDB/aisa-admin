@@ -104,7 +104,7 @@ try:
         obtener_productos_tienda_por_negocio,
         obtener_productos_con_stock_negocio,
         obtener_trabajador_negocio,
-        # Nuevas funciones de notificaciones
+        # Funciones de notificaciones
         suscribir_usuario, desuscribir_usuario, esta_suscrito,
         obtener_suscriptores, obtener_suscripciones_usuario,
         registrar_notificacion, registrar_notificacion_negocio,
@@ -206,14 +206,24 @@ def admin_required(f):
     def decorated_function(*args, **kwargs):
         token = request.cookies.get('token')
         if not token:
-            return redirect(url_for('login'))
+            print("❌ No hay token en admin_required")
+            return jsonify({'error': 'No autorizado'}), 401
         try:
             usuario = obtener_usuario_sesion(token)
-            if not usuario or usuario.get('rol') != 'admin':
+            if not usuario:
+                print(f"❌ Usuario no encontrado para token")
+                return jsonify({'error': 'No autorizado'}), 401
+            
+            print(f"🔍 admin_required - Usuario: {usuario.get('username')}, Rol: {usuario.get('rol')}")
+            
+            if usuario.get('rol') != 'admin':
+                print(f"❌ Usuario {usuario.get('username')} no es admin (rol: {usuario.get('rol')})")
                 return jsonify({'error': 'Acceso denegado'}), 403
+            
             return f(*args, **kwargs)
         except Exception as e:
             print(f"❌ Error en admin_required: {e}")
+            traceback.print_exc()
             return jsonify({'error': 'Error de autenticación'}), 401
     return decorated_function
 
@@ -1731,217 +1741,9 @@ def api_actualizar_trabajador_negocio(trabajador_id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/negocio/trabajador/<int:trabajador_id>', methods=['DELETE'])
+@app.route('/api/negocio/trabajador/<int:trabajador_id>/toggle', methods=['POST'])
 @login_required
-def api_eliminar_trabajador_negocio(trabajador_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('SELECT id FROM trabajadores_negocio WHERE negocio_id = %s AND trabajador_id = %s', (negocio_id, trabajador_id))
-        if not cursor.fetchone():
-            conn.close()
-            return jsonify({'error': 'El trabajador no pertenece a tu negocio'}), 403
-        conn.close()
-        
-        exito = eliminar_usuario(trabajador_id)
-        
-        if exito:
-            registrar_log(usuario['id'], 'trabajador_eliminado', f'Trabajador ID: {trabajador_id}')
-            return jsonify({'success': True})
-        else:
-            return jsonify({'error': 'Error al eliminar el trabajador'}), 500
-    except Exception as e:
-        print(f"❌ Error en api_eliminar_trabajador_negocio: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/trabajador/estadisticas', methods=['GET'])
-@login_required
-def api_trabajador_estadisticas():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    if usuario.get('rol') != 'trabajador':
-        return jsonify({'error': 'Solo para trabajadores'}), 403
-    
-    try:
-        stats = obtener_estadisticas_trabajador(usuario['id'])
-        return jsonify({
-            'ventas': stats.get('ventas', 0),
-            'clientes': stats.get('clientes', 0),
-            'ingresos': stats.get('ingresos', 0),
-            'servicios': stats.get('servicios', 0)
-        })
-    except Exception as e:
-        print(f"❌ Error en api_trabajador_estadisticas: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
-# API - VENTAS
-# ============================================
-
-@app.route('/api/ventas', methods=['GET'])
-@login_required
-def api_obtener_ventas():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        trabajador_id = request.args.get('trabajador_id')
-        if trabajador_id:
-            trabajador_id = int(trabajador_id)
-        
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-            if not trabajador_id:
-                trabajador_id = usuario['id']
-        
-        ventas = obtener_ventas(negocio_id, trabajador_id)
-        return jsonify([dict(v) for v in ventas])
-    except Exception as e:
-        print(f"❌ Error en api_obtener_ventas: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/ventas', methods=['POST'])
-@login_required
-def api_crear_venta():
-    """Crear una nueva venta"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'success': False, 'error': 'No autorizado'}), 401
-    
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': 'Datos inválidos'}), 400
-        
-        print(f"📝 Datos de venta recibidos: {data}")
-        
-        cliente = data.get('cliente')
-        producto = data.get('producto')
-        producto_id = data.get('producto_id')
-        cantidad = data.get('cantidad', 1)
-        precio = data.get('precio')
-        total = data.get('total')
-        estado = data.get('estado', 'pagado')
-        empresa = data.get('empresa')
-        tipo = data.get('tipo', 'producto')
-        factura_url = data.get('factura_url')
-        factura = data.get('factura')
-        trabajador_id = data.get('trabajador_id')
-        transferencia_id = data.get('transferencia_id')
-        transferencia_cedula = data.get('transferencia_cedula')
-        transferencia_banco = data.get('transferencia_banco')
-        transferencia_fecha = data.get('transferencia_fecha')
-        
-        if not cliente or not producto or precio is None or total is None:
-            return jsonify({'success': False, 'error': 'Cliente, producto, precio y total son obligatorios'}), 400
-        
-        # Determinar negocio_id
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'success': False, 'error': 'No estás asignado a ningún negocio'}), 403
-            if not trabajador_id:
-                trabajador_id = usuario['id']
-        
-        # Si es oferta, no afecta inventario
-        if estado == 'oferta':
-            producto_id = None
-            factura = None
-        
-        # Crear la venta
-        venta_id = crear_venta(
-            negocio_id, trabajador_id, cliente, producto, producto_id,
-            cantidad, float(precio), float(total), estado, empresa, tipo, factura_url,
-            factura, transferencia_id, transferencia_cedula,
-            transferencia_banco, transferencia_fecha
-        )
-        
-        if not venta_id:
-            return jsonify({'success': False, 'error': 'Error al crear la venta en la base de datos'}), 500
-        
-        # Si no es oferta y tiene producto_id, descontar stock
-        if estado != 'oferta' and producto_id:
-            try:
-                actualizar_stock_producto(producto_id, cantidad)
-                
-                # 🔔 VERIFICAR STOCK BAJO DESPUÉS DE VENTA
-                generar_notificaciones_stock(negocio_id)
-            except Exception as e:
-                print(f"⚠️ Error al actualizar stock: {e}")
-        
-        # Registrar comisión si corresponde
-        if estado != 'oferta' and trabajador_id and producto_id:
-            try:
-                conn = get_db()
-                cursor = conn.cursor()
-                cursor.execute('SELECT comision FROM productos WHERE id = %s', (producto_id,))
-                producto_comision = cursor.fetchone()
-                conn.close()
-                
-                if producto_comision and producto_comision[0] > 0:
-                    monto_comision = float(producto_comision[0]) * cantidad
-                    registrar_comision(negocio_id, trabajador_id, venta_id, producto_id, monto_comision)
-            except Exception as e:
-                print(f"⚠️ Error al registrar comisión: {e}")
-        
-        registrar_log(usuario['id'], 'venta_creada', f'Venta ID: {venta_id}, Cliente: {cliente}')
-        
-        # Generar número de factura si no es oferta
-        factura_numero = None
-        if estado != 'oferta' and empresa:
-            try:
-                factura_numero = generar_numero_factura(negocio_id, empresa)
-                conn = get_db()
-                cursor = conn.cursor()
-                cursor.execute('UPDATE ventas SET factura = %s WHERE id = %s', (factura_numero, venta_id))
-                conn.commit()
-                conn.close()
-            except Exception as e:
-                print(f"⚠️ Error al generar factura: {e}")
-        
-        return jsonify({
-            'success': True,
-            'id': venta_id,
-            'factura': factura_numero,
-            'message': 'Venta creada correctamente'
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en api_crear_venta: {e}")
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/venta/<int:venta_id>/estado', methods=['PUT'])
-@login_required
-def api_actualizar_estado_venta(venta_id):
+def api_toggle_trabajador_negocio(trabajador_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1949,10 +1751,7 @@ def api_actualizar_estado_venta(venta_id):
         return jsonify({'error': 'No autorizado'}), 401
     
     data = request.get_json()
-    estado = data.get('estado')
-    
-    if not estado:
-        return jsonify({'error': 'Estado es requerido'}), 400
+    activo = data.get('activo', 1)
     
     try:
         negocio_id = usuario.get('id')
@@ -1961,21 +1760,21 @@ def api_actualizar_estado_venta(venta_id):
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        exito = actualizar_estado_venta(venta_id, negocio_id, estado)
+        exito = toggle_trabajador_negocio(negocio_id, trabajador_id, activo)
         
         if exito:
-            registrar_log(usuario['id'], 'venta_estado_actualizado', f'Venta ID: {venta_id}, Estado: {estado}')
+            registrar_log(usuario['id'], 'trabajador_toggle', f'Trabajador ID: {trabajador_id}, Activo: {activo}')
             return jsonify({'success': True})
         else:
-            return jsonify({'error': 'Error al actualizar el estado'}), 500
+            return jsonify({'error': 'Error al actualizar el trabajador'}), 500
     except Exception as e:
-        print(f"❌ Error en api_actualizar_estado_venta: {e}")
+        print(f"❌ Error en api_toggle_trabajador_negocio: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
+@app.route('/api/negocio/trabajador/<int:trabajador_id>/eliminar', methods=['DELETE'])
 @login_required
-def api_eliminar_venta(venta_id):
+def api_eliminar_trabajador(trabajador_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -1989,91 +1788,15 @@ def api_eliminar_venta(venta_id):
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        exito, mensaje = eliminar_venta_con_reintegro(venta_id, negocio_id)
+        exito = eliminar_trabajador_definitivo(trabajador_id)
         
         if exito:
-            registrar_log(usuario['id'], 'venta_eliminada', f'Venta ID: {venta_id}')
-            return jsonify({'success': True, 'message': mensaje})
+            registrar_log(usuario['id'], 'trabajador_eliminado', f'Trabajador ID: {trabajador_id}')
+            return jsonify({'success': True})
         else:
-            return jsonify({'error': mensaje}), 500
+            return jsonify({'error': 'Error al eliminar el trabajador'}), 500
     except Exception as e:
-        print(f"❌ Error en api_eliminar_venta: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/venta/<int:venta_id>/factura', methods=['GET'])
-@login_required
-def api_generar_factura(venta_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        es_oferta = request.args.get('oferta', 'false').lower() == 'true'
-        
-        venta = obtener_venta_por_id(venta_id)
-        if not venta:
-            return jsonify({'error': 'Venta no encontrada'}), 404
-        
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        if venta.get('negocio_id') != negocio_id:
-            return jsonify({'error': 'No tienes permiso para acceder a esta venta'}), 403
-        
-        datos_negocio = obtener_datos_negocio(negocio_id)
-        negocio_nombre = datos_negocio.get('nombre_negocio', 'Mi Negocio')
-        negocio_telefono = datos_negocio.get('telefono', '')
-        negocio_direccion = datos_negocio.get('direccion', '')
-        
-        generador = GeneradorReportes(negocio_id, negocio_nombre, negocio_telefono, negocio_direccion)
-        
-        items = []
-        if venta.get('producto') and venta.get('cantidad', 0) > 0:
-            producto_nombre = venta.get('producto')
-            cantidad = venta.get('cantidad', 1)
-            precio_unitario = venta.get('precio', 0) / cantidad if cantidad > 0 else venta.get('precio', 0)
-            subtotal = venta.get('total', 0)
-            
-            items.append({
-                'nombre': producto_nombre,
-                'cantidad': cantidad,
-                'precio': precio_unitario,
-                'subtotal': subtotal
-            })
-        else:
-            items.append({
-                'nombre': venta.get('producto', 'Producto'),
-                'cantidad': 1,
-                'precio': venta.get('precio', 0),
-                'subtotal': venta.get('total', 0)
-            })
-        
-        pdf_bytes = generador.generar_factura_venta(venta, items, es_oferta)
-        
-        response = make_response(pdf_bytes)
-        response.headers.set('Content-Type', 'application/pdf')
-        response.headers.set('Content-Disposition', f'attachment; filename={"oferta" if es_oferta else "factura"}_{venta_id}.pdf')
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error en api_generar_factura: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/todos/ventas', methods=['GET'])
-@admin_required
-def api_todos_ventas():
-    try:
-        ventas = obtener_todas_ventas()
-        return jsonify([dict(v) for v in ventas])
-    except Exception as e:
-        print(f"❌ Error en api_todos_ventas: {e}")
+        print(f"❌ Error en api_eliminar_trabajador: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -2091,13 +1814,16 @@ def api_obtener_contratos():
         return jsonify({'error': 'No autorizado'}), 401
     
     try:
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        if usuario.get('rol') == 'admin':
+            contratos = obtener_todos_contratos()
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            contratos = obtener_contratos(negocio_id)
         
-        contratos = obtener_contratos(negocio_id)
         return jsonify([dict(c) for c in contratos])
     except Exception as e:
         print(f"❌ Error en api_obtener_contratos: {e}")
@@ -2113,19 +1839,23 @@ def api_crear_contrato():
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 401
     
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'admin':
+        return jsonify({'error': 'Solo los negocios pueden crear contratos'}), 403
+    
     data = request.get_json()
-    empresa = data.get('empresa')
-    numero_contrato = data.get('numero_contrato')
+    print(f"📝 Datos para crear contrato: {data}")
+    
+    trabajador_id = data.get('trabajador_id')
+    tipo = data.get('tipo')
+    salario = data.get('salario')
+    salario_promedio = data.get('salario_promedio')
+    frecuencia_pago = data.get('frecuencia_pago', 'mensual')
     fecha_inicio = data.get('fecha_inicio')
     fecha_fin = data.get('fecha_fin')
-    tipo = data.get('tipo', 'ventas')
-    monto = data.get('monto', 0)
-    estado = data.get('estado', 'activo')
     descripcion = data.get('descripcion', '')
-    trabajador_id = data.get('trabajador_id')
     
-    if not empresa or not numero_contrato or not fecha_inicio or not fecha_fin:
-        return jsonify({'error': 'Empresa, número de contrato, fecha inicio y fecha fin son obligatorios'}), 400
+    if not trabajador_id or not tipo or salario is None:
+        return jsonify({'error': 'Trabajador, tipo y salario son obligatorios'}), 400
     
     try:
         negocio_id = usuario.get('id')
@@ -2134,10 +1864,20 @@ def api_crear_contrato():
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        contrato_id = crear_contrato(negocio_id, trabajador_id, empresa, numero_contrato, fecha_inicio, fecha_fin, tipo, float(monto), estado, descripcion)
+        contrato_id = crear_contrato(
+            negocio_id,
+            trabajador_id,
+            tipo,
+            float(salario),
+            float(salario_promedio) if salario_promedio else None,
+            frecuencia_pago,
+            fecha_inicio,
+            fecha_fin,
+            descripcion
+        )
         
         if contrato_id:
-            registrar_log(usuario['id'], 'contrato_creado', f'Contrato: {empresa} (ID: {contrato_id})')
+            registrar_log(usuario['id'], 'contrato_creado', f'Contrato ID: {contrato_id}')
             return jsonify({'success': True, 'id': contrato_id})
         else:
             return jsonify({'error': 'Error al crear el contrato'}), 500
@@ -2156,27 +1896,37 @@ def api_actualizar_contrato(contrato_id):
         return jsonify({'error': 'No autorizado'}), 401
     
     data = request.get_json()
-    empresa = data.get('empresa')
+    tipo = data.get('tipo')
+    salario = data.get('salario')
+    salario_promedio = data.get('salario_promedio')
+    frecuencia_pago = data.get('frecuencia_pago')
     fecha_inicio = data.get('fecha_inicio')
     fecha_fin = data.get('fecha_fin')
-    tipo = data.get('tipo')
-    monto = data.get('monto')
-    estado = data.get('estado')
     descripcion = data.get('descripcion')
     
-    if not empresa or not fecha_inicio or not fecha_fin:
-        return jsonify({'error': 'Empresa, fecha inicio y fecha fin son obligatorios'}), 400
-    
     try:
-        actualizar_contrato(contrato_id, empresa, fecha_inicio, fecha_fin, tipo, float(monto) if monto else 0, estado, descripcion)
-        registrar_log(usuario['id'], 'contrato_actualizado', f'Contrato ID: {contrato_id}')
-        return jsonify({'success': True})
+        exito = actualizar_contrato(
+            contrato_id,
+            tipo,
+            float(salario) if salario else None,
+            float(salario_promedio) if salario_promedio else None,
+            frecuencia_pago,
+            fecha_inicio,
+            fecha_fin,
+            descripcion
+        )
+        
+        if exito:
+            registrar_log(usuario['id'], 'contrato_actualizado', f'Contrato ID: {contrato_id}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al actualizar el contrato'}), 500
     except Exception as e:
         print(f"❌ Error en api_actualizar_contrato: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/contrato/<int:contrato_id>/estado', methods=['PUT'])
+@app.route('/api/contrato/<int:contrato_id>/estado', methods=['POST'])
 @login_required
 def api_actualizar_estado_contrato(contrato_id):
     token = request.cookies.get('token')
@@ -2188,13 +1938,17 @@ def api_actualizar_estado_contrato(contrato_id):
     data = request.get_json()
     estado = data.get('estado')
     
-    if not estado:
-        return jsonify({'error': 'Estado es requerido'}), 400
+    if estado not in ['activo', 'finalizado', 'cancelado']:
+        return jsonify({'error': 'Estado inválido'}), 400
     
     try:
-        actualizar_estado_contrato(contrato_id, estado)
-        registrar_log(usuario['id'], 'contrato_estado_actualizado', f'Contrato ID: {contrato_id}, Estado: {estado}')
-        return jsonify({'success': True})
+        exito = actualizar_estado_contrato(contrato_id, estado)
+        
+        if exito:
+            registrar_log(usuario['id'], 'contrato_estado', f'Contrato ID: {contrato_id}, Estado: {estado}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al actualizar el estado'}), 500
     except Exception as e:
         print(f"❌ Error en api_actualizar_estado_contrato: {e}")
         traceback.print_exc()
@@ -2210,256 +1964,15 @@ def api_eliminar_contrato(contrato_id):
         return jsonify({'error': 'No autorizado'}), 401
     
     try:
-        eliminar_contrato(contrato_id)
-        registrar_log(usuario['id'], 'contrato_eliminado', f'Contrato ID: {contrato_id}')
-        return jsonify({'success': True})
+        exito = eliminar_contrato(contrato_id)
+        
+        if exito:
+            registrar_log(usuario['id'], 'contrato_eliminado', f'Contrato ID: {contrato_id}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al eliminar el contrato'}), 500
     except Exception as e:
         print(f"❌ Error en api_eliminar_contrato: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/contratos/ultimo_numero', methods=['GET'])
-@login_required
-def api_obtener_ultimo_numero_contrato():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        ultimo = obtener_ultimo_numero_contrato(negocio_id)
-        return jsonify({'ultimo_numero': ultimo})
-    except Exception as e:
-        print(f"❌ Error en api_obtener_ultimo_numero_contrato: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/contratos/empresas', methods=['GET'])
-@login_required
-def api_obtener_empresas_contratos():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        empresas = obtener_empresas_con_contratos_activos(negocio_id)
-        return jsonify(empresas)
-    except Exception as e:
-        print(f"❌ Error en api_obtener_empresas_contratos: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/todos/contratos', methods=['GET'])
-@admin_required
-def api_todos_contratos():
-    try:
-        contratos = obtener_todos_contratos()
-        return jsonify([dict(c) for c in contratos])
-    except Exception as e:
-        print(f"❌ Error en api_todos_contratos: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
-# API - REPORTES
-# ============================================
-
-@app.route('/api/reportes/contratos/resumen', methods=['GET'])
-@login_required
-def api_reportes_contratos_resumen():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        resumen = obtener_resumen_contratos(negocio_id)
-        return jsonify(resumen)
-    except Exception as e:
-        print(f"❌ Error en api_reportes_contratos_resumen: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/reportes/ingresos/resumen', methods=['GET'])
-@login_required
-def api_reportes_ingresos_resumen():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        resumen = obtener_resumen_ingresos(negocio_id)
-        return jsonify(resumen)
-    except Exception as e:
-        print(f"❌ Error en api_reportes_ingresos_resumen: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/reportes/productos/resumen', methods=['GET'])
-@login_required
-def api_reportes_productos_resumen():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        resumen = obtener_resumen_productos(negocio_id)
-        return jsonify(resumen)
-    except Exception as e:
-        print(f"❌ Error en api_reportes_productos_resumen: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/reportes/contratos', methods=['GET'])
-@login_required
-def api_reporte_contratos():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        tipo = request.args.get('tipo', 'todos')
-        
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        contratos = obtener_contratos(negocio_id)
-        
-        if tipo == 'activos':
-            contratos = [c for c in contratos if c.get('estado') == 'activo']
-        elif tipo == 'vencidos':
-            contratos = [c for c in contratos if c.get('estado') == 'vencido']
-        
-        datos_negocio = obtener_datos_negocio(negocio_id)
-        negocio_nombre = datos_negocio.get('nombre_negocio', 'Mi Negocio')
-        negocio_telefono = datos_negocio.get('telefono', '')
-        
-        generador = GeneradorReportes(negocio_id, negocio_nombre, negocio_telefono)
-        pdf_bytes = generador.generar_reporte_contratos(contratos, tipo)
-        
-        response = make_response(pdf_bytes)
-        response.headers.set('Content-Type', 'application/pdf')
-        response.headers.set('Content-Disposition', f'attachment; filename=reporte_contratos_{tipo}.pdf')
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error en api_reporte_contratos: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/reportes/ingresos', methods=['GET'])
-@login_required
-def api_reporte_ingresos():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        tipo = request.args.get('tipo', 'hoy')
-        
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        ventas, total_ingresos, total_ventas = obtener_ventas_por_periodo(negocio_id, tipo)
-        
-        datos_negocio = obtener_datos_negocio(negocio_id)
-        negocio_nombre = datos_negocio.get('nombre_negocio', 'Mi Negocio')
-        negocio_telefono = datos_negocio.get('telefono', '')
-        
-        generador = GeneradorReportes(negocio_id, negocio_nombre, negocio_telefono)
-        periodo = {'hoy': 'Hoy', 'semana': 'Esta Semana', 'mes': 'Este Mes', 'todos': 'Todos los períodos'}.get(tipo, '')
-        pdf_bytes = generador.generar_reporte_ingresos(ventas, total_ingresos, total_ventas, periodo)
-        
-        response = make_response(pdf_bytes)
-        response.headers.set('Content-Type', 'application/pdf')
-        response.headers.set('Content-Disposition', f'attachment; filename=reporte_ingresos_{tipo}.pdf')
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error en api_reporte_ingresos: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/reportes/productos', methods=['GET'])
-@login_required
-def api_reporte_productos():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        productos = obtener_productos(negocio_id)
-        
-        datos_negocio = obtener_datos_negocio(negocio_id)
-        negocio_nombre = datos_negocio.get('nombre_negocio', 'Mi Negocio')
-        negocio_telefono = datos_negocio.get('telefono', '')
-        
-        generador = GeneradorReportes(negocio_id, negocio_nombre, negocio_telefono)
-        pdf_bytes = generador.generar_reporte_productos(productos)
-        
-        response = make_response(pdf_bytes)
-        response.headers.set('Content-Type', 'application/pdf')
-        response.headers.set('Content-Disposition', 'attachment; filename=reporte_inventario.pdf')
-        return response
-        
-    except Exception as e:
-        print(f"❌ Error en api_reporte_productos: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -2467,63 +1980,40 @@ def api_reporte_productos():
 # API - NÓMINA
 # ============================================
 
-@app.route('/api/nomina/asistencia', methods=['POST'])
+@app.route('/api/nomina', methods=['GET'])
 @login_required
-def api_registrar_asistencia():
+def api_obtener_nomina():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 401
     
-    data = request.get_json()
-    trabajador_id = data.get('trabajador_id')
-    fecha = data.get('fecha')
-    presente = data.get('presente', 1)
-    horas = data.get('horas', 8)
-    
-    if not trabajador_id or not fecha:
-        return jsonify({'error': 'Trabajador ID y fecha son requeridos'}), 400
-    
     try:
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        mes = request.args.get('mes')
+        anio = request.args.get('anio')
         
-        exito = registrar_asistencia(trabajador_id, negocio_id, fecha, presente, horas)
-        
-        if exito:
-            return jsonify({'success': True})
+        if not mes or not anio:
+            fecha = datetime.now()
+            mes = fecha.month
+            anio = fecha.year
         else:
-            return jsonify({'error': 'Error al registrar asistencia'}), 500
+            mes = int(mes)
+            anio = int(anio)
+        
+        if usuario.get('rol') == 'admin':
+            nomina = obtener_nomina_mes(mes, anio)
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            nomina = obtener_nomina_mes(mes, anio, negocio_id)
+        
+        return jsonify([dict(n) for n in nomina])
     except Exception as e:
-        print(f"❌ Error en api_registrar_asistencia: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/nomina/comisiones', methods=['GET'])
-@login_required
-def api_obtener_comisiones():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    trabajador_id = request.args.get('trabajador_id')
-    mes = request.args.get('mes')
-    ano = request.args.get('ano')
-    
-    if not trabajador_id or not mes or not ano:
-        return jsonify({'error': 'trabajador_id, mes y ano son requeridos'}), 400
-    
-    try:
-        comisiones = obtener_comisiones_trabajador_mes(int(trabajador_id), int(mes), int(ano))
-        return jsonify({'comisiones': [dict(c) for c in comisiones]})
-    except Exception as e:
-        print(f"❌ Error en api_obtener_comisiones: {e}")
+        print(f"❌ Error en api_obtener_nomina: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
@@ -2538,711 +2028,104 @@ def api_calcular_nomina():
     
     data = request.get_json()
     trabajador_id = data.get('trabajador_id')
-    mes = data.get('mes')
-    ano = data.get('ano')
-    dias_trabajados = data.get('dias_trabajados')
+    mes = data.get('mes', datetime.now().month)
+    anio = data.get('anio', datetime.now().year)
     
-    if not trabajador_id or not mes or not ano:
-        return jsonify({'error': 'trabajador_id, mes y ano son requeridos'}), 400
+    if not trabajador_id:
+        return jsonify({'error': 'Trabajador ID es requerido'}), 400
     
     try:
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        resultado = calcular_nomina(negocio_id, int(trabajador_id), int(mes), int(ano))
+        resultado = calcular_nomina(trabajador_id, mes, anio)
         
         if resultado:
-            return jsonify({'success': True, 'nomina': resultado})
+            return jsonify(resultado)
         else:
-            return jsonify({'error': 'Error al calcular la nómina'}), 500
+            return jsonify({'error': 'No se pudo calcular la nómina'}), 500
     except Exception as e:
         print(f"❌ Error en api_calcular_nomina: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/nomina/detalle', methods=['GET'])
+@app.route('/api/nomina/trabajador/<int:trabajador_id>', methods=['GET'])
 @login_required
-def api_obtener_detalle_nomina():
+def api_obtener_nomina_trabajador(trabajador_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
     if not usuario:
         return jsonify({'error': 'No autorizado'}), 401
     
-    trabajador_id = request.args.get('trabajador_id')
-    mes = request.args.get('mes')
-    ano = request.args.get('ano')
-    
-    if not trabajador_id or not mes or not ano:
-        return jsonify({'error': 'trabajador_id, mes y ano son requeridos'}), 400
-    
     try:
-        detalle = obtener_detalle_nomina(int(trabajador_id), int(mes), int(ano))
-        return jsonify({'success': True, 'detalle': detalle})
-    except Exception as e:
-        print(f"❌ Error en api_obtener_detalle_nomina: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/nomina/reporte', methods=['GET'])
-@login_required
-def api_generar_reporte_nomina():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    trabajador_id = request.args.get('trabajador_id')
-    mes = request.args.get('mes')
-    ano = request.args.get('ano')
-    
-    if not trabajador_id or not mes or not ano:
-        return jsonify({'error': 'trabajador_id, mes y ano son requeridos'}), 400
-    
-    try:
-        negocio_id = usuario.get('id')
-        if usuario.get('rol') == 'trabajador':
-            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-            if not negocio_id:
-                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        mes = request.args.get('mes', datetime.now().month, type=int)
+        anio = request.args.get('anio', datetime.now().year, type=int)
         
-        detalle = obtener_detalle_nomina(int(trabajador_id), int(mes), int(ano))
+        nomina = obtener_nomina_trabajador(trabajador_id, mes, anio)
         
-        if not detalle:
+        if nomina:
+            return jsonify(dict(nomina))
+        else:
             return jsonify({'error': 'No se encontró nómina para este trabajador'}), 404
-        
-        from reportlab.lib.pagesizes import A4
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib import colors
-        from reportlab.lib.units import cm
-        import io
-        
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
-        styles = getSampleStyleSheet()
-        elementos = []
-        
-        estilo_titulo = ParagraphStyle('Titulo', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#6c3ce0'), alignment=1)
-        elementos.append(Paragraph('Reporte de Nómina', estilo_titulo))
-        elementos.append(Spacer(1, 0.5*cm))
-        
-        meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-        elementos.append(Paragraph(f'Trabajador: {detalle.get("nombre", "")}', styles['Normal']))
-        elementos.append(Paragraph(f'Período: {meses[int(mes)-1]} {ano}', styles['Normal']))
-        elementos.append(Spacer(1, 0.5*cm))
-        
-        datos = [
-            ['Concepto', 'Valor'],
-            ['Salario Base', f'${detalle.get("salario_base", 0):.2f}'],
-            ['Días del Mes', str(detalle.get("dias_mes", 0))],
-            ['Días Trabajados', str(detalle.get("dias_trabajados", 0))],
-            ['Ausencias', str(detalle.get("dias_ausencia", 0))],
-            ['Días Extras', str(detalle.get("dias_extras", 0))],
-            ['Salario Diario', f'${detalle.get("salario_diario", 0):.2f}'],
-            ['Salario Devengado', f'${detalle.get("salario_devengado", 0):.2f}'],
-            ['Comisiones', f'${detalle.get("comisiones", 0):.2f}'],
-            ['TOTAL', f'${detalle.get("total", 0):.2f}']
-        ]
-        
-        tabla = Table(datos, colWidths=[8*cm, 6*cm])
-        tabla.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#6c3ce0')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
-            ('TOPPADDING', (0, 0), (-1, 0), 6),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 9),
-            ('TOPPADDING', (0, 1), (-1, -1), 4),
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
-            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
-            ('BACKGROUND', (0, 8), (-1, 9), colors.HexColor('#e8e8f0')),
-        ]))
-        
-        elementos.append(tabla)
-        doc.build(elementos)
-        
-        pdf_bytes = buffer.getvalue()
-        buffer.close()
-        
-        response = make_response(pdf_bytes)
-        response.headers.set('Content-Type', 'application/pdf')
-        response.headers.set('Content-Disposition', f'attachment; filename=nomina_{trabajador_id}_{mes}_{ano}.pdf')
-        return response
-        
     except Exception as e:
-        print(f"❌ Error en api_generar_reporte_nomina: {e}")
+        print(f"❌ Error en api_obtener_nomina_trabajador: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-# ============================================
-# API - LOGS
-# ============================================
-
-@app.route('/api/logs', methods=['GET'])
-@admin_required
-def api_logs():
+@app.route('/api/nomina/resumen', methods=['GET'])
+@login_required
+def api_resumen_nomina():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
     try:
-        limit = request.args.get('limit', 50, type=int)
-        logs = obtener_logs(limit)
-        return jsonify([dict(l) for l in logs])
+        if usuario.get('rol') == 'admin':
+            resumen = obtener_resumen_nomina()
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            resumen = obtener_resumen_nomina(negocio_id)
+        
+        return jsonify(resumen)
     except Exception as e:
-        print(f"❌ Error en api_logs: {e}")
+        print(f"❌ Error en api_resumen_nomina: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-# ============================================
-# API - STORAGE (GOOGLE DRIVE)
-# ============================================
-
-@app.route('/api/storage/estado', methods=['GET'])
-@admin_required
-def api_storage_estado():
-    """Obtiene el estado del almacenamiento"""
+@app.route('/api/nomina/asistencia', methods=['GET'])
+@login_required
+def api_obtener_asistencia():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
     try:
-        storage = get_storage_manager()
-        estado = storage.obtener_estado()
-        return jsonify(estado)
+        mes = request.args.get('mes', datetime.now().month, type=int)
+        anio = request.args.get('anio', datetime.now().year, type=int)
+        
+        if usuario.get('rol') == 'trabajador':
+            trabajador_id = usuario['id']
+        else:
+            trabajador_id = request.args.get('trabajador_id', type=int)
+            if not trabajador_id:
+                return jsonify({'error': 'Trabajador ID es requerido'}), 400
+        
+        asistencia = obtener_asistencia_mes(trabajador_id, mes, anio)
+        return jsonify(asistencia)
     except Exception as e:
-        print(f"❌ Error en api_storage_estado: {e}")
+        print(f"❌ Error en api_obtener_asistencia: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/storage/auth', methods=['GET'])
-@admin_required
-def api_storage_auth():
-    """Re-autenticar con Google Drive"""
-    try:
-        token_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'token.pickle')
-        if os.path.exists(token_file):
-            os.remove(token_file)
-            print(f"🗑️ Token eliminado: {token_file}")
-        
-        storage = get_storage_manager()
-        estado = storage.obtener_estado()
-        return jsonify({'success': True, 'estado': estado})
-    except Exception as e:
-        print(f"❌ Error en api_storage_auth: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
-# ENDPOINTS DE REPARACIÓN
-# ============================================
-
-@app.route('/fix-admin', methods=['GET'])
-def fix_admin_endpoint():
-    """Endpoint para reparar el admin"""
-    try:
-        DATABASE_URL = os.environ.get('DATABASE_URL', '')
-        
-        if not DATABASE_URL:
-            return "<h1 style='color:#ff6b6b;'>❌ DATABASE_URL no está configurada</h1>", 500
-        
-        url = DATABASE_URL.strip()
-        if not url.startswith('postgresql://') and not url.startswith('postgres://'):
-            url = 'postgresql://' + url
-        
-        parsed = urllib.parse.urlparse(url)
-        
-        conn = psycopg2.connect(
-            host=parsed.hostname or 'localhost',
-            port=parsed.port or 5432,
-            database=parsed.path.lstrip('/') if parsed.path else '',
-            user=parsed.username or '',
-            password=parsed.password or '',
-            sslmode='require'
-        )
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        import bcrypt
-        
-        cursor.execute("SELECT * FROM usuarios WHERE username = 'admin'")
-        admin = cursor.fetchone()
-        
-        if not admin:
-            password = "admin123"
-            salt = bcrypt.gensalt()
-            password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
-            fecha = datetime.now().isoformat()
-            
-            cursor.execute('''
-                INSERT INTO usuarios (username, email, password_hash, nombre, rol, tipo, fecha_registro, activo, aprobado, verificado)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 1, 1, 1)
-            ''', ('admin', 'admin@aisa.com', password_hash, 'Administrador', 'admin', 'admin', fecha))
-            conn.commit()
-        
-        cursor.execute('''
-            UPDATE usuarios 
-            SET rol = 'admin', tipo = 'admin', activo = 1, aprobado = 1, verificado = 1
-            WHERE username = 'admin'
-        ''')
-        conn.commit()
-        conn.close()
-        
-        return """
-        <html>
-            <head><title>Admin Reparado</title></head>
-            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
-                <h1 style="color:#6c3ce0;">✅ Admin reparado correctamente</h1>
-                <p style="color:#888;">Usuario: <strong style="color:#6c3ce0;">admin</strong></p>
-                <p style="color:#888;">Contraseña: <strong style="color:#6c3ce0;">admin123</strong></p>
-                <br>
-                <a href="/login" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Ir al Login</a>
-            </body>
-        </html>
-        """
-        
-    except Exception as e:
-        return f"""
-        <html>
-            <head><title>Error</title></head>
-            <body style="background:#0f0f1a;color:#fff;font-family:sans-serif;padding:40px;text-align:center;">
-                <h1 style="color:#ff6b6b;">❌ Error</h1>
-                <pre style="color:#aaa;text-align:left;background:#1a1a2e;padding:20px;border-radius:8px;max-width:800px;margin:20px auto;">{e}</pre>
-                <a href="/login" style="color:#6c3ce0;text-decoration:none;border:1px solid #6c3ce0;padding:10px 20px;border-radius:8px;">Volver al Login</a>
-            </body>
-        </html>
-        """, 500
-
-# ============================================
-# ENDPOINTS DE INSTALACIÓN - NOTIFICACIONES
-# ============================================
-
-@app.route('/fix-notificaciones')
-@admin_required
-def fix_notificaciones():
-    """Página de instalación de notificaciones"""
-    return render_template('fix-notificaciones.html')
-
-@app.route('/api/instalar/tablas-notificaciones', methods=['POST'])
-@admin_required
-def api_instalar_tablas_notificaciones():
-    """Crea las tablas de notificaciones y suscripciones"""
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        tablas_creadas = []
-        
-        # 1. Tabla suscripciones
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS suscripciones (
-                id SERIAL PRIMARY KEY,
-                usuario_id INTEGER NOT NULL,
-                negocio_id INTEGER NOT NULL,
-                fecha_suscripcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                activo INTEGER DEFAULT 1,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-                UNIQUE(usuario_id, negocio_id)
-            )
-        ''')
-        tablas_creadas.append({'nombre': 'suscripciones', 'existe': True})
-        print("✅ Tabla suscripciones creada/verificada")
-        
-        # 2. Tabla notificaciones
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS notificaciones (
-                id SERIAL PRIMARY KEY,
-                usuario_id INTEGER NOT NULL,
-                negocio_id INTEGER NOT NULL,
-                tipo TEXT NOT NULL,
-                titulo TEXT NOT NULL,
-                mensaje TEXT NOT NULL,
-                leido INTEGER DEFAULT 0,
-                fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                url TEXT,
-                producto_id INTEGER,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-                FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-                FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
-            )
-        ''')
-        tablas_creadas.append({'nombre': 'notificaciones', 'existe': True})
-        print("✅ Tabla notificaciones creada/verificada")
-        
-        # 3. Tabla preferencias_notificaciones
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS preferencias_notificaciones (
-                id SERIAL PRIMARY KEY,
-                usuario_id INTEGER NOT NULL,
-                notificaciones_email INTEGER DEFAULT 1,
-                notificaciones_push INTEGER DEFAULT 1,
-                notificaciones_in_app INTEGER DEFAULT 1,
-                alerta_stock_bajo INTEGER DEFAULT 1,
-                alerta_producto_nuevo INTEGER DEFAULT 1,
-                alerta_stock_actualizado INTEGER DEFAULT 0,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
-                UNIQUE(usuario_id)
-            )
-        ''')
-        tablas_creadas.append({'nombre': 'preferencias_notificaciones', 'existe': True})
-        print("✅ Tabla preferencias_notificaciones creada/verificada")
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'message': 'Tablas de notificaciones creadas correctamente',
-            'tablas': tablas_creadas
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en api_instalar_tablas_notificaciones: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/instalar/verificar-notificaciones', methods=['GET'])
-@admin_required
-def api_instalar_verificar_notificaciones():
-    """Verifica si las tablas de notificaciones existen"""
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        tablas = {}
-        
-        # Verificar suscripciones
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'suscripciones'
-            )
-        """)
-        tablas['suscripciones'] = cursor.fetchone()[0]
-        
-        # Verificar notificaciones
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'notificaciones'
-            )
-        """)
-        tablas['notificaciones'] = cursor.fetchone()[0]
-        
-        # Verificar preferencias_notificaciones
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables 
-                WHERE table_name = 'preferencias_notificaciones'
-            )
-        """)
-        tablas['preferencias'] = cursor.fetchone()[0]
-        
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'tablas': tablas
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en api_instalar_verificar_notificaciones: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/instalar/preferencias-usuarios', methods=['POST'])
-@admin_required
-def api_instalar_preferencias_usuarios():
-    """Crea preferencias de notificaciones para todos los usuarios que no tengan"""
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        # Obtener usuarios sin preferencias
-        cursor.execute('''
-            SELECT u.id FROM usuarios u
-            LEFT JOIN preferencias_notificaciones p ON u.id = p.usuario_id
-            WHERE p.id IS NULL
-        ''')
-        usuarios = cursor.fetchall()
-        
-        procesados = 0
-        for u in usuarios:
-            cursor.execute('''
-                INSERT INTO preferencias_notificaciones (usuario_id)
-                VALUES (%s)
-            ''', (u[0],))
-            procesados += 1
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'message': f'Preferencias creadas para {procesados} usuarios',
-            'usuarios_procesados': procesados
-        })
-        
-    except Exception as e:
-        print(f"❌ Error en api_instalar_preferencias_usuarios: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-# ============================================
-# API - SUSCRIPCIONES
-# ============================================
-
-@app.route('/api/suscribir/<int:negocio_id>', methods=['POST'])
+@app.route('/api/nomina/asistencia/registrar', methods=['POST'])
 @login_required
-def api_suscribir(negocio_id):
-    """Suscribe al usuario autenticado a un negocio"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    if usuario.get('id') == negocio_id:
-        return jsonify({'error': 'No puedes suscribirte a tu propio negocio'}), 400
-    
-    # Verificar que el negocio existe
-    negocio = obtener_usuario_por_id(negocio_id)
-    if not negocio or negocio.get('tipo') != 'negocio':
-        return jsonify({'error': 'El negocio no existe'}), 404
-    
-    # Verificar si ya está suscrito
-    if esta_suscrito(usuario['id'], negocio_id):
-        return jsonify({
-            'success': True,
-            'message': 'Ya estás suscrito a este negocio',
-            'suscrito': True
-        })
-    
-    exito = suscribir_usuario(usuario['id'], negocio_id)
-    
-    if exito:
-        registrar_log(usuario['id'], 'suscripcion', f'Usuario suscrito al negocio {negocio_id}')
-        return jsonify({
-            'success': True,
-            'message': '✅ Te has suscrito correctamente',
-            'suscrito': True
-        })
-    else:
-        return jsonify({'error': 'Error al suscribirse'}), 500
-
-@app.route('/api/desuscribir/<int:negocio_id>', methods=['POST'])
-@login_required
-def api_desuscribir(negocio_id):
-    """Desuscribe al usuario autenticado de un negocio"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    if not esta_suscrito(usuario['id'], negocio_id):
-        return jsonify({
-            'success': True,
-            'message': 'No estás suscrito a este negocio',
-            'suscrito': False
-        })
-    
-    exito = desuscribir_usuario(usuario['id'], negocio_id)
-    
-    if exito:
-        registrar_log(usuario['id'], 'desuscripcion', f'Usuario desuscrito del negocio {negocio_id}')
-        return jsonify({
-            'success': True,
-            'message': '✅ Te has desuscrito correctamente',
-            'suscrito': False
-        })
-    else:
-        return jsonify({'error': 'Error al desuscribirse'}), 500
-
-@app.route('/api/esta-suscrito/<int:negocio_id>', methods=['GET'])
-@login_required
-def api_esta_suscrito(negocio_id):
-    """Verifica si el usuario está suscrito a un negocio"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    suscrito = esta_suscrito(usuario['id'], negocio_id)
-    
-    return jsonify({
-        'success': True,
-        'suscrito': suscrito
-    })
-
-@app.route('/api/mis-suscripciones', methods=['GET'])
-@login_required
-def api_mis_suscripciones():
-    """Obtiene todos los negocios a los que el usuario está suscrito"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    suscripciones = obtener_suscripciones_usuario(usuario['id'])
-    
-    return jsonify({
-        'success': True,
-        'suscripciones': [dict(s) for s in suscripciones]
-    })
-
-@app.route('/api/negocio/suscriptores', methods=['GET'])
-@login_required
-def api_negocio_suscriptores():
-    """Obtiene los suscriptores del negocio del usuario"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    negocio_id = usuario.get('id')
-    if usuario.get('rol') == 'trabajador':
-        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-        if not negocio_id:
-            return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-    
-    suscriptores = obtener_suscriptores(negocio_id)
-    
-    return jsonify({
-        'success': True,
-        'suscriptores': [dict(s) for s in suscriptores],
-        'total': len(suscriptores)
-    })
-
-# ============================================
-# API - NOTIFICACIONES
-# ============================================
-
-@app.route('/api/notificaciones', methods=['GET'])
-@login_required
-def api_notificaciones():
-    """Obtiene las notificaciones del usuario autenticado"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    limite = request.args.get('limite', 50, type=int)
-    offset = request.args.get('offset', 0, type=int)
-    
-    notificaciones = obtener_notificaciones_usuario(usuario['id'], limite, offset)
-    no_leidas = contar_notificaciones_no_leidas(usuario['id'])
-    
-    return jsonify({
-        'success': True,
-        'notificaciones': [dict(n) for n in notificaciones],
-        'no_leidas': no_leidas,
-        'total': len(notificaciones)
-    })
-
-@app.route('/api/notificaciones/no-leidas', methods=['GET'])
-@login_required
-def api_notificaciones_no_leidas():
-    """Obtiene el número de notificaciones no leídas"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    no_leidas = contar_notificaciones_no_leidas(usuario['id'])
-    
-    return jsonify({
-        'success': True,
-        'no_leidas': no_leidas
-    })
-
-@app.route('/api/notificacion/<int:notificacion_id>/leer', methods=['POST'])
-@login_required
-def api_marcar_notificacion_leida(notificacion_id):
-    """Marca una notificación como leída"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    marcar_notificacion_leida(notificacion_id, usuario['id'])
-    
-    return jsonify({
-        'success': True,
-        'message': 'Notificación marcada como leída'
-    })
-
-@app.route('/api/notificaciones/leer-todas', methods=['POST'])
-@login_required
-def api_marcar_todas_notificaciones_leidas():
-    """Marca todas las notificaciones como leídas"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    marcar_todas_notificaciones_leidas(usuario['id'])
-    
-    return jsonify({
-        'success': True,
-        'message': 'Todas las notificaciones marcadas como leídas'
-    })
-
-@app.route('/api/notificaciones/generar-stock', methods=['POST'])
-@login_required
-def api_generar_notificaciones_stock():
-    """Genera notificaciones de stock bajo para el negocio del usuario"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    negocio_id = usuario.get('id')
-    if usuario.get('rol') == 'trabajador':
-        negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-        if not negocio_id:
-            return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-    
-    generar_notificaciones_stock(negocio_id)
-    
-    return jsonify({
-        'success': True,
-        'message': 'Notificaciones de stock generadas'
-    })
-
-# ============================================
-# API - PREFERENCIAS DE NOTIFICACIONES
-# ============================================
-
-@app.route('/api/preferencias-notificaciones', methods=['GET'])
-@login_required
-def api_obtener_preferencias_notificaciones():
-    """Obtiene las preferencias de notificaciones del usuario"""
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    preferencias = obtener_preferencias_notificaciones(usuario['id'])
-    
-    return jsonify({
-        'success': True,
-        'preferencias': preferencias
-    })
-
-@app.route('/api/preferencias-notificaciones', methods=['PUT'])
-@login_required
-def api_actualizar_preferencias_notificaciones():
-    """Actualiza las preferencias de notificaciones del usuario"""
+def api_registrar_asistencia():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -3250,29 +2133,785 @@ def api_actualizar_preferencias_notificaciones():
         return jsonify({'error': 'No autorizado'}), 401
     
     data = request.get_json()
+    trabajador_id = data.get('trabajador_id')
+    fecha = data.get('fecha', datetime.now().date().isoformat())
+    hora_entrada = data.get('hora_entrada')
+    hora_salida = data.get('hora_salida')
+    tipo = data.get('tipo', 'presencial')
+    estado = data.get('estado', 'presente')
+    observaciones = data.get('observaciones', '')
     
-    preferencias = {
-        'notificaciones_email': data.get('notificaciones_email', 1),
-        'notificaciones_push': data.get('notificaciones_push', 1),
-        'notificaciones_in_app': data.get('notificaciones_in_app', 1),
-        'alerta_stock_bajo': data.get('alerta_stock_bajo', 1),
-        'alerta_producto_nuevo': data.get('alerta_producto_nuevo', 1),
-        'alerta_stock_actualizado': data.get('alerta_stock_actualizado', 0)
-    }
+    if not trabajador_id and usuario.get('rol') != 'admin':
+        trabajador_id = usuario['id']
     
-    actualizar_preferencias_notificaciones(usuario['id'], preferencias)
+    if not trabajador_id:
+        return jsonify({'error': 'Trabajador ID es requerido'}), 400
     
-    registrar_log(usuario['id'], 'preferencias_notificaciones', 'Preferencias actualizadas')
-    
-    return jsonify({
-        'success': True,
-        'message': '✅ Preferencias actualizadas correctamente'
-    })
+    try:
+        asistencia_id = registrar_asistencia(
+            trabajador_id,
+            fecha,
+            hora_entrada,
+            hora_salida,
+            tipo,
+            estado,
+            observaciones
+        )
+        
+        if asistencia_id:
+            registrar_log(usuario['id'], 'asistencia_registrada', f'Trabajador: {trabajador_id}, Fecha: {fecha}')
+            return jsonify({'success': True, 'id': asistencia_id})
+        else:
+            return jsonify({'error': 'Error al registrar la asistencia'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_registrar_asistencia: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 # ============================================
-# INICIO DE LA APLICACIÓN
+# API - COMISIONES
 # ============================================
 
+@app.route('/api/comisiones', methods=['GET'])
+@login_required
+def api_obtener_comisiones():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        mes = request.args.get('mes', datetime.now().month, type=int)
+        anio = request.args.get('anio', datetime.now().year, type=int)
+        
+        if usuario.get('rol') == 'admin':
+            comisiones = obtener_comisiones_negocio_mes(mes, anio)
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+                comisiones = obtener_comisiones_trabajador_mes(usuario['id'], mes, anio)
+            else:
+                comisiones = obtener_comisiones_negocio_mes(mes, anio, negocio_id)
+        
+        return jsonify([dict(c) for c in comisiones])
+    except Exception as e:
+        print(f"❌ Error en api_obtener_comisiones: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/comisiones/registrar', methods=['POST'])
+@login_required
+def api_registrar_comision():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'admin':
+        return jsonify({'error': 'Solo los negocios pueden registrar comisiones'}), 403
+    
+    data = request.get_json()
+    trabajador_id = data.get('trabajador_id')
+    monto = data.get('monto')
+    concepto = data.get('concepto', 'Comisión')
+    mes = data.get('mes', datetime.now().month)
+    anio = data.get('anio', datetime.now().year)
+    
+    if not trabajador_id or monto is None:
+        return jsonify({'error': 'Trabajador y monto son obligatorios'}), 400
+    
+    try:
+        comision_id = registrar_comision(
+            trabajador_id,
+            float(monto),
+            concepto,
+            mes,
+            anio
+        )
+        
+        if comision_id:
+            registrar_log(usuario['id'], 'comision_registrada', f'Trabajador: {trabajador_id}, Monto: {monto}')
+            return jsonify({'success': True, 'id': comision_id})
+        else:
+            return jsonify({'error': 'Error al registrar la comisión'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_registrar_comision: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - VENTAS
+# ============================================
+
+@app.route('/api/ventas', methods=['GET'])
+@login_required
+def api_obtener_ventas():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        if usuario.get('rol') == 'admin':
+            ventas = obtener_todas_ventas()
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+                ventas = obtener_ventas(negocio_id, usuario['id'])
+            else:
+                ventas = obtener_ventas(negocio_id)
+        
+        return jsonify([dict(v) for v in ventas])
+    except Exception as e:
+        print(f"❌ Error en api_obtener_ventas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ventas', methods=['POST'])
+@login_required
+def api_crear_venta():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'admin' and usuario.get('rol') != 'trabajador':
+        return jsonify({'error': 'No tienes permiso para crear ventas'}), 403
+    
+    data = request.get_json()
+    print(f"📝 Datos para crear venta: {data}")
+    
+    productos = data.get('productos', [])
+    cliente = data.get('cliente', '')
+    metodo_pago = data.get('metodo_pago', 'efectivo')
+    estado = data.get('estado', 'completada')
+    comision = data.get('comision', 0)
+    
+    if not productos:
+        return jsonify({'error': 'Debe incluir al menos un producto'}), 400
+    
+    try:
+        negocio_id = usuario.get('id')
+        trabajador_id = None
+        
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            trabajador_id = usuario['id']
+        
+        total = sum(p.get('precio', 0) * p.get('cantidad', 0) for p in productos)
+        
+        # Generar número de factura automático
+        numero_factura = generar_numero_factura(negocio_id)
+        
+        venta_id = crear_venta(
+            negocio_id,
+            trabajador_id,
+            numero_factura,
+            total,
+            metodo_pago,
+            cliente,
+            estado,
+            json.dumps(productos)
+        )
+        
+        if venta_id:
+            registrar_log(usuario['id'], 'venta_creada', f'Venta ID: {venta_id}, Total: {total}')
+            return jsonify({'success': True, 'id': venta_id, 'numero_factura': numero_factura})
+        else:
+            return jsonify({'error': 'Error al crear la venta'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_crear_venta: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/venta/<int:venta_id>', methods=['GET'])
+@login_required
+def api_obtener_venta(venta_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        venta = obtener_venta_por_id(venta_id)
+        
+        if not venta:
+            return jsonify({'error': 'Venta no encontrada'}), 404
+        
+        # Verificar que el usuario tenga acceso a esta venta
+        if usuario.get('rol') != 'admin':
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            
+            if venta.get('negocio_id') != negocio_id and venta.get('trabajador_id') != usuario.get('id'):
+                return jsonify({'error': 'No tienes permiso para ver esta venta'}), 403
+        
+        return jsonify(dict(venta))
+    except Exception as e:
+        print(f"❌ Error en api_obtener_venta: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/venta/<int:venta_id>/estado', methods=['POST'])
+@login_required
+def api_actualizar_estado_venta(venta_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    estado = data.get('estado')
+    
+    if estado not in ['completada', 'cancelada', 'pendiente', 'reembolsada']:
+        return jsonify({'error': 'Estado inválido'}), 400
+    
+    try:
+        exito = actualizar_estado_venta(venta_id, estado)
+        
+        if exito:
+            registrar_log(usuario['id'], 'venta_estado', f'Venta ID: {venta_id}, Estado: {estado}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al actualizar el estado'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_actualizar_estado_venta: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_venta(venta_id):
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        exito = eliminar_venta_con_reintegro(venta_id)
+        
+        if exito:
+            registrar_log(usuario['id'], 'venta_eliminada', f'Venta ID: {venta_id}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al eliminar la venta'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_eliminar_venta: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/estadisticas/ventas', methods=['GET'])
+@login_required
+def api_estadisticas_ventas():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        if usuario.get('rol') == 'admin':
+            estadisticas = obtener_estadisticas_ventas()
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            estadisticas = obtener_estadisticas_ventas(negocio_id)
+        
+        return jsonify(estadisticas)
+    except Exception as e:
+        print(f"❌ Error en api_estadisticas_ventas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ventas/periodo', methods=['GET'])
+@login_required
+def api_ventas_por_periodo():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        fecha_inicio = request.args.get('fecha_inicio')
+        fecha_fin = request.args.get('fecha_fin')
+        
+        if not fecha_inicio or not fecha_fin:
+            return jsonify({'error': 'Fecha inicio y fin son requeridas'}), 400
+        
+        if usuario.get('rol') == 'admin':
+            ventas = obtener_ventas_por_periodo(fecha_inicio, fecha_fin)
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            ventas = obtener_ventas_por_periodo(fecha_inicio, fecha_fin, negocio_id)
+        
+        return jsonify([dict(v) for v in ventas])
+    except Exception as e:
+        print(f"❌ Error en api_ventas_por_periodo: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - REPORTES
+# ============================================
+
+@app.route('/api/reporte/ventas', methods=['GET'])
+@login_required
+def api_generar_reporte_ventas():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        fecha_inicio = request.args.get('fecha_inicio')
+        fecha_fin = request.args.get('fecha_fin')
+        formato = request.args.get('formato', 'json')
+        
+        if not fecha_inicio or not fecha_fin:
+            return jsonify({'error': 'Fecha inicio y fin son requeridas'}), 400
+        
+        generador = GeneradorReportes()
+        
+        if usuario.get('rol') == 'admin':
+            reporte = generador.generar_reporte_ventas(fecha_inicio, fecha_fin)
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            reporte = generador.generar_reporte_ventas(fecha_inicio, fecha_fin, negocio_id)
+        
+        if formato == 'pdf':
+            pdf = generador.generar_pdf(reporte)
+            response = make_response(pdf)
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = f'attachment; filename=reporte_ventas_{fecha_inicio}_{fecha_fin}.pdf'
+            return response
+        
+        return jsonify(reporte)
+    except Exception as e:
+        print(f"❌ Error en api_generar_reporte_ventas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reporte/productos', methods=['GET'])
+@login_required
+def api_generar_reporte_productos():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        categoria = request.args.get('categoria')
+        formato = request.args.get('formato', 'json')
+        
+        generador = GeneradorReportes()
+        
+        if usuario.get('rol') == 'admin':
+            reporte = generador.generar_reporte_productos(categoria)
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            reporte = generador.generar_reporte_productos(categoria, negocio_id)
+        
+        if formato == 'pdf':
+            pdf = generador.generar_pdf(reporte)
+            response = make_response(pdf)
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = f'attachment; filename=reporte_productos.pdf'
+            return response
+        
+        return jsonify(reporte)
+    except Exception as e:
+        print(f"❌ Error en api_generar_reporte_productos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - NOTIFICACIONES
+# ============================================
+
+@app.route('/api/notificaciones/preferencias', methods=['GET'])
+@login_required
+def api_obtener_preferencias_notificaciones():
+    """Obtener las preferencias de notificaciones del usuario"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        preferencias = obtener_preferencias_notificaciones(usuario['id'])
+        return jsonify({
+            'success': True,
+            'preferencias': preferencias
+        })
+    except Exception as e:
+        print(f"❌ Error en api_obtener_preferencias_notificaciones: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notificaciones/preferencias', methods=['POST'])
+@login_required
+def api_actualizar_preferencias_notificaciones():
+    """Actualizar las preferencias de notificaciones del usuario"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Datos inválidos'}), 400
+    
+    try:
+        preferencias = data.get('preferencias')
+        if not preferencias:
+            return jsonify({'error': 'Preferencias requeridas'}), 400
+        
+        exito = actualizar_preferencias_notificaciones(usuario['id'], preferencias)
+        
+        if exito:
+            return jsonify({
+                'success': True,
+                'message': 'Preferencias actualizadas correctamente'
+            })
+        else:
+            return jsonify({'error': 'Error al actualizar preferencias'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_actualizar_preferencias_notificaciones: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notificaciones/suscribir', methods=['POST'])
+@login_required
+def api_suscribir_usuario():
+    """Suscriptor para recibir notificaciones push"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Datos inválidos'}), 400
+    
+    endpoint = data.get('endpoint')
+    p256dh = data.get('p256dh')
+    auth = data.get('auth')
+    
+    if not endpoint or not p256dh or not auth:
+        return jsonify({'error': 'Endpoint, p256dh y auth son requeridos'}), 400
+    
+    try:
+        exito = suscribir_usuario(usuario['id'], endpoint, p256dh, auth)
+        
+        if exito:
+            return jsonify({
+                'success': True,
+                'message': 'Usuario suscrito correctamente'
+            })
+        else:
+            return jsonify({'error': 'Error al suscribir usuario'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_suscribir_usuario: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notificaciones/desuscribir', methods=['POST'])
+@login_required
+def api_desuscribir_usuario():
+    """Desuscribir usuario de notificaciones"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Datos inválidos'}), 400
+    
+    endpoint = data.get('endpoint')
+    
+    if not endpoint:
+        return jsonify({'error': 'Endpoint es requerido'}), 400
+    
+    try:
+        exito = desuscribir_usuario(usuario['id'], endpoint)
+        
+        if exito:
+            return jsonify({
+                'success': True,
+                'message': 'Usuario desuscrito correctamente'
+            })
+        else:
+            return jsonify({'error': 'Error al desuscribir usuario'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_desuscribir_usuario: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notificaciones/check', methods=['GET'])
+@login_required
+def api_check_suscripcion():
+    """Verificar si el usuario está suscrito a notificaciones"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    endpoint = request.args.get('endpoint')
+    
+    if not endpoint:
+        return jsonify({'error': 'Endpoint es requerido'}), 400
+    
+    try:
+        suscrito = esta_suscrito(usuario['id'], endpoint)
+        return jsonify({
+            'success': True,
+            'suscrito': suscrito
+        })
+    except Exception as e:
+        print(f"❌ Error en api_check_suscripcion: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notificaciones', methods=['GET'])
+@login_required
+def api_obtener_notificaciones():
+    """Obtener todas las notificaciones del usuario"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        
+        notificaciones = obtener_notificaciones_usuario(usuario['id'], limit, offset)
+        no_leidas = contar_notificaciones_no_leidas(usuario['id'])
+        
+        return jsonify({
+            'success': True,
+            'notificaciones': notificaciones,
+            'no_leidas': no_leidas,
+            'total': len(notificaciones)
+        })
+    except Exception as e:
+        print(f"❌ Error en api_obtener_notificaciones: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notificaciones/no-leidas', methods=['GET'])
+@login_required
+def api_contar_no_leidas():
+    """Contar notificaciones no leídas del usuario"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        no_leidas = contar_notificaciones_no_leidas(usuario['id'])
+        return jsonify({
+            'success': True,
+            'no_leidas': no_leidas
+        })
+    except Exception as e:
+        print(f"❌ Error en api_contar_no_leidas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notificaciones/<int:notificacion_id>/leer', methods=['POST'])
+@login_required
+def api_marcar_notificacion_leida(notificacion_id):
+    """Marcar una notificación como leída"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        exito = marcar_notificacion_leida(notificacion_id)
+        
+        if exito:
+            return jsonify({
+                'success': True,
+                'message': 'Notificación marcada como leída'
+            })
+        else:
+            return jsonify({'error': 'Error al marcar notificación como leída'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_marcar_notificacion_leida: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notificaciones/leer-todas', methods=['POST'])
+@login_required
+def api_marcar_todas_leidas():
+    """Marcar todas las notificaciones como leídas"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        exito = marcar_todas_notificaciones_leidas(usuario['id'])
+        
+        if exito:
+            return jsonify({
+                'success': True,
+                'message': 'Todas las notificaciones marcadas como leídas'
+            })
+        else:
+            return jsonify({'error': 'Error al marcar todas como leídas'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_marcar_todas_leidas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notificaciones/stock', methods=['POST'])
+@login_required
+def api_generar_notificaciones_stock():
+    """Generar notificaciones de stock bajo para el negocio"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        if usuario.get('tipo') != 'negocio' and usuario.get('rol') != 'admin':
+            return jsonify({'error': 'Solo los negocios pueden generar notificaciones de stock'}), 403
+        
+        contador = generar_notificaciones_stock(negocio_id)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Se generaron {contador} notificaciones de stock bajo',
+            'cantidad': contador
+        })
+    except Exception as e:
+        print(f"❌ Error en api_generar_notificaciones_stock: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/notificaciones/enviar-test', methods=['POST'])
+@login_required
+def api_enviar_notificacion_test():
+    """Endpoint para enviar una notificación de prueba (solo para desarrollo)"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        data = request.get_json()
+        titulo = data.get('titulo', '🔔 Notificación de prueba')
+        mensaje = data.get('mensaje', 'Esta es una notificación de prueba del sistema.')
+        icono = data.get('icono', '🔔')
+        
+        # Registrar la notificación en la base de datos
+        notificacion_id = registrar_notificacion(
+            usuario['id'],
+            titulo,
+            mensaje,
+            'test',
+            icono
+        )
+        
+        if notificacion_id:
+            return jsonify({
+                'success': True,
+                'message': 'Notificación de prueba enviada',
+                'notificacion_id': notificacion_id
+            })
+        else:
+            return jsonify({'error': 'Error al enviar notificación de prueba'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_enviar_notificacion_test: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# ENDPOINT PÚBLICO PARA SERVICE WORKER (NUEVO)
+# ============================================
+@app.route('/sw.js')
+def service_worker():
+    """Endpoint público para el Service Worker"""
+    response = make_response(render_template('sw.js'))
+    response.headers['Content-Type'] = 'application/javascript'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+@app.route('/manifest.json')
+def manifest():
+    """Endpoint público para el manifest.json"""
+    response = make_response(render_template('manifest.json'))
+    response.headers['Content-Type'] = 'application/json'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+@app.route('/offline')
+def offline():
+    """Página offline para cuando no hay conexión"""
+    return render_template('offline.html')
+
+# ============================================
+# INICIAR APLICACIÓN
+# ============================================
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=False)
