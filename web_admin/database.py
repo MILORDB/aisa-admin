@@ -357,6 +357,61 @@ def init_db():
     ''')
     
     # ============================================
+    # TABLA SUSCRIPCIONES (NUEVA)
+    # ============================================
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS suscripciones (
+        id SERIAL PRIMARY KEY,
+        usuario_id INTEGER NOT NULL,
+        negocio_id INTEGER NOT NULL,
+        fecha_suscripcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        activo INTEGER DEFAULT 1,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        UNIQUE(usuario_id, negocio_id)
+    )
+    ''')
+    
+    # ============================================
+    # TABLA NOTIFICACIONES (NUEVA)
+    # ============================================
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS notificaciones (
+        id SERIAL PRIMARY KEY,
+        usuario_id INTEGER NOT NULL,
+        negocio_id INTEGER NOT NULL,
+        tipo TEXT NOT NULL,
+        titulo TEXT NOT NULL,
+        mensaje TEXT NOT NULL,
+        leido INTEGER DEFAULT 0,
+        fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        url TEXT,
+        producto_id INTEGER,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+    )
+    ''')
+    
+    # ============================================
+    # TABLA PREFERENCIAS_NOTIFICACIONES (NUEVA)
+    # ============================================
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS preferencias_notificaciones (
+        id SERIAL PRIMARY KEY,
+        usuario_id INTEGER NOT NULL,
+        notificaciones_email INTEGER DEFAULT 1,
+        notificaciones_push INTEGER DEFAULT 1,
+        notificaciones_in_app INTEGER DEFAULT 1,
+        alerta_stock_bajo INTEGER DEFAULT 1,
+        alerta_producto_nuevo INTEGER DEFAULT 1,
+        alerta_stock_actualizado INTEGER DEFAULT 0,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        UNIQUE(usuario_id)
+    )
+    ''')
+    
+    # ============================================
     # INSERTAR MÓDULOS
     # ============================================
     cursor.execute("SELECT COUNT(*) FROM modulos")
@@ -466,6 +521,16 @@ def crear_usuario(username, email, password, nombre=None, rol='usuario', tipo='c
                 VALUES (%s, %s, 1)
                 ''', (user_id, mod[0]))
         
+        # Crear preferencias de notificaciones para el usuario
+        try:
+            cursor.execute('''
+                INSERT INTO preferencias_notificaciones (usuario_id)
+                VALUES (%s)
+                ON CONFLICT (usuario_id) DO NOTHING
+            ''', (user_id,))
+        except Exception as e:
+            print(f"⚠️ Error creando preferencias: {e}")
+        
         conn.commit()
         print(f"✅ Usuario creado: {username} (ID: {user_id}) - Tipo: {tipo} - Verificado: {verificado}")
         return user_id
@@ -524,6 +589,11 @@ def eliminar_usuario(user_id):
             return False
         
         print(f"🗑️ Eliminando usuario: {usuario[1]} (ID: {user_id}) - Rol: {usuario[2]}")
+        
+        # Eliminar notificaciones y suscripciones primero (nuevas tablas)
+        cursor.execute("DELETE FROM notificaciones WHERE usuario_id = %s OR negocio_id = %s", (user_id, user_id))
+        cursor.execute("DELETE FROM suscripciones WHERE usuario_id = %s OR negocio_id = %s", (user_id, user_id))
+        cursor.execute("DELETE FROM preferencias_notificaciones WHERE usuario_id = %s", (user_id,))
         
         cursor.execute("DELETE FROM codigos_verificacion WHERE usuario_id = %s", (user_id,))
         cursor.execute("DELETE FROM sesiones WHERE usuario_id = %s", (user_id,))
@@ -1579,105 +1649,30 @@ def obtener_estadisticas_trabajador(trabajador_id):
         return {'ventas': 0, 'ingresos': 0, 'servicios': 0, 'clientes': 0}
 
 # ============================================
-# FUNCIONES PARA VENTAS (CORREGIDO)
+# FUNCIONES PARA VENTAS
 # ============================================
 
 def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, cantidad, precio, total,
                 estado='pagado', empresa=None, tipo='producto', factura_url=None,
                 factura=None, transferencia_id=None, transferencia_cedula=None,
                 transferencia_banco=None, transferencia_fecha=None):
-    """
-    Crea una nueva venta en la base de datos
-    
-    Args:
-        negocio_id (int): ID del negocio
-        trabajador_id (int): ID del trabajador (opcional)
-        cliente (str): Nombre del cliente
-        producto (str): Descripción del producto/servicio
-        producto_id (int): ID del producto (opcional)
-        cantidad (int): Cantidad de productos
-        precio (float): Precio unitario
-        total (float): Total de la venta
-        estado (str): Estado de la venta
-        empresa (str): Nombre de la empresa (opcional)
-        tipo (str): Tipo de venta (producto/servicio)
-        factura_url (str): URL de la factura (opcional)
-        factura (str): Número de factura (opcional)
-        transferencia_id (str): ID de transferencia (opcional)
-        transferencia_cedula (str): Cédula de la transferencia (opcional)
-        transferencia_banco (str): Banco de la transferencia (opcional)
-        transferencia_fecha (str): Fecha de la transferencia (opcional)
-    
-    Returns:
-        int: ID de la venta creada o None si hay error
-    """
-    conn = None
-    cursor = None
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        # Validar que el negocio existe
-        cursor.execute('SELECT id FROM usuarios WHERE id = %s AND tipo = %s', (negocio_id, 'negocio'))
-        if not cursor.fetchone():
-            print(f"❌ Error: El negocio {negocio_id} no existe o no es de tipo negocio")
-            return None
-        
-        fecha = datetime.now().isoformat()
-        cursor.execute('''
-        INSERT INTO ventas (
-            negocio_id, trabajador_id, cliente, producto, producto_id,
-            cantidad, precio, total, estado, empresa, tipo, factura_url,
-            factura, transferencia_id, transferencia_cedula,
-            transferencia_banco, transferencia_fecha, fecha, created_at
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-        ''', (
-            negocio_id, 
-            trabajador_id, 
-            cliente, 
-            producto, 
-            producto_id,
-            int(cantidad), 
-            float(precio), 
-            float(total), 
-            estado, 
-            empresa, 
-            tipo, 
-            factura_url,
-            factura, 
-            transferencia_id, 
-            transferencia_cedula,
-            transferencia_banco, 
-            transferencia_fecha, 
-            fecha, 
-            fecha
-        ))
-        
-        venta_id = cursor.fetchone()[0]
-        conn.commit()
-        
-        print(f"✅ Venta creada: ID {venta_id}, Cliente: {cliente}, Total: {total}")
-        return venta_id
-        
-    except psycopg2.Error as e:
-        print(f"❌ Error PostgreSQL en crear_venta: {e}")
-        if conn:
-            conn.rollback()
-        return None
-    except Exception as e:
-        print(f"❌ Error en crear_venta: {e}")
-        import traceback
-        traceback.print_exc()
-        if conn:
-            conn.rollback()
-        return None
-    finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
+    conn = get_db()
+    cursor = conn.cursor()
+    fecha = datetime.now().isoformat()
+    cursor.execute('''
+    INSERT INTO ventas (negocio_id, trabajador_id, cliente, producto, producto_id,
+                        cantidad, precio, total, estado, empresa, tipo, factura_url,
+                        factura, transferencia_id, transferencia_cedula,
+                        transferencia_banco, transferencia_fecha, fecha, created_at)
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    ''', (negocio_id, trabajador_id, cliente, producto, producto_id,
+          cantidad, precio, total, estado, empresa, tipo, factura_url,
+          factura, transferencia_id, transferencia_cedula,
+          transferencia_banco, transferencia_fecha, fecha, fecha))
+    conn.commit()
+    venta_id = cursor.lastrowid
+    conn.close()
+    return venta_id
 
 def obtener_ventas(negocio_id, trabajador_id=None):
     conn = get_db()
@@ -2657,3 +2652,336 @@ def obtener_modulos_trabajador():
     modulos = cursor.fetchall()
     conn.close()
     return modulos
+
+
+# ============================================
+# FUNCIONES PARA SUSCRIPCIONES Y NOTIFICACIONES (NUEVAS)
+# ============================================
+
+def suscribir_usuario(usuario_id, negocio_id):
+    """Suscribe a un usuario a un negocio"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO suscripciones (usuario_id, negocio_id, fecha_suscripcion, activo)
+            VALUES (%s, %s, CURRENT_TIMESTAMP, 1)
+            ON CONFLICT (usuario_id, negocio_id) DO UPDATE SET
+                activo = 1,
+                fecha_suscripcion = CURRENT_TIMESTAMP
+        ''', (usuario_id, negocio_id))
+        conn.commit()
+        
+        # Notificar al negocio
+        usuario = obtener_usuario_por_id(usuario_id)
+        negocio = obtener_usuario_por_id(negocio_id)
+        if usuario and negocio:
+            registrar_notificacion(
+                negocio_id,
+                negocio_id,
+                'nuevo_suscriptor',
+                f'👤 Nuevo suscriptor',
+                f'{usuario.get("nombre", usuario.get("username"))} se ha suscrito a tu tienda'
+            )
+        
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error en suscribir_usuario: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+def desuscribir_usuario(usuario_id, negocio_id):
+    """Desuscribe a un usuario de un negocio"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            UPDATE suscripciones SET activo = 0
+            WHERE usuario_id = %s AND negocio_id = %s
+        ''', (usuario_id, negocio_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error en desuscribir_usuario: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+def esta_suscrito(usuario_id, negocio_id):
+    """Verifica si un usuario está suscrito a un negocio"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT id FROM suscripciones
+        WHERE usuario_id = %s AND negocio_id = %s AND activo = 1
+    ''', (usuario_id, negocio_id))
+    resultado = cursor.fetchone()
+    conn.close()
+    return resultado is not None
+
+def obtener_suscriptores(negocio_id):
+    """Obtiene todos los suscriptores de un negocio"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT u.id, u.username, u.nombre, u.email, s.fecha_suscripcion
+        FROM suscripciones s
+        JOIN usuarios u ON s.usuario_id = u.id
+        WHERE s.negocio_id = %s AND s.activo = 1
+        ORDER BY s.fecha_suscripcion DESC
+    ''', (negocio_id,))
+    suscriptores = cursor.fetchall()
+    conn.close()
+    return suscriptores
+
+def obtener_suscripciones_usuario(usuario_id):
+    """Obtiene todos los negocios a los que un usuario está suscrito"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT n.id, n.username, n.nombre, n.datos_negocio, s.fecha_suscripcion
+        FROM suscripciones s
+        JOIN usuarios n ON s.negocio_id = n.id
+        WHERE s.usuario_id = %s AND s.activo = 1
+        ORDER BY s.fecha_suscripcion DESC
+    ''', (usuario_id,))
+    suscripciones = cursor.fetchall()
+    conn.close()
+    return suscripciones
+
+def registrar_notificacion(usuario_id, negocio_id, tipo, titulo, mensaje, url=None, producto_id=None):
+    """Registra una notificación para un usuario"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO notificaciones (usuario_id, negocio_id, tipo, titulo, mensaje, url, producto_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ''', (usuario_id, negocio_id, tipo, titulo, mensaje, url, producto_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error en registrar_notificacion: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+def registrar_notificacion_negocio(negocio_id, tipo, titulo, mensaje, producto_id=None):
+    """Registra una notificación para todos los suscriptores de un negocio"""
+    suscriptores = obtener_suscriptores(negocio_id)
+    for s in suscriptores:
+        registrar_notificacion(s['id'], negocio_id, tipo, titulo, mensaje, None, producto_id)
+    
+    # También para el negocio
+    registrar_notificacion(negocio_id, negocio_id, tipo, f'📢 {titulo}', mensaje, None, producto_id)
+
+def obtener_notificaciones_usuario(usuario_id, limite=50, offset=0):
+    """Obtiene las notificaciones de un usuario"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT n.*, 
+               u.username as negocio_username, 
+               u.nombre as negocio_nombre,
+               p.nombre as producto_nombre
+        FROM notificaciones n
+        LEFT JOIN usuarios u ON n.negocio_id = u.id
+        LEFT JOIN productos p ON n.producto_id = p.id
+        WHERE n.usuario_id = %s
+        ORDER BY n.fecha DESC
+        LIMIT %s OFFSET %s
+    ''', (usuario_id, limite, offset))
+    notificaciones = cursor.fetchall()
+    conn.close()
+    return notificaciones
+
+def contar_notificaciones_no_leidas(usuario_id):
+    """Cuenta las notificaciones no leídas de un usuario"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT COUNT(*) FROM notificaciones
+        WHERE usuario_id = %s AND leido = 0
+    ''', (usuario_id,))
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
+
+def marcar_notificacion_leida(notificacion_id, usuario_id):
+    """Marca una notificación como leída"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE notificaciones SET leido = 1
+        WHERE id = %s AND usuario_id = %s
+    ''', (notificacion_id, usuario_id))
+    conn.commit()
+    conn.close()
+
+def marcar_todas_notificaciones_leidas(usuario_id):
+    """Marca todas las notificaciones de un usuario como leídas"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE notificaciones SET leido = 1
+        WHERE usuario_id = %s
+    ''', (usuario_id,))
+    conn.commit()
+    conn.close()
+
+def verificar_stock_bajo(negocio_id):
+    """Verifica productos con stock bajo y genera notificaciones"""
+    productos = obtener_productos(negocio_id)
+    alertas = []
+    
+    for p in productos:
+        stock = p.get('stock', 0)
+        stock_minimo = p.get('stock_minimo', 3)
+        
+        if stock == 0:
+            alertas.append({
+                'tipo': 'stock_agotado',
+                'producto': p,
+                'mensaje': f"🚫 {p['nombre']} está AGOTADO"
+            })
+        elif stock <= stock_minimo:
+            alertas.append({
+                'tipo': 'stock_bajo',
+                'producto': p,
+                'mensaje': f"⚠️ {p['nombre']} tiene stock bajo ({stock} unidades)"
+            })
+    
+    return alertas
+
+def generar_notificaciones_stock(negocio_id):
+    """Genera notificaciones para todos los productos con stock bajo"""
+    alertas = verificar_stock_bajo(negocio_id)
+    
+    for alerta in alertas:
+        producto = alerta['producto']
+        mensaje = alerta['mensaje']
+        tipo = alerta['tipo']
+        
+        registrar_notificacion_negocio(
+            negocio_id,
+            tipo,
+            f'📦 Alerta de stock',
+            mensaje,
+            producto.get('id')
+        )
+
+def generar_notificacion_producto_nuevo(negocio_id, producto_id):
+    """Genera notificación cuando se crea un nuevo producto"""
+    producto = obtener_producto_por_id(producto_id)
+    if not producto:
+        return
+    
+    registrar_notificacion_negocio(
+        negocio_id,
+        'producto_nuevo',
+        f'🆕 Nuevo producto en la tienda',
+        f'¡{producto["nombre"]} ya está disponible! Precio: ${producto["precio"]:.2f}',
+        producto_id
+    )
+
+def generar_notificacion_stock_actualizado(negocio_id, producto_id, stock_anterior, stock_nuevo):
+    """Genera notificación cuando se actualiza el stock de un producto"""
+    producto = obtener_producto_por_id(producto_id)
+    if not producto:
+        return
+    
+    if stock_anterior == stock_nuevo:
+        return
+    
+    if stock_nuevo == 0:
+        tipo = 'stock_agotado'
+        titulo = '🚫 Producto agotado'
+        mensaje = f'{producto["nombre"]} se ha agotado'
+    elif stock_nuevo < stock_anterior:
+        tipo = 'stock_actualizado'
+        titulo = '📦 Stock actualizado'
+        mensaje = f'{producto["nombre"]} tiene {stock_nuevo} unidades disponibles'
+    else:
+        tipo = 'stock_actualizado'
+        titulo = '📦 ¡Stock repuesto!'
+        mensaje = f'{producto["nombre"]} tiene {stock_nuevo} unidades disponibles'
+    
+    registrar_notificacion_negocio(
+        negocio_id,
+        tipo,
+        titulo,
+        mensaje,
+        producto_id
+    )
+
+def obtener_producto_por_id(producto_id):
+    """Obtiene un producto por su ID"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('SELECT * FROM productos WHERE id = %s', (producto_id,))
+    producto = cursor.fetchone()
+    conn.close()
+    return producto
+
+def obtener_preferencias_notificaciones(usuario_id):
+    """Obtiene las preferencias de notificaciones de un usuario"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('''
+        SELECT * FROM preferencias_notificaciones
+        WHERE usuario_id = %s
+    ''', (usuario_id,))
+    preferencias = cursor.fetchone()
+    conn.close()
+    
+    if not preferencias:
+        # Crear preferencias por defecto
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO preferencias_notificaciones (usuario_id)
+            VALUES (%s)
+        ''', (usuario_id,))
+        conn.commit()
+        conn.close()
+        
+        preferencias = {
+            'usuario_id': usuario_id,
+            'notificaciones_email': 1,
+            'notificaciones_push': 1,
+            'notificaciones_in_app': 1,
+            'alerta_stock_bajo': 1,
+            'alerta_producto_nuevo': 1,
+            'alerta_stock_actualizado': 0
+        }
+    
+    return preferencias
+
+def actualizar_preferencias_notificaciones(usuario_id, preferencias):
+    """Actualiza las preferencias de notificaciones de un usuario"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE preferencias_notificaciones SET
+            notificaciones_email = %s,
+            notificaciones_push = %s,
+            notificaciones_in_app = %s,
+            alerta_stock_bajo = %s,
+            alerta_producto_nuevo = %s,
+            alerta_stock_actualizado = %s
+        WHERE usuario_id = %s
+    ''', (
+        preferencias.get('notificaciones_email', 1),
+        preferencias.get('notificaciones_push', 1),
+        preferencias.get('notificaciones_in_app', 1),
+        preferencias.get('alerta_stock_bajo', 1),
+        preferencias.get('alerta_producto_nuevo', 1),
+        preferencias.get('alerta_stock_actualizado', 0),
+        usuario_id
+    ))
+    conn.commit()
+    conn.close()
