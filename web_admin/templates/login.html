@@ -35,21 +35,27 @@
             max-width: 400px;
             box-shadow: 0 8px 30px rgba(0,0,0,0.5);
             border: 1px solid #2a2a3e;
+            animation: fadeInUp 0.6s ease forwards;
+        }
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         .logo {
             text-align: center;
             margin-bottom: 36px;
         }
-        .logo svg {
-            width: 80px;
-            height: 80px;
-            margin-bottom: 16px;
-        }
         .logo h1 {
-            font-size: 32px;
+            font-size: 36px;
             font-weight: 700;
             color: #6c3ce0;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
         }
         .form-group { margin-bottom: 20px; }
         .form-group label {
@@ -134,60 +140,22 @@
         .error.show {
             display: block;
         }
-        /* Animación de entrada */
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        .container {
-            animation: fadeInUp 0.6s ease forwards;
-        }
         @media (max-width: 600px) {
             .container { padding: 32px 24px; }
-            .logo svg { width: 64px; height: 64px; }
-            .logo h1 { font-size: 28px; }
+            .logo h1 { font-size: 30px; }
         }
         @media (max-width: 400px) {
             .container { padding: 24px 16px; }
-            .logo svg { width: 56px; height: 56px; }
-            .logo h1 { font-size: 24px; }
+            .logo h1 { font-size: 26px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- ============================================ -->
+        <!-- SOLO "AIsa" - SIN LOGO SVG                    -->
+        <!-- ============================================ -->
         <div class="logo">
-            <!-- ============================================ -->
-            <!-- LOGO SVG                                     -->
-            <!-- ============================================ -->
-            <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="80" height="80" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 5.38 5.38">
-                <defs>
-                    <style type="text/css">
-                        .fil0 {fill:#6c3ce0}
-                    </style>
-                </defs>
-                <g id="Capa_x0020_1">
-                    <metadata id="CorelCorpID_0Corel-Layer"/>
-                    <g id="_2961275662288">
-                        <rect class="fil0" x="0.69" y="0.61" width="4.1" height="4.21" rx="0.5"/>
-                        <text x="2.69" y="3.2" font-family="Arial, sans-serif" font-size="1.8" font-weight="bold" fill="white" text-anchor="middle">AIsa</text>
-                        <circle cx="2.69" cy="2.0" r="1.0" fill="none" stroke="white" stroke-width="0.15"/>
-                        <path d="M1.69 2.0 L2.69 1.2 L3.69 2.0" fill="none" stroke="white" stroke-width="0.15"/>
-                        <circle cx="2.69" cy="2.0" r="0.3" fill="white"/>
-                        <line x1="0.69" y1="3.8" x2="4.79" y2="3.8" stroke="white" stroke-width="0.08" opacity="0.4"/>
-                    </g>
-                </g>
-            </svg>
-            
-            <!-- ============================================ -->
-            <!-- SOLO "AIsa" - SIN SUBTÍTULO                  -->
-            <!-- ============================================ -->
             <h1>AIsa</h1>
         </div>
         
