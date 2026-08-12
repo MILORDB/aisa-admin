@@ -3,7 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro - AIsa</title>
+    <title>AIsa - Registro</title>
+    
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16x16.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='img/favicon-48x48.png') }}">
+    <link rel="icon" type="image/png" sizes="64x64" href="{{ url_for('static', filename='img/favicon-64x64.png') }}">
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -21,40 +29,82 @@
             padding: 40px;
             border-radius: 16px;
             width: 100%;
-            max-width: 550px;
+            max-width: 520px;
             box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            border: 1px solid #2a2a3e;
+            animation: fadeInUp 0.6s ease forwards;
         }
-        .logo { text-align: center; margin-bottom: 30px; }
-        .logo h1 { font-size: 28px; color: #6c3ce0; }
-        .logo p { color: #888; font-size: 14px; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 6px; font-size: 14px; color: #aaa; }
-        .form-group input, .form-group select {
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo svg {
+            width: 60px;
+            height: 60px;
+            margin-bottom: 12px;
+        }
+        .logo h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #6c3ce0;
+            letter-spacing: 2px;
+        }
+        .form-group { margin-bottom: 16px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 12px;
+            color: #888;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .form-group input, .form-group select, .form-group textarea {
             width: 100%;
-            padding: 12px 16px;
+            padding: 10px 14px;
             border: 1px solid #2a2a3e;
             border-radius: 8px;
             background: #0f0f1a;
             color: #fff;
-            font-size: 15px;
+            font-size: 14px;
             outline: none;
-            transition: border-color 0.3s;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            font-family: inherit;
         }
-        .form-group input:focus, .form-group select:focus { border-color: #6c3ce0; }
-        .form-group select option { background: #1a1a2e; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: #6c3ce0;
+            box-shadow: 0 0 0 3px rgba(108, 60, 224, 0.15);
+        }
+        .form-group input::placeholder, .form-group textarea::placeholder {
+            color: #444;
+        }
+        .form-group select option {
+            background: #1a1a2e;
+        }
         .form-group .help-text {
-            font-size: 12px;
+            font-size: 11px;
             color: #666;
-            margin-top: 4px;
+            margin-top: 3px;
             display: block;
         }
-        .form-group .help-text .highlight {
-            color: #6c3ce0;
-            font-weight: 600;
+        .form-group .help-text .highlight { color: #6c3ce0; font-weight: 600; }
+        .form-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
         }
+        .form-row .form-group {
+            flex: 1;
+            min-width: 140px;
+        }
+        .required { color: #ff6b6b; margin-left: 2px; }
         .btn {
             width: 100%;
-            padding: 12px;
+            padding: 13px;
             border: none;
             border-radius: 8px;
             background: #6c3ce0;
@@ -62,13 +112,27 @@
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.3s;
+            transition: background 0.3s, transform 0.1s;
+            margin-top: 4px;
         }
         .btn:hover { background: #5a2ec0; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .link { text-align: center; margin-top: 16px; font-size: 14px; color: #888; }
-        .link a { color: #6c3ce0; text-decoration: none; }
-        .link a:hover { text-decoration: underline; }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+            padding-top: 16px;
+            border-top: 1px solid #2a2a3e;
+        }
+        .link a {
+            color: #6c3ce0;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        .link a:hover { color: #8a5ce0; text-decoration: underline; }
         .error {
             background: #442222;
             color: #ff6b6b;
@@ -77,6 +141,7 @@
             margin-bottom: 16px;
             font-size: 14px;
             display: none;
+            border: 1px solid #662222;
         }
         .error.show { display: block; }
         .success {
@@ -87,6 +152,7 @@
             margin-bottom: 16px;
             font-size: 14px;
             display: none;
+            border: 1px solid #2a6a2a;
         }
         .success.show { display: block; }
         .negocio-fields {
@@ -98,29 +164,19 @@
         .negocio-fields.show { display: block; }
         .info-box {
             background: rgba(108, 60, 224, 0.08);
-            border: 1px solid rgba(108, 60, 224, 0.2);
+            border: 1px solid rgba(108, 60, 224, 0.15);
             border-radius: 8px;
-            padding: 12px 16px;
-            margin-bottom: 16px;
-            font-size: 13px;
-            color: #aaa;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            font-size: 12px;
+            color: #888;
         }
         .info-box strong { color: #6c3ce0; }
-        .form-row {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        .form-row .form-group {
-            flex: 1;
-            min-width: 150px;
-        }
-        .required {
-            color: #ff6b6b;
-            margin-left: 2px;
-        }
+        textarea { resize: vertical; min-height: 50px; }
         @media (max-width: 600px) {
             .container { padding: 24px; }
+            .logo svg { width: 50px; height: 50px; }
+            .logo h1 { font-size: 24px; }
             .form-row { flex-direction: column; }
             .form-row .form-group { min-width: unset; }
         }
@@ -129,15 +185,29 @@
 <body>
     <div class="container">
         <div class="logo">
-            <h1>🤖 AIsa</h1>
-            <p>Regístrate para comenzar</p>
+            <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="60" height="60" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 5.38 5.38">
+                <defs>
+                    <style type="text/css">.fil0 {fill:#6c3ce0}</style>
+                </defs>
+                <g id="Capa_x0020_1">
+                    <metadata id="CorelCorpID_0Corel-Layer"/>
+                    <g id="_2961275662288">
+                        <rect class="fil0" x="0.69" y="0.61" width="4.1" height="4.21" rx="0.5"/>
+                        <text x="2.69" y="3.2" font-family="Arial, sans-serif" font-size="1.8" font-weight="bold" fill="white" text-anchor="middle">AIsa</text>
+                        <circle cx="2.69" cy="2.0" r="1.0" fill="none" stroke="white" stroke-width="0.15"/>
+                        <path d="M1.69 2.0 L2.69 1.2 L3.69 2.0" fill="none" stroke="white" stroke-width="0.15"/>
+                        <circle cx="2.69" cy="2.0" r="0.3" fill="white"/>
+                        <line x1="0.69" y1="3.8" x2="4.79" y2="3.8" stroke="white" stroke-width="0.08" opacity="0.4"/>
+                    </g>
+                </g>
+            </svg>
+            <h1>AIsa</h1>
         </div>
 
         <div class="error" id="error"></div>
         <div class="success" id="success"></div>
 
         <form id="registerForm">
-            <!-- Datos personales -->
             <div class="form-group">
                 <label>Nombre completo <span class="required">*</span></label>
                 <input type="text" id="nombre" placeholder="Tu nombre completo" required>
@@ -158,14 +228,11 @@
                 <input type="password" id="password" placeholder="Mínimo 6 caracteres" required minlength="6">
             </div>
 
-            <!-- ======================================== -->
-            <!-- PROVINCIA Y MUNICIPIO (PARA TODOS)      -->
-            <!-- ======================================== -->
             <div class="form-row">
                 <div class="form-group">
                     <label>Provincia <span class="required">*</span></label>
                     <select id="provincia" onchange="cargarMunicipios()" required>
-                        <option value="">-- Seleccionar provincia --</option>
+                        <option value="">-- Seleccionar --</option>
                         <option value="La Habana">La Habana</option>
                         <option value="Artemisa">Artemisa</option>
                         <option value="Mayabeque">Mayabeque</option>
@@ -187,15 +254,12 @@
                 <div class="form-group">
                     <label>Municipio <span class="required">*</span></label>
                     <select id="municipio" required>
-                        <option value="">-- Seleccionar municipio --</option>
+                        <option value="">-- Seleccionar --</option>
                     </select>
                     <span class="help-text" id="municipioHelp">Selecciona primero una provincia</span>
                 </div>
             </div>
 
-            <!-- ======================================== -->
-            <!-- TELEFONO Y DIRECCION (PARA TODOS)       -->
-            <!-- ======================================== -->
             <div class="form-row">
                 <div class="form-group">
                     <label>Teléfono <span class="required">*</span></label>
@@ -207,45 +271,34 @@
                 </div>
             </div>
 
-            <!-- ======================================== -->
-            <!-- SELECTOR DE TIPO DE USUARIO              -->
-            <!-- ======================================== -->
             <div class="form-group">
                 <label>Tipo de cuenta <span class="required">*</span></label>
                 <select id="tipoUsuario" required>
                     <option value="cliente">👤 Modo Cliente</option>
                     <option value="negocio">🏢 Modo Negocio</option>
                 </select>
-                <span class="help-text" id="tipoHelp">Selecciona el tipo de cuenta que deseas crear</span>
+                <span class="help-text" id="tipoHelp">Selecciona el tipo de cuenta</span>
             </div>
 
-            <!-- ======================================== -->
-            <!-- CAMPOS ADICIONALES PARA NEGOCIO          -->
-            <!-- ======================================== -->
             <div class="negocio-fields" id="negocioFields">
                 <div class="info-box">
                     <strong>🏢 Modo Negocio</strong><br>
-                    Como negocio, podrás acceder a módulos especializados para la gestión de tu empresa.
-                    Además, podrás solicitar módulos adicionales al administrador.
+                    Acceso a módulos especializados para gestión empresarial.
                 </div>
-                
                 <div class="form-group">
                     <label>Nombre del negocio <span class="required">*</span></label>
                     <input type="text" id="nombreNegocio" placeholder="Nombre de tu negocio">
                 </div>
-                
                 <div class="form-group">
                     <label>RUC / NIT</label>
                     <input type="text" id="ruc" placeholder="Número de identificación tributaria">
                 </div>
-                
                 <div class="form-group">
-                    <label>Descripción del negocio</label>
-                    <textarea id="descripcionNegocio" rows="2" placeholder="Breve descripción de tu negocio" style="width:100%;padding:12px 16px;border:1px solid #2a2a3e;border-radius:8px;background:#0f0f1a;color:#fff;font-size:15px;outline:none;transition:border-color 0.3s;resize:vertical;"></textarea>
+                    <label>Descripción</label>
+                    <textarea id="descripcionNegocio" rows="2" placeholder="Breve descripción de tu negocio"></textarea>
                 </div>
             </div>
 
-            <!-- Campo oculto para el rol -->
             <input type="hidden" id="rol" value="usuario">
 
             <button type="submit" class="btn">Registrarse</button>
@@ -257,9 +310,6 @@
     </div>
 
     <script>
-        // ============================================
-        // DATOS DE MUNICIPIOS POR PROVINCIA (CUBA)
-        // ============================================
         const municipiosPorProvincia = {
             'La Habana': ['La Habana Vieja', 'Centro Habana', 'Cerro', 'Marianao', 'Playa', 'Plaza de la Revolución', 'Diez de Octubre', 'Arroyo Naranjo', 'Boyeros', 'La Lisa', 'San Miguel del Padrón', 'Cotorro', 'Regla', 'Guanabacoa', 'Habana del Este'],
             'Artemisa': ['Artemisa', 'Bahía Honda', 'Caimito', 'Candelaria', 'Guanajay', 'Güira de Melena', 'Mariel', 'San Antonio de los Baños', 'San Cristóbal', 'Alquízar', 'Bauta', 'Surgidero de Batabanó'],
@@ -279,17 +329,14 @@
             'Isla de la Juventud': ['Nueva Gerona', 'Santa Fe', 'La Demajagua', 'Cocodrilo', 'La Victoria', 'San Juan']
         };
 
-        // ============================================
-        // FUNCIÓN PARA CARGAR MUNICIPIOS
-        // ============================================
         function cargarMunicipios() {
             const provinciaSelect = document.getElementById('provincia');
             const municipioSelect = document.getElementById('municipio');
             const municipioHelp = document.getElementById('municipioHelp');
             const provincia = provinciaSelect.value;
-            
-            municipioSelect.innerHTML = '<option value="">-- Seleccionar municipio --</option>';
-            
+
+            municipioSelect.innerHTML = '<option value="">-- Seleccionar --</option>';
+
             if (provincia && municipiosPorProvincia[provincia]) {
                 const municipios = municipiosPorProvincia[provincia];
                 municipios.sort();
@@ -307,35 +354,20 @@
             }
         }
 
-        // ============================================
-        // MOSTRAR/OCULTAR CAMPOS DE NEGOCIO
-        // ============================================
         const tipoSelect = document.getElementById('tipoUsuario');
         const negocioFields = document.getElementById('negocioFields');
         const tipoHelp = document.getElementById('tipoHelp');
 
         tipoSelect.addEventListener('change', function() {
-            const negocioInputs = negocioFields.querySelectorAll('input, textarea');
             if (this.value === 'negocio') {
                 negocioFields.classList.add('show');
-                tipoHelp.innerHTML = '🏢 <span class="highlight">Modo Negocio</span>: Acceso a módulos de gestión empresarial';
-                negocioInputs.forEach(input => {
-                    if (input.id !== 'descripcionNegocio') {
-                        input.required = true;
-                    }
-                });
+                tipoHelp.innerHTML = '🏢 <span class="highlight">Modo Negocio</span>: Acceso a módulos de gestión';
             } else {
                 negocioFields.classList.remove('show');
-                tipoHelp.innerHTML = '👤 <span class="highlight">Modo Cliente</span>: Acceso a la tienda y funciones básicas';
-                negocioInputs.forEach(input => {
-                    input.required = false;
-                });
+                tipoHelp.innerHTML = '👤 <span class="highlight">Modo Cliente</span>: Acceso a la tienda';
             }
         });
 
-        // ============================================
-        // ENVÍO DEL FORMULARIO
-        // ============================================
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -348,7 +380,7 @@
             const municipio = document.getElementById('municipio').value;
             const telefono = document.getElementById('telefono').value.trim();
             const direccion = document.getElementById('direccion').value.trim();
-            
+
             const errorEl = document.getElementById('error');
             const successEl = document.getElementById('success');
             const btn = document.querySelector('.btn');
@@ -356,72 +388,30 @@
             errorEl.classList.remove('show');
             successEl.classList.remove('show');
 
-            // Validaciones
-            if (!nombre) {
-                errorEl.textContent = 'El nombre completo es obligatorio';
-                errorEl.classList.add('show');
-                return;
-            }
+            if (!nombre) { errorEl.textContent = 'El nombre completo es obligatorio'; errorEl.classList.add('show'); return; }
+            if (!username) { errorEl.textContent = 'El nombre de usuario es obligatorio'; errorEl.classList.add('show'); return; }
+            if (!email) { errorEl.textContent = 'El email es obligatorio'; errorEl.classList.add('show'); return; }
+            if (password.length < 6) { errorEl.textContent = 'La contraseña debe tener al menos 6 caracteres'; errorEl.classList.add('show'); return; }
+            if (!provincia || !municipio) { errorEl.textContent = 'Selecciona provincia y municipio'; errorEl.classList.add('show'); return; }
+            if (!telefono) { errorEl.textContent = 'El teléfono es obligatorio'; errorEl.classList.add('show'); return; }
 
-            if (!username) {
-                errorEl.textContent = 'El nombre de usuario es obligatorio';
-                errorEl.classList.add('show');
-                return;
-            }
+            const datosUsuario = { provincia, municipio, telefono, direccion: direccion || '' };
 
-            if (!email) {
-                errorEl.textContent = 'El email es obligatorio';
-                errorEl.classList.add('show');
-                return;
-            }
-
-            if (password.length < 6) {
-                errorEl.textContent = 'La contraseña debe tener al menos 6 caracteres';
-                errorEl.classList.add('show');
-                return;
-            }
-
-            if (!provincia || !municipio) {
-                errorEl.textContent = 'Por favor, selecciona provincia y municipio';
-                errorEl.classList.add('show');
-                return;
-            }
-
-            if (!telefono) {
-                errorEl.textContent = 'El teléfono es obligatorio';
-                errorEl.classList.add('show');
-                return;
-            }
-
-            // Datos del usuario (comunes para todos)
-            const datosUsuario = {
-                provincia: provincia,
-                municipio: municipio,
-                telefono: telefono,
-                direccion: direccion || ''
-            };
-
-            // Datos adicionales para negocio
             let datosNegocio = null;
             if (tipo === 'negocio') {
                 const nombreNegocio = document.getElementById('nombreNegocio').value.trim();
-                const ruc = document.getElementById('ruc').value.trim();
-                const descripcion = document.getElementById('descripcionNegocio').value.trim();
-
                 if (!nombreNegocio) {
                     errorEl.textContent = 'El nombre del negocio es obligatorio';
                     errorEl.classList.add('show');
                     return;
                 }
-
                 datosNegocio = {
                     ...datosUsuario,
                     nombre_negocio: nombreNegocio,
-                    ruc: ruc,
-                    descripcion: descripcion
+                    ruc: document.getElementById('ruc').value.trim(),
+                    descripcion: document.getElementById('descripcionNegocio').value.trim()
                 };
             } else {
-                // Para clientes, también guardamos los datos de ubicación
                 datosNegocio = datosUsuario;
             }
 
@@ -433,13 +423,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        nombre: nombre,
-                        username: username,
-                        email: email,
-                        password: password,
-                        tipo: tipo,
-                        rol: 'usuario',  // <-- IMPORTANTE: siempre enviamos rol = 'usuario'
-                        datos_negocio: datosNegocio
+                        nombre, username, email, password, tipo, rol: 'usuario', datos_negocio: datosNegocio
                     })
                 });
 
@@ -447,8 +431,7 @@
 
                 if (response.ok) {
                     if (data.requires_verification) {
-                        // Redirigir a la página de verificación
-                        successEl.textContent = '✅ Usuario registrado. Revisa tu correo para activar la cuenta.';
+                        successEl.textContent = '✅ Usuario registrado. Revisa tu correo.';
                         successEl.classList.add('show');
                         setTimeout(() => {
                             window.location.href = data.redirect_url || `/verificar?email=${data.email}&user_id=${data.user_id}`;
@@ -456,16 +439,13 @@
                     } else {
                         successEl.textContent = data.message || '¡Registro exitoso!';
                         successEl.classList.add('show');
-                        setTimeout(() => {
-                            window.location.href = '/login';
-                        }, 1500);
+                        setTimeout(() => window.location.href = '/login', 1500);
                     }
                 } else {
                     errorEl.textContent = data.error || 'Error al registrar usuario';
                     errorEl.classList.add('show');
                 }
             } catch (error) {
-                console.error('Error:', error);
                 errorEl.textContent = 'Error de conexión con el servidor';
                 errorEl.classList.add('show');
             } finally {
@@ -474,16 +454,9 @@
             }
         });
 
-        // ============================================
-        // INICIALIZAR
-        // ============================================
         document.getElementById('nombre').focus();
-
         document.addEventListener('DOMContentLoaded', function() {
-            const provinciaSelect = document.getElementById('provincia');
-            if (provinciaSelect.value) {
-                cargarMunicipios();
-            }
+            if (document.getElementById('provincia').value) cargarMunicipios();
         });
     </script>
 </body>
