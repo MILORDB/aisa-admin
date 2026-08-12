@@ -4,23 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    <!-- ============================================ -->
-    <!-- TÍTULO                                       -->
-    <!-- ============================================ -->
     <title>AIsa - {% block title %}Gestión Empresarial{% endblock %}</title>
 
     <!-- ============================================ -->
-    <!-- FAVICON (SOLO 16-64 + SVG)                   -->
+    <!-- FAVICON (SOLO 16-64 + SVG + ICO)             -->
     <!-- ============================================ -->
-    
-    <!-- SVG - Mejor calidad -->
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
-    
-    <!-- ICO - Compatibilidad universal -->
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
-    
-    <!-- PNG - Tamaños 16x16 a 64x64 -->
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16x16.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='img/favicon-48x48.png') }}">
@@ -73,7 +64,6 @@
     <!-- REGISTRAR SERVICE WORKER Y NOTIFICACIONES    -->
     <!-- ============================================ -->
     <script>
-    // Iniciar sistema de notificaciones
     (function() {
         'use strict';
         
@@ -147,7 +137,6 @@
         }
 
         async function initNotifications() {
-            // Crear badge
             let badge = document.getElementById('notifications-badge');
             if (!badge) {
                 badge = document.createElement('div');
@@ -169,7 +158,6 @@
                 document.body.appendChild(badge);
             }
 
-            // Crear botón de notificaciones
             let btn = document.getElementById('notify-btn');
             if (!btn) {
                 btn = document.createElement('button');
@@ -188,7 +176,6 @@
                 document.body.appendChild(btn);
             }
 
-            // Verificar estado
             if (localStorage.getItem('notifications_subscribed') === 'true') {
                 btn.textContent = '🔔 Notificaciones activas';
                 btn.style.background = '#4caf50';
@@ -238,7 +225,6 @@
             }
         }
 
-        // Funciones globales
         window.loadNotifications = function() {
             const container = document.getElementById('notifications-list');
             if (!container) return;
@@ -301,12 +287,18 @@
                 });
         };
 
-        // Iniciar
         if (document.readyState === 'complete') {
             initNotifications();
         } else {
             window.addEventListener('load', initNotifications);
         }
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                if (window.loadNotifications) window.loadNotifications();
+                if (window.updateNotificationCount) window.updateNotificationCount();
+            }
+        });
 
     })();
     </script>
