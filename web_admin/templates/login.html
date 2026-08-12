@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - AIsa</title>
+    <title>AIsa</title>
     
     <!-- ============================================ -->
     <!-- FAVICON                                      -->
@@ -29,35 +29,37 @@
         }
         .container {
             background: #1a1a2e;
-            padding: 40px;
+            padding: 48px 40px;
             border-radius: 16px;
             width: 100%;
             max-width: 400px;
             box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            border: 1px solid #2a2a3e;
         }
         .logo {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 36px;
         }
         .logo svg {
             width: 80px;
             height: 80px;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
         .logo h1 {
-            font-size: 28px;
+            font-size: 32px;
+            font-weight: 700;
             color: #6c3ce0;
-        }
-        .logo p {
-            color: #888;
-            font-size: 14px;
+            letter-spacing: 2px;
         }
         .form-group { margin-bottom: 20px; }
         .form-group label {
             display: block;
             margin-bottom: 6px;
-            font-size: 14px;
-            color: #aaa;
+            font-size: 13px;
+            color: #888;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         .form-group input {
             width: 100%;
@@ -68,14 +70,18 @@
             color: #fff;
             font-size: 15px;
             outline: none;
-            transition: border-color 0.3s;
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
         .form-group input:focus {
             border-color: #6c3ce0;
+            box-shadow: 0 0 0 3px rgba(108, 60, 224, 0.15);
+        }
+        .form-group input::placeholder {
+            color: #444;
         }
         .btn {
             width: 100%;
-            padding: 12px;
+            padding: 13px;
             border: none;
             border-radius: 8px;
             background: #6c3ce0;
@@ -83,26 +89,36 @@
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: background 0.3s;
+            transition: background 0.3s, transform 0.1s;
+            margin-top: 4px;
         }
         .btn:hover {
             background: #5a2ec0;
         }
+        .btn:active {
+            transform: scale(0.98);
+        }
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
         }
         .link {
             text-align: center;
-            margin-top: 16px;
+            margin-top: 20px;
             font-size: 14px;
-            color: #888;
+            color: #666;
+            padding-top: 16px;
+            border-top: 1px solid #2a2a3e;
         }
         .link a {
             color: #6c3ce0;
             text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
         }
         .link a:hover {
+            color: #8a5ce0;
             text-decoration: underline;
         }
         .error {
@@ -113,13 +129,33 @@
             margin-bottom: 16px;
             font-size: 14px;
             display: none;
+            border: 1px solid #662222;
         }
         .error.show {
             display: block;
         }
+        /* Animación de entrada */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .container {
+            animation: fadeInUp 0.6s ease forwards;
+        }
         @media (max-width: 600px) {
-            .container { padding: 24px; }
-            .logo svg { width: 60px; height: 60px; }
+            .container { padding: 32px 24px; }
+            .logo svg { width: 64px; height: 64px; }
+            .logo h1 { font-size: 28px; }
+        }
+        @media (max-width: 400px) {
+            .container { padding: 24px 16px; }
+            .logo svg { width: 56px; height: 56px; }
             .logo h1 { font-size: 24px; }
         }
     </style>
@@ -128,7 +164,7 @@
     <div class="container">
         <div class="logo">
             <!-- ============================================ -->
-            <!-- LOGO SVG (NUEVO)                              -->
+            <!-- LOGO SVG                                     -->
             <!-- ============================================ -->
             <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="80" height="80" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 5.38 5.38">
                 <defs>
@@ -139,22 +175,20 @@
                 <g id="Capa_x0020_1">
                     <metadata id="CorelCorpID_0Corel-Layer"/>
                     <g id="_2961275662288">
-                        <!-- Fondo del logo -->
-                        <rect class="fil0" x="0.69" y="0.61" width="4.1" height="4.21"/>
-                        <!-- Texto AIsa -->
+                        <rect class="fil0" x="0.69" y="0.61" width="4.1" height="4.21" rx="0.5"/>
                         <text x="2.69" y="3.2" font-family="Arial, sans-serif" font-size="1.8" font-weight="bold" fill="white" text-anchor="middle">AIsa</text>
-                        <!-- Icono de comercio combinado -->
                         <circle cx="2.69" cy="2.0" r="1.0" fill="none" stroke="white" stroke-width="0.15"/>
                         <path d="M1.69 2.0 L2.69 1.2 L3.69 2.0" fill="none" stroke="white" stroke-width="0.15"/>
                         <circle cx="2.69" cy="2.0" r="0.3" fill="white"/>
-                        <!-- Líneas decorativas -->
-                        <line x1="0.69" y1="3.8" x2="4.79" y2="3.8" stroke="white" stroke-width="0.08" opacity="0.5"/>
+                        <line x1="0.69" y1="3.8" x2="4.79" y2="3.8" stroke="white" stroke-width="0.08" opacity="0.4"/>
                     </g>
                 </g>
             </svg>
             
+            <!-- ============================================ -->
+            <!-- SOLO "AIsa" - SIN SUBTÍTULO                  -->
+            <!-- ============================================ -->
             <h1>AIsa</h1>
-            <p>Panel de administración</p>
         </div>
         
         <div class="error" id="error"></div>
