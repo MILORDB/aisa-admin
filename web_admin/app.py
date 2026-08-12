@@ -175,7 +175,7 @@ app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 CORS(app)
 
 # ============================================
-# RUTAS PARA FAVICON Y ARCHIVOS ESTÁTICOS
+# RUTAS PARA FAVICON (NUEVA ACTUALIZACIÓN)
 # ============================================
 
 @app.route('/favicon.ico')
@@ -196,38 +196,37 @@ def favicon_svg():
         mimetype='image/svg+xml'
     )
 
-@app.route('/static/img/<path:filename>')
-def serve_favicon_files(filename):
-    """Sirve archivos de la carpeta static/img"""
+@app.route('/favicon-16x16.png')
+def favicon_16():
     return send_from_directory(
         os.path.join(app.root_path, 'static', 'img'),
-        filename
+        'favicon-16x16.png',
+        mimetype='image/png'
     )
 
-@app.route('/manifest.json')
-def manifest():
-    """Endpoint público para el manifest.json"""
-    response = make_response(render_template('manifest.json'))
-    response.headers['Content-Type'] = 'application/json'
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
+@app.route('/favicon-32x32.png')
+def favicon_32():
+    return send_from_directory(
+        os.path.join(app.root_path, 'static', 'img'),
+        'favicon-32x32.png',
+        mimetype='image/png'
+    )
 
-@app.route('/sw.js')
-def service_worker():
-    """Endpoint público para el Service Worker"""
-    response = make_response(render_template('sw.js'))
-    response.headers['Content-Type'] = 'application/javascript'
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
+@app.route('/favicon-48x48.png')
+def favicon_48():
+    return send_from_directory(
+        os.path.join(app.root_path, 'static', 'img'),
+        'favicon-48x48.png',
+        mimetype='image/png'
+    )
 
-@app.route('/offline')
-def offline():
-    """Página offline para cuando no hay conexión"""
-    return render_template('offline.html')
+@app.route('/favicon-64x64.png')
+def favicon_64():
+    return send_from_directory(
+        os.path.join(app.root_path, 'static', 'img'),
+        'favicon-64x64.png',
+        mimetype='image/png'
+    )
 
 # ============================================
 # CONFIGURACIÓN DE CACHÉ (ANTI-CACHÉ)
@@ -932,7 +931,7 @@ def api_negocios_cercanos():
                 except:
                     pass
             
-            resultado.append({
+        resultado.append({
                 'id': n.get('id'),
                 'username': n.get('username'),
                 'nombre': n.get('nombre') or datos.get('nombre_negocio', n.get('username')),
