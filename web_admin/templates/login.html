@@ -3,7 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - AIsa Admin</title>
+    <title>Login - AIsa</title>
+    
+    <!-- ============================================ -->
+    <!-- FAVICON                                      -->
+    <!-- ============================================ -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16x16.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="48x48" href="{{ url_for('static', filename='img/favicon-48x48.png') }}">
+    <link rel="icon" type="image/png" sizes="64x64" href="{{ url_for('static', filename='img/favicon-64x64.png') }}">
+    
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -14,6 +25,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 20px;
         }
         .container {
             background: #1a1a2e;
@@ -23,11 +35,30 @@
             max-width: 400px;
             box-shadow: 0 8px 30px rgba(0,0,0,0.5);
         }
-        .logo { text-align: center; margin-bottom: 30px; }
-        .logo h1 { font-size: 28px; color: #6c3ce0; }
-        .logo p { color: #888; font-size: 14px; }
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 12px;
+        }
+        .logo h1 {
+            font-size: 28px;
+            color: #6c3ce0;
+        }
+        .logo p {
+            color: #888;
+            font-size: 14px;
+        }
         .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 6px; font-size: 14px; color: #aaa; }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #aaa;
+        }
         .form-group input {
             width: 100%;
             padding: 12px 16px;
@@ -39,7 +70,9 @@
             outline: none;
             transition: border-color 0.3s;
         }
-        .form-group input:focus { border-color: #6c3ce0; }
+        .form-group input:focus {
+            border-color: #6c3ce0;
+        }
         .btn {
             width: 100%;
             padding: 12px;
@@ -52,11 +85,26 @@
             cursor: pointer;
             transition: background 0.3s;
         }
-        .btn:hover { background: #5a2ec0; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .link { text-align: center; margin-top: 16px; font-size: 14px; color: #888; }
-        .link a { color: #6c3ce0; text-decoration: none; }
-        .link a:hover { text-decoration: underline; }
+        .btn:hover {
+            background: #5a2ec0;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .link {
+            text-align: center;
+            margin-top: 16px;
+            font-size: 14px;
+            color: #888;
+        }
+        .link a {
+            color: #6c3ce0;
+            text-decoration: none;
+        }
+        .link a:hover {
+            text-decoration: underline;
+        }
         .error {
             background: #442222;
             color: #ff6b6b;
@@ -66,16 +114,51 @@
             font-size: 14px;
             display: none;
         }
-        .error.show { display: block; }
+        .error.show {
+            display: block;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 24px; }
+            .logo svg { width: 60px; height: 60px; }
+            .logo h1 { font-size: 24px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="logo">
-            <h1>🤖 AIsa Admin</h1>
+            <!-- ============================================ -->
+            <!-- LOGO SVG (NUEVO)                              -->
+            <!-- ============================================ -->
+            <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="80" height="80" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd" viewBox="0 0 5.38 5.38">
+                <defs>
+                    <style type="text/css">
+                        .fil0 {fill:#6c3ce0}
+                    </style>
+                </defs>
+                <g id="Capa_x0020_1">
+                    <metadata id="CorelCorpID_0Corel-Layer"/>
+                    <g id="_2961275662288">
+                        <!-- Fondo del logo -->
+                        <rect class="fil0" x="0.69" y="0.61" width="4.1" height="4.21"/>
+                        <!-- Texto AIsa -->
+                        <text x="2.69" y="3.2" font-family="Arial, sans-serif" font-size="1.8" font-weight="bold" fill="white" text-anchor="middle">AIsa</text>
+                        <!-- Icono de comercio combinado -->
+                        <circle cx="2.69" cy="2.0" r="1.0" fill="none" stroke="white" stroke-width="0.15"/>
+                        <path d="M1.69 2.0 L2.69 1.2 L3.69 2.0" fill="none" stroke="white" stroke-width="0.15"/>
+                        <circle cx="2.69" cy="2.0" r="0.3" fill="white"/>
+                        <!-- Líneas decorativas -->
+                        <line x1="0.69" y1="3.8" x2="4.79" y2="3.8" stroke="white" stroke-width="0.08" opacity="0.5"/>
+                    </g>
+                </g>
+            </svg>
+            
+            <h1>AIsa</h1>
             <p>Panel de administración</p>
         </div>
+        
         <div class="error" id="error"></div>
+        
         <form id="loginForm">
             <div class="form-group">
                 <label>Usuario</label>
@@ -87,10 +170,12 @@
             </div>
             <button type="submit" class="btn">Iniciar Sesión</button>
         </form>
+        
         <div class="link">
             ¿No tienes cuenta? <a href="/register">Regístrate aquí</a>
         </div>
     </div>
+    
     <script>
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -98,9 +183,11 @@
             const password = document.getElementById('password').value.trim();
             const errorEl = document.getElementById('error');
             const btn = document.querySelector('.btn');
+            
             errorEl.classList.remove('show');
             btn.disabled = true;
             btn.textContent = 'Cargando...';
+            
             try {
                 const response = await fetch('/login', {
                     method: 'POST',
@@ -108,6 +195,7 @@
                     body: JSON.stringify({ username, password })
                 });
                 const data = await response.json();
+                
                 if (response.ok) {
                     window.location.href = '/dashboard';
                 } else {
