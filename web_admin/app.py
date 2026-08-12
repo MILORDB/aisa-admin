@@ -11,7 +11,7 @@ import urllib.parse
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, make_response, send_from_directory
 from flask_cors import CORS
 
 # ============================================
@@ -34,6 +34,8 @@ try:
     os.makedirs(os.path.join(BASE_DIR, 'static/uploads/facturas'), exist_ok=True)
     os.makedirs(os.path.join(BASE_DIR, 'static/temp'), exist_ok=True)
     os.makedirs(os.path.join(BASE_DIR, 'static/img'), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, 'static/css'), exist_ok=True)
+    os.makedirs(os.path.join(BASE_DIR, 'static/js'), exist_ok=True)
     print("📁 Carpetas de almacenamiento creadas/verificadas")
 except Exception as e:
     print(f"⚠️ Error creando carpetas: {e}")
@@ -171,6 +173,61 @@ except ImportError as e:
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 CORS(app)
+
+# ============================================
+# RUTAS PARA FAVICON Y ARCHIVOS ESTÁTICOS
+# ============================================
+
+@app.route('/favicon.ico')
+def favicon():
+    """Ruta directa para el favicon.ico"""
+    return send_from_directory(
+        os.path.join(app.root_path, 'static', 'img'),
+        'favicon.ico',
+        mimetype='image/vnd.microsoft.icon'
+    )
+
+@app.route('/favicon.svg')
+def favicon_svg():
+    """Ruta directa para el favicon.svg"""
+    return send_from_directory(
+        os.path.join(app.root_path, 'static', 'img'),
+        'favicon.svg',
+        mimetype='image/svg+xml'
+    )
+
+@app.route('/static/img/<path:filename>')
+def serve_favicon_files(filename):
+    """Sirve archivos de la carpeta static/img"""
+    return send_from_directory(
+        os.path.join(app.root_path, 'static', 'img'),
+        filename
+    )
+
+@app.route('/manifest.json')
+def manifest():
+    """Endpoint público para el manifest.json"""
+    response = make_response(render_template('manifest.json'))
+    response.headers['Content-Type'] = 'application/json'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+@app.route('/sw.js')
+def service_worker():
+    """Endpoint público para el Service Worker"""
+    response = make_response(render_template('sw.js'))
+    response.headers['Content-Type'] = 'application/javascript'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+@app.route('/offline')
+def offline():
+    """Página offline para cuando no hay conexión"""
+    return render_template('offline.html')
 
 # ============================================
 # CONFIGURACIÓN DE CACHÉ (ANTI-CACHÉ)
