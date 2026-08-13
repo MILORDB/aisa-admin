@@ -452,8 +452,14 @@
             const btnGuardar = document.getElementById('btnGuardarVenta');
             const btnCancelar = document.getElementById('btnCancelarVenta');
             
-            if (btnGuardar) btnGuardar.addEventListener('click', guardarVenta);
-            if (btnCancelar) btnCancelar.addEventListener('click', cerrarModal);
+            if (btnGuardar) {
+                btnGuardar.removeEventListener('click', guardarVenta);
+                btnGuardar.addEventListener('click', guardarVenta);
+            }
+            if (btnCancelar) {
+                btnCancelar.removeEventListener('click', cerrarModal);
+                btnCancelar.addEventListener('click', cerrarModal);
+            }
             
             cargarVentas();
             cargarProductos();
@@ -606,7 +612,49 @@
         }
 
         // ============================================
-        // FUNCIONES DE EMPRESAS CON CONTRATOS
+        // CARGAR PRODUCTOS CON STOCK
+        // ============================================
+        async function cargarProductos() {
+            try {
+                const response = await fetch('/api/productos/stock');
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.error('❌ Error en respuesta:', text);
+                    throw new Error('Error al cargar productos');
+                }
+                productos = await response.json();
+                console.log('📦 Productos cargados:', productos.length);
+                if (productos.length === 0) {
+                    console.warn('⚠️ No hay productos en stock');
+                } else {
+                    console.log('✅ Productos disponibles:', productos.map(p => `${p.nombre} (Stock: ${p.stock})`).join(', '));
+                }
+                return true;
+            } catch (error) {
+                console.error('❌ Error cargando productos:', error);
+                mostrarMensaje('Error al cargar productos: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        // ============================================
+        // CARGAR SERVICIOS
+        // ============================================
+        async function cargarServicios() {
+            try {
+                const response = await fetch('/api/servicios');
+                if (!response.ok) throw new Error('Error al cargar servicios');
+                servicios = await response.json();
+                console.log('📋 Servicios cargados:', servicios.length);
+                return true;
+            } catch (error) {
+                console.error('Error cargando servicios:', error);
+                return false;
+            }
+        }
+
+        // ============================================
+        // CARGAR EMPRESAS CON CONTRATOS
         // ============================================
         async function cargarEmpresasConContratos() {
             if (esOferta) {
@@ -622,12 +670,20 @@
             
             try {
                 const response = await fetch('/api/contratos/empresas');
-                if (!response.ok) throw new Error('Error al cargar empresas');
+                console.log('📡 Respuesta de contratos:', response.status);
+                
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.error('❌ Error en respuesta:', text);
+                    throw new Error('Error al cargar empresas');
+                }
+                
                 const empresas = await response.json();
+                console.log('📄 Empresas con contratos:', empresas);
                 
                 const info = document.getElementById('infoContrato');
                 
-                if (empresas.length === 0) {
+                if (!empresas || empresas.length === 0) {
                     select.innerHTML = '<option value="">-- No hay contratos activos --</option>';
                     if (info) info.textContent = '📄 Sin contratos activos';
                     return;
@@ -636,23 +692,33 @@
                 empresas.forEach(e => {
                     const opt = document.createElement('option');
                     opt.value = e.empresa;
-                    opt.dataset.numero = e.numero_contrato;
-                    opt.dataset.tipo = e.tipo;
-                    opt.dataset.fecha_fin = e.fecha_fin;
-                    opt.textContent = `${e.empresa} (${e.numero_contrato})`;
+                    opt.dataset.numero = e.numero_contrato || '';
+                    opt.dataset.tipo = e.tipo || 'ventas';
+                    opt.dataset.fecha_fin = e.fecha_fin || '';
+                    opt.textContent = `${e.empresa} (${e.numero_contrato || 'N/A'})`;
                     select.appendChild(opt);
                 });
                 
                 if (info) info.textContent = `📄 ${empresas.length} contratos activos disponibles`;
                 
+                // Seleccionar la primera empresa por defecto
+                if (empresas.length > 0) {
+                    select.selectedIndex = 1;
+                    seleccionarEmpresa();
+                }
+                
             } catch (error) {
-                console.error('Error:', error);
+                console.error('❌ Error cargando empresas:', error);
                 select.innerHTML = '<option value="">-- Error al cargar empresas --</option>';
                 const info = document.getElementById('infoContrato');
                 if (info) info.textContent = '📄 Error al cargar contratos';
+                mostrarMensaje('Error al cargar contratos: ' + error.message, 'error');
             }
         }
 
+        // ============================================
+        // SELECCIONAR EMPRESA
+        // ============================================
         function seleccionarEmpresa() {
             if (esOferta) return;
             
@@ -764,112 +830,137 @@
         }
 
         // ============================================
-        // FUNCIONES DE PRODUCTOS Y SERVICIOS
+        // AGREGAR LÍNEA DE PRODUCTO
         // ============================================
-        async function cargarProductos() {
-            try {
-                const response = await fetch('/api/productos/stock');
-                if (!response.ok) throw new Error('Error al cargar productos');
-                productos = await response.json();
-                console.log('📦 Productos cargados:', productos.length);
-                return true;
-            } catch (error) {
-                console.error('Error cargando productos:', error);
-                return false;
-            }
-        }
-
-        async function cargarServicios() {
-            try {
-                const response = await fetch('/api/servicios');
-                if (!response.ok) throw new Error('Error al cargar servicios');
-                servicios = await response.json();
-                console.log('📋 Servicios cargados:', servicios.length);
-                return true;
-            } catch (error) {
-                console.error('Error cargando servicios:', error);
-                return false;
-            }
-        }
-
         function agregarLineaProducto() {
             const container = document.getElementById('productosContainer');
-            if (!container) return;
+            if (!container) {
+                console.error('❌ Contenedor de productos no encontrado');
+                return;
+            }
             
             const id = nextId++;
-            const html = `<div class="item-line" id="producto-line-${id}">
-                <span class="item-tipo">📦</span>
-                <select class="select-producto" data-linea-id="${id}" onchange="actualizarLineaProducto(${id})">
-                    <option value="">-- Seleccionar --</option>
-                </select>
-                <input type="number" class="input-cantidad" data-linea-id="${id}" value="1" min="1" onchange="actualizarLineaProducto(${id})" style="width:60px;flex:none;">
-                <span class="item-stock" id="producto-stock-${id}">0</span>
-                <span class="item-precio" id="producto-precio-${id}">$0</span>
-                <span class="item-subtotal" id="producto-subtotal-${id}">$0</span>
-                <button class="btn-remove-item" onclick="eliminarLinea('producto',${id})">✕</button>
-            </div>`;
+            
+            // Mostrar mensaje si no hay productos
+            if (productos.length === 0) {
+                container.innerHTML = `
+                    <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
+                        ⚠️ No hay productos con stock disponible.<br>
+                        <small>Agrega productos en el módulo de Inventario.</small>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Crear opciones del select
+            let options = '<option value="">-- Seleccionar producto --</option>';
+            let hayStock = false;
+            productos.forEach(p => {
+                const stockDisponible = p.stock || 0;
+                if (stockDisponible > 0) {
+                    hayStock = true;
+                    options += `<option value="${p.id}" data-precio="${p.precio}" data-stock="${p.stock}">${p.nombre} (Stock: ${p.stock})</option>`;
+                }
+            });
+            
+            if (!hayStock) {
+                container.innerHTML = `
+                    <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
+                        ⚠️ No hay productos con stock disponible.<br>
+                        <small>Agrega productos en el módulo de Inventario.</small>
+                    </div>
+                `;
+                return;
+            }
+            
+            const html = `
+                <div class="item-line" id="producto-line-${id}">
+                    <span class="item-tipo">📦</span>
+                    <select class="select-producto" data-linea-id="${id}" onchange="actualizarLineaProducto(${id})">
+                        ${options}
+                    </select>
+                    <input type="number" class="input-cantidad" data-linea-id="${id}" value="1" min="1" onchange="actualizarLineaProducto(${id})" style="width:60px;flex:none;">
+                    <span class="item-stock" id="producto-stock-${id}">0</span>
+                    <span class="item-precio" id="producto-precio-${id}">$0</span>
+                    <span class="item-subtotal" id="producto-subtotal-${id}">$0</span>
+                    <button class="btn-remove-item" onclick="eliminarLinea('producto',${id})">✕</button>
+                </div>
+            `;
+            
+            container.innerHTML = '';
             container.insertAdjacentHTML('beforeend', html);
-            if (productos.length) actualizarSelectoresProductos();
             lineasProductos.push({id, tipo:'producto'});
+            
             const count = document.getElementById('countProductos');
             if (count) count.textContent = lineasProductos.length;
+            
+            // Actualizar la línea
+            const select = document.querySelector(`.select-producto[data-linea-id="${id}"]`);
+            if (select && select.options.length > 1) {
+                select.selectedIndex = 1;
+                actualizarLineaProducto(id);
+            }
+            
             actualizarFactura();
         }
 
+        // ============================================
+        // AGREGAR LÍNEA DE SERVICIO
+        // ============================================
         function agregarLineaServicio() {
             const container = document.getElementById('serviciosContainer');
             if (!container) return;
             
             const id = nextId++;
-            const html = `<div class="item-line" id="servicio-line-${id}">
-                <span class="item-tipo servicio">📋</span>
-                <select class="select-servicio" data-linea-id="${id}" onchange="actualizarLineaServicio(${id})">
-                    <option value="">-- Seleccionar --</option>
-                </select>
-                <span class="item-precio" id="servicio-precio-${id}">$0</span>
-                <span class="item-subtotal" id="servicio-subtotal-${id}">$0</span>
-                <button class="btn-remove-item" onclick="eliminarLinea('servicio',${id})">✕</button>
-            </div>`;
+            
+            if (servicios.length === 0) {
+                container.innerHTML = `
+                    <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
+                        ⚠️ No hay servicios disponibles.<br>
+                        <small>Agrega servicios en el módulo de Servicios.</small>
+                    </div>
+                `;
+                return;
+            }
+            
+            let options = '<option value="">-- Seleccionar servicio --</option>';
+            servicios.forEach(s => {
+                if (s.activo === 1) {
+                    options += `<option value="${s.id}" data-precio="${s.precio}">${s.nombre} - $${s.precio.toFixed(2)}</option>`;
+                }
+            });
+            
+            const html = `
+                <div class="item-line" id="servicio-line-${id}">
+                    <span class="item-tipo servicio">📋</span>
+                    <select class="select-servicio" data-linea-id="${id}" onchange="actualizarLineaServicio(${id})">
+                        ${options}
+                    </select>
+                    <span class="item-precio" id="servicio-precio-${id}">$0</span>
+                    <span class="item-subtotal" id="servicio-subtotal-${id}">$0</span>
+                    <button class="btn-remove-item" onclick="eliminarLinea('servicio',${id})">✕</button>
+                </div>
+            `;
+            
+            container.innerHTML = '';
             container.insertAdjacentHTML('beforeend', html);
-            if (servicios.length) actualizarSelectoresServicios();
             lineasServicios.push({id, tipo:'servicio'});
+            
             const count = document.getElementById('countServicios');
             if (count) count.textContent = lineasServicios.length;
+            
+            const select = document.querySelector(`.select-servicio[data-linea-id="${id}"]`);
+            if (select && select.options.length > 1) {
+                select.selectedIndex = 1;
+                actualizarLineaServicio(id);
+            }
+            
             actualizarFactura();
         }
 
-        function actualizarSelectoresProductos() {
-            document.querySelectorAll('.select-producto').forEach(select => {
-                const val = select.value;
-                while (select.options.length > 1) select.remove(1);
-                productos.filter(p => p.stock > 0).forEach(p => {
-                    const opt = document.createElement('option');
-                    opt.value = p.id; opt.textContent = p.nombre;
-                    opt.dataset.precio = p.precio; opt.dataset.stock = p.stock;
-                    select.appendChild(opt);
-                });
-                if (val) select.value = val;
-                const id = select.dataset.lineaId;
-                if (id) actualizarLineaProducto(parseInt(id));
-            });
-        }
-
-        function actualizarSelectoresServicios() {
-            document.querySelectorAll('.select-servicio').forEach(select => {
-                const val = select.value;
-                while (select.options.length > 1) select.remove(1);
-                servicios.forEach(s => {
-                    const opt = document.createElement('option');
-                    opt.value = s.id; opt.textContent = s.nombre;
-                    opt.dataset.precio = s.precio;
-                    select.appendChild(opt);
-                });
-                if (val) select.value = val;
-                const id = select.dataset.lineaId;
-                if (id) actualizarLineaServicio(parseInt(id));
-            });
-        }
-
+        // ============================================
+        // ACTUALIZAR LÍNEA DE PRODUCTO
+        // ============================================
         function actualizarLineaProducto(id) {
             const select = document.querySelector(`.select-producto[data-linea-id="${id}"]`);
             const cantInput = document.querySelector(`.input-cantidad[data-linea-id="${id}"]`);
@@ -899,6 +990,9 @@
             actualizarFactura();
         }
 
+        // ============================================
+        // ACTUALIZAR LÍNEA DE SERVICIO
+        // ============================================
         function actualizarLineaServicio(id) {
             const select = document.querySelector(`.select-servicio[data-linea-id="${id}"]`);
             const precioSpan = document.getElementById(`servicio-precio-${id}`);
@@ -919,6 +1013,9 @@
             actualizarFactura();
         }
 
+        // ============================================
+        // ELIMINAR LÍNEA
+        // ============================================
         function eliminarLinea(tipo, id) {
             const el = document.getElementById(`${tipo}-line-${id}`);
             if (el) {
@@ -936,6 +1033,9 @@
             actualizarFactura();
         }
 
+        // ============================================
+        // ACTUALIZAR FACTURA
+        // ============================================
         function actualizarFactura() {
             const empresa = document.getElementById('ventaEmpresa');
             const estado = document.getElementById('ventaEstado');
@@ -1051,11 +1151,26 @@
             
             nextId = 1;
             
-            await cargarProductos();
+            // ✅ Cargar productos y servicios ANTES de agregar líneas
+            const productosCargados = await cargarProductos();
             await cargarServicios();
             await cargarEmpresasConContratos();
             
-            agregarLineaProducto();
+            // ✅ Si hay productos, agregar una línea
+            if (productosCargados && productos.length > 0) {
+                agregarLineaProducto();
+            } else {
+                // Mostrar mensaje en el contenedor
+                if (productosContainer) {
+                    productosContainer.innerHTML = `
+                        <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
+                            ⚠️ No hay productos con stock disponible.<br>
+                            <small>Agrega productos en el módulo de Inventario.</small>
+                        </div>
+                    `;
+                }
+            }
+            
             actualizarFactura();
             
             const modal = document.getElementById('modalVenta');
@@ -1065,15 +1180,13 @@
             if (btn) { btn.disabled = false; btn.textContent = '+ Nueva'; }
         }
 
+        // ============================================
+        // CERRAR MODAL
+        // ============================================
         function cerrarModal() { 
             const modal = document.getElementById('modalVenta');
             if (modal) modal.classList.remove('show'); 
         }
-
-        document.addEventListener('click', function(e) {
-            const modal = document.getElementById('modalVenta');
-            if (e.target === modal) { cerrarModal(); }
-        });
 
         // ============================================
         // GUARDAR VENTA
@@ -1265,6 +1378,50 @@
         }
 
         // ============================================
+        // GENERAR FACTURA PDF
+        // ============================================
+        function generarFactura(id) {
+            const v = ventas.find(v => v.id === id);
+            if (!v) return;
+            
+            if (v.estado === 'oferta') {
+                if (!confirm(`📄 Esta es una OFERTA. ¿Generar documento de oferta?`)) return;
+            } else {
+                if (!confirm(`📄 ¿Generar factura #${id}?`)) return;
+            }
+            
+            const btn = event?.target; 
+            const orig = btn ? btn.textContent : '📄';
+            if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+            
+            const esOferta = v.estado === 'oferta';
+            const url = esOferta ? `/api/venta/${id}/factura?oferta=true` : `/api/venta/${id}/factura`;
+            
+            fetch(url)
+            .then(r => {
+                if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Error'); });
+                return r.blob().then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; 
+                    a.download = esOferta ? `oferta_${id}.pdf` : `factura_${id}.pdf`;
+                    document.body.appendChild(a); 
+                    a.click(); 
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    mostrarMensaje(`✅ ${esOferta ? 'Oferta' : 'Factura'} #${id} descargada`, 'exito');
+                });
+            })
+            .catch(error => { 
+                console.error(error); 
+                mostrarMensaje('Error: '+error.message, 'error'); 
+            })
+            .finally(() => { 
+                if (btn) { btn.textContent = orig; btn.disabled = false; } 
+            });
+        }
+
+        // ============================================
         // ELIMINAR VENTA
         // ============================================
         function eliminarVenta(id) {
@@ -1337,59 +1494,17 @@
         }
 
         // ============================================
-        // GENERAR FACTURA PDF
+        // EVENT LISTENERS GLOBALES
         // ============================================
-        function generarFactura(id) {
-            const v = ventas.find(v => v.id === id);
-            if (!v) return;
-            
-            if (v.estado === 'oferta') {
-                if (!confirm(`📄 Esta es una OFERTA. ¿Generar documento de oferta?`)) return;
-            } else {
-                if (!confirm(`📄 ¿Generar factura #${id}?`)) return;
-            }
-            
-            const btn = event?.target; 
-            const orig = btn ? btn.textContent : '📄';
-            if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
-            
-            const esOferta = v.estado === 'oferta';
-            const url = esOferta ? `/api/venta/${id}/factura?oferta=true` : `/api/venta/${id}/factura`;
-            
-            fetch(url)
-            .then(r => {
-                if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Error'); });
-                return r.blob().then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url; 
-                    a.download = esOferta ? `oferta_${id}.pdf` : `factura_${id}.pdf`;
-                    document.body.appendChild(a); 
-                    a.click(); 
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                    mostrarMensaje(`✅ ${esOferta ? 'Oferta' : 'Factura'} #${id} descargada`, 'exito');
-                });
-            })
-            .catch(error => { 
-                console.error(error); 
-                mostrarMensaje('Error: '+error.message, 'error'); 
-            })
-            .finally(() => { 
-                if (btn) { btn.textContent = orig; btn.disabled = false; } 
-            });
-        }
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('modalVenta');
+            if (e.target === modal) { cerrarModal(); }
+        });
 
         // ============================================
-        // EVENT LISTENERS
+        // INICIO
         // ============================================
         document.addEventListener('DOMContentLoaded', function() {
-            const ventaEmpresa = document.getElementById('ventaEmpresa');
-            const ventaEstado = document.getElementById('ventaEstado');
-            
-            if (ventaEmpresa) ventaEmpresa.addEventListener('change', actualizarFactura);
-            if (ventaEstado) ventaEstado.addEventListener('change', actualizarFactura);
-            
             init();
         });
     </script>
