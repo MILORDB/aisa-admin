@@ -1589,7 +1589,7 @@ def api_eliminar_producto_tienda(tienda_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - TIENDA PÚBLICA (PARA CLIENTE) - CORREGIDA
+# API - TIENDA PÚBLICA (PARA CLIENTE) - VERSIÓN ROBUSTA
 # ============================================
 
 @app.route('/api/tienda/public', methods=['GET'])
@@ -1611,41 +1611,70 @@ def api_tienda_publica():
         print(f"🔍 Ubicación usuario: provincia={provincia}, municipio={municipio}")
         
         conn = get_db()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor = conn.cursor()
         
-        # Obtener productos de tienda con información del negocio
-        query = '''
-            SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, 
-                   p.foto_url, p.descripcion, p.stock_minimo,
-                   p.negocio_id, 
-                   u.username as negocio_username, 
-                   u.nombre as negocio_nombre,
-                   u.datos_negocio,
-                   u.latitud,
-                   u.longitud,
-                   pt.destacado
-            FROM productos_tienda pt
-            JOIN productos p ON pt.producto_id = p.id
+        # Primero, obtener los IDs de productos en tienda
+        cursor.execute('SELECT producto_id FROM productos_tienda')
+        ids_tienda = cursor.fetchall()
+        ids_list = [str(row[0]) for row in ids_tienda]
+        
+        print(f"📊 IDs en productos_tienda: {ids_list}")
+        
+        if not ids_list:
+            print("⚠️ No hay productos en la tienda")
+            conn.close()
+            return jsonify([])
+        
+        ids_str = ','.join(ids_list)
+        
+        # Consulta para obtener productos con información del negocio
+        query = f'''
+            SELECT 
+                p.id, 
+                p.nombre, 
+                p.categoria, 
+                p.precio, 
+                p.stock, 
+                p.foto_url, 
+                p.descripcion, 
+                p.stock_minimo,
+                p.negocio_id, 
+                u.username as negocio_username, 
+                u.nombre as negocio_nombre,
+                u.datos_negocio,
+                u.latitud,
+                u.longitud
+            FROM productos p
             JOIN usuarios u ON p.negocio_id = u.id
-            WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0
-            ORDER BY pt.destacado DESC, p.id DESC
+            WHERE u.tipo = 'negocio' 
+              AND u.activo = 1 
+              AND p.stock > 0
+              AND p.id IN ({ids_str})
+            ORDER BY p.id DESC
             LIMIT 50
         '''
         
         cursor.execute(query)
         productos = cursor.fetchall()
-        conn.close()
         
-        print(f"📦 Productos encontrados (sin filtro): {len(productos)}")
+        print(f"📦 Productos encontrados en tiendas: {len(productos)}")
+        
+        # Obtener destacados por separado
+        cursor.execute('SELECT producto_id, destacado FROM productos_tienda')
+        destacados_rows = cursor.fetchall()
+        destacados = {row[0]: row[1] for row in destacados_rows}
         
         resultado = []
         for p in productos:
+            # p es una tupla, acceder por índice
             datos = {}
-            if p.get('datos_negocio'):
+            datos_negocio_str = p[11]  # índice de datos_negocio
+            if datos_negocio_str:
                 try:
-                    datos = json.loads(p['datos_negocio']) if isinstance(p['datos_negocio'], str) else p['datos_negocio']
-                except:
-                    pass
+                    datos = json.loads(datos_negocio_str) if isinstance(datos_negocio_str, str) else datos_negocio_str
+                except Exception as e:
+                    print(f"⚠️ Error parseando datos_negocio: {e}")
+                    datos = {}
             
             # Filtrar por ubicación si el usuario tiene ubicación
             if provincia and municipio:
@@ -1655,33 +1684,38 @@ def api_tienda_publica():
                     continue
             
             resultado.append({
-                'id': p['id'],
-                'nombre': p['nombre'],
-                'categoria': p.get('categoria'),
-                'precio': float(p['precio']),
-                'stock': p['stock'],
-                'stock_minimo': p.get('stock_minimo', 3),
-                'foto_url': p.get('foto_url'),
-                'descripcion': p.get('descripcion', ''),
-                'negocio_id': p['negocio_id'],
-                'negocio_username': p.get('negocio_username'),
-                'negocio_nombre': p.get('negocio_nombre') or datos.get('nombre_negocio', p.get('negocio_username')),
+                'id': p[0],
+                'nombre': p[1],
+                'categoria': p[2],
+                'precio': float(p[3]),
+                'stock': p[4],
+                'stock_minimo': p[7] or 3,
+                'foto_url': p[5],
+                'descripcion': p[6] or '',
+                'negocio_id': p[8],
+                'negocio_username': p[9],
+                'negocio_nombre': p[10] or datos.get('nombre_negocio', p[9]),
                 'telefono': datos.get('telefono', ''),
                 'direccion': datos.get('direccion', ''),
                 'provincia': datos.get('provincia', ''),
                 'municipio': datos.get('municipio', ''),
-                'latitud': p.get('latitud'),
-                'longitud': p.get('longitud'),
-                'destacado': p.get('destacado', 0),
+                'latitud': p[12],
+                'longitud': p[13],
+                'destacado': destacados.get(p[0], 0),
                 'tipo': 'producto'
             })
         
         print(f"📦 Productos filtrados por ubicación: {len(resultado)}")
+        conn.close()
         return jsonify(resultado)
         
     except Exception as e:
         print(f"❌ Error en api_tienda_publica: {e}")
         traceback.print_exc()
+        try:
+            conn.close()
+        except:
+            pass
         return jsonify({'error': str(e)}), 500
 
 # ============================================
