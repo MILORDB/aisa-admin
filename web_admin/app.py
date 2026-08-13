@@ -1733,8 +1733,7 @@ def api_eliminar_servicio(servicio_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/todos/servicios', methods=['GET'])
-@admin_required
-def api_todos_servicios():
+@admin_requireddef api_todos_servicios():
     try:
         servicios = obtener_todos_servicios()
         return jsonify([dict(s) for s in servicios])
@@ -2536,7 +2535,7 @@ def api_registrar_comision():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - VENTAS (CORREGIDO - CON EMPRESA)
+# API - VENTAS (CORREGIDO - CON DESCUENTO DE STOCK)
 # ============================================
 
 @app.route('/api/ventas', methods=['GET'])
@@ -2586,8 +2585,8 @@ def api_crear_venta():
     productos = data.get('productos', [])
     cliente = data.get('cliente', '')
     estado = data.get('estado', 'completada')
-    empresa = data.get('empresa')  # ✅ Obtener empresa (puede ser None)
-    factura = data.get('factura')  # ✅ Obtener factura si viene del frontend
+    empresa = data.get('empresa')
+    factura = data.get('factura')
     es_oferta = data.get('es_oferta', False) or estado == 'oferta'
     
     if not productos:
@@ -2604,33 +2603,39 @@ def api_crear_venta():
             trabajador_id = usuario['id']
         
         total = sum(p.get('precio', 0) * p.get('cantidad', 0) for p in productos)
+        cantidad_total = sum(p.get('cantidad', 1) for p in productos)
         
-        # ✅ Generar número de factura SOLO si NO es oferta y hay empresa
+        # Obtener el primer producto para los campos simples
+        primer_producto = productos[0] if productos else None
+        producto_id = primer_producto.get('id') if primer_producto else None
+        producto_nombre = primer_producto.get('nombre', '') if primer_producto else ''
+        tipo_producto = 'servicio' if primer_producto and primer_producto.get('tipo') == 'servicio' else 'producto'
+        
+        # Generar número de factura SOLO si NO es oferta y hay empresa
         numero_factura = None
         if not es_oferta and empresa:
-            # Si el frontend ya generó un número, usarlo
             if factura:
                 numero_factura = factura
             else:
-                # ✅ Generar número de factura con la empresa
                 numero_factura = generar_numero_factura(negocio_id, empresa)
         
         # Si es oferta, usar estado 'oferta'
         if es_oferta:
             estado = 'oferta'
         
+        # Crear la venta (esto descuenta el stock automáticamente)
         venta_id = crear_venta(
             negocio_id=negocio_id,
             trabajador_id=trabajador_id,
             cliente=cliente,
-            producto=productos[0].get('nombre', '') if productos else '',
-            producto_id=productos[0].get('id') if productos else None,
-            cantidad=sum(p.get('cantidad', 1) for p in productos),
+            producto=producto_nombre,
+            producto_id=producto_id,
+            cantidad=cantidad_total,
             precio=total,
             total=total,
             estado=estado,
             empresa=empresa,
-            tipo='producto' if not productos[0].get('tipo') or productos[0].get('tipo') != 'servicio' else 'servicio',
+            tipo=tipo_producto,
             factura=numero_factura,
             factura_url=None,
             transferencia_id=data.get('transferencia_id'),
@@ -2645,7 +2650,8 @@ def api_crear_venta():
                 'success': True, 
                 'id': venta_id, 
                 'numero_factura': numero_factura,
-                'es_oferta': es_oferta
+                'es_oferta': es_oferta,
+                'message': 'Venta creada correctamente'
             })
         else:
             return jsonify({'error': 'Error al crear la venta'}), 500
@@ -2713,7 +2719,7 @@ def api_actualizar_estado_venta(venta_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - ELIMINAR VENTA (CORREGIDO)
+# API - ELIMINAR VENTA
 # ============================================
 
 @app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
