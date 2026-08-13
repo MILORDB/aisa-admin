@@ -2587,7 +2587,8 @@ def api_crear_venta():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/venta/<int:venta_id>', methods=['GET'])
-@login_requireddef api_obtener_venta(venta_id):
+@login_required
+        def api_obtener_venta(venta_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
