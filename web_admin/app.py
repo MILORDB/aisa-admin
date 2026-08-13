@@ -175,7 +175,7 @@ app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24).hex())
 CORS(app)
 
 # ============================================
-# RUTAS PARA FAVICON (NUEVA ACTUALIZACIÓN)
+# RUTAS PARA FAVICON
 # ============================================
 
 @app.route('/favicon.ico')
@@ -227,6 +227,253 @@ def favicon_64():
         'favicon-64x64.png',
         mimetype='image/png'
     )
+
+# ============================================
+# RUTA PARA REPARAR TABLAS (NUEVA)
+# ============================================
+
+@app.route('/fix-db')
+def fix_db():
+    """Repara las tablas faltantes de la base de datos"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # ============================================
+        # TABLA SUSCRIPCIONES
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS suscripciones (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER NOT NULL,
+            negocio_id INTEGER NOT NULL,
+            fecha_suscripcion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            activo INTEGER DEFAULT 1,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(usuario_id, negocio_id)
+        )
+        ''')
+        
+        # ============================================
+        # TABLA PREFERENCIAS_NOTIFICACIONES
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS preferencias_notificaciones (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER NOT NULL,
+            notificaciones_email INTEGER DEFAULT 1,
+            notificaciones_push INTEGER DEFAULT 1,
+            notificaciones_in_app INTEGER DEFAULT 1,
+            alerta_stock_bajo INTEGER DEFAULT 1,
+            alerta_producto_nuevo INTEGER DEFAULT 1,
+            alerta_stock_actualizado INTEGER DEFAULT 0,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(usuario_id)
+        )
+        ''')
+        
+        # ============================================
+        # TABLA NOTIFICACIONES
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS notificaciones (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER NOT NULL,
+            negocio_id INTEGER NOT NULL,
+            tipo TEXT NOT NULL,
+            titulo TEXT NOT NULL,
+            mensaje TEXT NOT NULL,
+            leido INTEGER DEFAULT 0,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            url TEXT,
+            producto_id INTEGER,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (producto_id) REFERENCES productos(id) ON DELETE SET NULL
+        )
+        ''')
+        
+        # ============================================
+        # TABLA SUSCRIPCIONES_PUSH
+        # ============================================
+        cursor.execute('''
+        CREATE TABLE IF NOT EXISTS suscripciones_push (
+            id SERIAL PRIMARY KEY,
+            usuario_id INTEGER NOT NULL,
+            endpoint TEXT NOT NULL,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            activo INTEGER DEFAULT 1,
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            UNIQUE(usuario_id, endpoint)
+        )
+        ''')
+        
+        # ============================================
+        # CREAR ÍNDICES
+        # ============================================
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_suscripciones_usuario ON suscripciones(usuario_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_suscripciones_negocio ON suscripciones(negocio_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario ON notificaciones(usuario_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_notificaciones_leido ON notificaciones(leido)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_notificaciones_fecha ON notificaciones(fecha DESC)')
+        
+        conn.commit()
+        conn.close()
+        
+        return '''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Reparación DB - AIsa</title>
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body {
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    background: #0f0f1a;
+                    color: #fff;
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                }
+                .container {
+                    background: #1a1a2e;
+                    padding: 40px;
+                    border-radius: 16px;
+                    max-width: 600px;
+                    width: 100%;
+                    border: 1px solid #2a2a3e;
+                    text-align: center;
+                }
+                .icon { font-size: 64px; margin-bottom: 20px; }
+                h1 { color: #6c3ce0; margin-bottom: 10px; }
+                p { color: #888; margin-bottom: 20px; line-height: 1.6; }
+                .success { color: #6bff6b; }
+                .btn {
+                    display: inline-block;
+                    padding: 12px 30px;
+                    background: #6c3ce0;
+                    color: #fff;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    transition: background 0.3s;
+                }
+                .btn:hover { background: #5a2ec0; }
+                .log {
+                    background: #0f0f1a;
+                    border: 1px solid #2a2a3e;
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin-top: 20px;
+                    text-align: left;
+                    font-family: monospace;
+                    font-size: 12px;
+                    color: #aaa;
+                    max-height: 300px;
+                    overflow-y: auto;
+                }
+                .log .ok { color: #6bff6b; }
+                .log .error { color: #ff6b6b; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="icon">✅</div>
+                <h1>Base de Datos Reparada</h1>
+                <p>Todas las tablas faltantes han sido creadas correctamente.</p>
+                <div class="log">
+                    <div class="ok">✅ Tabla suscripciones creada</div>
+                    <div class="ok">✅ Tabla preferencias_notificaciones creada</div>
+                    <div class="ok">✅ Tabla notificaciones creada</div>
+                    <div class="ok">✅ Tabla suscripciones_push creada</div>
+                    <div class="ok">✅ Índices creados</div>
+                </div>
+                <br>
+                <a href="/dashboard" class="btn">← Volver al Dashboard</a>
+            </div>
+        </body>
+        </html>
+        '''
+        
+    except Exception as e:
+        return f'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Error - AIsa</title>
+            <style>
+                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+                body {{
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    background: #0f0f1a;
+                    color: #fff;
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 20px;
+                }}
+                .container {{
+                    background: #1a1a2e;
+                    padding: 40px;
+                    border-radius: 16px;
+                    max-width: 600px;
+                    width: 100%;
+                    border: 1px solid #2a2a3e;
+                    text-align: center;
+                }}
+                .icon {{ font-size: 64px; margin-bottom: 20px; }}
+                h1 {{ color: #ff6b6b; margin-bottom: 10px; }}
+                p {{ color: #888; margin-bottom: 20px; line-height: 1.6; }}
+                .error {{ color: #ff6b6b; }}
+                .log {{
+                    background: #0f0f1a;
+                    border: 1px solid #2a2a3e;
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin-top: 20px;
+                    text-align: left;
+                    font-family: monospace;
+                    font-size: 12px;
+                    color: #aaa;
+                    max-height: 300px;
+                    overflow-y: auto;
+                }}
+                .log .error {{ color: #ff6b6b; }}
+                .btn {{
+                    display: inline-block;
+                    padding: 12px 30px;
+                    background: #6c3ce0;
+                    color: #fff;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    transition: background 0.3s;
+                }}
+                .btn:hover {{ background: #5a2ec0; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="icon">❌</div>
+                <h1>Error al reparar</h1>
+                <p class="error">{str(e)}</p>
+                <div class="log">
+                    <div class="error">❌ Error: {str(e)}</div>
+                </div>
+                <br>
+                <a href="/dashboard" class="btn">← Volver al Dashboard</a>
+            </div>
+        </body>
+        </html>
+        '''
 
 # ============================================
 # CONFIGURACIÓN DE CACHÉ (ANTI-CACHÉ)
@@ -931,7 +1178,7 @@ def api_negocios_cercanos():
                 except:
                     pass
             
-        resultado.append({
+            resultado.append({
                 'id': n.get('id'),
                 'username': n.get('username'),
                 'nombre': n.get('nombre') or datos.get('nombre_negocio', n.get('username')),
@@ -2422,7 +2669,7 @@ def api_obtener_venta(venta_id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/venta/<int:venta_id>/estado', methods=['POST'])
+@app.route('/api/venta/<int:venta_id>/estado', methods(['POST'])
 @login_required
 def api_actualizar_estado_venta(venta_id):
     token = request.cookies.get('token')
@@ -2938,7 +3185,7 @@ def api_enviar_notificacion_test():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# ENDPOINT PÚBLICO PARA SERVICE WORKER (NUEVO)
+# ENDPOINT PÚBLICO PARA SERVICE WORKER
 # ============================================
 @app.route('/sw.js')
 def service_worker():
