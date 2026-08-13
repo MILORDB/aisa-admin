@@ -2005,7 +2005,7 @@ def api_eliminar_trabajador(trabajador_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - CONTRATOS (CORREGIDO - SIN CONFLICTOS DE NOMBRES)
+# API - CONTRATOS
 # ============================================
 
 @app.route('/api/contratos', methods=['GET'])
@@ -2034,11 +2034,9 @@ def api_obtener_contratos():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/contratos', methods=['POST'])
 @login_required
 def api_crear_contrato():
-    """Crea un nuevo contrato"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -2051,7 +2049,6 @@ def api_crear_contrato():
     data = request.get_json()
     print(f"📝 Datos para crear contrato: {data}")
     
-    # Obtener datos del frontend
     empresa = data.get('empresa')
     numero_contrato = data.get('numero_contrato')
     fecha_inicio = data.get('fecha_inicio')
@@ -2103,11 +2100,9 @@ def api_crear_contrato():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/contrato/<int:contrato_id>', methods=['PUT'])
 @login_required
 def api_actualizar_contrato(contrato_id):
-    """Actualiza un contrato existente"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -2165,11 +2160,9 @@ def api_actualizar_contrato(contrato_id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/contrato/<int:contrato_id>/estado', methods=['POST'])
 @login_required
 def api_cambiar_estado_contrato(contrato_id):
-    """Cambia el estado de un contrato"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -2212,11 +2205,9 @@ def api_cambiar_estado_contrato(contrato_id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/contrato/<int:contrato_id>', methods=['DELETE'])
 @login_required
 def api_eliminar_contrato(contrato_id):
-    """Elimina un contrato"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -2253,11 +2244,9 @@ def api_eliminar_contrato(contrato_id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-
 @app.route('/api/contratos/empresas', methods=['GET'])
 @login_required
 def api_contratos_empresas():
-    """Obtiene empresas con contratos activos para el negocio"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -2547,7 +2536,7 @@ def api_registrar_comision():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - VENTAS
+# API - VENTAS (CORREGIDO - CON EMPRESA)
 # ============================================
 
 @app.route('/api/ventas', methods=['GET'])
@@ -2593,11 +2582,13 @@ def api_crear_venta():
     data = request.get_json()
     print(f"📝 Datos para crear venta: {data}")
     
+    # Obtener datos del frontend
     productos = data.get('productos', [])
     cliente = data.get('cliente', '')
-    metodo_pago = data.get('metodo_pago', 'efectivo')
     estado = data.get('estado', 'completada')
-    comision = data.get('comision', 0)
+    empresa = data.get('empresa')  # ✅ Obtener empresa (puede ser None)
+    factura = data.get('factura')  # ✅ Obtener factura si viene del frontend
+    es_oferta = data.get('es_oferta', False) or estado == 'oferta'
     
     if not productos:
         return jsonify({'error': 'Debe incluir al menos un producto'}), 400
@@ -2614,23 +2605,48 @@ def api_crear_venta():
         
         total = sum(p.get('precio', 0) * p.get('cantidad', 0) for p in productos)
         
-        # Generar número de factura automático
-        numero_factura = generar_numero_factura(negocio_id)
+        # ✅ Generar número de factura SOLO si NO es oferta y hay empresa
+        numero_factura = None
+        if not es_oferta and empresa:
+            # Si el frontend ya generó un número, usarlo
+            if factura:
+                numero_factura = factura
+            else:
+                # ✅ Generar número de factura con la empresa
+                numero_factura = generar_numero_factura(negocio_id, empresa)
+        
+        # Si es oferta, usar estado 'oferta'
+        if es_oferta:
+            estado = 'oferta'
         
         venta_id = crear_venta(
-            negocio_id,
-            trabajador_id,
-            numero_factura,
-            total,
-            metodo_pago,
-            cliente,
-            estado,
-            json.dumps(productos)
+            negocio_id=negocio_id,
+            trabajador_id=trabajador_id,
+            cliente=cliente,
+            producto=productos[0].get('nombre', '') if productos else '',
+            producto_id=productos[0].get('id') if productos else None,
+            cantidad=sum(p.get('cantidad', 1) for p in productos),
+            precio=total,
+            total=total,
+            estado=estado,
+            empresa=empresa,
+            tipo='producto' if not productos[0].get('tipo') or productos[0].get('tipo') != 'servicio' else 'servicio',
+            factura=numero_factura,
+            factura_url=None,
+            transferencia_id=data.get('transferencia_id'),
+            transferencia_cedula=data.get('transferencia_cedula'),
+            transferencia_banco=data.get('transferencia_banco'),
+            transferencia_fecha=data.get('transferencia_fecha')
         )
         
         if venta_id:
             registrar_log(usuario['id'], 'venta_creada', f'Venta ID: {venta_id}, Total: {total}')
-            return jsonify({'success': True, 'id': venta_id, 'numero_factura': numero_factura})
+            return jsonify({
+                'success': True, 
+                'id': venta_id, 
+                'numero_factura': numero_factura,
+                'es_oferta': es_oferta
+            })
         else:
             return jsonify({'error': 'Error al crear la venta'}), 500
     except Exception as e:
@@ -2776,7 +2792,7 @@ def api_estadisticas_ventas():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/ventas/periodo', methods=['GET'])
+@app.route('/api/ventas/periodo', methods(['GET'])
 @login_required
 def api_ventas_por_periodo():
     token = request.cookies.get('token')
