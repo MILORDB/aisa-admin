@@ -1641,30 +1641,102 @@ def obtener_estadisticas_trabajador(trabajador_id):
         return {'ventas': 0, 'ingresos': 0, 'servicios': 0, 'clientes': 0}
 
 # ============================================
-# FUNCIONES PARA VENTAS
+# FUNCIONES PARA VENTAS (CORREGIDO - CON DESCUENTO DE STOCK)
 # ============================================
 
 def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, cantidad, precio, total,
                 estado='pagado', empresa=None, tipo='producto', factura_url=None,
                 factura=None, transferencia_id=None, transferencia_cedula=None,
                 transferencia_banco=None, transferencia_fecha=None):
+    """
+    Crea una nueva venta y descuenta el stock del producto
+    
+    Args:
+        negocio_id (int): ID del negocio
+        trabajador_id (int): ID del trabajador (opcional)
+        cliente (str): Nombre del cliente
+        producto (str): Nombre del producto
+        producto_id (int): ID del producto
+        cantidad (int): Cantidad vendida
+        precio (float): Precio unitario
+        total (float): Total de la venta
+        estado (str): Estado de la venta
+        empresa (str): Empresa (opcional)
+        tipo (str): Tipo de venta
+        factura_url (str): URL de la factura
+        factura (str): Número de factura
+        transferencia_id (str): ID de transferencia
+        transferencia_cedula (str): Cédula de transferencia
+        transferencia_banco (str): Banco de transferencia
+        transferencia_fecha (str): Fecha de transferencia
+    
+    Returns:
+        int: ID de la venta creada o None si hay error
+    """
     conn = get_db()
     cursor = conn.cursor()
-    fecha = datetime.now().isoformat()
-    cursor.execute('''
-    INSERT INTO ventas (negocio_id, trabajador_id, cliente, producto, producto_id,
-                        cantidad, precio, total, estado, empresa, tipo, factura_url,
-                        factura, transferencia_id, transferencia_cedula,
-                        transferencia_banco, transferencia_fecha, fecha, created_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ''', (negocio_id, trabajador_id, cliente, producto, producto_id,
-          cantidad, precio, total, estado, empresa, tipo, factura_url,
-          factura, transferencia_id, transferencia_cedula,
-          transferencia_banco, transferencia_fecha, fecha, fecha))
-    conn.commit()
-    venta_id = cursor.lastrowid
-    conn.close()
-    return venta_id
+    try:
+        fecha = datetime.now().isoformat()
+        
+        # Si es una oferta, no descontar stock
+        es_oferta = estado == 'oferta'
+        
+        # Si hay producto_id y NO es oferta, descontar stock
+        if producto_id and not es_oferta:
+            # Verificar stock disponible
+            cursor.execute('SELECT stock FROM productos WHERE id = %s AND negocio_id = %s', (producto_id, negocio_id))
+            result = cursor.fetchone()
+            if not result:
+                conn.close()
+                print(f"❌ Producto no encontrado: {producto_id}")
+                return None
+            
+            stock_actual = result[0]
+            if stock_actual < cantidad:
+                conn.close()
+                print(f"❌ Stock insuficiente: {stock_actual} < {cantidad}")
+                return None
+            
+            # Descontar stock
+            cursor.execute('''
+                UPDATE productos 
+                SET stock = stock - %s, updated_at = %s 
+                WHERE id = %s AND negocio_id = %s AND stock >= %s
+            ''', (cantidad, fecha, producto_id, negocio_id, cantidad))
+            
+            if cursor.rowcount == 0:
+                conn.rollback()
+                conn.close()
+                print(f"❌ Error al actualizar stock")
+                return None
+            
+            print(f"✅ Stock actualizado: {stock_actual} → {stock_actual - cantidad}")
+        
+        # Insertar la venta
+        cursor.execute('''
+        INSERT INTO ventas (negocio_id, trabajador_id, cliente, producto, producto_id,
+                            cantidad, precio, total, estado, empresa, tipo, factura_url,
+                            factura, transferencia_id, transferencia_cedula,
+                            transferencia_banco, transferencia_fecha, fecha, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+        ''', (negocio_id, trabajador_id, cliente, producto, producto_id,
+              cantidad, precio, total, estado, empresa, tipo, factura_url,
+              factura, transferencia_id, transferencia_cedula,
+              transferencia_banco, transferencia_fecha, fecha, fecha))
+        
+        venta_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Venta creada: ID {venta_id}, Total: {total}")
+        return venta_id
+        
+    except Exception as e:
+        print(f"❌ Error en crear_venta: {e}")
+        conn.rollback()
+        conn.close()
+        return None
 
 def obtener_ventas(negocio_id, trabajador_id=None):
     conn = get_db()
@@ -2657,7 +2729,7 @@ def obtener_resumen_nomina(negocio_id, mes, ano):
         }
 
 # ============================================
-# FUNCIONES PARA SECUENCIA DE FACTURAS (CORREGIDO)
+# FUNCIONES PARA SECUENCIA DE FACTURAS
 # ============================================
 
 def obtener_ultimo_numero_factura(negocio_id, empresa):
@@ -2700,9 +2772,6 @@ def actualizar_ultimo_numero_factura(negocio_id, empresa, numero):
         conn.close()
         return False
 
-# ============================================
-# ✅ GENERAR NÚMERO DE FACTURA (CORREGIDO - CON EMPRESA)
-# ============================================
 def generar_numero_factura(negocio_id, empresa, año=None):
     """
     Genera un número de factura consecutivo para una empresa
