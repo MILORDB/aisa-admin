@@ -2669,7 +2669,7 @@ def api_obtener_venta(venta_id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/venta/<int:venta_id>/estado', methods(['POST'])
+@app.route('/api/venta/<int:venta_id>/estado', methods=['POST'])
 @login_required
 def api_actualizar_estado_venta(venta_id):
     token = request.cookies.get('token')
