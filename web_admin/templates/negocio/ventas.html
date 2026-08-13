@@ -82,8 +82,6 @@
             border-color: #6c3ce0; outline: none;
         }
         .form-row label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
-        .form-row .campo-opcional label { font-size: 10px; color: #888; }
-        .form-row .campo-obligatorio label::after { content: " *"; color: #ff6b6b; }
         
         .search-bar {
             display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
@@ -181,8 +179,6 @@
             background: #1a1a2e; color: #fff; border: 1px solid #2a2a3e;
             border-radius: 4px; padding: 1px 4px; font-size: 10px;
         }
-        .contrato-link { color: #6c3ce0; text-decoration: none; font-size: 11px; cursor: pointer; }
-        .contrato-link:hover { text-decoration: underline; }
         .badge-numero { font-size: 10px; color: #6c3ce0; font-weight: 600; }
         .badge-oferta { font-size: 10px; color: #ff9800; font-weight: 600; background: rgba(255,152,0,0.1); padding: 1px 6px; border-radius: 4px; }
         
@@ -287,11 +283,10 @@
                 <div style="flex:2;">
                     <label>🏢 Empresa / TCP / MIPYME</label>
                     <select id="ventaEmpresa" onchange="seleccionarEmpresa()">
-                        <option value="">-- Seleccionar --</option>
-                        <option value="VENTA DIRECTA" selected>🛒 Venta directa</option>
+                        <option value="">-- Seleccionar empresa --</option>
                     </select>
                     <div style="font-size:10px;color:#888;margin-top:2px;">
-                        <span id="infoContrato">📄 Modo: Venta directa</span>
+                        <span id="infoContrato">📄 Cargando contratos...</span>
                         <span id="empresaInfo" style="display:none;color:#6c3ce0;margin-left:8px;"></span>
                     </div>
                 </div>
@@ -313,7 +308,11 @@
 
             <div class="seccion-items">
                 <div class="seccion-titulo"><span>📦 Productos</span><span class="badge-count" id="countProductos">0</span></div>
-                <div id="productosContainer"></div>
+                <div id="productosContainer">
+                    <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
+                        🔄 Cargando productos...
+                    </div>
+                </div>
                 <div style="display:flex;justify-content:center;margin-top:4px;">
                     <button class="btn-add" onclick="agregarLineaProducto()">➕</button>
                 </div>
@@ -321,7 +320,11 @@
 
             <div class="seccion-items">
                 <div class="seccion-titulo"><span>📋 Servicios</span><span class="badge-count" id="countServicios">0</span></div>
-                <div id="serviciosContainer"></div>
+                <div id="serviciosContainer">
+                    <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
+                        🔄 Cargando servicios...
+                    </div>
+                </div>
                 <div style="display:flex;justify-content:center;margin-top:4px;">
                     <button class="btn-add" onclick="agregarLineaServicio()">➕</button>
                 </div>
@@ -625,11 +628,6 @@
                 }
                 productos = await response.json();
                 console.log('📦 Productos cargados:', productos.length);
-                if (productos.length === 0) {
-                    console.warn('⚠️ No hay productos en stock');
-                } else {
-                    console.log('✅ Productos disponibles:', productos.map(p => `${p.nombre} (Stock: ${p.stock})`).join(', '));
-                }
                 return true;
             } catch (error) {
                 console.error('❌ Error cargando productos:', error);
@@ -655,7 +653,7 @@
         }
 
         // ============================================
-        // CARGAR EMPRESAS CON CONTRATOS (VERSIÓN TOLERANTE)
+        // CARGAR EMPRESAS CON CONTRATOS
         // ============================================
         async function cargarEmpresasConContratos() {
             if (esOferta) {
@@ -667,39 +665,52 @@
             const select = document.getElementById('ventaEmpresa');
             if (!select) return;
             
-            // ✅ Siempre mostrar opción de venta directa
-            select.innerHTML = `
-                <option value="">-- Seleccionar --</option>
-                <option value="VENTA DIRECTA" selected>🛒 Venta directa</option>
-            `;
+            select.innerHTML = '<option value="">-- Seleccionar empresa --</option>';
             
-            const info = document.getElementById('infoContrato');
-            if (info) info.textContent = '📄 Modo: Venta directa';
-            
-            // Intentar cargar contratos (silenciosamente)
             try {
                 const response = await fetch('/api/contratos/empresas');
-                if (response.ok) {
-                    const empresas = await response.json();
-                    if (empresas && empresas.length > 0) {
-                        empresas.forEach(e => {
-                            const opt = document.createElement('option');
-                            opt.value = e.empresa;
-                            opt.dataset.numero = e.numero_contrato || '';
-                            opt.dataset.tipo = e.tipo || 'ventas';
-                            opt.dataset.fecha_fin = e.fecha_fin || '';
-                            opt.textContent = `${e.empresa} (${e.numero_contrato || 'N/A'})`;
-                            select.appendChild(opt);
-                        });
-                        if (info) info.textContent = `📄 ${empresas.length} contratos disponibles`;
-                    }
+                console.log('📡 Respuesta de contratos:', response.status);
+                
+                if (!response.ok) {
+                    // Si no hay endpoint de contratos, mostrar mensaje
+                    select.innerHTML = '<option value="">-- Sin contratos activos --</option>';
+                    const info = document.getElementById('infoContrato');
+                    if (info) info.textContent = '📄 No hay contratos activos';
+                    return;
                 }
+                
+                const empresas = await response.json();
+                console.log('📄 Empresas con contratos:', empresas);
+                
+                const info = document.getElementById('infoContrato');
+                
+                if (!empresas || empresas.length === 0) {
+                    select.innerHTML = '<option value="">-- Sin contratos activos --</option>';
+                    if (info) info.textContent = '📄 No hay contratos activos';
+                    return;
+                }
+                
+                empresas.forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = e.empresa;
+                    opt.dataset.numero = e.numero_contrato || '';
+                    opt.dataset.tipo = e.tipo || 'ventas';
+                    opt.dataset.fecha_fin = e.fecha_fin || '';
+                    opt.textContent = `${e.empresa} (${e.numero_contrato || 'N/A'})`;
+                    select.appendChild(opt);
+                });
+                
+                if (info) info.textContent = `📄 ${empresas.length} contratos activos disponibles`;
+                
+                // NO seleccionar automáticamente la primera empresa
+                // Dejar que el usuario seleccione manualmente
+                
             } catch (error) {
-                // No mostrar error, solo usar venta directa
-                console.log('ℹ️ Modo venta directa');
+                console.error('❌ Error cargando empresas:', error);
+                select.innerHTML = '<option value="">-- Error al cargar contratos --</option>';
+                const info = document.getElementById('infoContrato');
+                if (info) info.textContent = '📄 Error al cargar contratos';
             }
-            
-            generarNumeroFactura();
         }
 
         // ============================================
@@ -713,6 +724,7 @@
             
             const selected = select.options[select.selectedIndex];
             const infoSpan = document.getElementById('empresaInfo');
+            const info = document.getElementById('infoContrato');
             
             if (selected && selected.value) {
                 const numero = selected.dataset.numero || '';
@@ -721,21 +733,19 @@
                 
                 if (infoSpan) {
                     infoSpan.style.display = 'inline';
-                    infoSpan.innerHTML = numero ? `📌 ${numero} | ${tipo} | Fin: ${fechaFin}` : '🛒 Venta directa';
+                    infoSpan.innerHTML = `📌 ${numero} | ${tipo} | Fin: ${fechaFin}`;
                 }
                 
-                generarNumeroFactura();
+                if (info) info.textContent = `📄 Contrato: ${numero} (${tipo})`;
                 
-                const info = document.getElementById('infoContrato');
-                if (info) info.textContent = numero ? `📄 Contrato: ${numero} (${tipo})` : '📄 Venta directa';
+                generarNumeroFactura();
             } else {
                 if (infoSpan) infoSpan.style.display = 'none';
                 const factura = document.getElementById('ventaFactura');
                 if (factura) factura.value = '';
                 const facturaNum = document.getElementById('facturaNumero');
                 if (facturaNum) facturaNum.textContent = '-';
-                const info = document.getElementById('infoContrato');
-                if (info) info.textContent = '📄 Selecciona una opción';
+                if (info) info.textContent = '📄 Selecciona una empresa con contrato';
             }
             
             actualizarFactura();
@@ -761,10 +771,9 @@
             const facturaNum = document.getElementById('facturaNumero');
             
             if (empresa && input && facturaNum) {
-                const prefijo = empresa === 'VENTA DIRECTA' ? 'VD' : 'FAC';
                 ultimoNumeroFactura++;
                 const año = new Date().getFullYear();
-                input.value = `${prefijo}-${año}-${String(ultimoNumeroFactura).padStart(4,'0')}`;
+                input.value = `FAC-${año}-${String(ultimoNumeroFactura).padStart(4,'0')}`;
                 facturaNum.textContent = input.value;
             } else if (input) {
                 input.value = '';
@@ -810,7 +819,7 @@
                 if (estadoSelect) estadoSelect.value = 'pagado';
                 if (facturaTitulo) facturaTitulo.textContent = '🧾 FACTURA';
                 if (facturaNum) facturaNum.textContent = '-';
-                if (infoContrato) infoContrato.textContent = '📄 Cargando...';
+                if (infoContrato) infoContrato.textContent = '📄 Cargando contratos...';
                 cargarEmpresasConContratos();
             }
             actualizarFactura();
@@ -839,7 +848,7 @@
                 return;
             }
             
-            // Crear opciones del select
+            // Crear opciones del select - INCLUYE OPCIÓN VACÍA
             let options = '<option value="">-- Seleccionar producto --</option>';
             let hayStock = false;
             productos.forEach(p => {
@@ -880,13 +889,6 @@
             
             const count = document.getElementById('countProductos');
             if (count) count.textContent = lineasProductos.length;
-            
-            // Actualizar la línea
-            const select = document.querySelector(`.select-producto[data-linea-id="${id}"]`);
-            if (select && select.options.length > 1) {
-                select.selectedIndex = 1;
-                actualizarLineaProducto(id);
-            }
             
             actualizarFactura();
         }
@@ -935,12 +937,6 @@
             
             const count = document.getElementById('countServicios');
             if (count) count.textContent = lineasServicios.length;
-            
-            const select = document.querySelector(`.select-servicio[data-linea-id="${id}"]`);
-            if (select && select.options.length > 1) {
-                select.selectedIndex = 1;
-                actualizarLineaServicio(id);
-            }
             
             actualizarFactura();
         }
@@ -1089,16 +1085,18 @@
         }
 
         // ============================================
-        // NUEVA VENTA
+        // NUEVA VENTA (CORREGIDO - SIN PRODUCTO PRESELECCIONADO)
         // ============================================
         async function nuevaVenta() {
             const btn = document.querySelector('.btn-primary');
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Cargando...'; }
             
+            // Resetear oferta
             const esOfertaCheck = document.getElementById('esOferta');
             if (esOfertaCheck) esOfertaCheck.checked = false;
             esOferta = false;
             
+            // Limpiar campos
             const ventaEmpresa = document.getElementById('ventaEmpresa');
             const ventaFactura = document.getElementById('ventaFactura');
             const ventaEstado = document.getElementById('ventaEstado');
@@ -1119,51 +1117,51 @@
             if (transferenciaBanco) transferenciaBanco.value = '';
             if (transferenciaFecha) transferenciaFecha.value = '';
             if (camposTransferencia) camposTransferencia.classList.remove('show');
-            if (infoContrato) infoContrato.textContent = '📄 Cargando...';
+            if (infoContrato) infoContrato.textContent = '📄 Cargando contratos...';
             if (empresaInfo) empresaInfo.style.display = 'none';
             if (facturaTitulo) facturaTitulo.textContent = '🧾 FACTURA';
             
+            // Limpiar contenedores
             const productosContainer = document.getElementById('productosContainer');
             const serviciosContainer = document.getElementById('serviciosContainer');
-            if (productosContainer) productosContainer.innerHTML = '';
-            if (serviciosContainer) serviciosContainer.innerHTML = '';
+            if (productosContainer) {
+                productosContainer.innerHTML = `
+                    <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
+                        🔄 Cargando productos...
+                    </div>
+                `;
+            }
+            if (serviciosContainer) {
+                serviciosContainer.innerHTML = `
+                    <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
+                        🔄 Cargando servicios...
+                    </div>
+                `;
+            }
             
+            // Resetear variables
             lineasProductos = [];
             lineasServicios = [];
+            nextId = 1;
             
             const countP = document.getElementById('countProductos');
             const countS = document.getElementById('countServicios');
             if (countP) countP.textContent = '0';
             if (countS) countS.textContent = '0';
             
-            nextId = 1;
-            
-            // ✅ Cargar productos y servicios ANTES de agregar líneas
+            // Cargar datos
             const productosCargados = await cargarProductos();
             await cargarServicios();
             await cargarEmpresasConContratos();
             
-            // ✅ Si hay productos, agregar una línea
-            if (productosCargados && productos.length > 0) {
-                agregarLineaProducto();
-            } else {
-                // Mostrar mensaje en el contenedor
-                if (productosContainer) {
-                    productosContainer.innerHTML = `
-                        <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
-                            ⚠️ No hay productos con stock disponible.<br>
-                            <small>Agrega productos en el módulo de Inventario.</small>
-                        </div>
-                    `;
-                }
-            }
+            // 🔴 NO agregar línea de producto automáticamente
+            // El usuario debe hacer clic en el botón "+" para agregar productos
             
             actualizarFactura();
             
             const modal = document.getElementById('modalVenta');
             if (modal) modal.classList.add('show');
             
-            if (ventaEmpresa) ventaEmpresa.focus();
             if (btn) { btn.disabled = false; btn.textContent = '+ Nueva'; }
         }
 
@@ -1222,7 +1220,7 @@
             });
             
             if (items.length === 0) { 
-                mostrarMensaje('Agrega un producto o servicio', 'error'); 
+                mostrarMensaje('Agrega al menos un producto o servicio', 'error'); 
                 return; 
             }
             
@@ -1417,7 +1415,7 @@
                 return;
             }
             
-            // ✅ Obtener el negocio_id correctamente
+            // ✅ Obtener el negocio_id de la venta
             const negocioId = v.negocio_id || v.negocioId;
             
             if (!negocioId) {
