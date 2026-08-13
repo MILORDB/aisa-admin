@@ -239,7 +239,7 @@ def init_db():
     ''')
     
     # ============================================
-    # TABLA CONTRATOS (MÓDULO COMPLETO)
+    # TABLA CONTRATOS
     # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS contratos (
@@ -1974,7 +1974,7 @@ def eliminar_servicio(servicio_id):
     conn.close()
 
 # ============================================
-# FUNCIONES PARA CONTRATOS (MÓDULO COMPLETO)
+# FUNCIONES PARA CONTRATOS
 # ============================================
 
 def obtener_ultimo_numero_contrato(negocio_id):
@@ -2657,10 +2657,11 @@ def obtener_resumen_nomina(negocio_id, mes, ano):
         }
 
 # ============================================
-# FUNCIONES PARA SECUENCIA DE FACTURAS
+# FUNCIONES PARA SECUENCIA DE FACTURAS (CORREGIDO)
 # ============================================
 
 def obtener_ultimo_numero_factura(negocio_id, empresa):
+    """Obtiene el último número de factura para una empresa"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -2679,6 +2680,7 @@ def obtener_ultimo_numero_factura(negocio_id, empresa):
         return 0
 
 def actualizar_ultimo_numero_factura(negocio_id, empresa, numero):
+    """Actualiza el último número de factura para una empresa"""
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -2698,7 +2700,21 @@ def actualizar_ultimo_numero_factura(negocio_id, empresa, numero):
         conn.close()
         return False
 
+# ============================================
+# ✅ GENERAR NÚMERO DE FACTURA (CORREGIDO - CON EMPRESA)
+# ============================================
 def generar_numero_factura(negocio_id, empresa, año=None):
+    """
+    Genera un número de factura consecutivo para una empresa
+    
+    Args:
+        negocio_id (int): ID del negocio
+        empresa (str): Nombre de la empresa
+        año (int): Año para la factura (opcional)
+    
+    Returns:
+        str: Número de factura generado
+    """
     if not año:
         año = datetime.now().year
     ultimo = obtener_ultimo_numero_factura(negocio_id, empresa)
