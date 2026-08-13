@@ -498,37 +498,85 @@
         function cerrarModal() { document.getElementById('modalContrato').classList.remove('show'); }
         document.getElementById('modalContrato').addEventListener('click', function(e) { if (e.target === this) cerrarModal(); });
 
-        async function guardarContrato() {
-            const btn = document.getElementById('btnGuardar');
-            btn.disabled = true; btn.textContent = '⏳ Guardando...';
-            try {
-                const empresa = document.getElementById('contratoEmpresa').value.trim();
-                const numero_contrato = document.getElementById('contratoNumero').value.trim();
-                const fecha_inicio = document.getElementById('contratoFechaInicio').value;
-                const fecha_fin = document.getElementById('contratoFechaFin').value;
-                const monto = parseFloat(document.getElementById('contratoMonto').value) || 0;
-                const descripcion = document.getElementById('contratoDescripcion').value.trim();
-                const tipo = document.querySelector('input[name="tipoContrato"]:checked')?.value || '';
-                if (!empresa || !fecha_inicio || !tipo) {
-                    mostrarMensaje('Empresa, fecha inicio y tipo son obligatorios', 'error');
-                    btn.disabled=false; btn.textContent='💾 Guardar'; return;
-                }
-                const data = { empresa, numero_contrato, fecha_inicio, fecha_fin, tipo, monto, descripcion, estado:'activo' };
-                const url = editandoId ? `/api/contrato/${editandoId}` : '/api/contratos';
-                const method = editandoId ? 'PUT' : 'POST';
-                const response = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
-                const result = await response.json();
-                if (response.ok && result.success) {
-                    mostrarMensaje(`✅ Contrato ${editandoId ? 'actualizado' : 'creado'}`, 'exito');
-                    cerrarModal();
-                    await cargarContratos();
-                    if (!editandoId) await obtenerUltimoNumeroContrato();
-                } else {
-                    mostrarMensaje(result.error || 'Error', 'error');
-                }
-            } catch (error) { console.error(error); mostrarMensaje('Error: '+error.message, 'error'); }
-            finally { btn.disabled = false; btn.textContent = editandoId ? '💾 Actualizar' : '💾 Guardar'; }
+  async function guardarContrato() {
+    const btn = document.getElementById('btnGuardar');
+    btn.disabled = true;
+    btn.textContent = '⏳ Guardando...';
+    
+    try {
+        const empresa = document.getElementById('contratoEmpresa').value.trim();
+        const numero_contrato = document.getElementById('contratoNumero').value.trim();
+        const fecha_inicio = document.getElementById('contratoFechaInicio').value;
+        const fecha_fin = document.getElementById('contratoFechaFin').value;
+        const monto = parseFloat(document.getElementById('contratoMonto').value) || 0;
+        const descripcion = document.getElementById('contratoDescripcion').value.trim();
+        const tipo = document.querySelector('input[name="tipoContrato"]:checked')?.value || '';
+        const estado = document.getElementById('contratoEstado') ? document.getElementById('contratoEstado').value : 'activo';
+        
+        // ✅ Validaciones
+        if (!empresa) {
+            mostrarMensaje('La empresa es obligatoria', 'error');
+            btn.disabled = false;
+            btn.textContent = '💾 Guardar';
+            return;
         }
+        
+        if (!fecha_inicio) {
+            mostrarMensaje('La fecha de inicio es obligatoria', 'error');
+            btn.disabled = false;
+            btn.textContent = '💾 Guardar';
+            return;
+        }
+        
+        if (!tipo) {
+            mostrarMensaje('El tipo de contrato es obligatorio', 'error');
+            btn.disabled = false;
+            btn.textContent = '💾 Guardar';
+            return;
+        }
+        
+        // ✅ Enviar datos correctos al backend
+        const data = {
+            empresa: empresa,
+            numero_contrato: numero_contrato,
+            fecha_inicio: fecha_inicio,
+            fecha_fin: fecha_fin,
+            tipo: tipo,
+            monto: monto,
+            descripcion: descripcion,
+            estado: estado
+        };
+        
+        console.log('📤 Enviando datos:', data);
+        
+        const url = editandoId ? `/api/contrato/${editandoId}` : '/api/contratos';
+        const method = editandoId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        console.log('📥 Respuesta:', result);
+        
+        if (response.ok && result.success) {
+            mostrarMensaje(`✅ Contrato ${editandoId ? 'actualizado' : 'creado'} correctamente`, 'exito');
+            cerrarModal();
+            await cargarContratos();
+            if (!editandoId) await obtenerUltimoNumeroContrato();
+        } else {
+            mostrarMensaje(result.error || 'Error al guardar el contrato', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        mostrarMensaje('Error: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = editandoId ? '💾 Actualizar' : '💾 Guardar';
+    }
+}   
 
         function cambiarEstado(id, estado) {
             if (!confirm(`¿Cambiar estado a "${estado}"?`)) { cargarContratos(); return; }
