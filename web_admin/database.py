@@ -239,7 +239,7 @@ def init_db():
     ''')
     
     # ============================================
-    # TABLA CONTRATOS
+    # TABLA CONTRATOS (MÓDULO COMPLETO)
     # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS contratos (
@@ -357,7 +357,7 @@ def init_db():
     ''')
     
     # ============================================
-    # TABLA SUSCRIPCIONES (NUEVA)
+    # TABLA SUSCRIPCIONES
     # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS suscripciones (
@@ -373,7 +373,7 @@ def init_db():
     ''')
     
     # ============================================
-    # TABLA NOTIFICACIONES (NUEVA)
+    # TABLA NOTIFICACIONES
     # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS notificaciones (
@@ -394,7 +394,7 @@ def init_db():
     ''')
     
     # ============================================
-    # TABLA PREFERENCIAS_NOTIFICACIONES (NUEVA)
+    # TABLA PREFERENCIAS_NOTIFICACIONES
     # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS preferencias_notificaciones (
@@ -408,6 +408,23 @@ def init_db():
         alerta_stock_actualizado INTEGER DEFAULT 0,
         FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
         UNIQUE(usuario_id)
+    )
+    ''')
+    
+    # ============================================
+    # TABLA SUSCRIPCIONES_PUSH
+    # ============================================
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS suscripciones_push (
+        id SERIAL PRIMARY KEY,
+        usuario_id INTEGER NOT NULL,
+        endpoint TEXT NOT NULL,
+        p256dh TEXT NOT NULL,
+        auth TEXT NOT NULL,
+        fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        activo INTEGER DEFAULT 1,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        UNIQUE(usuario_id, endpoint)
     )
     ''')
     
@@ -590,10 +607,11 @@ def eliminar_usuario(user_id):
         
         print(f"🗑️ Eliminando usuario: {usuario[1]} (ID: {user_id}) - Rol: {usuario[2]}")
         
-        # Eliminar notificaciones y suscripciones primero (nuevas tablas)
+        # Eliminar notificaciones y suscripciones primero
         cursor.execute("DELETE FROM notificaciones WHERE usuario_id = %s OR negocio_id = %s", (user_id, user_id))
         cursor.execute("DELETE FROM suscripciones WHERE usuario_id = %s OR negocio_id = %s", (user_id, user_id))
         cursor.execute("DELETE FROM preferencias_notificaciones WHERE usuario_id = %s", (user_id,))
+        cursor.execute("DELETE FROM suscripciones_push WHERE usuario_id = %s", (user_id,))
         
         cursor.execute("DELETE FROM codigos_verificacion WHERE usuario_id = %s", (user_id,))
         cursor.execute("DELETE FROM sesiones WHERE usuario_id = %s", (user_id,))
@@ -994,35 +1012,18 @@ def obtener_logs(limit=50):
 # ============================================
 
 def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, stock=0, stock_minimo=3):
-    """
-    Crea un nuevo producto en la base de datos
-    
-    Args:
-        negocio_id (int): ID del negocio
-        nombre (str): Nombre del producto
-        categoria (str): Categoría del producto
-        precio (float): Precio del producto
-        costo (float): Costo del producto (opcional)
-        comision (float): Comisión por venta (opcional)
-        stock (int): Cantidad en stock (opcional)
-        stock_minimo (int): Stock mínimo para alerta (opcional)
-    
-    Returns:
-        int: ID del producto creado o None si hay error
-    """
+    """Crea un nuevo producto en la base de datos"""
     conn = None
     cursor = None
     try:
         conn = get_db()
         cursor = conn.cursor()
         
-        # Verificar que el negocio existe
         cursor.execute('SELECT id FROM usuarios WHERE id = %s AND tipo = %s', (negocio_id, 'negocio'))
         if not cursor.fetchone():
             print(f"❌ Error: El negocio {negocio_id} no existe o no es de tipo negocio")
             return None
         
-        # Insertar el producto
         created_at = datetime.now().isoformat()
         cursor.execute('''
         INSERT INTO productos (
@@ -1174,9 +1175,7 @@ def obtener_productos_tienda_negocio(negocio_id):
     return productos
 
 def obtener_productos_tienda_por_negocio(negocio_id):
-    """
-    Obtiene los productos que un negocio tiene en su tienda.
-    """
+    """Obtiene los productos que un negocio tiene en su tienda."""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
@@ -1193,9 +1192,7 @@ def obtener_productos_tienda_por_negocio(negocio_id):
     return [dict(p) for p in productos]
 
 def obtener_productos_con_stock_negocio(negocio_id):
-    """
-    Obtiene productos con stock disponible de un negocio específico.
-    """
+    """Obtiene productos con stock disponible de un negocio específico."""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
@@ -1211,10 +1208,7 @@ def obtener_productos_con_stock_negocio(negocio_id):
     return [dict(p) for p in productos]
 
 def obtener_productos_tienda(negocio_id=None):
-    """
-    Obtiene productos de la tienda pública.
-    Si se proporciona negocio_id, obtiene solo los productos de ese negocio.
-    """
+    """Obtiene productos de la tienda pública."""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
@@ -1487,9 +1481,7 @@ def obtener_trabajadores_activos(negocio_id):
         return []
 
 def obtener_trabajador_negocio(trabajador_id):
-    """
-    Obtiene la información de un trabajador incluyendo su relación con el negocio.
-    """
+    """Obtiene la información de un trabajador incluyendo su relación con el negocio."""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
@@ -1809,39 +1801,54 @@ def actualizar_estado_venta(venta_id, negocio_id, estado):
     return filas > 0
 
 def eliminar_venta_con_reintegro(venta_id, negocio_id):
+    """Elimina una venta y reintegra el stock de los productos"""
     conn = get_db()
     cursor = conn.cursor()
     try:
+        # Obtener datos de la venta
         cursor.execute('''
-            SELECT producto_id, cantidad, total, cliente, producto, fecha, empresa, tipo, 
-                   factura_url, factura, transferencia_id, transferencia_cedula, 
-                   transferencia_banco, transferencia_fecha
+            SELECT producto_id, cantidad, total, estado
             FROM ventas 
             WHERE id = %s AND negocio_id = %s
         ''', (venta_id, negocio_id))
         venta = cursor.fetchone()
+        
         if not venta:
             conn.close()
             return False, "Venta no encontrada"
         
         producto_id = venta[0]
         cantidad = venta[1]
+        total = venta[2]
+        estado = venta[3]
         
+        # Si es una oferta, no reintegrar stock
+        if estado == 'oferta':
+            cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, negocio_id))
+            conn.commit()
+            conn.close()
+            return True, "Oferta eliminada correctamente"
+        
+        # Reintegrar stock si hay producto asociado
         if producto_id:
             cursor.execute('''
                 UPDATE productos 
                 SET stock = stock + %s, updated_at = %s 
-                WHERE id = %s
-            ''', (cantidad, datetime.now().isoformat(), producto_id))
+                WHERE id = %s AND negocio_id = %s
+            ''', (cantidad, datetime.now().isoformat(), producto_id, negocio_id))
+            
             if cursor.rowcount == 0:
                 conn.rollback()
                 conn.close()
                 return False, "Error al actualizar el stock"
         
+        # Eliminar la venta
         cursor.execute('DELETE FROM ventas WHERE id = %s AND negocio_id = %s', (venta_id, negocio_id))
         conn.commit()
         conn.close()
-        return True, {'producto_id': producto_id, 'cantidad': cantidad}
+        
+        return True, f"Venta eliminada correctamente. Stock reintegrado: {cantidad} unidades."
+        
     except Exception as e:
         print(f"❌ Error eliminando venta: {e}")
         conn.rollback()
@@ -1853,29 +1860,13 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
 # ============================================
 
 def crear_servicio(negocio_id, trabajador_id, nombre, categoria, precio, duracion, activo=1, descripcion=''):
-    """
-    Crea un nuevo servicio en la base de datos
-    
-    Args:
-        negocio_id (int): ID del negocio
-        trabajador_id (int): ID del trabajador (opcional)
-        nombre (str): Nombre del servicio
-        categoria (str): Categoría del servicio
-        precio (float): Precio del servicio
-        duracion (int): Duración en minutos
-        activo (int): 1=activo, 0=inactivo
-        descripcion (str): Descripción del servicio
-    
-    Returns:
-        int: ID del servicio creado o None si hay error
-    """
+    """Crea un nuevo servicio en la base de datos"""
     conn = None
     cursor = None
     try:
         conn = get_db()
         cursor = conn.cursor()
         
-        # Verificar que el negocio existe
         cursor.execute('SELECT id FROM usuarios WHERE id = %s AND tipo = %s', (negocio_id, 'negocio'))
         if not cursor.fetchone():
             print(f"❌ Error: El negocio {negocio_id} no existe o no es de tipo negocio")
@@ -1983,10 +1974,11 @@ def eliminar_servicio(servicio_id):
     conn.close()
 
 # ============================================
-# FUNCIONES PARA CONTRATOS
+# FUNCIONES PARA CONTRATOS (MÓDULO COMPLETO)
 # ============================================
 
 def obtener_ultimo_numero_contrato(negocio_id):
+    """Obtiene el último número de contrato para un negocio"""
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT numero_contrato FROM contratos WHERE negocio_id = %s ORDER BY id DESC LIMIT 1', (negocio_id,))
@@ -2003,38 +1995,58 @@ def obtener_ultimo_numero_contrato(negocio_id):
 
 def crear_contrato(negocio_id, trabajador_id, empresa, numero_contrato, fecha_inicio, fecha_fin,
                    tipo, monto=0, estado='activo', descripcion=''):
+    """Crea un nuevo contrato en la base de datos"""
     conn = get_db()
     cursor = conn.cursor()
     fecha = datetime.now().isoformat()
-    cursor.execute('''
-    INSERT INTO contratos (negocio_id, trabajador_id, empresa, numero_contrato, fecha_inicio, fecha_fin,
-                           tipo, monto, estado, descripcion, created_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-    ''', (negocio_id, trabajador_id, empresa, numero_contrato, fecha_inicio, fecha_fin,
-          tipo, monto, estado, descripcion, fecha))
-    conn.commit()
-    contrato_id = cursor.lastrowid
-    conn.close()
-    return contrato_id
+    try:
+        cursor.execute('''
+        INSERT INTO contratos (negocio_id, trabajador_id, empresa, numero_contrato, fecha_inicio, fecha_fin,
+                               tipo, monto, estado, descripcion, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+        ''', (negocio_id, trabajador_id, empresa, numero_contrato, fecha_inicio, fecha_fin,
+              tipo, monto, estado, descripcion, fecha))
+        
+        contrato_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        print(f"✅ Contrato creado: {numero_contrato} (ID: {contrato_id})")
+        return contrato_id
+    except Exception as e:
+        print(f"❌ Error creando contrato: {e}")
+        conn.rollback()
+        conn.close()
+        return None
 
 def obtener_contratos(negocio_id, trabajador_id=None):
+    """Obtiene los contratos de un negocio"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    if trabajador_id:
-        cursor.execute('''
-        SELECT c.*, u.nombre as trabajador_nombre
-        FROM contratos c LEFT JOIN usuarios u ON c.trabajador_id = u.id
-        WHERE c.negocio_id = %s AND c.trabajador_id = %s ORDER BY c.id DESC
-        ''', (negocio_id, trabajador_id))
-    else:
-        cursor.execute('''
-        SELECT c.*, u.nombre as trabajador_nombre
-        FROM contratos c LEFT JOIN usuarios u ON c.trabajador_id = u.id
-        WHERE c.negocio_id = %s ORDER BY c.id DESC
-        ''', (negocio_id,))
-    contratos = cursor.fetchall()
-    conn.close()
-    return contratos
+    try:
+        if trabajador_id:
+            cursor.execute('''
+            SELECT c.*, u.nombre as trabajador_nombre
+            FROM contratos c 
+            LEFT JOIN usuarios u ON c.trabajador_id = u.id
+            WHERE c.negocio_id = %s AND c.trabajador_id = %s 
+            ORDER BY c.id DESC
+            ''', (negocio_id, trabajador_id))
+        else:
+            cursor.execute('''
+            SELECT c.*, u.nombre as trabajador_nombre
+            FROM contratos c 
+            LEFT JOIN usuarios u ON c.trabajador_id = u.id
+            WHERE c.negocio_id = %s 
+            ORDER BY c.id DESC
+            ''', (negocio_id,))
+        contratos = cursor.fetchall()
+        conn.close()
+        return contratos
+    except Exception as e:
+        print(f"❌ Error en obtener_contratos: {e}")
+        conn.close()
+        return []
 
 def obtener_contrato_por_id(contrato_id):
     """Obtiene un contrato por su ID"""
@@ -2046,6 +2058,7 @@ def obtener_contrato_por_id(contrato_id):
     return contrato
 
 def obtener_todos_contratos():
+    """Obtiene todos los contratos del sistema"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
@@ -2059,63 +2072,127 @@ def obtener_todos_contratos():
     conn.close()
     return contratos
 
-def actualizar_contrato(contrato_id, empresa, fecha_inicio, fecha_fin, tipo, monto, estado, descripcion):
+def actualizar_contrato(contrato_id, tipo, salario=None, salario_promedio=None, 
+                        frecuencia_pago=None, fecha_inicio=None, fecha_fin=None, 
+                        descripcion=None):
+    """Actualiza un contrato existente"""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-    UPDATE contratos SET empresa = %s, fecha_inicio = %s, fecha_fin = %s, tipo = %s, monto = %s,
-    estado = %s, descripcion = %s, updated_at = %s WHERE id = %s
-    ''', (empresa, fecha_inicio, fecha_fin, tipo, monto, estado, descripcion, datetime.now().isoformat(), contrato_id))
-    conn.commit()
-    conn.close()
+    try:
+        updates = []
+        params = []
+        
+        if tipo is not None:
+            updates.append("tipo = %s")
+            params.append(tipo)
+        if salario is not None:
+            updates.append("salario = %s")
+            params.append(salario)
+        if salario_promedio is not None:
+            updates.append("salario_promedio = %s")
+            params.append(salario_promedio)
+        if frecuencia_pago is not None:
+            updates.append("frecuencia_pago = %s")
+            params.append(frecuencia_pago)
+        if fecha_inicio is not None:
+            updates.append("fecha_inicio = %s")
+            params.append(fecha_inicio)
+        if fecha_fin is not None:
+            updates.append("fecha_fin = %s")
+            params.append(fecha_fin)
+        if descripcion is not None:
+            updates.append("descripcion = %s")
+            params.append(descripcion)
+        
+        updates.append("updated_at = %s")
+        params.append(datetime.now().isoformat())
+        
+        params.append(contrato_id)
+        
+        query = f"UPDATE contratos SET {', '.join(updates)} WHERE id = %s"
+        cursor.execute(query, params)
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error actualizando contrato: {e}")
+        conn.rollback()
+        conn.close()
+        return False
 
 def actualizar_estado_contrato(contrato_id, estado):
+    """Actualiza el estado de un contrato"""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('UPDATE contratos SET estado = %s, updated_at = %s WHERE id = %s',
-                   (estado, datetime.now().isoformat(), contrato_id))
-    conn.commit()
-    conn.close()
+    try:
+        cursor.execute('UPDATE contratos SET estado = %s, updated_at = %s WHERE id = %s',
+                       (estado, datetime.now().isoformat(), contrato_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error actualizando estado del contrato: {e}")
+        conn.rollback()
+        conn.close()
+        return False
 
 def eliminar_contrato(contrato_id):
+    """Elimina un contrato"""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM contratos WHERE id = %s', (contrato_id,))
-    conn.commit()
-    conn.close()
+    try:
+        cursor.execute('DELETE FROM contratos WHERE id = %s', (contrato_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error eliminando contrato: {e}")
+        conn.rollback()
+        conn.close()
+        return False
 
 def obtener_empresas_con_contratos_activos(negocio_id):
     """Obtiene empresas con contratos activos para un negocio"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     hoy = datetime.now().date().isoformat()
-    cursor.execute('''
-        SELECT DISTINCT empresa, numero_contrato, tipo, fecha_fin
-        FROM contratos 
-        WHERE negocio_id = %s AND estado IN ('activo', 'pendiente') AND fecha_fin >= %s
-        ORDER BY empresa ASC
-    ''', (negocio_id, hoy))
-    empresas = cursor.fetchall()
-    conn.close()
-    return [dict(e) for e in empresas]
+    try:
+        cursor.execute('''
+            SELECT DISTINCT empresa, numero_contrato, tipo, fecha_fin
+            FROM contratos 
+            WHERE negocio_id = %s 
+            AND estado IN ('activo', 'pendiente') 
+            AND fecha_fin >= %s
+            ORDER BY empresa ASC
+        ''', (negocio_id, hoy))
+        empresas = cursor.fetchall()
+        conn.close()
+        return [dict(e) for e in empresas]
+    except Exception as e:
+        print(f"❌ Error en obtener_empresas_con_contratos_activos: {e}")
+        conn.close()
+        return []
 
 def obtener_contratos_activos_para_empresa(negocio_id, empresa):
     """Obtiene contratos activos para una empresa específica"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     hoy = datetime.now().date().isoformat()
-    cursor.execute('''
-        SELECT * FROM contratos 
-        WHERE negocio_id = %s AND empresa = %s AND estado IN ('activo', 'pendiente') AND fecha_fin >= %s
-        ORDER BY fecha_fin ASC
-    ''', (negocio_id, empresa, hoy))
-    contratos = cursor.fetchall()
-    conn.close()
-    return contratos
-
-# ============================================
-# FUNCIONES PARA REPORTES
-# ============================================
+    try:
+        cursor.execute('''
+            SELECT * FROM contratos 
+            WHERE negocio_id = %s AND empresa = %s 
+            AND estado IN ('activo', 'pendiente') 
+            AND fecha_fin >= %s
+            ORDER BY fecha_fin ASC
+        ''', (negocio_id, empresa, hoy))
+        contratos = cursor.fetchall()
+        conn.close()
+        return contratos
+    except Exception as e:
+        print(f"❌ Error en obtener_contratos_activos_para_empresa: {e}")
+        conn.close()
+        return []
 
 def obtener_resumen_contratos(negocio_id):
     """Obtiene resumen de contratos para el dashboard"""
@@ -2148,6 +2225,10 @@ def obtener_resumen_contratos(negocio_id):
         print(f"❌ Error en obtener_resumen_contratos: {e}")
         conn.close()
         return {'total': 0, 'activos': 0, 'vencidos': 0, 'total_gastos': 0, 'tiene_contratos': False}
+
+# ============================================
+# FUNCIONES PARA REPORTES
+# ============================================
 
 def obtener_resumen_ingresos(negocio_id):
     """Obtiene resumen de ingresos para el dashboard"""
@@ -2653,9 +2734,8 @@ def obtener_modulos_trabajador():
     conn.close()
     return modulos
 
-
 # ============================================
-# FUNCIONES PARA SUSCRIPCIONES Y NOTIFICACIONES (NUEVAS)
+# FUNCIONES PARA SUSCRIPCIONES Y NOTIFICACIONES
 # ============================================
 
 def suscribir_usuario(usuario_id, negocio_id):
@@ -2860,6 +2940,7 @@ def verificar_stock_bajo(negocio_id):
 def generar_notificaciones_stock(negocio_id):
     """Genera notificaciones para todos los productos con stock bajo"""
     alertas = verificar_stock_bajo(negocio_id)
+    contador = 0
     
     for alerta in alertas:
         producto = alerta['producto']
@@ -2873,6 +2954,9 @@ def generar_notificaciones_stock(negocio_id):
             mensaje,
             producto.get('id')
         )
+        contador += 1
+    
+    return contador
 
 def generar_notificacion_producto_nuevo(negocio_id, producto_id):
     """Genera notificación cuando se crea un nuevo producto"""
@@ -2985,3 +3069,48 @@ def actualizar_preferencias_notificaciones(usuario_id, preferencias):
     ))
     conn.commit()
     conn.close()
+
+# ============================================
+# FUNCIONES PARA SUSCRIPCIONES PUSH
+# ============================================
+
+def suscribir_usuario_push(usuario_id, endpoint, p256dh, auth):
+    """Guarda la suscripción push de un usuario"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO suscripciones_push (usuario_id, endpoint, p256dh, auth, activo)
+            VALUES (%s, %s, %s, %s, 1)
+            ON CONFLICT (usuario_id, endpoint) DO UPDATE SET
+                p256dh = EXCLUDED.p256dh,
+                auth = EXCLUDED.auth,
+                activo = 1,
+                fecha_creacion = CURRENT_TIMESTAMP
+        ''', (usuario_id, endpoint, p256dh, auth))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error en suscribir_usuario_push: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+def desuscribir_usuario_push(usuario_id, endpoint):
+    """Desuscribe a un usuario de notificaciones push"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            UPDATE suscripciones_push SET activo = 0
+            WHERE usuario_id = %s AND endpoint = %s
+        ''', (usuario_id, endpoint))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error en desuscribir_usuario_push: {e}")
+        conn.rollback()
+        conn.close()
+        return False
