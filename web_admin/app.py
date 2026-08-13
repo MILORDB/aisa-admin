@@ -2181,6 +2181,52 @@ def api_eliminar_contrato(contrato_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
+# API - CONTRATOS - EMPRESAS (PARA VENTAS) - NUEVO ENDPOINT
+# ============================================
+
+@app.route('/api/contratos/empresas', methods=['GET'])
+@login_required
+def api_contratos_empresas():
+    """Obtiene empresas con contratos activos para el negocio"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        # Obtener el negocio_id
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+            if not negocio_id:
+                return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+        
+        # Obtener empresas con contratos activos
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        hoy = datetime.now().date().isoformat()
+        cursor.execute('''
+            SELECT DISTINCT empresa, numero_contrato, tipo, fecha_fin
+            FROM contratos 
+            WHERE negocio_id = %s 
+            AND estado IN ('activo', 'pendiente') 
+            AND fecha_fin >= %s
+            ORDER BY empresa ASC
+        ''', (negocio_id, hoy))
+        
+        empresas = cursor.fetchall()
+        conn.close()
+        
+        return jsonify([dict(e) for e in empresas])
+        
+    except Exception as e:
+        print(f"❌ Error en api_contratos_empresas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
 # API - NÓMINA
 # ============================================
 
@@ -2541,8 +2587,7 @@ def api_crear_venta():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/venta/<int:venta_id>', methods=['GET'])
-@login_required
-def api_obtener_venta(venta_id):
+@login_requireddef api_obtener_venta(venta_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
