@@ -25,16 +25,6 @@
             flex-shrink: 0;
         }
         .header h1 { font-size: 17px; display: flex; align-items: center; gap: 8px; }
-        .header .btn-volver {
-            color: #fff;
-            text-decoration: none;
-            padding: 4px 12px;
-            border-radius: 20px;
-            background: rgba(255,255,255,0.1);
-            font-size: 12px;
-            transition: background 0.3s;
-        }
-        .header .btn-volver:hover { background: rgba(255,255,255,0.2); }
         .container {
             flex: 1;
             padding: 10px;
@@ -184,7 +174,6 @@
 
     <header class="header">
         <h1>🗺️ Mapa de Negocios</h1>
-        <a href="/negocio/dashboard" class="btn-volver">← Volver</a>
     </header>
 
     <div class="container">
@@ -324,8 +313,8 @@
                     
                     if (navigator.geolocation) {
                         navigator.geolocation.getCurrentPosition(function(pos) {
-                            const lat = pos.coords.latitude;
-                            const lng = pos.coords.longitude;
+                            const lat = pos.coordinates.latitude;
+                            const lng = pos.coordinates.longitude;
                             map.setView([lat, lng], 13);
                             mostrarUbicacionUsuario(lat, lng);
                         }, function() {});
