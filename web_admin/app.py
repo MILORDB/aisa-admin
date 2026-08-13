@@ -2792,7 +2792,7 @@ def api_estadisticas_ventas():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/ventas/periodo', methods(['GET'])
+@app.route('/api/ventas/periodo', methods=['GET'])
 @login_required
 def api_ventas_por_periodo():
     token = request.cookies.get('token')
