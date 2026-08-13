@@ -1584,7 +1584,7 @@ def api_eliminar_producto_tienda(tienda_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - TIENDA PÚBLICA (PARA CLIENTE)
+# API - TIENDA PÚBLICA (PARA CLIENTE) - CORREGIDA
 # ============================================
 
 @app.route('/api/tienda/public', methods=['GET'])
@@ -1600,8 +1600,10 @@ def api_tienda_publica():
     try:
         # Obtener ubicación del usuario
         datos_usuario = obtener_datos_negocio(usuario['id'])
-        provincia = datos_usuario.get('provincia')
-        municipio = datos_usuario.get('municipio')
+        provincia = datos_usuario.get('provincia', '')
+        municipio = datos_usuario.get('municipio', '')
+        
+        print(f"🔍 Ubicación usuario: provincia={provincia}, municipio={municipio}")
         
         conn = get_db()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -1621,22 +1623,15 @@ def api_tienda_publica():
             JOIN productos p ON pt.producto_id = p.id
             JOIN usuarios u ON p.negocio_id = u.id
             WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0
+            ORDER BY pt.destacado DESC, p.id DESC
+            LIMIT 50
         '''
-        params = []
         
-        if provincia and municipio:
-            query += ' AND u.datos_negocio LIKE %s AND u.datos_negocio LIKE %s'
-            params.append(f'%"provincia": "{provincia}"%')
-            params.append(f'%"municipio": "{municipio}"%')
-        elif provincia:
-            query += ' AND u.datos_negocio LIKE %s'
-            params.append(f'%"provincia": "{provincia}"%')
-        
-        query += ' ORDER BY pt.destacado DESC, p.id DESC LIMIT 50'
-        
-        cursor.execute(query, params)
+        cursor.execute(query)
         productos = cursor.fetchall()
         conn.close()
+        
+        print(f"📦 Productos encontrados (sin filtro): {len(productos)}")
         
         resultado = []
         for p in productos:
@@ -1646,6 +1641,13 @@ def api_tienda_publica():
                     datos = json.loads(p['datos_negocio']) if isinstance(p['datos_negocio'], str) else p['datos_negocio']
                 except:
                     pass
+            
+            # Filtrar por ubicación si el usuario tiene ubicación
+            if provincia and municipio:
+                prov_producto = datos.get('provincia', '')
+                mun_producto = datos.get('municipio', '')
+                if prov_producto != provincia or mun_producto != municipio:
+                    continue
             
             resultado.append({
                 'id': p['id'],
@@ -1669,6 +1671,7 @@ def api_tienda_publica():
                 'tipo': 'producto'
             })
         
+        print(f"📦 Productos filtrados por ubicación: {len(resultado)}")
         return jsonify(resultado)
         
     except Exception as e:
@@ -1677,7 +1680,7 @@ def api_tienda_publica():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - SERVICIOS PÚBLICOS (PARA CLIENTE)
+# API - SERVICIOS PÚBLICOS (PARA CLIENTE) - CORREGIDA
 # ============================================
 
 @app.route('/api/servicios/publicos', methods=['GET'])
@@ -1693,8 +1696,10 @@ def api_servicios_publicos():
     try:
         # Obtener ubicación del usuario
         datos_usuario = obtener_datos_negocio(usuario['id'])
-        provincia = datos_usuario.get('provincia')
-        municipio = datos_usuario.get('municipio')
+        provincia = datos_usuario.get('provincia', '')
+        municipio = datos_usuario.get('municipio', '')
+        
+        print(f"🔍 Ubicación usuario (servicios): provincia={provincia}, municipio={municipio}")
         
         conn = get_db()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
@@ -1710,22 +1715,15 @@ def api_servicios_publicos():
             FROM servicios s
             JOIN usuarios u ON s.negocio_id = u.id
             WHERE s.activo = 1 AND u.activo = 1 AND u.tipo = 'negocio'
+            ORDER BY s.id DESC
+            LIMIT 30
         '''
-        params = []
         
-        if provincia and municipio:
-            query += ' AND u.datos_negocio LIKE %s AND u.datos_negocio LIKE %s'
-            params.append(f'%"provincia": "{provincia}"%')
-            params.append(f'%"municipio": "{municipio}"%')
-        elif provincia:
-            query += ' AND u.datos_negocio LIKE %s'
-            params.append(f'%"provincia": "{provincia}"%')
-        
-        query += ' ORDER BY s.id DESC LIMIT 30'
-        
-        cursor.execute(query, params)
+        cursor.execute(query)
         servicios = cursor.fetchall()
         conn.close()
+        
+        print(f"📋 Servicios encontrados (sin filtro): {len(servicios)}")
         
         resultado = []
         for s in servicios:
@@ -1735,6 +1733,13 @@ def api_servicios_publicos():
                     datos = json.loads(s['datos_negocio']) if isinstance(s['datos_negocio'], str) else s['datos_negocio']
                 except:
                     pass
+            
+            # Filtrar por ubicación si el usuario tiene ubicación
+            if provincia and municipio:
+                prov_servicio = datos.get('provincia', '')
+                mun_servicio = datos.get('municipio', '')
+                if prov_servicio != provincia or mun_servicio != municipio:
+                    continue
             
             resultado.append({
                 'id': s['id'],
@@ -1755,10 +1760,117 @@ def api_servicios_publicos():
                 'tipo': 'servicio'
             })
         
+        print(f"📋 Servicios filtrados por ubicación: {len(resultado)}")
         return jsonify(resultado)
         
     except Exception as e:
         print(f"❌ Error en api_servicios_publicos: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - DIAGNÓSTICO PARA CLIENTE
+# ============================================
+
+@app.route('/api/diagnostico/productos', methods=['GET'])
+@login_required
+def api_diagnostico_productos():
+    """Endpoint de diagnóstico para verificar productos en la base de datos"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Contar productos totales
+        cursor.execute('SELECT COUNT(*) as total FROM productos')
+        total_productos = cursor.fetchone()
+        
+        # Contar productos con stock > 0
+        cursor.execute('SELECT COUNT(*) as total FROM productos WHERE stock > 0')
+        con_stock = cursor.fetchone()
+        
+        # Contar productos en tienda
+        cursor.execute('SELECT COUNT(*) as total FROM productos_tienda')
+        en_tienda = cursor.fetchone()
+        
+        # Contar negocios activos
+        cursor.execute('SELECT COUNT(*) as total FROM usuarios WHERE tipo = %s AND activo = 1', ('negocio',))
+        negocios = cursor.fetchone()
+        
+        # Obtener algunos productos de ejemplo
+        cursor.execute('''
+            SELECT p.id, p.nombre, p.stock, p.negocio_id, u.username, u.tipo, u.activo
+            FROM productos p
+            JOIN usuarios u ON p.negocio_id = u.id
+            WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0
+            LIMIT 5
+        ''')
+        ejemplos = cursor.fetchall()
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'total_productos': total_productos['total'] if total_productos else 0,
+            'productos_con_stock': con_stock['total'] if con_stock else 0,
+            'productos_en_tienda': en_tienda['total'] if en_tienda else 0,
+            'negocios_activos': negocios['total'] if negocios else 0,
+            'ejemplos': [dict(e) for e in ejemplos]
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en diagnostico: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/diagnostico/servicios', methods=['GET'])
+@login_required
+def api_diagnostico_servicios():
+    """Endpoint de diagnóstico para verificar servicios en la base de datos"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Contar servicios activos
+        cursor.execute('SELECT COUNT(*) as total FROM servicios WHERE activo = 1')
+        servicios_activos = cursor.fetchone()
+        
+        # Contar negocios activos
+        cursor.execute('SELECT COUNT(*) as total FROM usuarios WHERE tipo = %s AND activo = 1', ('negocio',))
+        negocios = cursor.fetchone()
+        
+        # Obtener algunos servicios de ejemplo
+        cursor.execute('''
+            SELECT s.id, s.nombre, s.precio, s.activo, s.negocio_id, u.username, u.tipo, u.activo
+            FROM servicios s
+            JOIN usuarios u ON s.negocio_id = u.id
+            WHERE u.tipo = 'negocio' AND u.activo = 1 AND s.activo = 1
+            LIMIT 5
+        ''')
+        ejemplos = cursor.fetchall()
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'servicios_activos': servicios_activos['total'] if servicios_activos else 0,
+            'negocios_activos': negocios['total'] if negocios else 0,
+            'ejemplos': [dict(e) for e in ejemplos]
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en diagnostico: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
