@@ -287,7 +287,7 @@
                 <div style="flex:2;">
                     <label>🏢 Empresa / TCP / MIPYME</label>
                     <select id="ventaEmpresa" onchange="seleccionarEmpresa()">
-                        <option value="">-- Seleccionar empresa --</option>
+                        <option value="">-- Seleccionar empresa (opcional) --</option>
                     </select>
                     <div style="font-size:10px;color:#888;margin-top:2px;">
                         <span id="infoContrato">📄 Cargando contratos...</span>
@@ -297,6 +297,7 @@
                 <div style="flex:1;">
                     <label>📄 N° Factura</label>
                     <input type="text" id="ventaFactura" placeholder="FAC-0001" readonly style="background:#0a0a14;color:#6c3ce0;font-weight:700;font-size:12px;">
+                    <div style="font-size:9px;color:#666;margin-top:2px;" id="facturaInfo">Selecciona una empresa para generar factura</div>
                 </div>
             </div>
 
@@ -390,6 +391,7 @@
         let ultimoNumeroFactura = 0;
         let esOferta = false;
         let trabajadorId = null;
+        let empresaSeleccionada = null;
 
         // ============================================
         // OBTENER TRABAJADOR ID DESDE LA URL
@@ -666,14 +668,13 @@
             const select = document.getElementById('ventaEmpresa');
             if (!select) return;
             
-            select.innerHTML = '<option value="">-- Seleccionar empresa --</option>';
+            select.innerHTML = '<option value="">-- Seleccionar empresa (opcional) --</option>';
             
             try {
                 const response = await fetch('/api/contratos/empresas');
                 console.log('📡 Respuesta de contratos:', response.status);
                 
                 if (!response.ok) {
-                    select.innerHTML = '<option value="">-- Sin contratos activos --</option>';
                     const info = document.getElementById('infoContrato');
                     if (info) info.textContent = '📄 No hay contratos activos';
                     return;
@@ -685,7 +686,6 @@
                 const info = document.getElementById('infoContrato');
                 
                 if (!empresas || empresas.length === 0) {
-                    select.innerHTML = '<option value="">-- Sin contratos activos --</option>';
                     if (info) info.textContent = '📄 No hay contratos activos';
                     return;
                 }
@@ -704,7 +704,6 @@
                 
             } catch (error) {
                 console.error('❌ Error cargando empresas:', error);
-                select.innerHTML = '<option value="">-- Error al cargar contratos --</option>';
                 const info = document.getElementById('infoContrato');
                 if (info) info.textContent = '📄 Error al cargar contratos';
             }
@@ -721,43 +720,61 @@
             
             const selected = select.options[select.selectedIndex];
             const infoSpan = document.getElementById('empresaInfo');
+            const facturaInfo = document.getElementById('facturaInfo');
             
             if (selected && selected.value) {
                 const numero = selected.dataset.numero || '';
                 const tipo = selected.dataset.tipo || '';
                 const fechaFin = selected.dataset.fecha_fin || '';
+                empresaSeleccionada = selected.value;
                 
                 if (infoSpan) {
                     infoSpan.style.display = 'inline';
                     infoSpan.innerHTML = `📌 ${numero} | ${tipo} | Fin: ${fechaFin}`;
                 }
                 
+                if (facturaInfo) {
+                    facturaInfo.textContent = '📄 Generando factura...';
+                    facturaInfo.style.color = '#6c3ce0';
+                }
+                
+                // ✅ Generar número de factura
                 generarNumeroFactura();
                 
                 const info = document.getElementById('infoContrato');
                 if (info) info.textContent = `📄 Contrato: ${numero} (${tipo})`;
             } else {
                 if (infoSpan) infoSpan.style.display = 'none';
+                empresaSeleccionada = null;
+                
                 const factura = document.getElementById('ventaFactura');
                 if (factura) factura.value = '';
                 const facturaNum = document.getElementById('facturaNumero');
                 if (facturaNum) facturaNum.textContent = '-';
+                
+                if (facturaInfo) {
+                    facturaInfo.textContent = 'Selecciona una empresa para generar factura';
+                    facturaInfo.style.color = '#666';
+                }
+                
                 const info = document.getElementById('infoContrato');
-                if (info) info.textContent = '📄 Selecciona una empresa';
+                if (info) info.textContent = '📄 Selecciona una empresa (opcional)';
             }
             
             actualizarFactura();
         }
 
         // ============================================
-        // FUNCIONES DE FACTURA
+        // GENERAR NÚMERO DE FACTURA (CORREGIDO)
         // ============================================
         function generarNumeroFactura() {
             if (esOferta) {
                 const factura = document.getElementById('ventaFactura');
                 const facturaNum = document.getElementById('facturaNumero');
+                const facturaInfo = document.getElementById('facturaInfo');
                 if (factura) factura.value = '';
                 if (facturaNum) facturaNum.textContent = '📄 OFERTA';
+                if (facturaInfo) facturaInfo.textContent = '📄 Oferta - Sin facturación';
                 return;
             }
             
@@ -767,15 +784,28 @@
             const empresa = select.value.trim();
             const input = document.getElementById('ventaFactura');
             const facturaNum = document.getElementById('facturaNumero');
+            const facturaInfo = document.getElementById('facturaInfo');
             
+            // ✅ Solo generar factura si hay empresa seleccionada
             if (empresa && input && facturaNum) {
+                // Generar número localmente
                 ultimoNumeroFactura++;
                 const año = new Date().getFullYear();
-                input.value = `FAC-${año}-${String(ultimoNumeroFactura).padStart(4,'0')}`;
-                facturaNum.textContent = input.value;
+                const facturaGenerada = `FAC-${año}-${String(ultimoNumeroFactura).padStart(4,'0')}`;
+                input.value = facturaGenerada;
+                facturaNum.textContent = facturaGenerada;
+                
+                if (facturaInfo) {
+                    facturaInfo.textContent = `📄 Factura generada para: ${empresa}`;
+                    facturaInfo.style.color = '#6bff6b';
+                }
             } else if (input) {
                 input.value = '';
                 if (facturaNum) facturaNum.textContent = '-';
+                if (facturaInfo) {
+                    facturaInfo.textContent = 'Selecciona una empresa para generar factura';
+                    facturaInfo.style.color = '#666';
+                }
             }
         }
 
@@ -805,6 +835,8 @@
             const facturaNum = document.getElementById('facturaNumero');
             const camposTransferencia = document.getElementById('camposTransferencia');
             const infoContrato = document.getElementById('infoContrato');
+            const facturaInfo = document.getElementById('facturaInfo');
+            const selectEmpresa = document.getElementById('ventaEmpresa');
             
             if (esOferta) {
                 if (estadoSelect) estadoSelect.value = 'oferta';
@@ -812,12 +844,15 @@
                 if (facturaTitulo) facturaTitulo.textContent = '📄 OFERTA DE VENTA';
                 if (facturaNum) facturaNum.textContent = '📄 OFERTA';
                 if (infoContrato) infoContrato.textContent = '📄 Oferta - No requiere factura';
+                if (facturaInfo) facturaInfo.textContent = '📄 Oferta - Sin facturación';
                 if (camposTransferencia) camposTransferencia.classList.remove('show');
+                if (selectEmpresa) selectEmpresa.disabled = true;
             } else {
                 if (estadoSelect) estadoSelect.value = 'pagado';
                 if (facturaTitulo) facturaTitulo.textContent = '🧾 FACTURA';
                 if (facturaNum) facturaNum.textContent = '-';
-                if (infoContrato) infoContrato.textContent = '📄 Cargando contratos...';
+                if (facturaInfo) facturaInfo.textContent = 'Selecciona una empresa para generar factura';
+                if (selectEmpresa) selectEmpresa.disabled = false;
                 cargarEmpresasConContratos();
             }
             actualizarFactura();
@@ -872,7 +907,7 @@
                         ${options}
                     </select>
                     <input type="number" class="input-cantidad" data-linea-id="${id}" value="1" min="1" onchange="actualizarLineaProducto(${id})" style="width:60px;flex:none;">
-                    <span class="item-stock" id="producto-stock-${id}>0</span>
+                    <span class="item-stock" id="producto-stock-${id}">0</span>
                     <span class="item-precio" id="producto-precio-${id}">$0</span>
                     <span class="item-subtotal" id="producto-subtotal-${id}">$0</span>
                     <button class="btn-remove-item" onclick="eliminarLinea('producto',${id})">✕</button>
@@ -1071,7 +1106,7 @@
                 ).join('') : '<div style="color:#888;font-size:10px;text-align:center;">Sin items</div>';
             }
             
-            if (facturaEmpresa) facturaEmpresa.textContent = esOferta ? '📄 OFERTA' : empresaVal;
+            if (facturaEmpresa) facturaEmpresa.textContent = esOferta ? '📄 OFERTA' : (empresaVal !== '-' ? empresaVal : 'Sin empresa');
             if (facturaFecha) facturaFecha.textContent = fecha;
             if (facturaNumDisplay) facturaNumDisplay.textContent = facturaNumVal;
             if (facturaTotal) facturaTotal.textContent = `$${total.toFixed(2)}`;
@@ -1095,10 +1130,12 @@
             const btn = document.querySelector('.btn-primary');
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Cargando...'; }
             
+            // Resetear oferta
             const esOfertaCheck = document.getElementById('esOferta');
             if (esOfertaCheck) esOfertaCheck.checked = false;
             esOferta = false;
             
+            // Limpiar campos
             const ventaEmpresa = document.getElementById('ventaEmpresa');
             const ventaFactura = document.getElementById('ventaFactura');
             const ventaEstado = document.getElementById('ventaEstado');
@@ -1110,8 +1147,12 @@
             const infoContrato = document.getElementById('infoContrato');
             const empresaInfo = document.getElementById('empresaInfo');
             const facturaTitulo = document.getElementById('facturaTitulo');
+            const facturaInfo = document.getElementById('facturaInfo');
             
-            if (ventaEmpresa) ventaEmpresa.value = '';
+            if (ventaEmpresa) {
+                ventaEmpresa.value = '';
+                ventaEmpresa.disabled = false;
+            }
             if (ventaFactura) ventaFactura.value = '';
             if (ventaEstado) ventaEstado.value = 'pagado';
             if (transferenciaId) transferenciaId.value = '';
@@ -1122,7 +1163,12 @@
             if (infoContrato) infoContrato.textContent = '📄 Cargando contratos...';
             if (empresaInfo) empresaInfo.style.display = 'none';
             if (facturaTitulo) facturaTitulo.textContent = '🧾 FACTURA';
+            if (facturaInfo) facturaInfo.textContent = 'Selecciona una empresa para generar factura';
             
+            empresaSeleccionada = null;
+            ultimoNumeroFactura = 0;
+            
+            // Limpiar contenedores
             const productosContainer = document.getElementById('productosContainer');
             const serviciosContainer = document.getElementById('serviciosContainer');
             if (productosContainer) {
@@ -1185,11 +1231,12 @@
             const esOfertaCheck = document.getElementById('esOferta');
             const selectEmpresa = document.getElementById('ventaEmpresa');
             const estadoSelect = document.getElementById('ventaEstado');
+            const facturaInput = document.getElementById('ventaFactura');
             
             const esOfertaVal = esOfertaCheck ? esOfertaCheck.checked : false;
-            const empresa = esOfertaVal ? null : (selectEmpresa ? selectEmpresa.value.trim() : null);
+            const empresa = selectEmpresa ? selectEmpresa.value.trim() : null;
             const estado = esOfertaVal ? 'oferta' : (estadoSelect ? estadoSelect.value : 'pagado');
-            const factura = esOfertaVal ? null : (document.getElementById('ventaFactura') ? document.getElementById('ventaFactura').value.trim() : null);
+            const factura = (empresa && !esOfertaVal) ? (facturaInput ? facturaInput.value.trim() : null) : null;
             
             // ✅ Recolectar productos en formato array
             let productos = [];
@@ -1268,7 +1315,8 @@
                 transferencia_cedula: transCedula,
                 transferencia_banco: transBanco,
                 transferencia_fecha: transFecha,
-                productos: productos  // ✅ Array de productos
+                productos: productos,
+                es_oferta: esOfertaVal
             };
             
             console.log('📤 Datos:', JSON.stringify(data, null, 2));
@@ -1288,13 +1336,15 @@
                 const responseText = await response.text();
                 let result;
                 try { result = JSON.parse(responseText); } catch (e) {
+                    console.error('Error parseando JSON:', e);
                     mostrarMensaje('Error del servidor', 'error');
                     if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
                     return;
                 }
                 
                 if (result.success) {
-                    mostrarMensaje(`✅ ${esOfertaVal ? 'Oferta' : 'Venta'} registrada`, 'exito');
+                    const mensajeFactura = result.numero_factura ? `\n📄 Factura: ${result.numero_factura}` : '';
+                    mostrarMensaje(`✅ ${esOfertaVal ? 'Oferta' : 'Venta'} registrada${mensajeFactura}`, 'exito');
                     cerrarModal(); 
                     cargarVentas(); 
                     cargarProductos();
@@ -1302,7 +1352,8 @@
                     mostrarMensaje(result.error || 'Error al guardar', 'error');
                 }
             } catch (error) { 
-                mostrarMensaje('Error de conexión', 'error'); 
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión: ' + error.message, 'error'); 
             } finally {
                 if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
             }
@@ -1485,6 +1536,18 @@
         document.addEventListener('click', function(e) {
             const modal = document.getElementById('modalVenta');
             if (e.target === modal) { cerrarModal(); }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.getElementById('modalVenta').classList.contains('show')) {
+                cerrarModal();
+            }
+            if (e.key === 'Enter' && document.getElementById('modalVenta').classList.contains('show')) {
+                const btn = document.getElementById('btnGuardarVenta');
+                if (!btn.disabled) {
+                    btn.click();
+                }
+            }
         });
 
         // ============================================
