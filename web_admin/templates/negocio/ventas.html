@@ -824,7 +824,7 @@
         }
 
         // ============================================
-        // AGREGAR LÍNEA DE PRODUCTO (CORREGIDO)
+        // AGREGAR LÍNEA DE PRODUCTO
         // ============================================
         function agregarLineaProducto() {
             const container = document.getElementById('productosContainer');
@@ -835,7 +835,6 @@
             
             const id = nextId++;
             
-            // Mostrar mensaje si no hay productos
             if (productos.length === 0) {
                 container.innerHTML = `
                     <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
@@ -846,7 +845,6 @@
                 return;
             }
             
-            // Crear opciones del select - INCLUYE OPCIÓN VACÍA
             let options = '<option value="">-- Seleccionar producto --</option>';
             let hayStock = false;
             productos.forEach(p => {
@@ -874,14 +872,13 @@
                         ${options}
                     </select>
                     <input type="number" class="input-cantidad" data-linea-id="${id}" value="1" min="1" onchange="actualizarLineaProducto(${id})" style="width:60px;flex:none;">
-                    <span class="item-stock" id="producto-stock-${id}">0</span>
+                    <span class="item-stock" id="producto-stock-${id}>0</span>
                     <span class="item-precio" id="producto-precio-${id}">$0</span>
                     <span class="item-subtotal" id="producto-subtotal-${id}">$0</span>
                     <button class="btn-remove-item" onclick="eliminarLinea('producto',${id})">✕</button>
                 </div>
             `;
             
-            // ✅ Reemplazar el contenido si está vacío o tiene mensaje
             if (container.innerHTML.includes('No hay productos con stock disponible') || 
                 container.innerHTML.includes('Cargando productos')) {
                 container.innerHTML = '';
@@ -949,7 +946,7 @@
         }
 
         // ============================================
-        // ACTUALIZAR LÍNEA DE PRODUCTO (CORREGIDO)
+        // ACTUALIZAR LÍNEA DE PRODUCTO
         // ============================================
         function actualizarLineaProducto(id) {
             const select = document.querySelector(`.select-producto[data-linea-id="${id}"]`);
@@ -1092,18 +1089,16 @@
         }
 
         // ============================================
-        // NUEVA VENTA (CORREGIDO - SIN PRODUCTO PRESELECCIONADO)
+        // NUEVA VENTA
         // ============================================
         async function nuevaVenta() {
             const btn = document.querySelector('.btn-primary');
             if (btn) { btn.disabled = true; btn.textContent = '⏳ Cargando...'; }
             
-            // Resetear oferta
             const esOfertaCheck = document.getElementById('esOferta');
             if (esOfertaCheck) esOfertaCheck.checked = false;
             esOferta = false;
             
-            // Limpiar campos
             const ventaEmpresa = document.getElementById('ventaEmpresa');
             const ventaFactura = document.getElementById('ventaFactura');
             const ventaEstado = document.getElementById('ventaEstado');
@@ -1128,7 +1123,6 @@
             if (empresaInfo) empresaInfo.style.display = 'none';
             if (facturaTitulo) facturaTitulo.textContent = '🧾 FACTURA';
             
-            // Limpiar contenedores
             const productosContainer = document.getElementById('productosContainer');
             const serviciosContainer = document.getElementById('serviciosContainer');
             if (productosContainer) {
@@ -1146,7 +1140,6 @@
                 `;
             }
             
-            // Resetear variables
             lineasProductos = [];
             lineasServicios = [];
             nextId = 1;
@@ -1156,13 +1149,10 @@
             if (countP) countP.textContent = '0';
             if (countS) countS.textContent = '0';
             
-            // Cargar datos
             const productosCargados = await cargarProductos();
             await cargarServicios();
             await cargarEmpresasConContratos();
             
-            // ✅ NO agregar línea de producto automáticamente
-            // ✅ Mostrar mensaje de que hay productos disponibles
             if (productosCargados && productos.length > 0 && productosContainer) {
                 productosContainer.innerHTML = `
                     <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
@@ -1189,7 +1179,7 @@
         }
 
         // ============================================
-        // GUARDAR VENTA
+        // GUARDAR VENTA (CORREGIDO)
         // ============================================
         async function guardarVenta() {
             const esOfertaCheck = document.getElementById('esOferta');
@@ -1201,130 +1191,120 @@
             const estado = esOfertaVal ? 'oferta' : (estadoSelect ? estadoSelect.value : 'pagado');
             const factura = esOfertaVal ? null : (document.getElementById('ventaFactura') ? document.getElementById('ventaFactura').value.trim() : null);
             
-            // Recolectar items
-            let items = [];
+            // ✅ Recolectar productos en formato array
+            let productos = [];
+            let cliente = esOfertaVal ? '📄 OFERTA' : (empresa || 'Cliente sin empresa');
+            let total = 0;
+            
+            // Productos
             document.querySelectorAll('#productosContainer .item-line').forEach(line => {
                 const select = line.querySelector('.select-producto');
                 const cantInput = line.querySelector('.input-cantidad');
                 if (select && select.value) {
                     const selected = select.options[select.selectedIndex];
                     const cantidad = parseInt(cantInput ? cantInput.value : 1) || 1;
-                    items.push({ 
-                        tipo:'producto', 
-                        id:parseInt(select.value), 
-                        nombre:selected.text, 
-                        cantidad, 
-                        precio:parseFloat(selected.dataset.precio), 
-                        subtotal:parseFloat(selected.dataset.precio)*cantidad 
+                    const precio = parseFloat(selected.dataset.precio) || 0;
+                    productos.push({
+                        id: parseInt(select.value),
+                        nombre: selected.text,
+                        cantidad: cantidad,
+                        precio: precio,
+                        subtotal: precio * cantidad
                     });
+                    total += precio * cantidad;
                 }
             });
+            
+            // Servicios
             document.querySelectorAll('#serviciosContainer .item-line').forEach(line => {
                 const select = line.querySelector('.select-servicio');
                 if (select && select.value) {
                     const selected = select.options[select.selectedIndex];
-                    items.push({ 
-                        tipo:'servicio', 
-                        id:parseInt(select.value), 
-                        nombre:selected.text, 
-                        cantidad:1, 
-                        precio:parseFloat(selected.dataset.precio), 
-                        subtotal:parseFloat(selected.dataset.precio) 
+                    const precio = parseFloat(selected.dataset.precio) || 0;
+                    productos.push({
+                        id: parseInt(select.value),
+                        nombre: selected.text,
+                        cantidad: 1,
+                        precio: precio,
+                        subtotal: precio,
+                        tipo: 'servicio'
                     });
+                    total += precio;
                 }
             });
             
-            if (items.length === 0) { 
+            // ✅ Validar
+            if (productos.length === 0) { 
                 mostrarMensaje('Agrega al menos un producto o servicio', 'error'); 
                 return; 
             }
             
-            const cliente = esOfertaVal ? '📄 OFERTA' : (empresa || 'Cliente sin empresa');
-            const nombres = items.map(i => `${i.cantidad}x ${i.nombre}`).join(', ');
-            const primerItem = items[0];
-            const total = items.reduce((s,i) => s + i.subtotal, 0);
+            const nombres = productos.map(i => `${i.cantidad}x ${i.nombre}`).join(', ');
+            const primerItem = productos[0];
             
-            // Datos de transferencia
+            // Transferencia
             let transId = null, transCedula = null, transBanco = null, transFecha = null;
             if (!esOfertaVal && estado === 'transferencia') {
-                transId = document.getElementById('transferenciaId') ? document.getElementById('transferenciaId').value.trim() || null : null;
-                transCedula = document.getElementById('transferenciaCedula') ? document.getElementById('transferenciaCedula').value.trim() || null : null;
-                transBanco = document.getElementById('transferenciaBanco') ? document.getElementById('transferenciaBanco').value.trim() || null : null;
-                transFecha = document.getElementById('transferenciaFecha') ? document.getElementById('transferenciaFecha').value || null : null;
+                transId = document.getElementById('transferenciaId')?.value.trim() || null;
+                transCedula = document.getElementById('transferenciaCedula')?.value.trim() || null;
+                transBanco = document.getElementById('transferenciaBanco')?.value.trim() || null;
+                transFecha = document.getElementById('transferenciaFecha')?.value || null;
             }
             
+            // ✅ Datos para el backend
             const data = {
                 cliente: cliente,
                 producto: nombres,
                 producto_id: primerItem.id || null,
-                cantidad: items.reduce((s,i) => s + i.cantidad, 0),
+                cantidad: productos.reduce((s, i) => s + i.cantidad, 0),
                 precio: parseFloat(total),
                 total: parseFloat(total),
                 empresa: empresa,
                 factura: factura,
-                tipo: items.length === 1 && items[0].tipo === 'servicio' ? 'servicio' : 'producto',
+                tipo: productos.length === 1 && productos[0].tipo === 'servicio' ? 'servicio' : 'producto',
                 trabajador_id: trabajadorId || null,
                 estado: estado,
                 transferencia_id: transId,
                 transferencia_cedula: transCedula,
                 transferencia_banco: transBanco,
-                transferencia_fecha: transFecha
+                transferencia_fecha: transFecha,
+                productos: productos  // ✅ Array de productos
             };
+            
+            console.log('📤 Datos:', JSON.stringify(data, null, 2));
             
             const btn = document.getElementById('btnGuardarVenta');
             const textoOriginal = btn ? btn.textContent : '💾 Guardar';
-            
-            if (btn) {
-                btn.disabled = true;
-                btn.textContent = '⏳ Guardando...';
-            }
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
             
             try {
-                console.log('📤 Enviando datos de venta:', JSON.stringify(data));
-                
                 const response = await fetch('/api/ventas', { 
                     method: 'POST', 
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     credentials: 'include',
                     body: JSON.stringify(data) 
                 });
                 
-                console.log('📥 Status:', response.status);
-                
                 const responseText = await response.text();
-                console.log('📥 Respuesta raw:', responseText);
-                
                 let result;
-                try {
-                    result = JSON.parse(responseText);
-                } catch (e) {
-                    console.error('❌ Error parseando JSON:', e);
-                    mostrarMensaje('Error del servidor: ' + responseText.substring(0, 100), 'error');
+                try { result = JSON.parse(responseText); } catch (e) {
+                    mostrarMensaje('Error del servidor', 'error');
                     if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
                     return;
                 }
                 
-                console.log('📥 Resultado:', result);
-                
                 if (result.success) {
-                    const mensajeFactura = result.factura ? `\n📄 Factura: ${result.factura}` : '';
-                    mostrarMensaje(`✅ ${esOfertaVal ? 'Oferta' : 'Venta'} registrada${esOfertaVal ? ' (sin facturación)' : ''}${mensajeFactura}`, 'exito');
+                    mostrarMensaje(`✅ ${esOfertaVal ? 'Oferta' : 'Venta'} registrada`, 'exito');
                     cerrarModal(); 
                     cargarVentas(); 
                     cargarProductos();
                 } else {
-                    mostrarMensaje(result.error || 'Error al guardar la venta', 'error');
+                    mostrarMensaje(result.error || 'Error al guardar', 'error');
                 }
             } catch (error) { 
-                console.error('❌ Error en fetch:', error); 
-                mostrarMensaje('Error de conexión: ' + error.message, 'error'); 
+                mostrarMensaje('Error de conexión', 'error'); 
             } finally {
-                if (btn) {
-                    btn.disabled = false;
-                    btn.textContent = textoOriginal;
-                }
+                if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
             }
         }
 
@@ -1421,7 +1401,7 @@
         }
 
         // ============================================
-        // ELIMINAR VENTA (CORREGIDO)
+        // ELIMINAR VENTA
         // ============================================
         function eliminarVenta(id) {
             const v = ventas.find(v => v.id === id);
