@@ -82,6 +82,8 @@
             border-color: #6c3ce0; outline: none;
         }
         .form-row label { font-size: 11px; color: #aaa; display: block; margin-bottom: 2px; }
+        .form-row .campo-opcional label { font-size: 10px; color: #888; }
+        .form-row .campo-obligatorio label::after { content: " *"; color: #ff6b6b; }
         
         .search-bar {
             display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
@@ -179,6 +181,8 @@
             background: #1a1a2e; color: #fff; border: 1px solid #2a2a3e;
             border-radius: 4px; padding: 1px 4px; font-size: 10px;
         }
+        .contrato-link { color: #6c3ce0; text-decoration: none; font-size: 11px; cursor: pointer; }
+        .contrato-link:hover { text-decoration: underline; }
         .badge-numero { font-size: 10px; color: #6c3ce0; font-weight: 600; }
         .badge-oferta { font-size: 10px; color: #ff9800; font-weight: 600; background: rgba(255,152,0,0.1); padding: 1px 6px; border-radius: 4px; }
         
@@ -308,11 +312,7 @@
 
             <div class="seccion-items">
                 <div class="seccion-titulo"><span>📦 Productos</span><span class="badge-count" id="countProductos">0</span></div>
-                <div id="productosContainer">
-                    <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
-                        🔄 Cargando productos...
-                    </div>
-                </div>
+                <div id="productosContainer"></div>
                 <div style="display:flex;justify-content:center;margin-top:4px;">
                     <button class="btn-add" onclick="agregarLineaProducto()">➕</button>
                 </div>
@@ -320,11 +320,7 @@
 
             <div class="seccion-items">
                 <div class="seccion-titulo"><span>📋 Servicios</span><span class="badge-count" id="countServicios">0</span></div>
-                <div id="serviciosContainer">
-                    <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
-                        🔄 Cargando servicios...
-                    </div>
-                </div>
+                <div id="serviciosContainer"></div>
                 <div style="display:flex;justify-content:center;margin-top:4px;">
                     <button class="btn-add" onclick="agregarLineaServicio()">➕</button>
                 </div>
@@ -628,6 +624,11 @@
                 }
                 productos = await response.json();
                 console.log('📦 Productos cargados:', productos.length);
+                if (productos.length === 0) {
+                    console.warn('⚠️ No hay productos en stock');
+                } else {
+                    console.log('✅ Productos disponibles:', productos.map(p => `${p.nombre} (Stock: ${p.stock})`).join(', '));
+                }
                 return true;
             } catch (error) {
                 console.error('❌ Error cargando productos:', error);
@@ -672,7 +673,6 @@
                 console.log('📡 Respuesta de contratos:', response.status);
                 
                 if (!response.ok) {
-                    // Si no hay endpoint de contratos, mostrar mensaje
                     select.innerHTML = '<option value="">-- Sin contratos activos --</option>';
                     const info = document.getElementById('infoContrato');
                     if (info) info.textContent = '📄 No hay contratos activos';
@@ -702,9 +702,6 @@
                 
                 if (info) info.textContent = `📄 ${empresas.length} contratos activos disponibles`;
                 
-                // NO seleccionar automáticamente la primera empresa
-                // Dejar que el usuario seleccione manualmente
-                
             } catch (error) {
                 console.error('❌ Error cargando empresas:', error);
                 select.innerHTML = '<option value="">-- Error al cargar contratos --</option>';
@@ -724,7 +721,6 @@
             
             const selected = select.options[select.selectedIndex];
             const infoSpan = document.getElementById('empresaInfo');
-            const info = document.getElementById('infoContrato');
             
             if (selected && selected.value) {
                 const numero = selected.dataset.numero || '';
@@ -736,16 +732,18 @@
                     infoSpan.innerHTML = `📌 ${numero} | ${tipo} | Fin: ${fechaFin}`;
                 }
                 
-                if (info) info.textContent = `📄 Contrato: ${numero} (${tipo})`;
-                
                 generarNumeroFactura();
+                
+                const info = document.getElementById('infoContrato');
+                if (info) info.textContent = `📄 Contrato: ${numero} (${tipo})`;
             } else {
                 if (infoSpan) infoSpan.style.display = 'none';
                 const factura = document.getElementById('ventaFactura');
                 if (factura) factura.value = '';
                 const facturaNum = document.getElementById('facturaNumero');
                 if (facturaNum) facturaNum.textContent = '-';
-                if (info) info.textContent = '📄 Selecciona una empresa con contrato';
+                const info = document.getElementById('infoContrato');
+                if (info) info.textContent = '📄 Selecciona una empresa';
             }
             
             actualizarFactura();
@@ -826,7 +824,7 @@
         }
 
         // ============================================
-        // AGREGAR LÍNEA DE PRODUCTO
+        // AGREGAR LÍNEA DE PRODUCTO (CORREGIDO)
         // ============================================
         function agregarLineaProducto() {
             const container = document.getElementById('productosContainer');
@@ -883,7 +881,12 @@
                 </div>
             `;
             
-            container.innerHTML = '';
+            // ✅ Reemplazar el contenido si está vacío o tiene mensaje
+            if (container.innerHTML.includes('No hay productos con stock disponible') || 
+                container.innerHTML.includes('Cargando productos')) {
+                container.innerHTML = '';
+            }
+            
             container.insertAdjacentHTML('beforeend', html);
             lineasProductos.push({id, tipo:'producto'});
             
@@ -931,7 +934,11 @@
                 </div>
             `;
             
-            container.innerHTML = '';
+            if (container.innerHTML.includes('No hay servicios disponibles') || 
+                container.innerHTML.includes('Cargando servicios')) {
+                container.innerHTML = '';
+            }
+            
             container.insertAdjacentHTML('beforeend', html);
             lineasServicios.push({id, tipo:'servicio'});
             
@@ -942,7 +949,7 @@
         }
 
         // ============================================
-        // ACTUALIZAR LÍNEA DE PRODUCTO
+        // ACTUALIZAR LÍNEA DE PRODUCTO (CORREGIDO)
         // ============================================
         function actualizarLineaProducto(id) {
             const select = document.querySelector(`.select-producto[data-linea-id="${id}"]`);
@@ -1154,8 +1161,16 @@
             await cargarServicios();
             await cargarEmpresasConContratos();
             
-            // 🔴 NO agregar línea de producto automáticamente
-            // El usuario debe hacer clic en el botón "+" para agregar productos
+            // ✅ NO agregar línea de producto automáticamente
+            // ✅ Mostrar mensaje de que hay productos disponibles
+            if (productosCargados && productos.length > 0 && productosContainer) {
+                productosContainer.innerHTML = `
+                    <div style="color:#888;text-align:center;padding:10px;font-size:12px;">
+                        📦 ${productos.length} productos disponibles.<br>
+                        <small>Haz clic en ➕ para agregar productos a la venta.</small>
+                    </div>
+                `;
+            }
             
             actualizarFactura();
             
@@ -1415,7 +1430,6 @@
                 return;
             }
             
-            // ✅ Obtener el negocio_id de la venta
             const negocioId = v.negocio_id || v.negocioId;
             
             if (!negocioId) {
@@ -1449,7 +1463,6 @@
                 boton.disabled = true;
             }
             
-            // ✅ Enviar negocio_id en la URL
             fetch(`/api/venta/${id}?negocio_id=${negocioId}`, { 
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' }
