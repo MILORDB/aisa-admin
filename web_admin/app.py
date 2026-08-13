@@ -2005,7 +2005,7 @@ def api_eliminar_trabajador(trabajador_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - CONTRATOS
+# API - CONTRATOS (CORREGIDO - SIN CONFLICTOS DE NOMBRES)
 # ============================================
 
 @app.route('/api/contratos', methods=['GET'])
@@ -2034,11 +2034,11 @@ def api_obtener_contratos():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/contratos', methods=['POST'])
-@login_required
+
 @app.route('/api/contratos', methods=['POST'])
 @login_required
 def api_crear_contrato():
+    """Crea un nuevo contrato"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -2051,7 +2051,7 @@ def api_crear_contrato():
     data = request.get_json()
     print(f"📝 Datos para crear contrato: {data}")
     
-    # ✅ Obtener datos del frontend (NO trabajador_id)
+    # Obtener datos del frontend
     empresa = data.get('empresa')
     numero_contrato = data.get('numero_contrato')
     fecha_inicio = data.get('fecha_inicio')
@@ -2061,7 +2061,7 @@ def api_crear_contrato():
     descripcion = data.get('descripcion', '')
     estado = data.get('estado', 'activo')
     
-    # ✅ Validar campos obligatorios (NO trabajador_id, NO salario)
+    # Validar campos obligatorios
     if not empresa:
         return jsonify({'error': 'La empresa es obligatoria'}), 400
     if not numero_contrato:
@@ -2080,10 +2080,9 @@ def api_crear_contrato():
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        # ✅ Crear contrato con los datos correctos
         contrato_id = crear_contrato(
             negocio_id=negocio_id,
-            trabajador_id=None,  # No se usa, solo para compatibilidad
+            trabajador_id=None,
             empresa=empresa,
             numero_contrato=numero_contrato,
             fecha_inicio=fecha_inicio,
@@ -2104,9 +2103,156 @@ def api_crear_contrato():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-# ============================================
-# API - CONTRATOS - EMPRESAS (PARA VENTAS) - NUEVO ENDPOINT
-# ============================================
+
+@app.route('/api/contrato/<int:contrato_id>', methods=['PUT'])
+@login_required
+def api_actualizar_contrato(contrato_id):
+    """Actualiza un contrato existente"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    
+    empresa = data.get('empresa')
+    numero_contrato = data.get('numero_contrato')
+    fecha_inicio = data.get('fecha_inicio')
+    fecha_fin = data.get('fecha_fin')
+    tipo = data.get('tipo')
+    monto = data.get('monto')
+    descripcion = data.get('descripcion')
+    estado = data.get('estado')
+    
+    try:
+        # Verificar que el contrato existe y pertenece al negocio
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT negocio_id FROM contratos WHERE id = %s', (contrato_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            return jsonify({'error': 'Contrato no encontrado'}), 404
+        
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        
+        if result[0] != negocio_id and usuario.get('rol') != 'admin':
+            return jsonify({'error': 'No tienes permiso para modificar este contrato'}), 403
+        
+        # Actualizar el contrato
+        exito = actualizar_contrato(
+            contrato_id=contrato_id,
+            tipo=tipo,
+            salario=None,
+            salario_promedio=None,
+            frecuencia_pago=None,
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+            descripcion=descripcion
+        )
+        
+        if exito:
+            registrar_log(usuario['id'], 'contrato_actualizado', f'Contrato ID: {contrato_id}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al actualizar el contrato'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_actualizar_contrato: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/contrato/<int:contrato_id>/estado', methods=['POST'])
+@login_required
+def api_cambiar_estado_contrato(contrato_id):
+    """Cambia el estado de un contrato"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    estado = data.get('estado')
+    
+    if estado not in ['activo', 'finalizado', 'cancelado', 'pendiente']:
+        return jsonify({'error': 'Estado inválido'}), 400
+    
+    try:
+        # Verificar que el contrato existe
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT negocio_id FROM contratos WHERE id = %s', (contrato_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            return jsonify({'error': 'Contrato no encontrado'}), 404
+        
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        
+        if result[0] != negocio_id and usuario.get('rol') != 'admin':
+            return jsonify({'error': 'No tienes permiso para modificar este contrato'}), 403
+        
+        exito = actualizar_estado_contrato(contrato_id, estado)
+        
+        if exito:
+            registrar_log(usuario['id'], 'contrato_estado', f'Contrato ID: {contrato_id}, Estado: {estado}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al actualizar el estado'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_cambiar_estado_contrato: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/contrato/<int:contrato_id>', methods=['DELETE'])
+@login_required
+def api_eliminar_contrato(contrato_id):
+    """Elimina un contrato"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        # Verificar que el contrato existe
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT negocio_id FROM contratos WHERE id = %s', (contrato_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            return jsonify({'error': 'Contrato no encontrado'}), 404
+        
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        
+        if result[0] != negocio_id and usuario.get('rol') != 'admin':
+            return jsonify({'error': 'No tienes permiso para eliminar este contrato'}), 403
+        
+        exito = eliminar_contrato(contrato_id)
+        
+        if exito:
+            registrar_log(usuario['id'], 'contrato_eliminado', f'Contrato ID: {contrato_id}')
+            return jsonify({'success': True})
+        else:
+            return jsonify({'error': 'Error al eliminar el contrato'}), 500
+    except Exception as e:
+        print(f"❌ Error en api_eliminar_contrato: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/contratos/empresas', methods=['GET'])
 @login_required
@@ -2119,32 +2265,14 @@ def api_contratos_empresas():
         return jsonify({'error': 'No autorizado'}), 401
     
     try:
-        # Obtener el negocio_id
         negocio_id = usuario.get('id')
         if usuario.get('rol') == 'trabajador':
             negocio_id = obtener_negocio_de_trabajador(usuario['id'])
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        # Obtener empresas con contratos activos
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
-        hoy = datetime.now().date().isoformat()
-        cursor.execute('''
-            SELECT DISTINCT empresa, numero_contrato, tipo, fecha_fin
-            FROM contratos 
-            WHERE negocio_id = %s 
-            AND estado IN ('activo', 'pendiente') 
-            AND fecha_fin >= %s
-            ORDER BY empresa ASC
-        ''', (negocio_id, hoy))
-        
-        empresas = cursor.fetchall()
-        conn.close()
-        
-        return jsonify([dict(e) for e in empresas])
-        
+        empresas = obtener_empresas_con_contratos_activos(negocio_id)
+        return jsonify(empresas)
     except Exception as e:
         print(f"❌ Error en api_contratos_empresas: {e}")
         traceback.print_exc()
@@ -2511,7 +2639,7 @@ def api_crear_venta():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/venta/<int:venta_id>', methods=['GET'])
-@login_required  # <--- ✅ ESPACIO CORRECTO
+@login_required
 def api_obtener_venta(venta_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
@@ -2621,6 +2749,65 @@ def api_eliminar_venta(venta_id):
         print(f"❌ Error en api_eliminar_venta: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/estadisticas/ventas', methods=['GET'])
+@login_required
+def api_estadisticas_ventas():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        if usuario.get('rol') == 'admin':
+            estadisticas = obtener_estadisticas_ventas()
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            estadisticas = obtener_estadisticas_ventas(negocio_id)
+        
+        return jsonify(estadisticas)
+    except Exception as e:
+        print(f"❌ Error en api_estadisticas_ventas: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/ventas/periodo', methods=['GET'])
+@login_required
+def api_ventas_por_periodo():
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    try:
+        fecha_inicio = request.args.get('fecha_inicio')
+        fecha_fin = request.args.get('fecha_fin')
+        
+        if not fecha_inicio or not fecha_fin:
+            return jsonify({'error': 'Fecha inicio y fin son requeridas'}), 400
+        
+        if usuario.get('rol') == 'admin':
+            ventas = obtener_ventas_por_periodo(fecha_inicio, fecha_fin)
+        else:
+            negocio_id = usuario.get('id')
+            if usuario.get('rol') == 'trabajador':
+                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+                if not negocio_id:
+                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
+            ventas = obtener_ventas_por_periodo(fecha_inicio, fecha_fin, negocio_id)
+        
+        return jsonify([dict(v) for v in ventas])
+    except Exception as e:
+        print(f"❌ Error en api_ventas_por_periodo: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 # ============================================
 # API - REPORTES
 # ============================================
