@@ -160,6 +160,68 @@
             flex-wrap: wrap;
             margin-top: 6px;
         }
+        /* Estilos para el popup del mapa */
+        .map-popup {
+            min-width: 200px;
+            max-width: 280px;
+            padding: 2px 0;
+        }
+        .map-popup .popup-nombre {
+            font-size: 15px;
+            font-weight: 700;
+            color: #6c3ce0;
+            margin-bottom: 4px;
+        }
+        .map-popup .popup-telefono {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .map-popup .popup-descripcion {
+            font-size: 11px;
+            color: #888;
+            margin-top: 3px;
+            padding-top: 3px;
+            border-top: 1px solid #2a2a3e;
+            line-height: 1.4;
+        }
+        .map-popup .popup-direccion {
+            font-size: 11px;
+            color: #666;
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .map-popup .popup-ver-mas {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 3px 12px;
+            background: #6c3ce0;
+            color: #fff;
+            border-radius: 4px;
+            font-size: 10px;
+            text-decoration: none;
+            transition: background 0.3s;
+        }
+        .map-popup .popup-ver-mas:hover {
+            background: #5a2ec0;
+        }
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px !important;
+            background: #1a1a2e !important;
+            border: 1px solid #2a2a3e !important;
+        }
+        .leaflet-popup-tip {
+            background: #1a1a2e !important;
+        }
+        .leaflet-popup-content {
+            color: #fff !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        }
         @media (max-width: 600px) {
             .container { padding: 6px; }
             .card { padding: 8px; }
@@ -167,6 +229,8 @@
             .ubicacion-info { flex-direction: column; align-items: flex-start; gap: 4px; }
             .btn-acciones { flex-direction: column; }
             .btn-acciones .btn { width: 100%; text-align: center; }
+            .map-popup { min-width: 160px; }
+            .map-popup .popup-nombre { font-size: 13px; }
         }
     </style>
 </head>
@@ -313,8 +377,8 @@
                     
                     if (navigator.geolocation) {
                         navigator.geolocation.getCurrentPosition(function(pos) {
-                            const lat = pos.coordinates.latitude;
-                            const lng = pos.coordinates.longitude;
+                            const lat = pos.coords.latitude;
+                            const lng = pos.coords.longitude;
                             map.setView([lat, lng], 13);
                             mostrarUbicacionUsuario(lat, lng);
                         }, function() {});
@@ -347,7 +411,7 @@
         }
 
         // ============================================
-        // CARGAR NEGOCIOS EN EL MAPA
+        // CARGAR NEGOCIOS EN EL MAPA (CON DATOS ACTUALIZADOS)
         // ============================================
 
         async function cargarNegocios() {
@@ -365,18 +429,25 @@
 
                     data.negocios.forEach(negocio => {
                         if (negocio.latitud && negocio.longitud) {
+                            // Crear contenido del popup con los datos del negocio
+                            const popupContent = `
+                                <div class="map-popup">
+                                    <div class="popup-nombre">🏪 ${negocio.nombre || 'Negocio'}</div>
+                                    ${negocio.telefono ? `<div class="popup-telefono">📞 ${negocio.telefono}</div>` : ''}
+                                    ${negocio.direccion ? `<div class="popup-direccion">📍 ${negocio.direccion}</div>` : ''}
+                                    ${negocio.descripcion ? `<div class="popup-descripcion">${negocio.descripcion}</div>` : ''}
+                                    <div style="font-size:9px;color:#666;margin-top:4px;border-top:1px solid #1a1a2e;padding-top:4px;">
+                                        📌 ${negocio.latitud.toFixed(4)}, ${negocio.longitud.toFixed(4)}
+                                    </div>
+                                </div>
+                            `;
+
                             const marker = L.marker([negocio.latitud, negocio.longitud], { icon: negocioIcon })
                                 .addTo(map)
-                                .bindPopup(`
-                                    <div style="min-width:160px;font-size:12px;">
-                                        <strong style="color:#6c3ce0;">🏪 ${negocio.nombre}</strong>
-                                        ${negocio.direccion ? `<br>📍 ${negocio.direccion}` : ''}
-                                        ${negocio.telefono ? `<br>📞 ${negocio.telefono}` : ''}
-                                        ${negocio.descripcion ? `<br>${negocio.descripcion}` : ''}
-                                        <br>
-                                        <span style="font-size:10px;color:#888;">${negocio.latitud.toFixed(4)}, ${negocio.longitud.toFixed(4)}</span>
-                                    </div>
-                                `);
+                                .bindPopup(popupContent, {
+                                    maxWidth: 300,
+                                    className: 'negocio-popup'
+                                });
                             
                             markersNegocios.push(marker);
                         }
