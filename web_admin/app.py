@@ -229,7 +229,7 @@ def favicon_64():
     )
 
 # ============================================
-# RUTA PARA REPARAR TABLAS (NUEVA)
+# RUTA PARA REPARAR TABLAS
 # ============================================
 
 @app.route('/fix-db')
@@ -239,9 +239,7 @@ def fix_db():
         conn = get_db()
         cursor = conn.cursor()
         
-        # ============================================
         # TABLA SUSCRIPCIONES
-        # ============================================
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS suscripciones (
             id SERIAL PRIMARY KEY,
@@ -255,9 +253,7 @@ def fix_db():
         )
         ''')
         
-        # ============================================
         # TABLA PREFERENCIAS_NOTIFICACIONES
-        # ============================================
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS preferencias_notificaciones (
             id SERIAL PRIMARY KEY,
@@ -273,9 +269,7 @@ def fix_db():
         )
         ''')
         
-        # ============================================
         # TABLA NOTIFICACIONES
-        # ============================================
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS notificaciones (
             id SERIAL PRIMARY KEY,
@@ -294,9 +288,7 @@ def fix_db():
         )
         ''')
         
-        # ============================================
         # TABLA SUSCRIPCIONES_PUSH
-        # ============================================
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS suscripciones_push (
             id SERIAL PRIMARY KEY,
@@ -311,14 +303,11 @@ def fix_db():
         )
         ''')
         
-        # ============================================
-        # CREAR ÍNDICES
-        # ============================================
+        # ÍNDICES
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_suscripciones_usuario ON suscripciones(usuario_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_suscripciones_negocio ON suscripciones(negocio_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_notificaciones_usuario ON notificaciones(usuario_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_notificaciones_leido ON notificaciones(leido)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_notificaciones_fecha ON notificaciones(fecha DESC)')
         
         conn.commit()
         conn.close()
@@ -326,61 +315,17 @@ def fix_db():
         return '''
         <!DOCTYPE html>
         <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Reparación DB - AIsa</title>
-            <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                body {
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    background: #0f0f1a;
-                    color: #fff;
-                    min-height: 100vh;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 20px;
-                }
-                .container {
-                    background: #1a1a2e;
-                    padding: 40px;
-                    border-radius: 16px;
-                    max-width: 600px;
-                    width: 100%;
-                    border: 1px solid #2a2a3e;
-                    text-align: center;
-                }
-                .icon { font-size: 64px; margin-bottom: 20px; }
-                h1 { color: #6c3ce0; margin-bottom: 10px; }
-                p { color: #888; margin-bottom: 20px; line-height: 1.6; }
-                .success { color: #6bff6b; }
-                .btn {
-                    display: inline-block;
-                    padding: 12px 30px;
-                    background: #6c3ce0;
-                    color: #fff;
-                    text-decoration: none;
-                    border-radius: 8px;
-                    transition: background 0.3s;
-                }
-                .btn:hover { background: #5a2ec0; }
-                .log {
-                    background: #0f0f1a;
-                    border: 1px solid #2a2a3e;
-                    border-radius: 8px;
-                    padding: 16px;
-                    margin-top: 20px;
-                    text-align: left;
-                    font-family: monospace;
-                    font-size: 12px;
-                    color: #aaa;
-                    max-height: 300px;
-                    overflow-y: auto;
-                }
-                .log .ok { color: #6bff6b; }
-                .log .error { color: #ff6b6b; }
-            </style>
+        <head><meta charset="UTF-8"><title>Reparación DB - AIsa</title>
+        <style>
+            body { font-family: Arial; background: #0f0f1a; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; }
+            .container { background: #1a1a2e; padding: 40px; border-radius: 16px; max-width: 600px; border: 1px solid #2a2a3e; text-align: center; }
+            .icon { font-size: 64px; }
+            h1 { color: #6c3ce0; }
+            .ok { color: #6bff6b; }
+            .log { background: #0f0f1a; padding: 16px; border-radius: 8px; text-align: left; font-family: monospace; font-size: 12px; margin-top: 20px; }
+            .btn { display: inline-block; padding: 12px 30px; background: #6c3ce0; color: #fff; text-decoration: none; border-radius: 8px; margin-top: 20px; }
+            .btn:hover { background: #5a2ec0; }
+        </style>
         </head>
         <body>
             <div class="container">
@@ -405,60 +350,16 @@ def fix_db():
         return f'''
         <!DOCTYPE html>
         <html>
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Error - AIsa</title>
-            <style>
-                * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-                body {{
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    background: #0f0f1a;
-                    color: #fff;
-                    min-height: 100vh;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    padding: 20px;
-                }}
-                .container {{
-                    background: #1a1a2e;
-                    padding: 40px;
-                    border-radius: 16px;
-                    max-width: 600px;
-                    width: 100%;
-                    border: 1px solid #2a2a3e;
-                    text-align: center;
-                }}
-                .icon {{ font-size: 64px; margin-bottom: 20px; }}
-                h1 {{ color: #ff6b6b; margin-bottom: 10px; }}
-                p {{ color: #888; margin-bottom: 20px; line-height: 1.6; }}
-                .error {{ color: #ff6b6b; }}
-                .log {{
-                    background: #0f0f1a;
-                    border: 1px solid #2a2a3e;
-                    border-radius: 8px;
-                    padding: 16px;
-                    margin-top: 20px;
-                    text-align: left;
-                    font-family: monospace;
-                    font-size: 12px;
-                    color: #aaa;
-                    max-height: 300px;
-                    overflow-y: auto;
-                }}
-                .log .error {{ color: #ff6b6b; }}
-                .btn {{
-                    display: inline-block;
-                    padding: 12px 30px;
-                    background: #6c3ce0;
-                    color: #fff;
-                    text-decoration: none;
-                    border-radius: 8px;
-                    transition: background 0.3s;
-                }}
-                .btn:hover {{ background: #5a2ec0; }}
-            </style>
+        <head><meta charset="UTF-8"><title>Error - AIsa</title>
+        <style>
+            body {{ font-family: Arial; background: #0f0f1a; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; }}
+            .container {{ background: #1a1a2e; padding: 40px; border-radius: 16px; max-width: 600px; border: 1px solid #2a2a3e; text-align: center; }}
+            .icon {{ font-size: 64px; }}
+            h1 {{ color: #ff6b6b; }}
+            .error {{ color: #ff6b6b; }}
+            .log {{ background: #0f0f1a; padding: 16px; border-radius: 8px; text-align: left; font-family: monospace; font-size: 12px; margin-top: 20px; }}
+            .btn {{ display: inline-block; padding: 12px 30px; background: #6c3ce0; color: #fff; text-decoration: none; border-radius: 8px; margin-top: 20px; }}
+        </style>
         </head>
         <body>
             <div class="container">
@@ -2697,6 +2598,10 @@ def api_actualizar_estado_venta(venta_id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ============================================
+# API - ELIMINAR VENTA (CORREGIDO)
+# ============================================
+
 @app.route('/api/venta/<int:venta_id>', methods=['DELETE'])
 @login_required
 def api_eliminar_venta(venta_id):
@@ -2707,13 +2612,41 @@ def api_eliminar_venta(venta_id):
         return jsonify({'error': 'No autorizado'}), 401
     
     try:
-        exito = eliminar_venta_con_reintegro(venta_id)
+        # Obtener el negocio_id de la venta
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('SELECT negocio_id, estado, total FROM ventas WHERE id = %s', (venta_id,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if not result:
+            return jsonify({'error': 'Venta no encontrada'}), 404
+        
+        negocio_id = result[0]
+        estado = result[1]
+        total = result[2]
+        
+        # Verificar permisos
+        if usuario.get('rol') != 'admin':
+            if usuario.get('id') != negocio_id and usuario.get('rol') != 'negocio':
+                negocio_trabajador = obtener_negocio_de_trabajador(usuario['id'])
+                if negocio_trabajador != negocio_id:
+                    return jsonify({'error': 'No tienes permiso para eliminar esta venta'}), 403
+        
+        # Ejecutar eliminación con reintegro
+        exito, mensaje = eliminar_venta_con_reintegro(venta_id, negocio_id)
         
         if exito:
-            registrar_log(usuario['id'], 'venta_eliminada', f'Venta ID: {venta_id}')
-            return jsonify({'success': True})
+            registrar_log(usuario['id'], 'venta_eliminada', f'Venta ID: {venta_id}, Total: {total}')
+            return jsonify({
+                'success': True,
+                'message': mensaje or 'Venta eliminada correctamente'
+            })
         else:
-            return jsonify({'error': 'Error al eliminar la venta'}), 500
+            return jsonify({
+                'error': mensaje or 'Error al eliminar la venta'
+            }), 500
+            
     except Exception as e:
         print(f"❌ Error en api_eliminar_venta: {e}")
         traceback.print_exc()
