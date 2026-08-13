@@ -2036,6 +2036,8 @@ def api_obtener_contratos():
 
 @app.route('/api/contratos', methods=['POST'])
 @login_required
+@app.route('/api/contratos', methods=['POST'])
+@login_required
 def api_crear_contrato():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
@@ -2049,17 +2051,27 @@ def api_crear_contrato():
     data = request.get_json()
     print(f"📝 Datos para crear contrato: {data}")
     
-    trabajador_id = data.get('trabajador_id')
-    tipo = data.get('tipo')
-    salario = data.get('salario')
-    salario_promedio = data.get('salario_promedio')
-    frecuencia_pago = data.get('frecuencia_pago', 'mensual')
+    # ✅ Obtener datos del frontend (NO trabajador_id)
+    empresa = data.get('empresa')
+    numero_contrato = data.get('numero_contrato')
     fecha_inicio = data.get('fecha_inicio')
     fecha_fin = data.get('fecha_fin')
+    tipo = data.get('tipo', 'ventas')
+    monto = data.get('monto', 0)
     descripcion = data.get('descripcion', '')
+    estado = data.get('estado', 'activo')
     
-    if not trabajador_id or not tipo or salario is None:
-        return jsonify({'error': 'Trabajador, tipo y salario son obligatorios'}), 400
+    # ✅ Validar campos obligatorios (NO trabajador_id, NO salario)
+    if not empresa:
+        return jsonify({'error': 'La empresa es obligatoria'}), 400
+    if not numero_contrato:
+        return jsonify({'error': 'El número de contrato es obligatorio'}), 400
+    if not fecha_inicio:
+        return jsonify({'error': 'La fecha de inicio es obligatoria'}), 400
+    if not fecha_fin:
+        return jsonify({'error': 'La fecha de fin es obligatoria'}), 400
+    if not tipo:
+        return jsonify({'error': 'El tipo de contrato es obligatorio'}), 400
     
     try:
         negocio_id = usuario.get('id')
@@ -2068,16 +2080,18 @@ def api_crear_contrato():
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
+        # ✅ Crear contrato con los datos correctos
         contrato_id = crear_contrato(
-            negocio_id,
-            trabajador_id,
-            tipo,
-            float(salario),
-            float(salario_promedio) if salario_promedio else None,
-            frecuencia_pago,
-            fecha_inicio,
-            fecha_fin,
-            descripcion
+            negocio_id=negocio_id,
+            trabajador_id=None,  # No se usa, solo para compatibilidad
+            empresa=empresa,
+            numero_contrato=numero_contrato,
+            fecha_inicio=fecha_inicio,
+            fecha_fin=fecha_fin,
+            tipo=tipo,
+            monto=monto,
+            estado=estado,
+            descripcion=descripcion
         )
         
         if contrato_id:
@@ -2087,96 +2101,6 @@ def api_crear_contrato():
             return jsonify({'error': 'Error al crear el contrato'}), 500
     except Exception as e:
         print(f"❌ Error en api_crear_contrato: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/contrato/<int:contrato_id>', methods=['PUT'])
-@login_required
-def api_actualizar_contrato(contrato_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    data = request.get_json()
-    tipo = data.get('tipo')
-    salario = data.get('salario')
-    salario_promedio = data.get('salario_promedio')
-    frecuencia_pago = data.get('frecuencia_pago')
-    fecha_inicio = data.get('fecha_inicio')
-    fecha_fin = data.get('fecha_fin')
-    descripcion = data.get('descripcion')
-    
-    try:
-        exito = actualizar_contrato(
-            contrato_id,
-            tipo,
-            float(salario) if salario else None,
-            float(salario_promedio) if salario_promedio else None,
-            frecuencia_pago,
-            fecha_inicio,
-            fecha_fin,
-            descripcion
-        )
-        
-        if exito:
-            registrar_log(usuario['id'], 'contrato_actualizado', f'Contrato ID: {contrato_id}')
-            return jsonify({'success': True})
-        else:
-            return jsonify({'error': 'Error al actualizar el contrato'}), 500
-    except Exception as e:
-        print(f"❌ Error en api_actualizar_contrato: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/contrato/<int:contrato_id>/estado', methods=['POST'])
-@login_required
-def api_actualizar_estado_contrato(contrato_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    data = request.get_json()
-    estado = data.get('estado')
-    
-    if estado not in ['activo', 'finalizado', 'cancelado']:
-        return jsonify({'error': 'Estado inválido'}), 400
-    
-    try:
-        exito = actualizar_estado_contrato(contrato_id, estado)
-        
-        if exito:
-            registrar_log(usuario['id'], 'contrato_estado', f'Contrato ID: {contrato_id}, Estado: {estado}')
-            return jsonify({'success': True})
-        else:
-            return jsonify({'error': 'Error al actualizar el estado'}), 500
-    except Exception as e:
-        print(f"❌ Error en api_actualizar_estado_contrato: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/contrato/<int:contrato_id>', methods=['DELETE'])
-@login_required
-def api_eliminar_contrato(contrato_id):
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        exito = eliminar_contrato(contrato_id)
-        
-        if exito:
-            registrar_log(usuario['id'], 'contrato_eliminado', f'Contrato ID: {contrato_id}')
-            return jsonify({'success': True})
-        else:
-            return jsonify({'error': 'Error al eliminar el contrato'}), 500
-    except Exception as e:
-        print(f"❌ Error en api_eliminar_contrato: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
