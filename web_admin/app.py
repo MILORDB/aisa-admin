@@ -1733,7 +1733,8 @@ def api_eliminar_servicio(servicio_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/todos/servicios', methods=['GET'])
-@admin_requireddef api_todos_servicios():
+@admin_required
+def api_todos_servicios():
     try:
         servicios = obtener_todos_servicios()
         return jsonify([dict(s) for s in servicios])
