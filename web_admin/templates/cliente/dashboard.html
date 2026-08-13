@@ -2,8 +2,10 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AIsa - Cliente</title>
+    <!-- Leaflet CSS para el mapa en el modal -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -14,41 +16,49 @@
         }
         .header {
             background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
-            padding: 16px 24px;
+            padding: 12px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .header h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .header h1 { font-size: 20px; display: flex; align-items: center; gap: 8px; }
+        .header h1 span { font-size: 22px; }
         .header .user {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             flex-wrap: wrap;
         }
         .header .user .user-avatar {
-            width: 32px;
-            height: 32px;
+            width: 30px;
+            height: 30px;
             border-radius: 50%;
             background: rgba(255,255,255,0.2);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 14px;
         }
         .header .user .user-name {
-            font-size: 14px;
+            font-size: 13px;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .header .user a {
             color: #fff;
             text-decoration: none;
-            opacity: 0.7;
+            opacity: 0.8;
             padding: 4px 12px;
             border-radius: 12px;
             background: rgba(255,255,255,0.1);
             transition: all 0.3s;
-            font-size: 13px;
+            font-size: 12px;
         }
         .header .user a:hover {
             opacity: 1;
@@ -62,24 +72,17 @@
             background: rgba(255,255,255,0.25);
         }
         
-        .container { padding: 24px; max-width: 1200px; margin: 0 auto; }
-        .card {
-            background: #1a1a2e;
-            border-radius: 12px;
-            padding: 24px;
-            border: 1px solid #2a2a3e;
-            margin-bottom: 20px;
-        }
-        .card h2 { font-size: 18px; color: #6c3ce0; margin-bottom: 16px; }
-        .welcome { font-size: 20px; margin-bottom: 8px; }
-        .subtitle { color: #888; font-size: 14px; }
+        .container { padding: 16px; max-width: 1200px; margin: 0 auto; }
         
+        /* ============================================
+           TARJETA DE UBICACIÓN
+           ============================================ */
         .ubicacion-card {
             background: rgba(108, 60, 224, 0.08);
             border: 1px solid rgba(108, 60, 224, 0.2);
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 12px 16px;
-            margin: 16px 0;
+            margin-bottom: 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -96,7 +99,7 @@
         .ubicacion-card .info .icon { font-size: 18px; }
         .ubicacion-card .info .lugar { color: #6c3ce0; font-weight: 600; }
         .ubicacion-card .btn-ubicacion {
-            padding: 4px 12px;
+            padding: 4px 14px;
             border: 1px solid #6c3ce0;
             border-radius: 6px;
             background: transparent;
@@ -110,81 +113,120 @@
             color: #fff;
         }
         
-        .productos-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 20px;
-            margin-top: 12px;
+        /* ============================================
+           SECCIONES
+           ============================================ */
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 16px 0 10px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
+        .section-title .badge {
+            font-size: 10px;
+            background: rgba(108,60,224,0.2);
+            color: #6c3ce0;
+            padding: 1px 10px;
+            border-radius: 12px;
+            font-weight: 400;
+        }
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #2a2a3e, transparent);
+            margin: 8px 0 16px 0;
+        }
+        
+        /* ============================================
+           PRODUCTOS GRID
+           ============================================ */
+        .productos-scroll {
+            display: flex;
+            gap: 14px;
+            overflow-x: auto;
+            padding: 4px 2px 12px 2px;
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x mandatory;
+        }
+        .productos-scroll::-webkit-scrollbar {
+            height: 4px;
+        }
+        .productos-scroll::-webkit-scrollbar-track {
+            background: #1a1a2e;
+            border-radius: 4px;
+        }
+        .productos-scroll::-webkit-scrollbar-thumb {
+            background: #6c3ce0;
+            border-radius: 4px;
+        }
+        
         .producto-card {
-            background: #0f0f1a;
+            min-width: 180px;
+            max-width: 200px;
+            background: #1a1a2e;
             border: 1px solid #2a2a3e;
             border-radius: 12px;
-            padding: 16px;
-            text-align: center;
+            padding: 12px;
+            cursor: pointer;
             transition: all 0.3s;
-            position: relative;
+            scroll-snap-align: start;
+            flex-shrink: 0;
         }
         .producto-card:hover {
             border-color: #6c3ce0;
-            transform: translateY(-4px);
-            box-shadow: 0 8px 25px rgba(108, 60, 224, 0.15);
-        }
-        .producto-card .destacado-badge {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: #ff9800;
-            color: #000;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 10px;
-            font-weight: 600;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(108, 60, 224, 0.15);
         }
         .producto-card .foto {
             width: 100%;
-            height: 180px;
+            height: 140px;
             object-fit: cover;
             border-radius: 8px;
-            margin-bottom: 12px;
-            background: #1a1a2e;
+            margin-bottom: 8px;
+            background: #0f0f1a;
         }
         .producto-card .nombre {
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 600;
-            margin: 8px 0 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .producto-card .categoria {
-            font-size: 11px;
+            font-size: 10px;
             color: #888;
-            margin-bottom: 4px;
+            margin-top: 1px;
         }
         .producto-card .precio {
-            font-size: 18px;
+            font-size: 17px;
             color: #6c3ce0;
             font-weight: 700;
+            margin-top: 2px;
         }
         .producto-card .stock {
-            font-size: 12px;
+            font-size: 11px;
             color: #888;
-            margin: 4px 0 8px;
+            margin-top: 2px;
         }
         .producto-card .stock.bajo { color: #ff6b6b; }
-        .producto-card .btn {
-            padding: 8px 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            transition: all 0.3s;
-        }
-        .producto-card .btn-primary { background: #6c3ce0; color: #fff; }
-        .producto-card .btn-primary:hover { background: #5a2ec0; }
-        .producto-card .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
         .producto-card .negocio-nombre {
-            font-size: 11px;
+            font-size: 10px;
             color: #666;
             margin-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .producto-card .destacado-badge {
+            display: inline-block;
+            font-size: 9px;
+            background: #ff9800;
+            color: #000;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+            margin-top: 2px;
         }
         .producto-card .ubicacion-tag {
             font-size: 9px;
@@ -196,124 +238,354 @@
             margin-top: 2px;
         }
         
-        .loading-productos { text-align: center; color: #888; padding: 40px; }
-        .empty-productos { text-align: center; color: #888; padding: 40px; }
-        .empty-productos .icon { font-size: 48px; margin-bottom: 12px; }
-        
+        /* ============================================
+           ESTADÍSTICAS
+           ============================================ */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 12px;
-            margin-top: 12px;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+            margin: 4px 0 12px 0;
         }
         .stat-item {
-            background: #0f0f1a;
+            background: #1a1a2e;
             border: 1px solid #2a2a3e;
             border-radius: 8px;
-            padding: 16px;
+            padding: 12px;
             text-align: center;
         }
-        .stat-item .number { font-size: 24px; font-weight: 700; color: #6c3ce0; }
-        .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
+        .stat-item .number { font-size: 20px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 10px; color: #888; margin-top: 2px; }
         
-        .negocios-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 12px;
-            margin-top: 12px;
+        .empty-state {
+            text-align: center;
+            color: #888;
+            padding: 30px 10px;
+            font-size: 13px;
         }
-        .negocio-card {
+        .empty-state .icon { font-size: 40px; margin-bottom: 10px; display: block; }
+        
+        /* ============================================
+           MODAL DE PRODUCTO
+           ============================================ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            backdrop-filter: blur(4px);
+            animation: fadeIn 0.3s ease;
+        }
+        .modal-overlay.show { display: flex; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        
+        .modal-content {
+            background: #1a1a2e;
+            border-radius: 16px;
+            max-width: 480px;
+            width: 100%;
+            max-height: 95vh;
+            overflow-y: auto;
+            border: 1px solid #2a2a3e;
+            position: relative;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .modal-close {
+            position: sticky;
+            top: 0;
+            right: 0;
+            float: right;
+            background: rgba(255,255,255,0.05);
+            border: none;
+            color: #888;
+            font-size: 24px;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 0 16px 0 12px;
+            transition: background 0.3s;
+            z-index: 10;
+        }
+        .modal-close:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        
+        .modal-body {
+            padding: 8px 20px 20px 20px;
+        }
+        .modal-body .modal-foto {
+            width: 100%;
+            max-height: 280px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 12px;
             background: #0f0f1a;
+        }
+        .modal-body .modal-nombre {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+        .modal-body .modal-categoria {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 4px;
+        }
+        .modal-body .modal-precio {
+            font-size: 26px;
+            color: #6c3ce0;
+            font-weight: 700;
+            margin: 4px 0;
+        }
+        .modal-body .modal-descripcion {
+            font-size: 13px;
+            color: #aaa;
+            margin: 8px 0 12px 0;
+            line-height: 1.5;
+        }
+        
+        .modal-body .modal-stock {
+            display: inline-block;
+            padding: 2px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin: 4px 0 12px 0;
+        }
+        .modal-body .modal-stock.disponible {
+            background: rgba(76,175,80,0.15);
+            color: #6bff6b;
+        }
+        .modal-body .modal-stock.bajo {
+            background: rgba(255,152,0,0.15);
+            color: #ffbb33;
+        }
+        .modal-body .modal-stock.agotado {
+            background: rgba(244,67,54,0.15);
+            color: #ff6b6b;
+        }
+        
+        .modal-body .modal-negocio {
+            background: rgba(108,60,224,0.05);
             border: 1px solid #2a2a3e;
             border-radius: 8px;
-            padding: 12px 16px;
-            transition: all 0.3s;
+            padding: 10px 14px;
+            margin: 8px 0 14px 0;
         }
-        .negocio-card:hover {
-            border-color: #6c3ce0;
+        .modal-body .modal-negocio .label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .negocio-card .nombre { font-size: 14px; font-weight: 600; }
-        .negocio-card .direccion { font-size: 11px; color: #888; margin: 4px 0; }
-        .negocio-card .telefono { font-size: 11px; color: #888; }
+        .modal-body .modal-negocio .nombre {
+            font-size: 15px;
+            font-weight: 600;
+            color: #6c3ce0;
+        }
+        .modal-body .modal-negocio .direccion {
+            font-size: 12px;
+            color: #888;
+            margin-top: 2px;
+        }
         
+        .modal-body .modal-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .modal-body .modal-actions .btn {
+            flex: 1;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            min-width: 120px;
+        }
+        .modal-body .modal-actions .btn-telefono {
+            background: #4caf50;
+            color: #fff;
+        }
+        .modal-body .modal-actions .btn-telefono:hover {
+            background: #3d8b40;
+            transform: scale(1.02);
+        }
+        .modal-body .modal-actions .btn-mapa {
+            background: #2196f3;
+            color: #fff;
+        }
+        .modal-body .modal-actions .btn-mapa:hover {
+            background: #1976d2;
+            transform: scale(1.02);
+        }
+        .modal-body .modal-actions .btn-mapa:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* ============================================
+           MAPA EN MODAL
+           ============================================ */
+        .modal-mapa-container {
+            margin-top: 12px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #2a2a3e;
+            display: none;
+        }
+        .modal-mapa-container.show {
+            display: block;
+        }
+        .modal-mapa-container #modalMapa {
+            width: 100%;
+            height: 220px;
+            background: #0f0f1a;
+        }
+        
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
         @media (max-width: 600px) {
-            .container { padding: 16px; }
-            .productos-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
-            .header { padding: 12px 16px; flex-wrap: wrap; gap: 8px; }
+            .container { padding: 10px; }
+            .header { padding: 10px 14px; flex-wrap: wrap; gap: 6px; }
             .header .user { width: 100%; justify-content: flex-end; }
-            .stats-grid { grid-template-columns: 1fr 1fr; }
-            .negocios-grid { grid-template-columns: 1fr; }
+            .header .user .user-name { max-width: 60px; font-size: 12px; }
+            .producto-card { min-width: 140px; max-width: 160px; padding: 8px; }
+            .producto-card .foto { height: 100px; }
+            .producto-card .nombre { font-size: 12px; }
+            .producto-card .precio { font-size: 14px; }
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+            .modal-content { max-width: 100%; margin: 0 8px; }
+            .modal-body .modal-foto { max-height: 180px; }
+            .modal-body .modal-nombre { font-size: 18px; }
+            .modal-body .modal-precio { font-size: 22px; }
+            .modal-body .modal-actions .btn { font-size: 12px; padding: 8px 12px; min-width: 80px; }
             .ubicacion-card { flex-direction: column; align-items: flex-start; }
         }
         @media (max-width: 400px) {
-            .productos-grid { grid-template-columns: 1fr; }
+            .producto-card { min-width: 120px; max-width: 140px; }
+            .producto-card .foto { height: 80px; }
+            .stats-grid { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
 <body>
 
     <header class="header">
-        <h1>🛍️ AIsa <span style="font-size:14px;font-weight:normal;opacity:0.7;">Modo Cliente</span></h1>
+        <h1><span>🛍️</span> AIsa <span style="font-size:12px;font-weight:normal;opacity:0.7;">Catálogo</span></h1>
         <div class="user">
             <div class="user-avatar">👤</div>
             <span class="user-name">{{ usuario.nombre or usuario.username }}</span>
-            <a href="/perfil" class="btn-perfil">👤 Mi Perfil</a>
+            <a href="/perfil" class="btn-perfil">👤 Perfil</a>
             <a href="/logout">Cerrar sesión</a>
         </div>
     </header>
 
     <div class="container">
-        <div class="card">
-            <div class="welcome">👋 ¡Bienvenido, {{ usuario.nombre or usuario.username }}!</div>
-            <div class="subtitle">Explora productos disponibles en tu zona</div>
-            
-            <!-- Tarjeta de ubicación -->
-            <div class="ubicacion-card" id="ubicacionCard">
-                <div class="info">
-                    <span class="icon">📍</span>
-                    <span>Tu ubicación: </span>
-                    <span class="lugar" id="ubicacionTexto">Cargando ubicación...</span>
-                </div>
-                <button class="btn-ubicacion" onclick="window.location.href='/perfil'">
-                    ✏️ Actualizar ubicación
-                </button>
+
+        <!-- TARJETA DE UBICACIÓN -->
+        <div class="ubicacion-card" id="ubicacionCard">
+            <div class="info">
+                <span class="icon">📍</span>
+                <span>Tu ubicación: </span>
+                <span class="lugar" id="ubicacionTexto">Cargando ubicación...</span>
             </div>
-            
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="number" id="totalProductos">0</span>
-                    <span class="label">📦 Productos cerca</span>
-                </div>
-                <div class="stat-item">
-                    <span class="number" id="negociosActivos">0</span>
-                    <span class="label">🏢 Negocios cercanos</span>
-                </div>
-                <div class="stat-item">
-                    <span class="number" id="productosDestacados">0</span>
-                    <span class="label">⭐ Destacados</span>
-                </div>
+            <button class="btn-ubicacion" onclick="window.location.href='/perfil'">
+                ✏️ Actualizar ubicación
+            </button>
+        </div>
+
+        <!-- ESTADÍSTICAS RÁPIDAS -->
+        <div class="stats-grid">
+            <div class="stat-item">
+                <span class="number" id="totalProductos">0</span>
+                <span class="label">📦 Productos</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="negociosActivos">0</span>
+                <span class="label">🏢 Negocios</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="productosDestacados">0</span>
+                <span class="label">⭐ Destacados</span>
             </div>
         </div>
 
-        <!-- Negocios cercanos -->
-        <div class="card" id="negociosCard">
-            <h2>🏢 Negocios cerca de ti</h2>
-            <div id="negociosContainer">
-                <div class="loading-productos">Cargando negocios...</div>
+        <!-- SECCIÓN 1: CATÁLOGO ALEATORIO (Productos y servicios) -->
+        <div class="section-title">
+            🎲 Catálogo aleatorio
+            <span class="badge">de negocios cercanos</span>
+        </div>
+        <div id="catalogoContainer">
+            <div class="empty-state">
+                <span class="icon">🔄</span>
+                Cargando catálogo...
             </div>
         </div>
 
-        <!-- Tienda -->
-        <div class="card">
-            <h2>🛒 Productos disponibles</h2>
-            <div id="productosContainer">
-                <div class="loading-productos">Cargando productos...</div>
+        <div class="section-divider"></div>
+
+        <!-- SECCIÓN 2: PRODUCTOS DE TIENDAS (Destacados y publicados) -->
+        <div class="section-title">
+            🏪 Productos en tiendas
+            <span class="badge">publicados por negocios</span>
+        </div>
+        <div id="tiendaContainer">
+            <div class="empty-state">
+                <span class="icon">🔄</span>
+                Cargando productos de tiendas...
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============================================
+    MODAL DE PRODUCTO
+    ============================================ -->
+    <div class="modal-overlay" id="modalProducto">
+        <div class="modal-content">
+            <button class="modal-close" onclick="cerrarModalProducto()">✕</button>
+            <div class="modal-body" id="modalBody">
+                <!-- Contenido dinámico -->
             </div>
         </div>
     </div>
 
+    <!-- Leaflet JS para el mapa en el modal -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <script>
+        // ============================================
+        // VARIABLES GLOBALES
+        // ============================================
         let ubicacionUsuario = { provincia: '', municipio: '' };
+        let catalogoProductos = [];
+        let tiendaProductos = [];
+        let mapaModal = null;
+        let marcadorModal = null;
+        let mapaInicializado = false;
 
         // ============================================
         // OBTENER UBICACIÓN DEL USUARIO
@@ -349,129 +621,436 @@
         }
 
         // ============================================
-        // CARGAR NEGOCIOS CERCANOS
+        // CARGAR CATÁLOGO ALEATORIO (Productos + Servicios)
         // ============================================
         
-        async function cargarNegociosCercanos() {
-            const container = document.getElementById('negociosContainer');
+        async function cargarCatalogo() {
+            const container = document.getElementById('catalogoContainer');
+            container.innerHTML = '<div class="empty-state"><span class="icon">🔄</span>Cargando catálogo...</div>';
             
             try {
-                const response = await fetch('/api/negocios/cercanos');
-                const data = await response.json();
+                // Obtener productos de la tienda pública (filtrados por ubicación)
+                const response = await fetch('/api/tienda/public');
+                if (!response.ok) throw new Error('Error al cargar catálogo');
+                const productos = await response.json();
                 
-                if (!data.success) {
-                    container.innerHTML = `<div class="empty-productos">❌ ${data.message || 'Error'}</div>`;
-                    return;
+                // Obtener servicios (también filtrados por ubicación si es posible)
+                const servResponse = await fetch('/api/servicios/publicos');
+                let servicios = [];
+                if (servResponse.ok) {
+                    servicios = await servResponse.json();
                 }
                 
-                const negocios = data.negocios || [];
+                // Combinar productos y servicios
+                let todos = [];
                 
-                if (negocios.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-productos">
-                            <div class="icon">🏪</div>
-                            <div>No hay negocios registrados en tu zona</div>
-                            <div style="font-size:12px;color:#666;margin-top:8px;">
-                                Actualiza tu ubicación en el perfil para encontrar negocios cercanos
-                            </div>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                let html = '<div class="negocios-grid">';
-                negocios.forEach(n => {
-                    html += `
-                        <div class="negocio-card">
-                            <div class="nombre">🏢 ${n.nombre}</div>
-                            ${n.direccion ? `<div class="direccion">📍 ${n.direccion}</div>` : ''}
-                            ${n.telefono ? `<div class="telefono">📞 ${n.telefono}</div>` : ''}
-                            ${n.descripcion ? `<div style="font-size:11px;color:#888;margin-top:4px;">${n.descripcion}</div>` : ''}
-                        </div>
-                    `;
+                // Productos con su tipo
+                productos.forEach(p => {
+                    todos.push({
+                        ...p,
+                        tipo: 'producto',
+                        es_servicio: false,
+                        nombre: p.nombre,
+                        precio: p.precio,
+                        stock: p.stock || 0,
+                        foto_url: p.foto_url || null,
+                        categoria: p.categoria || 'Producto',
+                        negocio_id: p.negocio_id,
+                        negocio_nombre: p.negocio_nombre || p.negocio_username || 'Negocio',
+                        direccion: p.direccion || '',
+                        telefono: p.telefono || '',
+                        descripcion: p.descripcion || '',
+                        provincia: p.provincia || '',
+                        municipio: p.municipio || '',
+                        destacado: p.destacado || 0,
+                        stock_minimo: p.stock_minimo || 3
+                    });
                 });
-                html += '</div>';
                 
-                container.innerHTML = html;
-                document.getElementById('negociosActivos').textContent = negocios.length;
+                // Servicios
+                servicios.forEach(s => {
+                    todos.push({
+                        ...s,
+                        tipo: 'servicio',
+                        es_servicio: true,
+                        nombre: s.nombre,
+                        precio: s.precio,
+                        stock: 999, // Servicios no tienen stock
+                        foto_url: null,
+                        categoria: s.categoria || 'Servicio',
+                        negocio_id: s.negocio_id,
+                        negocio_nombre: s.negocio_nombre || s.negocio_username || 'Negocio',
+                        direccion: s.direccion || '',
+                        telefono: s.telefono || '',
+                        descripcion: s.descripcion || '',
+                        provincia: s.provincia || '',
+                        municipio: s.municipio || '',
+                        destacado: 0,
+                        stock_minimo: 0
+                    });
+                });
+                
+                // Mezclar aleatoriamente
+                for (let i = todos.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [todos[i], todos[j]] = [todos[j], todos[i]];
+                }
+                
+                // Limitar a 30 items para no saturar
+                catalogoProductos = todos.slice(0, 30);
+                
+                renderCatalogo(catalogoProductos);
+                
+                // Actualizar estadísticas
+                const negociosUnicos = new Set(todos.map(p => p.negocio_id));
+                document.getElementById('negociosActivos').textContent = negociosUnicos.size || 0;
+                document.getElementById('totalProductos').textContent = todos.length || 0;
+                const destacados = todos.filter(p => p.destacado).length;
+                document.getElementById('productosDestacados').textContent = destacados || 0;
                 
             } catch (error) {
-                console.error('Error:', error);
-                container.innerHTML = '<div class="empty-productos">❌ Error al cargar negocios</div>';
+                console.error('Error cargando catálogo:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <span class="icon">❌</span>
+                        Error al cargar el catálogo
+                    </div>
+                `;
             }
         }
 
         // ============================================
-        // CARGAR PRODUCTOS DE LA TIENDA PÚBLICA
+        // RENDER CATÁLOGO
         // ============================================
         
-        async function cargarProductosTienda() {
-            const container = document.getElementById('productosContainer');
-            container.innerHTML = '<div class="loading-productos">Cargando productos...</div>';
+        function renderCatalogo(productos) {
+            const container = document.getElementById('catalogoContainer');
+            
+            if (!productos || productos.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <span class="icon">📭</span>
+                        No hay productos o servicios disponibles en tu zona
+                        <div style="font-size:11px;color:#666;margin-top:6px;">
+                            Actualiza tu ubicación en el perfil para ver más resultados
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '<div class="productos-scroll">';
+            
+            productos.forEach(p => {
+                const fotoUrl = p.foto_url || '/static/img/default_product.png';
+                const stockClass = p.stock < (p.stock_minimo || 3) ? 'bajo' : '';
+                const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
+                const tipoIcon = p.tipo === 'servicio' ? '📋' : '📦';
+                const tipoLabel = p.tipo === 'servicio' ? 'Servicio' : 'Producto';
+                const ubicacionText = p.provincia && p.municipio ? `${p.provincia}, ${p.municipio}` : '';
+                
+                html += `
+                    <div class="producto-card" onclick="abrirModalProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                        <img src="${fotoUrl}" alt="${p.nombre}" class="foto" 
+                             onerror="this.src='/static/img/default_product.png'">
+                        <div class="nombre">${tipoIcon} ${p.nombre}</div>
+                        <div class="categoria">${p.categoria || ''} • ${tipoLabel}</div>
+                        <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
+                        <div class="stock ${stockClass}">${stockText}</div>
+                        <div class="negocio-nombre">🏢 ${p.negocio_nombre}</div>
+                        ${ubicacionText ? `<div class="ubicacion-tag">📍 ${ubicacionText}</div>` : ''}
+                        ${p.destacado ? '<div class="destacado-badge">⭐ Destacado</div>' : ''}
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // ============================================
+        // CARGAR PRODUCTOS DE TIENDAS
+        // ============================================
+        
+        async function cargarTienda() {
+            const container = document.getElementById('tiendaContainer');
+            container.innerHTML = '<div class="empty-state"><span class="icon">🔄</span>Cargando productos de tiendas...</div>';
             
             try {
                 const response = await fetch('/api/tienda/public');
-                if (!response.ok) throw new Error('Error al cargar productos');
+                if (!response.ok) throw new Error('Error al cargar tienda');
                 const productos = await response.json();
                 
-                // Actualizar estadísticas
-                const total = productos.length;
-                const destacados = productos.filter(p => p.destacado).length;
+                // Filtrar solo los que tienen destacado o están en tienda
+                // En la API ya vienen los que están en la tienda
+                tiendaProductos = productos || [];
                 
-                document.getElementById('totalProductos').textContent = total;
-                document.getElementById('productosDestacados').textContent = destacados;
-                
-                if (productos.length === 0) {
-                    container.innerHTML = `
-                        <div class="empty-productos">
-                            <div class="icon">🛍️</div>
-                            <div>No hay productos disponibles en tu zona</div>
-                            <div style="font-size:12px;color:#666;margin-top:8px;">
-                                Actualiza tu ubicación en el perfil para ver productos cercanos
-                            </div>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                let html = '<div class="productos-grid">';
-                productos.forEach(p => {
-                    const stockClass = p.stock < 5 ? 'bajo' : '';
-                    const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
-                    const disabled = p.stock <= 0 ? 'disabled' : '';
-                    const fotoUrl = p.foto_url || '/static/img/default_product.png';
-                    const destacadoHtml = p.destacado ? '<span class="destacado-badge">⭐ Destacado</span>' : '';
-                    const negocioNombre = p.negocio_nombre || p.negocio_username || 'Negocio';
-                    const ubicacionTexto = p.provincia && p.municipio ? `${p.provincia}, ${p.municipio}` : '';
-                    
-                    html += `
-                        <div class="producto-card">
-                            ${destacadoHtml}
-                            <img src="${fotoUrl}" alt="${p.nombre}" class="foto" 
-                                 onerror="this.src='/static/img/default_product.png'">
-                            <div class="nombre">${p.nombre}</div>
-                            <div class="categoria">${p.categoria || ''}</div>
-                            <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
-                            <div class="stock ${stockClass}">${stockText}</div>
-                            <div class="negocio-nombre">🏢 ${negocioNombre}</div>
-                            ${ubicacionTexto ? `<div class="ubicacion-tag">📍 ${ubicacionTexto}</div>` : ''}
-                            <button class="btn btn-primary" ${disabled} onclick="agregarCarrito(${p.id}, '${p.nombre}', ${p.precio})">
-                                🛒 Agregar al carrito
-                            </button>
-                        </div>
-                    `;
-                });
-                html += '</div>';
-                container.innerHTML = html;
+                renderTienda(tiendaProductos);
                 
             } catch (error) {
-                console.error('Error:', error);
-                container.innerHTML = '<div class="empty-productos">❌ Error al cargar productos</div>';
+                console.error('Error cargando tienda:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <span class="icon">❌</span>
+                        Error al cargar productos de tiendas
+                    </div>
+                `;
+            }
+        }
+
+        // ============================================
+        // RENDER TIENDA
+        // ============================================
+        
+        function renderTienda(productos) {
+            const container = document.getElementById('tiendaContainer');
+            
+            if (!productos || productos.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <span class="icon">🏪</span>
+                        No hay productos publicados en tiendas cercanas
+                        <div style="font-size:11px;color:#666;margin-top:6px;">
+                            Los negocios pueden publicar sus productos en la sección "Tienda"
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '<div class="productos-scroll">';
+            
+            productos.forEach(p => {
+                const fotoUrl = p.foto_url || '/static/img/default_product.png';
+                const stockClass = p.stock < (p.stock_minimo || 3) ? 'bajo' : '';
+                const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
+                const ubicacionText = p.provincia && p.municipio ? `${p.provincia}, ${p.municipio}` : '';
+                
+                html += `
+                    <div class="producto-card" onclick="abrirModalProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                        <img src="${fotoUrl}" alt="${p.nombre}" class="foto" 
+                             onerror="this.src='/static/img/default_product.png'">
+                        <div class="nombre">📦 ${p.nombre}</div>
+                        <div class="categoria">${p.categoria || ''}</div>
+                        <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
+                        <div class="stock ${stockClass}">${stockText}</div>
+                        <div class="negocio-nombre">🏢 ${p.negocio_nombre || p.negocio_username || 'Negocio'}</div>
+                        ${ubicacionText ? `<div class="ubicacion-tag">📍 ${ubicacionText}</div>` : ''}
+                        ${p.destacado ? '<div class="destacado-badge">⭐ Destacado</div>' : ''}
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // ============================================
+        // MODAL DE PRODUCTO
+        // ============================================
+        
+        function abrirModalProducto(producto) {
+            const modal = document.getElementById('modalProducto');
+            const body = document.getElementById('modalBody');
+            
+            // Determinar estado del stock
+            let stockClase = 'disponible';
+            let stockTexto = '✅ Disponible';
+            if (producto.stock === 0) {
+                stockClase = 'agotado';
+                stockTexto = '🚫 Agotado';
+            } else if (producto.stock < (producto.stock_minimo || 3)) {
+                stockClase = 'bajo';
+                stockTexto = `⚠️ Stock bajo: ${producto.stock} unidades`;
+            } else {
+                stockTexto = `✅ ${producto.stock} unidades disponibles`;
+            }
+            
+            const fotoUrl = producto.foto_url || '/static/img/default_product.png';
+            const tipoIcon = producto.tipo === 'servicio' ? '📋' : '📦';
+            const tipoLabel = producto.tipo === 'servicio' ? 'Servicio' : 'Producto';
+            const telefono = producto.telefono || 'No disponible';
+            const tieneUbicacion = producto.latitud && producto.longitud;
+            const tieneTelefono = telefono !== 'No disponible' && telefono !== '';
+            
+            // Construir HTML del modal
+            body.innerHTML = `
+                <img src="${fotoUrl}" alt="${producto.nombre}" class="modal-foto" 
+                     onerror="this.src='/static/img/default_product.png'">
+                <div class="modal-nombre">${tipoIcon} ${producto.nombre}</div>
+                <div class="modal-categoria">${producto.categoria || 'Sin categoría'} • ${tipoLabel}</div>
+                <div class="modal-precio">$${parseFloat(producto.precio).toFixed(2)}</div>
+                <span class="modal-stock ${stockClase}">${stockTexto}</span>
+                
+                ${producto.descripcion ? `<div class="modal-descripcion">${producto.descripcion}</div>` : ''}
+                
+                <div class="modal-negocio">
+                    <div class="label">🏢 Negocio</div>
+                    <div class="nombre">${producto.negocio_nombre || producto.negocio_username || 'Negocio'}</div>
+                    ${producto.direccion ? `<div class="direccion">📍 ${producto.direccion}</div>` : ''}
+                    ${producto.provincia && producto.municipio ? 
+                        `<div class="direccion">📍 ${producto.provincia}, ${producto.municipio}</div>` : ''}
+                </div>
+                
+                <div class="modal-actions">
+                    <button class="btn btn-telefono" onclick="llamarNegocio('${telefono}')" 
+                            ${!tieneTelefono ? 'disabled' : ''}>
+                        📞 ${tieneTelefono ? 'Llamar' : 'Sin teléfono'}
+                    </button>
+                    <button class="btn btn-mapa" onclick="mostrarEnMapa(${JSON.stringify(producto).replace(/"/g, '&quot;')})" 
+                            ${!tieneUbicacion ? 'disabled' : ''}>
+                        🗺️ Mostrar en mapa
+                    </button>
+                </div>
+                
+                <div class="modal-mapa-container" id="modalMapaContainer">
+                    <div id="modalMapa"></div>
+                </div>
+            `;
+            
+            modal.classList.add('show');
+            document.body.style.overflow = 'hidden';
+            
+            // Guardar referencia del producto para el mapa
+            modal.dataset.producto = JSON.stringify(producto);
+            mapaInicializado = false;
+        }
+        
+        function cerrarModalProducto() {
+            const modal = document.getElementById('modalProducto');
+            modal.classList.remove('show');
+            document.body.style.overflow = '';
+            
+            // Limpiar mapa
+            const container = document.getElementById('modalMapaContainer');
+            container.classList.remove('show');
+            if (mapaModal) {
+                mapaModal.remove();
+                mapaModal = null;
+                marcadorModal = null;
+            }
+            mapaInicializado = false;
+        }
+        
+        // Cerrar modal al hacer clic fuera
+        document.getElementById('modalProducto').addEventListener('click', function(e) {
+            if (e.target === this) {
+                cerrarModalProducto();
+            }
+        });
+        
+        // Cerrar modal con Escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                cerrarModalProducto();
+            }
+        });
+
+        // ============================================
+        // FUNCIONES DEL MODAL
+        // ============================================
+        
+        function llamarNegocio(telefono) {
+            if (!telefono || telefono === 'No disponible') {
+                alert('📞 El negocio no tiene número de teléfono registrado.');
+                return;
+            }
+            // Formatear número para llamada
+            const numeroLimpio = telefono.replace(/[^0-9+]/g, '');
+            if (numeroLimpio) {
+                window.location.href = `tel:${numeroLimpio}`;
+            } else {
+                alert('📞 Número de teléfono inválido.');
             }
         }
         
-        function agregarCarrito(id, nombre, precio) {
-            alert(`🛒 Producto "${nombre}" agregado al carrito\n💰 Precio: $${precio.toFixed(2)}`);
+        function mostrarEnMapa(producto) {
+            if (!producto.latitud || !producto.longitud) {
+                alert('🗺️ Este negocio no tiene ubicación registrada.');
+                return;
+            }
+            
+            const container = document.getElementById('modalMapaContainer');
+            container.classList.add('show');
+            
+            // Si ya hay mapa, destruirlo para recrearlo
+            if (mapaModal) {
+                mapaModal.remove();
+                mapaModal = null;
+                marcadorModal = null;
+            }
+            
+            // Esperar a que el DOM se actualice
+            setTimeout(() => {
+                const mapDiv = document.getElementById('modalMapa');
+                if (!mapDiv) return;
+                
+                // Inicializar mapa
+                mapaModal = L.map('modalMapa').setView([producto.latitud, producto.longitud], 14);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(mapaModal);
+                
+                // Marcador del negocio
+                const negocioIcon = L.divIcon({
+                    html: '🏪',
+                    className: 'custom-marker',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30]
+                });
+                
+                marcadorModal = L.marker([producto.latitud, producto.longitud], { icon: negocioIcon })
+                    .addTo(mapaModal)
+                    .bindPopup(`<strong>${producto.negocio_nombre || 'Negocio'}</strong><br>${producto.nombre}<br>📍 ${producto.latitud}, ${producto.longitud}`)
+                    .openPopup();
+                
+                // Intentar obtener ubicación del usuario
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        function(pos) {
+                            const userLat = pos.coords.latitude;
+                            const userLng = pos.coords.longitude;
+                            
+                            const userIcon = L.divIcon({
+                                html: '📍',
+                                className: 'custom-marker',
+                                iconSize: [30, 30],
+                                iconAnchor: [15, 30]
+                            });
+                            
+                            L.marker([userLat, userLng], { icon: userIcon })
+                                .addTo(mapaModal)
+                                .bindPopup('Tu ubicación')
+                                .openPopup();
+                            
+                            // Ajustar vista para mostrar ambos puntos
+                            const bounds = L.latLngBounds(
+                                [producto.latitud, producto.longitud],
+                                [userLat, userLng]
+                            );
+                            mapaModal.fitBounds(bounds, { padding: [50, 50] });
+                        },
+                        function() {
+                            // No se pudo obtener ubicación, centrar en el negocio
+                            mapaModal.setView([producto.latitud, producto.longitud], 14);
+                        },
+                        { enableHighAccuracy: true, timeout: 10000 }
+                    );
+                } else {
+                    mapaModal.setView([producto.latitud, producto.longitud], 14);
+                }
+                
+                // Redimensionar el mapa después de mostrarlo
+                setTimeout(() => {
+                    if (mapaModal) {
+                        mapaModal.invalidateSize();
+                    }
+                }, 300);
+                
+                mapaInicializado = true;
+                
+            }, 200);
         }
 
         // ============================================
@@ -480,13 +1059,17 @@
         
         async function iniciar() {
             await obtenerUbicacionUsuario();
-            await cargarProductosTienda();
-            await cargarNegociosCercanos();
+            await cargarCatalogo();
+            await cargarTienda();
+            
+            // Actualizar cada 30 segundos
+            setInterval(() => {
+                cargarCatalogo();
+                cargarTienda();
+            }, 30000);
         }
         
-        iniciar();
-        setInterval(cargarProductosTienda, 30000);
-        setInterval(cargarNegociosCercanos, 60000);
+        document.addEventListener('DOMContentLoaded', iniciar);
     </script>
 </body>
 </html>
