@@ -370,6 +370,7 @@
                 </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <!-- ⚠️ IMPORTANTE: QUITÉ EL onclick="guardarProducto()" PARA EVITAR DUPLICADOS -->
                 <button class="btn btn-success" id="btnGuardar">💾 Guardar</button>
                 <button class="btn btn-danger" id="btnCancelar">✕ Cancelar</button>
             </div>
@@ -406,7 +407,6 @@
                 exitoEl.textContent = '✅ ' + texto;
                 exitoEl.classList.add('show');
             }
-            // También mostrar en consola para debug
             console.log(`📝 ${tipo.toUpperCase()}: ${texto}`);
             setTimeout(() => {
                 errorEl.classList.remove('show');
@@ -680,105 +680,101 @@
             document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
-// ============================================
-// GUARDAR PRODUCTO (CON SUBIDA DE FOTO)
-// ============================================
-async function guardarProducto() {
-    const nombre = document.getElementById('prodNombre').value.trim();
-    const categoria = document.getElementById('prodCategoria').value;
-    const precio = parseFloat(document.getElementById('prodPrecio').value);
-    const costo = parseFloat(document.getElementById('prodCosto').value) || 0;
-    const comision = parseFloat(document.getElementById('prodComision').value) || 0;
-    const stock = parseInt(document.getElementById('prodStock').value) || 0;
-    const stock_minimo = parseInt(document.getElementById('prodMinimo').value) || 3;
+        // ============================================
+        // GUARDAR PRODUCTO (CORREGIDO - SIN onclick en HTML)
+        // ============================================
+        async function guardarProducto() {
+            const nombre = document.getElementById('prodNombre').value.trim();
+            const categoria = document.getElementById('prodCategoria').value;
+            const precio = parseFloat(document.getElementById('prodPrecio').value);
+            const costo = parseFloat(document.getElementById('prodCosto').value) || 0;
+            const comision = parseFloat(document.getElementById('prodComision').value) || 0;
+            const stock = parseInt(document.getElementById('prodStock').value) || 0;
+            const stock_minimo = parseInt(document.getElementById('prodMinimo').value) || 3;
 
-    if (!nombre || !categoria || isNaN(precio)) {
-        mostrarMensaje('Nombre, categoría y precio son obligatorios', 'error');
-        return;
-    }
-
-    const data = { nombre, categoria, precio, costo, comision, stock, stock_minimo };
-    
-    const btn = document.getElementById('btnGuardar');
-    const textoOriginal = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = '⏳ Guardando...';
-
-    try {
-        const url = editandoId ? `/api/producto/${editandoId}` : '/api/productos';
-        const method = editandoId ? 'PUT' : 'POST';
-        
-        console.log('📤 Enviando datos producto:', data);
-        
-        const response = await fetch(url, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-
-        const result = await response.json();
-        console.log('📥 Respuesta producto:', result);
-
-        if (result.success) {
-            const productoId = result.id || editandoId;
-            
-            // ============================================
-            // SUBIR FOTO SI EXISTE
-            // ============================================
-            const fotoInput = document.getElementById('prodFoto');
-            if (fotoInput && fotoInput.files && fotoInput.files.length > 0) {
-                const formData = new FormData();
-                formData.append('foto', fotoInput.files[0]);
-                
-                console.log('📤 Subiendo foto para producto:', productoId);
-                console.log('📷 Archivo:', fotoInput.files[0].name, fotoInput.files[0].size, fotoInput.files[0].type);
-                
-                try {
-                    const fotoResponse = await fetch(`/api/producto/${productoId}/foto`, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    const fotoResult = await fotoResponse.json();
-                    console.log('📥 Respuesta foto:', fotoResult);
-                    
-                    if (fotoResult.success) {
-                        mostrarMensaje(`✅ Producto "${nombre}" guardado con foto`, 'exito');
-                    } else {
-                        mostrarMensaje(`✅ Producto guardado pero error al subir foto: ${fotoResult.error || 'Error desconocido'}`, 'warning');
-                    }
-                } catch (fotoError) {
-                    console.error('❌ Error subiendo foto:', fotoError);
-                    mostrarMensaje('Producto guardado pero no se pudo subir la foto', 'warning');
-                }
-            } else {
-                mostrarMensaje(`✅ "${nombre}" ${editandoId ? 'actualizado' : 'agregado'}`, 'exito');
+            // Validaciones
+            if (!nombre || !categoria || isNaN(precio) || precio <= 0) {
+                mostrarMensaje('Nombre, categoría y precio son obligatorios', 'error');
+                return;
             }
+
+            const data = { nombre, categoria, precio, costo, comision, stock, stock_minimo };
             
-            cancelarFormulario();
-            await cargarProductos();
-        } else {
-            mostrarMensaje(result.error || 'Error al guardar producto', 'error');
+            const btn = document.getElementById('btnGuardar');
+            const textoOriginal = btn.textContent;
+            
+            // Deshabilitar botón para evitar doble clic
+            btn.disabled = true;
+            btn.textContent = '⏳ Guardando...';
+
+            try {
+                const url = editandoId ? `/api/producto/${editandoId}` : '/api/productos';
+                const method = editandoId ? 'PUT' : 'POST';
+                
+                console.log('📤 Enviando datos producto:', data);
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                console.log('📥 Respuesta producto:', result);
+
+                if (result.success) {
+                    const productoId = result.id || editandoId;
+                    
+                    // Subir foto si existe
+                    const fotoInput = document.getElementById('prodFoto');
+                    if (fotoInput && fotoInput.files && fotoInput.files.length > 0) {
+                        const formData = new FormData();
+                        formData.append('foto', fotoInput.files[0]);
+                        
+                        console.log('📤 Subiendo foto para producto:', productoId);
+                        
+                        try {
+                            const fotoResponse = await fetch(`/api/producto/${productoId}/foto`, {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            const fotoResult = await fotoResponse.json();
+                            console.log('📥 Respuesta foto:', fotoResult);
+                            
+                            if (fotoResult.success) {
+                                mostrarMensaje(`✅ Producto "${nombre}" guardado con foto`, 'exito');
+                            } else {
+                                mostrarMensaje(`✅ Producto guardado pero error al subir foto: ${fotoResult.error || 'Error desconocido'}`, 'error');
+                            }
+                        } catch (fotoError) {
+                            console.error('❌ Error subiendo foto:', fotoError);
+                            mostrarMensaje('✅ Producto guardado pero no se pudo subir la foto', 'error');
+                        }
+                    } else {
+                        mostrarMensaje(`✅ "${nombre}" ${editandoId ? 'actualizado' : 'agregado'} correctamente`, 'exito');
+                    }
+                    
+                    cancelarFormulario();
+                    await cargarProductos();
+                } else {
+                    mostrarMensaje(result.error || 'Error al guardar producto', 'error');
+                }
+            } catch (error) {
+                console.error('❌ Error:', error);
+                mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = textoOriginal;
+            }
         }
-    } catch (error) {
-        console.error('❌ Error:', error);
-        mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = textoOriginal;
-    }
-}
 
         // ============================================
         // ELIMINAR PRODUCTO
         // ============================================
         async function eliminarProducto(id, nombre) {
             if (!confirm(`⚠️ ¿Eliminar "${nombre}"?`)) return;
-            if (!confirm(`Confirmación final: ¿Eliminar "${nombre}"?`)) return;
-            
-            const btn = event?.target;
-            const textoOriginal = btn ? btn.textContent : '🗑️';
-            if (btn) { btn.textContent = '⏳...'; btn.disabled = true; }
+            if (!confirm(`Confirmación final: ¿Eliminar "${nombre}" definitivamente?`)) return;
             
             try {
                 const response = await fetch(`/api/producto/${id}`, {
@@ -789,7 +785,7 @@ async function guardarProducto() {
                 const data = await response.json();
                 
                 if (data.success) {
-                    mostrarMensaje(`✅ "${nombre}" eliminado`, 'exito');
+                    mostrarMensaje(`✅ "${nombre}" eliminado correctamente`, 'exito');
                     await cargarProductos();
                 } else {
                     mostrarMensaje(data.error || 'Error al eliminar', 'error');
@@ -797,28 +793,29 @@ async function guardarProducto() {
             } catch (error) {
                 console.error('Error:', error);
                 mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
-            } finally {
-                if (btn) { btn.textContent = textoOriginal; btn.disabled = false; }
             }
         }
 
         // ============================================
-        // EVENT LISTENERS
+        // EVENT LISTENERS (SOLO AQUÍ, NO onclick en HTML)
         // ============================================
         document.addEventListener('DOMContentLoaded', function() {
             console.log('📦 Módulo de inventario cargado');
             
-            // Asignar event listeners
+            // ⚠️ IMPORTANTE: Asignar event listeners SOLO aquí
             const btnGuardar = document.getElementById('btnGuardar');
             const btnCancelar = document.getElementById('btnCancelar');
             
             if (btnGuardar) {
+                // Quitar cualquier evento anterior para evitar duplicados
+                btnGuardar.removeEventListener('click', guardarProducto);
                 btnGuardar.addEventListener('click', guardarProducto);
-                console.log('✅ Event listener de guardar asignado');
+                console.log('✅ Event listener de guardar asignado correctamente');
             }
             if (btnCancelar) {
+                btnCancelar.removeEventListener('click', cancelarFormulario);
                 btnCancelar.addEventListener('click', cancelarFormulario);
-                console.log('✅ Event listener de cancelar asignado');
+                console.log('✅ Event listener de cancelar asignado correctamente');
             }
             
             // Input listeners
