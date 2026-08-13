@@ -2587,8 +2587,8 @@ def api_crear_venta():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/venta/<int:venta_id>', methods=['GET'])
-@login_required
-        def api_obtener_venta(venta_id):
+@login_required  # <--- ✅ ESPACIO CORRECTO
+def api_obtener_venta(venta_id):
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -2697,65 +2697,6 @@ def api_eliminar_venta(venta_id):
         print(f"❌ Error en api_eliminar_venta: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
-@app.route('/api/estadisticas/ventas', methods=['GET'])
-@login_required
-def api_estadisticas_ventas():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        if usuario.get('rol') == 'admin':
-            estadisticas = obtener_estadisticas_ventas()
-        else:
-            negocio_id = usuario.get('id')
-            if usuario.get('rol') == 'trabajador':
-                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-                if not negocio_id:
-                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-            estadisticas = obtener_estadisticas_ventas(negocio_id)
-        
-        return jsonify(estadisticas)
-    except Exception as e:
-        print(f"❌ Error en api_estadisticas_ventas: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/ventas/periodo', methods=['GET'])
-@login_required
-def api_ventas_por_periodo():
-    token = request.cookies.get('token')
-    usuario = obtener_usuario_sesion(token)
-    
-    if not usuario:
-        return jsonify({'error': 'No autorizado'}), 401
-    
-    try:
-        fecha_inicio = request.args.get('fecha_inicio')
-        fecha_fin = request.args.get('fecha_fin')
-        
-        if not fecha_inicio or not fecha_fin:
-            return jsonify({'error': 'Fecha inicio y fin son requeridas'}), 400
-        
-        if usuario.get('rol') == 'admin':
-            ventas = obtener_ventas_por_periodo(fecha_inicio, fecha_fin)
-        else:
-            negocio_id = usuario.get('id')
-            if usuario.get('rol') == 'trabajador':
-                negocio_id = obtener_negocio_de_trabajador(usuario['id'])
-                if not negocio_id:
-                    return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-            ventas = obtener_ventas_por_periodo(fecha_inicio, fecha_fin, negocio_id)
-        
-        return jsonify([dict(v) for v in ventas])
-    except Exception as e:
-        print(f"❌ Error en api_ventas_por_periodo: {e}")
-        traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
-
 # ============================================
 # API - REPORTES
 # ============================================
