@@ -15,6 +15,11 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, m
 from flask_cors import CORS
 
 # ============================================
+# IMPORTAR RealDictCursor PARA POSTGRESQL
+# ============================================
+from psycopg2.extras import RealDictCursor
+
+# ============================================
 # CONFIGURACIÓN DE LOGGING
 # ============================================
 logging.basicConfig(level=logging.DEBUG)
