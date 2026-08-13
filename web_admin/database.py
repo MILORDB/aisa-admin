@@ -2,7 +2,7 @@
 
 import os
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import RealDictCursor  # <-- Asegúrate que esto esté
 from datetime import datetime, timedelta
 import bcrypt
 import json
