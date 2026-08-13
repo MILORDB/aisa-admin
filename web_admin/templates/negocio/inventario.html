@@ -21,21 +21,6 @@
             margin-bottom: 12px;
         }
         .card h2 { font-size: 15px; color: #6c3ce0; margin-bottom: 12px; }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-        .stat-item {
-            background: #0f0f1a;
-            border: 1px solid #2a2a3e;
-            border-radius: 8px;
-            padding: 10px;
-            text-align: center;
-        }
-        .stat-item .number { font-size: 20px; font-weight: 700; color: #6c3ce0; }
-        .stat-item .label { font-size: 9px; color: #888; margin-top: 2px; }
         .btn {
             padding: 6px 14px;
             border: none;
@@ -55,6 +40,7 @@
         .btn-sm { padding: 3px 8px; font-size: 10px; }
         .btn-info { background: #2196f3; color: #fff; }
         .btn-info:hover { background: #1976d2; }
+        
         .tabla {
             width: 100%;
             border-collapse: collapse;
@@ -85,6 +71,7 @@
         .tabla .badge.agotado { background: #442222; color: #ff6b6b; font-weight: bold; }
         .tabla .badge.ganancia { background: #1a237e; color: #6bff6b; }
         .tabla .badge.comision { background: #ff9800; color: #000; }
+        
         .form-row {
             display: flex;
             gap: 8px;
@@ -140,9 +127,8 @@
             border: 1px solid rgba(76,175,80,0.2);
             display: none;
         }
-        .form-row .ganancia-preview.show {
-            display: block;
-        }
+        .form-row .ganancia-preview.show { display: block; }
+        
         .form-row .foto-upload {
             border: 2px dashed #2a2a3e;
             border-radius: 8px;
@@ -174,6 +160,7 @@
         .form-row .foto-upload .foto-preview.show {
             display: inline-block;
         }
+        
         .search-bar {
             display: flex;
             gap: 8px;
@@ -191,6 +178,7 @@
             min-width: 120px;
         }
         .search-bar input:focus { border-color: #6c3ce0; outline: none; }
+        
         .empty { text-align: center; color: #888; padding: 30px; font-size: 13px; }
         .loading { text-align: center; color: #888; padding: 20px; font-size: 13px; }
         .mensaje-exito {
@@ -213,6 +201,7 @@
             display: none;
         }
         .mensaje-error.show { display: block; }
+        
         .categoria-tag {
             display: inline-block;
             background: rgba(108, 60, 224, 0.2);
@@ -259,6 +248,22 @@
             border-radius: 4px;
             object-fit: cover;
         }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .stat-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        .stat-item .number { font-size: 20px; font-weight: 700; color: #6c3ce0; }
+        .stat-item .label { font-size: 9px; color: #888; margin-top: 2px; }
+
         @media (max-width: 600px) {
             body { padding: 8px; }
             .card { padding: 10px; }
@@ -286,7 +291,6 @@
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:6px;">
         <h1 style="font-size:18px;display:flex;align-items:center;gap:8px;">📦 Inventario <span style="font-size:12px;font-weight:normal;opacity:0.7;">Gestión de productos</span></h1>
-        <button class="btn btn-info btn-sm" onclick="verificarStorage()">🔍 Verificar Almacenamiento</button>
     </div>
 
     <div class="mensaje-error" id="mensajeError"></div>
@@ -370,7 +374,6 @@
                 </div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <!-- ⚠️ IMPORTANTE: QUITÉ EL onclick="guardarProducto()" PARA EVITAR DUPLICADOS -->
                 <button class="btn btn-success" id="btnGuardar">💾 Guardar</button>
                 <button class="btn btn-danger" id="btnCancelar">✕ Cancelar</button>
             </div>
@@ -428,38 +431,6 @@
                     preview.classList.add('show');
                 };
                 reader.readAsDataURL(file);
-            }
-        }
-
-        // ============================================
-        // VERIFICAR ALMACENAMIENTO
-        // ============================================
-        async function verificarStorage() {
-            try {
-                const response = await fetch('/api/storage/estado');
-                const data = await response.json();
-                console.log('📁 Estado del almacenamiento:', data);
-                
-                let mensaje = `📁 Almacenamiento: ${data.tipo || 'Desconocido'}\n`;
-                mensaje += `🔐 Autenticado: ${data.autenticado ? '✅ Sí' : '❌ No'}\n`;
-                mensaje += `📂 Usando local: ${data.use_local ? '✅ Sí' : '❌ No'}`;
-                
-                if (data.used_gb !== undefined) {
-                    mensaje += `\n📊 Espacio usado: ${data.used_gb} GB`;
-                    mensaje += `\n📊 Espacio total: ${data.total_gb} GB`;
-                    mensaje += `\n📊 Espacio libre: ${data.free_gb} GB`;
-                }
-                
-                if (data.use_local) {
-                    mostrarMensaje('⚠️ Usando almacenamiento LOCAL. Google Drive no configurado.', 'error');
-                } else {
-                    mostrarMensaje('✅ Google Drive conectado correctamente!', 'exito');
-                }
-                
-                alert(mensaje);
-            } catch (error) {
-                console.error('Error:', error);
-                mostrarMensaje('❌ Error verificando almacenamiento', 'error');
             }
         }
 
@@ -681,7 +652,7 @@
         }
 
         // ============================================
-        // GUARDAR PRODUCTO (CORREGIDO - SIN onclick en HTML)
+        // GUARDAR PRODUCTO
         // ============================================
         async function guardarProducto() {
             const nombre = document.getElementById('prodNombre').value.trim();
@@ -692,7 +663,6 @@
             const stock = parseInt(document.getElementById('prodStock').value) || 0;
             const stock_minimo = parseInt(document.getElementById('prodMinimo').value) || 3;
 
-            // Validaciones
             if (!nombre || !categoria || isNaN(precio) || precio <= 0) {
                 mostrarMensaje('Nombre, categoría y precio son obligatorios', 'error');
                 return;
@@ -702,8 +672,6 @@
             
             const btn = document.getElementById('btnGuardar');
             const textoOriginal = btn.textContent;
-            
-            // Deshabilitar botón para evitar doble clic
             btn.disabled = true;
             btn.textContent = '⏳ Guardando...';
 
@@ -725,7 +693,6 @@
                 if (result.success) {
                     const productoId = result.id || editandoId;
                     
-                    // Subir foto si existe
                     const fotoInput = document.getElementById('prodFoto');
                     if (fotoInput && fotoInput.files && fotoInput.files.length > 0) {
                         const formData = new FormData();
@@ -797,17 +764,15 @@
         }
 
         // ============================================
-        // EVENT LISTENERS (SOLO AQUÍ, NO onclick en HTML)
+        // EVENT LISTENERS
         // ============================================
         document.addEventListener('DOMContentLoaded', function() {
             console.log('📦 Módulo de inventario cargado');
             
-            // ⚠️ IMPORTANTE: Asignar event listeners SOLO aquí
             const btnGuardar = document.getElementById('btnGuardar');
             const btnCancelar = document.getElementById('btnCancelar');
             
             if (btnGuardar) {
-                // Quitar cualquier evento anterior para evitar duplicados
                 btnGuardar.removeEventListener('click', guardarProducto);
                 btnGuardar.addEventListener('click', guardarProducto);
                 console.log('✅ Event listener de guardar asignado correctamente');
@@ -818,16 +783,12 @@
                 console.log('✅ Event listener de cancelar asignado correctamente');
             }
             
-            // Input listeners
             const precioInput = document.getElementById('prodPrecio');
             const costoInput = document.getElementById('prodCosto');
             if (precioInput) precioInput.addEventListener('input', calcularGanancia);
             if (costoInput) costoInput.addEventListener('input', calcularGanancia);
             
-            // Cargar productos iniciales
             cargarProductos();
-            
-            // Actualizar cada 30 segundos
             setInterval(cargarProductos, 30000);
         });
     </script>
