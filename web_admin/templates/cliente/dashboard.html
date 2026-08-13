@@ -139,7 +139,7 @@
         }
         
         /* ============================================
-           PRODUCTOS GRID
+           PRODUCTOS GRID - SCROLL HORIZONTAL
            ============================================ */
         .productos-scroll {
             display: flex;
@@ -237,6 +237,19 @@
             display: inline-block;
             margin-top: 2px;
         }
+        .producto-card .tipo-badge {
+            display: inline-block;
+            font-size: 8px;
+            padding: 1px 6px;
+            border-radius: 8px;
+            background: rgba(108,60,224,0.15);
+            color: #6c3ce0;
+            margin-top: 2px;
+        }
+        .producto-card .tipo-badge.servicio {
+            background: rgba(255,152,0,0.15);
+            color: #ff9800;
+        }
         
         /* ============================================
            ESTADÍSTICAS
@@ -275,7 +288,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.85);
             z-index: 2000;
             align-items: center;
             justify-content: center;
@@ -290,10 +303,15 @@
             to { opacity: 1; transform: scale(1); }
         }
         
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
         .modal-content {
             background: #1a1a2e;
             border-radius: 16px;
-            max-width: 480px;
+            max-width: 500px;
             width: 100%;
             max-height: 95vh;
             overflow-y: auto;
@@ -301,9 +319,19 @@
             position: relative;
             animation: slideUp 0.3s ease;
         }
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
+        .modal-content::-webkit-scrollbar {
+            width: 4px;
+        }
+        .modal-content::-webkit-scrollbar-track {
+            background: #0f0f1a;
+            border-radius: 4px;
+        }
+        .modal-content::-webkit-scrollbar-thumb {
+            background: #2a2a3e;
+            border-radius: 4px;
+        }
+        .modal-content::-webkit-scrollbar-thumb:hover {
+            background: #6c3ce0;
         }
         
         .modal-close {
@@ -380,6 +408,10 @@
             background: rgba(244,67,54,0.15);
             color: #ff6b6b;
         }
+        .modal-body .modal-stock.servicio {
+            background: rgba(33,150,243,0.15);
+            color: #64b5f6;
+        }
         
         .modal-body .modal-negocio {
             background: rgba(108,60,224,0.05);
@@ -431,6 +463,11 @@
             background: #3d8b40;
             transform: scale(1.02);
         }
+        .modal-body .modal-actions .btn-telefono:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
         .modal-body .modal-actions .btn-mapa {
             background: #2196f3;
             color: #fff;
@@ -464,30 +501,70 @@
             background: #0f0f1a;
         }
         
+        /* Estilos para los marcadores de Leaflet en el modal */
+        .custom-marker {
+            background: none;
+            border: none;
+            font-size: 28px;
+            text-align: center;
+            line-height: 28px;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+        
         /* ============================================
            RESPONSIVE
            ============================================ */
+        @media (max-width: 768px) {
+            .container { padding: 12px; }
+            .producto-card { min-width: 150px; max-width: 170px; padding: 10px; }
+            .producto-card .foto { height: 110px; }
+            .producto-card .nombre { font-size: 12px; }
+            .producto-card .precio { font-size: 15px; }
+        }
+        
         @media (max-width: 600px) {
             .container { padding: 10px; }
             .header { padding: 10px 14px; flex-wrap: wrap; gap: 6px; }
             .header .user { width: 100%; justify-content: flex-end; }
             .header .user .user-name { max-width: 60px; font-size: 12px; }
-            .producto-card { min-width: 140px; max-width: 160px; padding: 8px; }
-            .producto-card .foto { height: 100px; }
-            .producto-card .nombre { font-size: 12px; }
+            .header .user a { font-size: 11px; padding: 3px 10px; }
+            .producto-card { min-width: 130px; max-width: 150px; padding: 8px; }
+            .producto-card .foto { height: 90px; }
+            .producto-card .nombre { font-size: 11px; }
             .producto-card .precio { font-size: 14px; }
+            .producto-card .stock { font-size: 10px; }
             .stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
-            .modal-content { max-width: 100%; margin: 0 8px; }
+            .stat-item { padding: 8px; }
+            .stat-item .number { font-size: 16px; }
+            .modal-content { max-width: 100%; margin: 0; border-radius: 12px; }
+            .modal-body { padding: 4px 14px 14px 14px; }
             .modal-body .modal-foto { max-height: 180px; }
             .modal-body .modal-nombre { font-size: 18px; }
             .modal-body .modal-precio { font-size: 22px; }
             .modal-body .modal-actions .btn { font-size: 12px; padding: 8px 12px; min-width: 80px; }
+            .modal-mapa-container #modalMapa { height: 160px; }
             .ubicacion-card { flex-direction: column; align-items: flex-start; }
+            .ubicacion-card .btn-ubicacion { width: 100%; text-align: center; }
+            .section-title { font-size: 14px; }
+            .section-title .badge { font-size: 9px; padding: 1px 8px; }
         }
+        
         @media (max-width: 400px) {
-            .producto-card { min-width: 120px; max-width: 140px; }
-            .producto-card .foto { height: 80px; }
-            .stats-grid { grid-template-columns: 1fr 1fr; }
+            .producto-card { min-width: 110px; max-width: 130px; padding: 6px; }
+            .producto-card .foto { height: 70px; }
+            .producto-card .nombre { font-size: 10px; }
+            .producto-card .precio { font-size: 12px; }
+            .producto-card .negocio-nombre { font-size: 8px; }
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 4px; }
+            .stat-item { padding: 6px; }
+            .stat-item .number { font-size: 14px; }
+            .stat-item .label { font-size: 8px; }
+            .modal-body .modal-foto { max-height: 140px; }
+            .modal-body .modal-nombre { font-size: 16px; }
+            .modal-body .modal-precio { font-size: 18px; }
+            .modal-body .modal-actions .btn { font-size: 11px; padding: 6px 10px; min-width: 60px; }
+            .modal-body .modal-negocio .nombre { font-size: 13px; }
+            .modal-mapa-container #modalMapa { height: 130px; }
         }
     </style>
 </head>
@@ -530,6 +607,10 @@
             <div class="stat-item">
                 <span class="number" id="productosDestacados">0</span>
                 <span class="label">⭐ Destacados</span>
+            </div>
+            <div class="stat-item">
+                <span class="number" id="totalServicios">0</span>
+                <span class="label">📋 Servicios</span>
             </div>
         </div>
 
@@ -585,7 +666,15 @@
         let tiendaProductos = [];
         let mapaModal = null;
         let marcadorModal = null;
+        let marcadorUsuario = null;
         let mapaInicializado = false;
+
+        // ============================================
+        // FUNCIÓN PARA ESCAPAR JSON PARA ONCLICK
+        // ============================================
+        function escaparJSON(obj) {
+            return JSON.stringify(obj).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
 
         // ============================================
         // OBTENER UBICACIÓN DEL USUARIO
@@ -621,7 +710,7 @@
         }
 
         // ============================================
-        // CARGAR CATÁLOGO ALEATORIO (Productos + Servicios)
+        // CARGAR CATÁLOGO ALEATORIO
         // ============================================
         
         async function cargarCatalogo() {
@@ -629,74 +718,32 @@
             container.innerHTML = '<div class="empty-state"><span class="icon">🔄</span>Cargando catálogo...</div>';
             
             try {
-                // Obtener productos de la tienda pública (filtrados por ubicación)
-                const response = await fetch('/api/tienda/public');
-                if (!response.ok) throw new Error('Error al cargar catálogo');
-                const productos = await response.json();
+                // Obtener productos de la tienda pública
+                const prodResponse = await fetch('/api/tienda/public');
+                let productos = [];
+                if (prodResponse.ok) {
+                    productos = await prodResponse.json();
+                    console.log('📦 Productos cargados:', productos.length);
+                }
                 
-                // Obtener servicios (también filtrados por ubicación si es posible)
+                // Obtener servicios públicos
                 const servResponse = await fetch('/api/servicios/publicos');
                 let servicios = [];
                 if (servResponse.ok) {
                     servicios = await servResponse.json();
+                    console.log('📋 Servicios cargados:', servicios.length);
                 }
                 
                 // Combinar productos y servicios
-                let todos = [];
+                let todos = [...productos, ...servicios];
                 
-                // Productos con su tipo
-                productos.forEach(p => {
-                    todos.push({
-                        ...p,
-                        tipo: 'producto',
-                        es_servicio: false,
-                        nombre: p.nombre,
-                        precio: p.precio,
-                        stock: p.stock || 0,
-                        foto_url: p.foto_url || null,
-                        categoria: p.categoria || 'Producto',
-                        negocio_id: p.negocio_id,
-                        negocio_nombre: p.negocio_nombre || p.negocio_username || 'Negocio',
-                        direccion: p.direccion || '',
-                        telefono: p.telefono || '',
-                        descripcion: p.descripcion || '',
-                        provincia: p.provincia || '',
-                        municipio: p.municipio || '',
-                        destacado: p.destacado || 0,
-                        stock_minimo: p.stock_minimo || 3
-                    });
-                });
-                
-                // Servicios
-                servicios.forEach(s => {
-                    todos.push({
-                        ...s,
-                        tipo: 'servicio',
-                        es_servicio: true,
-                        nombre: s.nombre,
-                        precio: s.precio,
-                        stock: 999, // Servicios no tienen stock
-                        foto_url: null,
-                        categoria: s.categoria || 'Servicio',
-                        negocio_id: s.negocio_id,
-                        negocio_nombre: s.negocio_nombre || s.negocio_username || 'Negocio',
-                        direccion: s.direccion || '',
-                        telefono: s.telefono || '',
-                        descripcion: s.descripcion || '',
-                        provincia: s.provincia || '',
-                        municipio: s.municipio || '',
-                        destacado: 0,
-                        stock_minimo: 0
-                    });
-                });
-                
-                // Mezclar aleatoriamente
+                // Mezclar aleatoriamente (Fisher-Yates)
                 for (let i = todos.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [todos[i], todos[j]] = [todos[j], todos[i]];
                 }
                 
-                // Limitar a 30 items para no saturar
+                // Limitar a 30 items
                 catalogoProductos = todos.slice(0, 30);
                 
                 renderCatalogo(catalogoProductos);
@@ -704,7 +751,8 @@
                 // Actualizar estadísticas
                 const negociosUnicos = new Set(todos.map(p => p.negocio_id));
                 document.getElementById('negociosActivos').textContent = negociosUnicos.size || 0;
-                document.getElementById('totalProductos').textContent = todos.length || 0;
+                document.getElementById('totalProductos').textContent = productos.length || 0;
+                document.getElementById('totalServicios').textContent = servicios.length || 0;
                 const destacados = todos.filter(p => p.destacado).length;
                 document.getElementById('productosDestacados').textContent = destacados || 0;
                 
@@ -713,7 +761,7 @@
                 container.innerHTML = `
                     <div class="empty-state">
                         <span class="icon">❌</span>
-                        Error al cargar el catálogo
+                        Error al cargar el catálogo: ${error.message}
                     </div>
                 `;
             }
@@ -743,23 +791,36 @@
             
             productos.forEach(p => {
                 const fotoUrl = p.foto_url || '/static/img/default_product.png';
-                const stockClass = p.stock < (p.stock_minimo || 3) ? 'bajo' : '';
-                const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
-                const tipoIcon = p.tipo === 'servicio' ? '📋' : '📦';
-                const tipoLabel = p.tipo === 'servicio' ? 'Servicio' : 'Producto';
+                const esServicio = p.tipo === 'servicio';
+                const stockClass = !esServicio && p.stock !== undefined && p.stock < (p.stock_minimo || 3) ? 'bajo' : '';
+                let stockText = '';
+                if (esServicio) {
+                    stockText = '📋 Servicio';
+                } else if (p.stock > 0) {
+                    stockText = `📦 ${p.stock} unidades`;
+                } else {
+                    stockText = '🚫 Agotado';
+                }
+                const tipoIcon = esServicio ? '📋' : '📦';
+                const tipoLabel = esServicio ? 'Servicio' : 'Producto';
+                const tipoBadgeClass = esServicio ? 'servicio' : '';
                 const ubicacionText = p.provincia && p.municipio ? `${p.provincia}, ${p.municipio}` : '';
                 
+                // Escapar el objeto para pasarlo al onclick
+                const pEscapado = escaparJSON(p);
+                
                 html += `
-                    <div class="producto-card" onclick="abrirModalProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                    <div class="producto-card" onclick="abrirModalProducto(${pEscapado})">
                         <img src="${fotoUrl}" alt="${p.nombre}" class="foto" 
                              onerror="this.src='/static/img/default_product.png'">
                         <div class="nombre">${tipoIcon} ${p.nombre}</div>
-                        <div class="categoria">${p.categoria || ''} • ${tipoLabel}</div>
+                        <div class="categoria">${p.categoria || ''}</div>
                         <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
                         <div class="stock ${stockClass}">${stockText}</div>
-                        <div class="negocio-nombre">🏢 ${p.negocio_nombre}</div>
+                        <div class="negocio-nombre">🏢 ${p.negocio_nombre || p.negocio_username || 'Negocio'}</div>
                         ${ubicacionText ? `<div class="ubicacion-tag">📍 ${ubicacionText}</div>` : ''}
                         ${p.destacado ? '<div class="destacado-badge">⭐ Destacado</div>' : ''}
+                        <span class="tipo-badge ${tipoBadgeClass}">${tipoLabel}</span>
                     </div>
                 `;
             });
@@ -778,12 +839,11 @@
             
             try {
                 const response = await fetch('/api/tienda/public');
-                if (!response.ok) throw new Error('Error al cargar tienda');
-                const productos = await response.json();
-                
-                // Filtrar solo los que tienen destacado o están en tienda
-                // En la API ya vienen los que están en la tienda
-                tiendaProductos = productos || [];
+                if (!response.ok) {
+                    throw new Error('Error al cargar tienda');
+                }
+                tiendaProductos = await response.json();
+                console.log('🏪 Productos de tienda cargados:', tiendaProductos.length);
                 
                 renderTienda(tiendaProductos);
                 
@@ -792,7 +852,7 @@
                 container.innerHTML = `
                     <div class="empty-state">
                         <span class="icon">❌</span>
-                        Error al cargar productos de tiendas
+                        Error al cargar productos de tiendas: ${error.message}
                     </div>
                 `;
             }
@@ -826,8 +886,10 @@
                 const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
                 const ubicacionText = p.provincia && p.municipio ? `${p.provincia}, ${p.municipio}` : '';
                 
+                const pEscapado = escaparJSON(p);
+                
                 html += `
-                    <div class="producto-card" onclick="abrirModalProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                    <div class="producto-card" onclick="abrirModalProducto(${pEscapado})">
                         <img src="${fotoUrl}" alt="${p.nombre}" class="foto" 
                              onerror="this.src='/static/img/default_product.png'">
                         <div class="nombre">📦 ${p.nombre}</div>
@@ -853,10 +915,17 @@
             const modal = document.getElementById('modalProducto');
             const body = document.getElementById('modalBody');
             
+            console.log('🔄 Abriendo modal para:', producto.nombre);
+            
             // Determinar estado del stock
+            const esServicio = producto.tipo === 'servicio';
             let stockClase = 'disponible';
             let stockTexto = '✅ Disponible';
-            if (producto.stock === 0) {
+            
+            if (esServicio) {
+                stockClase = 'servicio';
+                stockTexto = '📋 Servicio disponible';
+            } else if (producto.stock === 0 || producto.stock === undefined) {
                 stockClase = 'agotado';
                 stockTexto = '🚫 Agotado';
             } else if (producto.stock < (producto.stock_minimo || 3)) {
@@ -867,8 +936,8 @@
             }
             
             const fotoUrl = producto.foto_url || '/static/img/default_product.png';
-            const tipoIcon = producto.tipo === 'servicio' ? '📋' : '📦';
-            const tipoLabel = producto.tipo === 'servicio' ? 'Servicio' : 'Producto';
+            const tipoIcon = esServicio ? '📋' : '📦';
+            const tipoLabel = esServicio ? 'Servicio' : 'Producto';
             const telefono = producto.telefono || 'No disponible';
             const tieneUbicacion = producto.latitud && producto.longitud;
             const tieneTelefono = telefono !== 'No disponible' && telefono !== '';
@@ -883,6 +952,7 @@
                 <span class="modal-stock ${stockClase}">${stockTexto}</span>
                 
                 ${producto.descripcion ? `<div class="modal-descripcion">${producto.descripcion}</div>` : ''}
+                ${producto.duracion ? `<div class="modal-descripcion" style="color:#6c3ce0;font-size:12px;">⏱️ Duración: ${producto.duracion} minutos</div>` : ''}
                 
                 <div class="modal-negocio">
                     <div class="label">🏢 Negocio</div>
@@ -897,7 +967,7 @@
                             ${!tieneTelefono ? 'disabled' : ''}>
                         📞 ${tieneTelefono ? 'Llamar' : 'Sin teléfono'}
                     </button>
-                    <button class="btn btn-mapa" onclick="mostrarEnMapa(${JSON.stringify(producto).replace(/"/g, '&quot;')})" 
+                    <button class="btn btn-mapa" onclick="mostrarEnMapa(${escaparJSON(producto)})" 
                             ${!tieneUbicacion ? 'disabled' : ''}>
                         🗺️ Mostrar en mapa
                     </button>
@@ -928,6 +998,7 @@
                 mapaModal.remove();
                 mapaModal = null;
                 marcadorModal = null;
+                marcadorUsuario = null;
             }
             mapaInicializado = false;
         }
@@ -951,7 +1022,7 @@
         // ============================================
         
         function llamarNegocio(telefono) {
-            if (!telefono || telefono === 'No disponible') {
+            if (!telefono || telefono === 'No disponible' || telefono === '') {
                 alert('📞 El negocio no tiene número de teléfono registrado.');
                 return;
             }
@@ -978,77 +1049,90 @@
                 mapaModal.remove();
                 mapaModal = null;
                 marcadorModal = null;
+                marcadorUsuario = null;
             }
             
             // Esperar a que el DOM se actualice
             setTimeout(() => {
                 const mapDiv = document.getElementById('modalMapa');
-                if (!mapDiv) return;
-                
-                // Inicializar mapa
-                mapaModal = L.map('modalMapa').setView([producto.latitud, producto.longitud], 14);
-                
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '&copy; OpenStreetMap'
-                }).addTo(mapaModal);
-                
-                // Marcador del negocio
-                const negocioIcon = L.divIcon({
-                    html: '🏪',
-                    className: 'custom-marker',
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 30]
-                });
-                
-                marcadorModal = L.marker([producto.latitud, producto.longitud], { icon: negocioIcon })
-                    .addTo(mapaModal)
-                    .bindPopup(`<strong>${producto.negocio_nombre || 'Negocio'}</strong><br>${producto.nombre}<br>📍 ${producto.latitud}, ${producto.longitud}`)
-                    .openPopup();
-                
-                // Intentar obtener ubicación del usuario
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        function(pos) {
-                            const userLat = pos.coords.latitude;
-                            const userLng = pos.coords.longitude;
-                            
-                            const userIcon = L.divIcon({
-                                html: '📍',
-                                className: 'custom-marker',
-                                iconSize: [30, 30],
-                                iconAnchor: [15, 30]
-                            });
-                            
-                            L.marker([userLat, userLng], { icon: userIcon })
-                                .addTo(mapaModal)
-                                .bindPopup('Tu ubicación')
-                                .openPopup();
-                            
-                            // Ajustar vista para mostrar ambos puntos
-                            const bounds = L.latLngBounds(
-                                [producto.latitud, producto.longitud],
-                                [userLat, userLng]
-                            );
-                            mapaModal.fitBounds(bounds, { padding: [50, 50] });
-                        },
-                        function() {
-                            // No se pudo obtener ubicación, centrar en el negocio
-                            mapaModal.setView([producto.latitud, producto.longitud], 14);
-                        },
-                        { enableHighAccuracy: true, timeout: 10000 }
-                    );
-                } else {
-                    mapaModal.setView([producto.latitud, producto.longitud], 14);
+                if (!mapDiv) {
+                    console.error('❌ No se encontró el div del mapa');
+                    return;
                 }
                 
-                // Redimensionar el mapa después de mostrarlo
-                setTimeout(() => {
-                    if (mapaModal) {
-                        mapaModal.invalidateSize();
+                try {
+                    // Inicializar mapa
+                    mapaModal = L.map('modalMapa').setView([producto.latitud, producto.longitud], 14);
+                    
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; OpenStreetMap'
+                    }).addTo(mapaModal);
+                    
+                    // Marcador del negocio
+                    const negocioIcon = L.divIcon({
+                        html: '🏪',
+                        className: 'custom-marker',
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 32]
+                    });
+                    
+                    marcadorModal = L.marker([producto.latitud, producto.longitud], { icon: negocioIcon })
+                        .addTo(mapaModal)
+                        .bindPopup(`
+                            <strong>${producto.negocio_nombre || 'Negocio'}</strong><br>
+                            ${producto.nombre}<br>
+                            <span style="color:#6c3ce0;font-weight:600;">$${parseFloat(producto.precio).toFixed(2)}</span>
+                        `)
+                        .openPopup();
+                    
+                    // Intentar obtener ubicación del usuario
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            function(pos) {
+                                const userLat = pos.coords.latitude;
+                                const userLng = pos.coords.longitude;
+                                
+                                const userIcon = L.divIcon({
+                                    html: '📍',
+                                    className: 'custom-marker',
+                                    iconSize: [28, 28],
+                                    iconAnchor: [14, 28]
+                                });
+                                
+                                marcadorUsuario = L.marker([userLat, userLng], { icon: userIcon })
+                                    .addTo(mapaModal)
+                                    .bindPopup('📍 Tu ubicación');
+                                
+                                // Ajustar vista para mostrar ambos puntos
+                                const bounds = L.latLngBounds(
+                                    [producto.latitud, producto.longitud],
+                                    [userLat, userLng]
+                                );
+                                mapaModal.fitBounds(bounds, { padding: [50, 50] });
+                            },
+                            function(err) {
+                                console.warn('No se pudo obtener ubicación:', err.message);
+                                mapaModal.setView([producto.latitud, producto.longitud], 14);
+                            },
+                            { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+                        );
+                    } else {
+                        mapaModal.setView([producto.latitud, producto.longitud], 14);
                     }
-                }, 300);
-                
-                mapaInicializado = true;
+                    
+                    // Redimensionar el mapa después de mostrarlo
+                    setTimeout(() => {
+                        if (mapaModal) {
+                            mapaModal.invalidateSize();
+                        }
+                    }, 300);
+                    
+                    mapaInicializado = true;
+                    
+                } catch (error) {
+                    console.error('❌ Error al crear el mapa:', error);
+                    alert('Error al cargar el mapa. Intenta nuevamente.');
+                }
                 
             }, 200);
         }
@@ -1058,6 +1142,7 @@
         // ============================================
         
         async function iniciar() {
+            console.log('🚀 Iniciando vista de cliente...');
             await obtenerUbicacionUsuario();
             await cargarCatalogo();
             await cargarTienda();
