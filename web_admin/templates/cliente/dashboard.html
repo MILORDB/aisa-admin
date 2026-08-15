@@ -151,10 +151,15 @@
         .producto-card .foto {
             width: 100%;
             height: 140px;
-            object-fit: cover;
             border-radius: 8px;
             margin-bottom: 8px;
             background: #0f0f1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            color: #444;
+            border: 2px dashed #2a2a3e;
         }
         .producto-card .nombre {
             font-size: 14px;
@@ -311,10 +316,16 @@
         .modal-body .modal-foto {
             width: 100%;
             max-height: 280px;
-            object-fit: cover;
             border-radius: 10px;
             margin-bottom: 12px;
             background: #0f0f1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+            color: #444;
+            border: 2px dashed #2a2a3e;
+            min-height: 180px;
         }
         .modal-body .modal-nombre {
             font-size: 22px;
@@ -468,7 +479,7 @@
         @media (max-width: 768px) {
             .container { padding: 12px; }
             .producto-card { min-width: 150px; max-width: 170px; padding: 10px; }
-            .producto-card .foto { height: 110px; }
+            .producto-card .foto { height: 110px; font-size: 36px; }
             .producto-card .nombre { font-size: 12px; }
             .producto-card .precio { font-size: 15px; }
         }
@@ -480,13 +491,13 @@
             .header .user .user-name { max-width: 60px; font-size: 12px; }
             .header .user a { font-size: 11px; padding: 3px 10px; }
             .producto-card { min-width: 130px; max-width: 150px; padding: 8px; }
-            .producto-card .foto { height: 90px; }
+            .producto-card .foto { height: 90px; font-size: 30px; }
             .producto-card .nombre { font-size: 11px; }
             .producto-card .precio { font-size: 14px; }
             .producto-card .stock { font-size: 10px; }
             .modal-content { max-width: 100%; margin: 0; border-radius: 12px; }
             .modal-body { padding: 4px 14px 14px 14px; }
-            .modal-body .modal-foto { max-height: 180px; }
+            .modal-body .modal-foto { max-height: 180px; min-height: 120px; font-size: 48px; }
             .modal-body .modal-nombre { font-size: 18px; }
             .modal-body .modal-precio { font-size: 22px; }
             .modal-body .modal-actions .btn { font-size: 12px; padding: 8px 12px; min-width: 80px; }
@@ -496,11 +507,11 @@
         
         @media (max-width: 400px) {
             .producto-card { min-width: 110px; max-width: 130px; padding: 6px; }
-            .producto-card .foto { height: 70px; }
+            .producto-card .foto { height: 70px; font-size: 24px; }
             .producto-card .nombre { font-size: 10px; }
             .producto-card .precio { font-size: 12px; }
             .producto-card .negocio-nombre { font-size: 8px; }
-            .modal-body .modal-foto { max-height: 140px; }
+            .modal-body .modal-foto { max-height: 140px; min-height: 100px; font-size: 36px; }
             .modal-body .modal-nombre { font-size: 16px; }
             .modal-body .modal-precio { font-size: 18px; }
             .modal-body .modal-actions .btn { font-size: 11px; padding: 6px 10px; min-width: 60px; }
@@ -696,7 +707,6 @@
             let html = '<div class="productos-scroll">';
             
             productos.forEach(p => {
-                const fotoUrl = p.foto_url || '/static/img/default_product.png';
                 const esServicio = p.tipo === 'servicio';
                 const stockClass = !esServicio && p.stock !== undefined && p.stock < (p.stock_minimo || 3) ? 'bajo' : '';
                 let stockText = '';
@@ -717,8 +727,7 @@
                 
                 html += `
                     <div class="producto-card" onclick="abrirModalProducto(${pEscapado})">
-                        <img src="${fotoUrl}" alt="${p.nombre}" class="foto" 
-                             onerror="this.src='/static/img/default_product.png'">
+                        <div class="foto">📷</div>
                         <div class="nombre">${tipoIcon} ${p.nombre}</div>
                         <div class="categoria">${p.categoria || ''}</div>
                         <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
@@ -787,7 +796,6 @@
             let html = '<div class="productos-scroll">';
             
             productos.forEach(p => {
-                const fotoUrl = p.foto_url || '/static/img/default_product.png';
                 const stockClass = p.stock < (p.stock_minimo || 3) ? 'bajo' : '';
                 const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
                 const ubicacionText = p.provincia && p.municipio ? `${p.provincia}, ${p.municipio}` : '';
@@ -796,8 +804,7 @@
                 
                 html += `
                     <div class="producto-card" onclick="abrirModalProducto(${pEscapado})">
-                        <img src="${fotoUrl}" alt="${p.nombre}" class="foto" 
-                             onerror="this.src='/static/img/default_product.png'">
+                        <div class="foto">📷</div>
                         <div class="nombre">📦 ${p.nombre}</div>
                         <div class="categoria">${p.categoria || ''}</div>
                         <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
@@ -841,7 +848,6 @@
                 stockTexto = `✅ ${producto.stock} unidades disponibles`;
             }
             
-            const fotoUrl = producto.foto_url || '/static/img/default_product.png';
             const tipoIcon = esServicio ? '📋' : '📦';
             const tipoLabel = esServicio ? 'Servicio' : 'Producto';
             const telefono = producto.telefono || 'No disponible';
@@ -850,8 +856,7 @@
             
             // Construir HTML del modal
             body.innerHTML = `
-                <img src="${fotoUrl}" alt="${producto.nombre}" class="modal-foto" 
-                     onerror="this.src='/static/img/default_product.png'">
+                <div class="modal-foto">📷</div>
                 <div class="modal-nombre">${tipoIcon} ${producto.nombre}</div>
                 <div class="modal-categoria">${producto.categoria || 'Sin categoría'} • ${tipoLabel}</div>
                 <div class="modal-precio">$${parseFloat(producto.precio).toFixed(2)}</div>
