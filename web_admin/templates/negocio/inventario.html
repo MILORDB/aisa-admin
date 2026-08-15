@@ -78,7 +78,7 @@
             flex-wrap: wrap;
             margin-bottom: 8px;
         }
-        .form-row input, .form-row select {
+        .form-row input, .form-row select, .form-row textarea {
             padding: 6px 10px;
             border: 1px solid #2a2a3e;
             border-radius: 6px;
@@ -87,8 +87,9 @@
             font-size: 12px;
             flex: 1;
             min-width: 100px;
+            font-family: inherit;
         }
-        .form-row input:focus, .form-row select:focus {
+        .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
             border-color: #6c3ce0;
             outline: none;
         }
@@ -117,6 +118,14 @@
             font-size: 9px;
             color: #666;
             margin-top: 2px;
+        }
+        .form-row .descripcion-field {
+            width: 100%;
+        }
+        .form-row .descripcion-field textarea {
+            width: 100%;
+            min-height: 60px;
+            resize: vertical;
         }
         .form-row .ganancia-preview {
             font-size: 10px;
@@ -263,6 +272,14 @@
         }
         .stat-item .number { font-size: 20px; font-weight: 700; color: #6c3ce0; }
         .stat-item .label { font-size: 9px; color: #888; margin-top: 2px; }
+        .descripcion-cell {
+            font-size: 10px;
+            color: #888;
+            max-width: 150px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
         @media (max-width: 600px) {
             body { padding: 8px; }
@@ -278,12 +295,14 @@
             .acciones-cell .btn-sm { flex: 1; text-align: center; min-width: 60px; }
             .tabla { font-size: 11px; }
             .tabla th, .tabla td { padding: 4px 6px; }
+            .descripcion-cell { max-width: 80px; }
         }
         @media (max-width: 400px) {
             .stats-grid { grid-template-columns: 1fr 1fr; }
             .tabla { font-size: 10px; }
             .tabla th, .tabla td { padding: 3px 4px; }
             .acciones-cell .btn-sm { font-size: 9px; padding: 2px 6px; min-width: 45px; }
+            .descripcion-cell { max-width: 60px; }
         }
     </style>
 </head>
@@ -334,7 +353,7 @@
         <div id="formProducto" style="display:none;border-top:1px solid #2a2a3e;padding-top:12px;margin-top:8px;">
             <h3 style="font-size:14px;margin-bottom:8px;" id="formTitle">📦 Nuevo Producto</h3>
             <div class="form-row">
-                <input type="text" id="prodNombre" placeholder="Nombre">
+                <input type="text" id="prodNombre" placeholder="Nombre" required>
                 <select id="prodCategoria">
                     <option value="">-- Seleccionar categoría --</option>
                     <option value="electronica">Electrónica</option>
@@ -342,11 +361,13 @@
                     <option value="hogar">Hogar</option>
                     <option value="belleza">Belleza</option>
                     <option value="deporte">Deporte</option>
+                    <option value="alimentos">Alimentos</option>
+                    <option value="automotriz">Automotriz</option>
                     <option value="otros">Otros</option>
                 </select>
             </div>
             <div class="form-row">
-                <input type="number" id="prodPrecio" placeholder="Precio venta" step="0.01">
+                <input type="number" id="prodPrecio" placeholder="Precio venta" step="0.01" required>
                 <div class="costo-field" style="flex:1;">
                     <label>💰 Costo</label>
                     <input type="number" id="prodCosto" placeholder="Costo del producto" step="0.01" oninput="calcularGanancia()">
@@ -358,8 +379,11 @@
                 </div>
             </div>
             <div class="form-row">
-                <input type="number" id="prodStock" placeholder="Stock">
-                <input type="number" id="prodMinimo" placeholder="Mínimo">
+                <input type="number" id="prodStock" placeholder="Stock" required>
+                <input type="number" id="prodMinimo" placeholder="Stock mínimo" value="3">
+            </div>
+            <div class="form-row descripcion-field">
+                <textarea id="prodDescripcion" placeholder="Descripción del producto (opcional)" rows="2"></textarea>
             </div>
             <div class="form-row">
                 <div class="ganancia-preview" id="gananciaPreview">
@@ -493,7 +517,8 @@
             
             const filtrados = productos.filter(p => 
                 p.nombre.toLowerCase().includes(filtroLower) ||
-                (p.categoria && p.categoria.toLowerCase().includes(filtroLower))
+                (p.categoria && p.categoria.toLowerCase().includes(filtroLower)) ||
+                (p.descripcion && p.descripcion.toLowerCase().includes(filtroLower))
             );
 
             if (filtrados.length === 0) {
@@ -506,6 +531,7 @@
                     <th>Foto</th>
                     <th>Producto</th>
                     <th>Categoría</th>
+                    <th>Descripción</th>
                     <th>Precio</th>
                     <th>Costo</th>
                     <th>Ganancia</th>
@@ -529,6 +555,7 @@
                 const fotoHtml = p.foto_url 
                     ? `<img src="${p.foto_url}" class="foto-producto" alt="${p.nombre}" onerror="this.style.display='none'">`
                     : `<span style="color:#666;font-size:20px;">📷</span>`;
+                const descripcion = p.descripcion || '';
                 
                 let gananciaClase = 'media';
                 let gananciaLabel = '📊';
@@ -544,6 +571,7 @@
                         <td>${fotoHtml}</td>
                         <td><strong>${p.nombre}</strong></td>
                         <td><span class="categoria-tag">${categoriaDisplay}</span></td>
+                        <td><div class="descripcion-cell" title="${descripcion}">${descripcion || '-'}</div></td>
                         <td>$${parseFloat(p.precio).toFixed(2)}</td>
                         <td>$${costo.toFixed(2)}</td>
                         <td>
@@ -610,7 +638,8 @@
             document.getElementById('prodCosto').value = '';
             document.getElementById('prodComision').value = '';
             document.getElementById('prodStock').value = '';
-            document.getElementById('prodMinimo').value = '';
+            document.getElementById('prodMinimo').value = '3';
+            document.getElementById('prodDescripcion').value = '';
             document.getElementById('gananciaPreview').classList.remove('show');
             document.getElementById('fotoPreview').classList.remove('show');
             document.getElementById('fotoPreview').src = '';
@@ -635,6 +664,7 @@
             document.getElementById('prodComision').value = p.comision || 0;
             document.getElementById('prodStock').value = p.stock;
             document.getElementById('prodMinimo').value = p.stock_minimo || 3;
+            document.getElementById('prodDescripcion').value = p.descripcion || '';
             
             if (p.foto_url) {
                 const preview = document.getElementById('fotoPreview');
@@ -662,13 +692,23 @@
             const comision = parseFloat(document.getElementById('prodComision').value) || 0;
             const stock = parseInt(document.getElementById('prodStock').value) || 0;
             const stock_minimo = parseInt(document.getElementById('prodMinimo').value) || 3;
+            const descripcion = document.getElementById('prodDescripcion').value.trim();
 
             if (!nombre || !categoria || isNaN(precio) || precio <= 0) {
                 mostrarMensaje('Nombre, categoría y precio son obligatorios', 'error');
                 return;
             }
 
-            const data = { nombre, categoria, precio, costo, comision, stock, stock_minimo };
+            const data = { 
+                nombre, 
+                categoria, 
+                precio, 
+                costo, 
+                comision, 
+                stock, 
+                stock_minimo,
+                descripcion
+            };
             
             const btn = document.getElementById('btnGuardar');
             const textoOriginal = btn.textContent;
