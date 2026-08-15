@@ -75,9 +75,10 @@
         .container { padding: 16px; max-width: 1200px; margin: 0 auto; }
         
         /* ============================================
-           TARJETA DE UBICACIÓN (SOLO INFORMATIVA)
+           TARJETA DE UBICACIÓN (OCULTA)
            ============================================ */
         .ubicacion-card {
+            display: none;
             background: rgba(108, 60, 224, 0.08);
             border: 1px solid rgba(108, 60, 224, 0.2);
             border-radius: 10px;
@@ -502,7 +503,6 @@
             .modal-body .modal-precio { font-size: 22px; }
             .modal-body .modal-actions .btn { font-size: 12px; padding: 8px 12px; min-width: 80px; }
             .modal-mapa-container #modalMapa { height: 160px; }
-            .ubicacion-card { flex-direction: column; align-items: flex-start; }
         }
         
         @media (max-width: 400px) {
@@ -534,8 +534,8 @@
 
     <div class="container">
 
-        <!-- TARJETA DE UBICACIÓN (SOLO INFORMATIVA) -->
-        <div class="ubicacion-card" id="ubicacionCard">
+        <!-- TARJETA DE UBICACIÓN (OCULTA) -->
+        <div class="ubicacion-card" id="ubicacionCard" style="display:none;">
             <div class="info">
                 <span class="icon">📍</span>
                 <span>Tu ubicación: </span>
@@ -598,7 +598,7 @@
         }
 
         // ============================================
-        // OBTENER UBICACIÓN DEL USUARIO
+        // OBTENER UBICACIÓN DEL USUARIO (solo para filtrar productos)
         // ============================================
         
         async function obtenerUbicacionUsuario() {
@@ -612,21 +612,10 @@
                         municipio: data.municipio || ''
                     };
                     
-                    const texto = ubicacionUsuario.provincia && ubicacionUsuario.municipio 
-                        ? `${ubicacionUsuario.provincia}, ${ubicacionUsuario.municipio}`
-                        : '⚠️ No has configurado tu ubicación';
-                    
-                    document.getElementById('ubicacionTexto').textContent = texto;
-                    
-                    if (!ubicacionUsuario.provincia || !ubicacionUsuario.municipio) {
-                        document.getElementById('ubicacionTexto').style.color = '#ff6b6b';
-                    } else {
-                        document.getElementById('ubicacionTexto').style.color = '#6c3ce0';
-                    }
+                    console.log('📍 Ubicación del usuario:', ubicacionUsuario);
                 }
             } catch (error) {
                 console.error('Error al obtener ubicación:', error);
-                document.getElementById('ubicacionTexto').textContent = '❌ Error al cargar ubicación';
             }
         }
 
