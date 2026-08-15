@@ -1011,7 +1011,7 @@ def obtener_logs(limit=50):
 # FUNCIONES PARA PRODUCTOS
 # ============================================
 
-def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, stock=0, stock_minimo=3):
+def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, stock=0, stock_minimo=3, descripcion=''):
     """Crea un nuevo producto en la base de datos"""
     conn = None
     cursor = None
@@ -1034,10 +1034,11 @@ def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, s
             costo, 
             comision, 
             stock, 
-            stock_minimo, 
+            stock_minimo,
+            descripcion,
             created_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         ''', (
             negocio_id, 
@@ -1047,7 +1048,8 @@ def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, s
             float(costo), 
             float(comision), 
             int(stock), 
-            int(stock_minimo), 
+            int(stock_minimo),
+            descripcion,
             created_at
         ))
         
@@ -1291,16 +1293,16 @@ def eliminar_producto_tienda(tienda_id):
     conn.commit()
     conn.close()
 
-def actualizar_producto(producto_id, nombre, categoria, precio, costo, comision, stock, stock_minimo):
+def actualizar_producto(producto_id, nombre, categoria, precio, costo, comision, stock, stock_minimo, descripcion=''):
     conn = get_db()
     cursor = conn.cursor()
     try:
         cursor.execute('''
         UPDATE productos 
         SET nombre = %s, categoria = %s, precio = %s, costo = %s, comision = %s,
-        stock = %s, stock_minimo = %s, updated_at = %s 
+            stock = %s, stock_minimo = %s, descripcion = %s, updated_at = %s 
         WHERE id = %s
-        ''', (nombre, categoria, precio, costo, comision, stock, stock_minimo, datetime.now().isoformat(), producto_id))
+        ''', (nombre, categoria, precio, costo, comision, stock, stock_minimo, descripcion, datetime.now().isoformat(), producto_id))
         conn.commit()
         conn.close()
         return True
