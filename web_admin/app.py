@@ -1305,6 +1305,7 @@ def api_crear_producto():
     comision = data.get('comision', 0)
     stock = data.get('stock', 0)
     stock_minimo = data.get('stock_minimo', 3)
+    descripcion = data.get('descripcion', '')  # NUEVO
     
     print(f"📝 Creando producto: {nombre}, {categoria}, {precio}")
     
@@ -1313,15 +1314,11 @@ def api_crear_producto():
     
     try:
         negocio_id = usuario.get('id')
-        producto_id = crear_producto(negocio_id, nombre, categoria, float(precio), float(costo), float(comision), int(stock), int(stock_minimo))
+        producto_id = crear_producto(negocio_id, nombre, categoria, float(precio), float(costo), float(comision), int(stock), int(stock_minimo), descripcion)
         
         if producto_id:
             registrar_log(usuario['id'], 'producto_creado', f'Producto: {nombre}')
-            
-            # 🔔 GENERAR NOTIFICACIÓN DE PRODUCTO NUEVO
             generar_notificacion_producto_nuevo(negocio_id, producto_id)
-            
-            # 🔔 VERIFICAR STOCK BAJO
             generar_notificaciones_stock(negocio_id)
             
             return jsonify({'success': True, 'id': producto_id, 'message': 'Producto creado correctamente'})
@@ -1349,21 +1346,20 @@ def api_actualizar_producto(producto_id):
     comision = data.get('comision', 0)
     stock = data.get('stock', 0)
     stock_minimo = data.get('stock_minimo', 3)
+    descripcion = data.get('descripcion', '')  # NUEVO
     
     if not nombre or not categoria or precio is None:
         return jsonify({'error': 'Nombre, categoría y precio son obligatorios'}), 400
     
     try:
-        # Obtener stock anterior para generar notificación
         producto_anterior = obtener_producto_por_id(producto_id)
         stock_anterior = producto_anterior.get('stock', 0) if producto_anterior else 0
         
-        exito = actualizar_producto(producto_id, nombre, categoria, float(precio), float(costo), float(comision), int(stock), int(stock_minimo))
+        exito = actualizar_producto(producto_id, nombre, categoria, float(precio), float(costo), float(comision), int(stock), int(stock_minimo), descripcion)
         
         if exito:
             registrar_log(usuario['id'], 'producto_actualizado', f'Producto ID: {producto_id}')
             
-            # 🔔 GENERAR NOTIFICACIÓN DE STOCK ACTUALIZADO
             negocio_id = usuario.get('id')
             if usuario.get('rol') == 'trabajador':
                 negocio_id = obtener_negocio_de_trabajador(usuario['id'])
@@ -1371,7 +1367,6 @@ def api_actualizar_producto(producto_id):
             if negocio_id and stock_anterior != stock:
                 generar_notificacion_stock_actualizado(negocio_id, producto_id, stock_anterior, stock)
             
-            # 🔔 VERIFICAR STOCK BAJO
             if negocio_id:
                 generar_notificaciones_stock(negocio_id)
             
@@ -1382,7 +1377,7 @@ def api_actualizar_producto(producto_id):
         print(f"❌ Error en api_actualizar_producto: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
+        
 @app.route('/api/producto/<int:producto_id>', methods=['DELETE'])
 @login_required
 def api_eliminar_producto(producto_id):
@@ -1615,12 +1610,12 @@ def api_tienda_publica():
         municipio = datos_usuario.get('municipio', '')
         print(f"📍 Ubicación usuario: {provincia}, {municipio}")
         
-        # PASO 1: Obtener productos de la tienda
+        # PASO 1: Obtener productos de la tienda (CON descripcion)
         print("📊 PASO 1: Obteniendo productos_tienda...")
         cursor.execute("""
-            SELECT pt.producto_id, pt.destacado, p.id, p.nombre, p.categoria, 
-                   p.precio, p.stock, p.foto_url, p.descripcion, p.stock_minimo,
-                   p.negocio_id
+            SELECT pt.producto_id, pt.destacado, 
+                   p.id, p.nombre, p.categoria, p.precio, p.stock, 
+                   p.foto_url, p.descripcion, p.stock_minimo, p.negocio_id
             FROM productos_tienda pt
             JOIN productos p ON pt.producto_id = p.id
             WHERE p.stock > 0
@@ -1637,7 +1632,7 @@ def api_tienda_publica():
             return jsonify([])
         
         # PASO 2: Obtener datos de los negocios
-        negocio_ids = list(set([row[10] for row in rows]))  # índice de negocio_id
+        negocio_ids = list(set([row[10] for row in rows]))
         print(f"🏢 Negocios involucrados: {negocio_ids}")
         
         negocios_data = {}
@@ -1679,7 +1674,7 @@ def api_tienda_publica():
             
             negocio = negocios_data.get(negocio_id, {})
             
-            # Filtrar por ubicación si el usuario tiene ubicación configurada
+            # Filtrar por ubicación
             if provincia and municipio:
                 prov_negocio = negocio.get('provincia', '')
                 mun_negocio = negocio.get('municipio', '')
@@ -1694,7 +1689,7 @@ def api_tienda_publica():
                 'stock': row[6],
                 'stock_minimo': row[9] or 3,
                 'foto_url': row[7],
-                'descripcion': row[8] or '',
+                'descripcion': row[8] or '',  # AHORA CON DESCRIPCION
                 'negocio_id': negocio_id,
                 'negocio_username': negocio.get('username', ''),
                 'negocio_nombre': negocio.get('nombre', ''),
