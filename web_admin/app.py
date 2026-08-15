@@ -1589,7 +1589,7 @@ def api_eliminar_producto_tienda(tienda_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - TIENDA PÚBLICA (PARA CLIENTE) - VERSIÓN ROBUSTA
+# API - TIENDA PÚBLICA (PARA CLIENTE) - CORREGIDA
 # ============================================
 
 @app.route('/api/tienda/public', methods=['GET'])
@@ -1603,114 +1603,119 @@ def api_tienda_publica():
         return jsonify({'error': 'No autorizado'}), 401
     
     try:
-        # Obtener ubicación del usuario
-        datos_usuario = obtener_datos_negocio(usuario['id'])
-        provincia = datos_usuario.get('provincia', '')
-        municipio = datos_usuario.get('municipio', '')
-        
-        print(f"🔍 Ubicación usuario: provincia={provincia}, municipio={municipio}")
+        print("=" * 50)
+        print("🚀 /api/tienda/public - Iniciando")
         
         conn = get_db()
         cursor = conn.cursor()
         
-        # Primero, obtener los IDs de productos en tienda
-        cursor.execute('SELECT producto_id FROM productos_tienda')
-        ids_tienda = cursor.fetchall()
-        ids_list = [str(row[0]) for row in ids_tienda]
+        # Obtener ubicación del usuario
+        datos_usuario = obtener_datos_negocio(usuario['id'])
+        provincia = datos_usuario.get('provincia', '')
+        municipio = datos_usuario.get('municipio', '')
+        print(f"📍 Ubicación usuario: {provincia}, {municipio}")
         
-        print(f"📊 IDs en productos_tienda: {ids_list}")
+        # PASO 1: Obtener productos de la tienda
+        print("📊 PASO 1: Obteniendo productos_tienda...")
+        cursor.execute("""
+            SELECT pt.producto_id, pt.destacado, p.id, p.nombre, p.categoria, 
+                   p.precio, p.stock, p.foto_url, p.descripcion, p.stock_minimo,
+                   p.negocio_id
+            FROM productos_tienda pt
+            JOIN productos p ON pt.producto_id = p.id
+            WHERE p.stock > 0
+            ORDER BY pt.destacado DESC, p.id DESC
+            LIMIT 50
+        """)
         
-        if not ids_list:
+        rows = cursor.fetchall()
+        print(f"📦 Productos en tienda encontrados: {len(rows)}")
+        
+        if not rows:
             print("⚠️ No hay productos en la tienda")
             conn.close()
             return jsonify([])
         
-        ids_str = ','.join(ids_list)
+        # PASO 2: Obtener datos de los negocios
+        negocio_ids = list(set([row[10] for row in rows]))  # índice de negocio_id
+        print(f"🏢 Negocios involucrados: {negocio_ids}")
         
-        # Consulta para obtener productos con información del negocio
-        query = f'''
-            SELECT 
-                p.id, 
-                p.nombre, 
-                p.categoria, 
-                p.precio, 
-                p.stock, 
-                p.foto_url, 
-                p.descripcion, 
-                p.stock_minimo,
-                p.negocio_id, 
-                u.username as negocio_username, 
-                u.nombre as negocio_nombre,
-                u.datos_negocio,
-                u.latitud,
-                u.longitud
-            FROM productos p
-            JOIN usuarios u ON p.negocio_id = u.id
-            WHERE u.tipo = 'negocio' 
-              AND u.activo = 1 
-              AND p.stock > 0
-              AND p.id IN ({ids_str})
-            ORDER BY p.id DESC
-            LIMIT 50
-        '''
+        negocios_data = {}
+        for neg_id in negocio_ids:
+            cursor.execute("""
+                SELECT id, username, nombre, datos_negocio, latitud, longitud
+                FROM usuarios
+                WHERE id = %s
+            """, (neg_id,))
+            n_row = cursor.fetchone()
+            if n_row:
+                datos = {}
+                if n_row[3]:
+                    try:
+                        datos = json.loads(n_row[3]) if isinstance(n_row[3], str) else n_row[3]
+                    except:
+                        pass
+                negocios_data[neg_id] = {
+                    'id': n_row[0],
+                    'username': n_row[1],
+                    'nombre': n_row[2] or datos.get('nombre_negocio', n_row[1]),
+                    'telefono': datos.get('telefono', ''),
+                    'direccion': datos.get('direccion', ''),
+                    'provincia': datos.get('provincia', ''),
+                    'municipio': datos.get('municipio', ''),
+                    'latitud': n_row[4],
+                    'longitud': n_row[5],
+                    'datos_negocio': datos
+                }
         
-        cursor.execute(query)
-        productos = cursor.fetchall()
+        print(f"✅ Negocios cargados: {len(negocios_data)}")
         
-        print(f"📦 Productos encontrados en tiendas: {len(productos)}")
-        
-        # Obtener destacados por separado
-        cursor.execute('SELECT producto_id, destacado FROM productos_tienda')
-        destacados_rows = cursor.fetchall()
-        destacados = {row[0]: row[1] for row in destacados_rows}
-        
+        # PASO 3: Construir resultado con filtro de ubicación
         resultado = []
-        for p in productos:
-            # p es una tupla, acceder por índice
-            datos = {}
-            datos_negocio_str = p[11]  # índice de datos_negocio
-            if datos_negocio_str:
-                try:
-                    datos = json.loads(datos_negocio_str) if isinstance(datos_negocio_str, str) else datos_negocio_str
-                except Exception as e:
-                    print(f"⚠️ Error parseando datos_negocio: {e}")
-                    datos = {}
+        for row in rows:
+            producto_id = row[0]
+            destacado = row[1]
+            negocio_id = row[10]
             
-            # Filtrar por ubicación si el usuario tiene ubicación
+            negocio = negocios_data.get(negocio_id, {})
+            
+            # Filtrar por ubicación si el usuario tiene ubicación configurada
             if provincia and municipio:
-                prov_producto = datos.get('provincia', '')
-                mun_producto = datos.get('municipio', '')
-                if prov_producto != provincia or mun_producto != municipio:
+                prov_negocio = negocio.get('provincia', '')
+                mun_negocio = negocio.get('municipio', '')
+                if prov_negocio != provincia or mun_negocio != municipio:
                     continue
             
             resultado.append({
-                'id': p[0],
-                'nombre': p[1],
-                'categoria': p[2],
-                'precio': float(p[3]),
-                'stock': p[4],
-                'stock_minimo': p[7] or 3,
-                'foto_url': p[5],
-                'descripcion': p[6] or '',
-                'negocio_id': p[8],
-                'negocio_username': p[9],
-                'negocio_nombre': p[10] or datos.get('nombre_negocio', p[9]),
-                'telefono': datos.get('telefono', ''),
-                'direccion': datos.get('direccion', ''),
-                'provincia': datos.get('provincia', ''),
-                'municipio': datos.get('municipio', ''),
-                'latitud': p[12],
-                'longitud': p[13],
-                'destacado': destacados.get(p[0], 0),
+                'id': producto_id,
+                'nombre': row[3],
+                'categoria': row[4],
+                'precio': float(row[5]),
+                'stock': row[6],
+                'stock_minimo': row[9] or 3,
+                'foto_url': row[7],
+                'descripcion': row[8] or '',
+                'negocio_id': negocio_id,
+                'negocio_username': negocio.get('username', ''),
+                'negocio_nombre': negocio.get('nombre', ''),
+                'telefono': negocio.get('telefono', ''),
+                'direccion': negocio.get('direccion', ''),
+                'provincia': negocio.get('provincia', ''),
+                'municipio': negocio.get('municipio', ''),
+                'latitud': negocio.get('latitud'),
+                'longitud': negocio.get('longitud'),
+                'destacado': destacado or 0,
                 'tipo': 'producto'
             })
         
-        print(f"📦 Productos filtrados por ubicación: {len(resultado)}")
+        print(f"✅ Productos filtrados por ubicación: {len(resultado)}")
+        print("=" * 50)
+        
         conn.close()
         return jsonify(resultado)
         
     except Exception as e:
-        print(f"❌ Error en api_tienda_publica: {e}")
+        print(f"❌ ERROR en api_tienda_publica: {e}")
         traceback.print_exc()
         try:
             conn.close()
@@ -1733,47 +1738,44 @@ def api_servicios_publicos():
         return jsonify({'error': 'No autorizado'}), 401
     
     try:
+        print("=" * 50)
+        print("🚀 /api/servicios/publicos - Iniciando")
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        
         # Obtener ubicación del usuario
         datos_usuario = obtener_datos_negocio(usuario['id'])
         provincia = datos_usuario.get('provincia', '')
         municipio = datos_usuario.get('municipio', '')
+        print(f"📍 Ubicación usuario: {provincia}, {municipio}")
         
-        print(f"🔍 Ubicación usuario (servicios): provincia={provincia}, municipio={municipio}")
-        
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # Obtener servicios con información del negocio
-        query = '''
-            SELECT s.*, 
-                   u.username as negocio_username, 
-                   u.nombre as negocio_nombre,
-                   u.datos_negocio,
-                   u.latitud,
-                   u.longitud
+        # Obtener servicios activos con datos del negocio
+        print("📊 Obteniendo servicios...")
+        cursor.execute("""
+            SELECT s.id, s.nombre, s.categoria, s.precio, s.duracion, 
+                   s.descripcion, s.negocio_id,
+                   u.username, u.nombre, u.datos_negocio, u.latitud, u.longitud
             FROM servicios s
             JOIN usuarios u ON s.negocio_id = u.id
             WHERE s.activo = 1 AND u.activo = 1 AND u.tipo = 'negocio'
             ORDER BY s.id DESC
             LIMIT 30
-        '''
+        """)
         
-        cursor.execute(query)
-        servicios = cursor.fetchall()
-        conn.close()
-        
-        print(f"📋 Servicios encontrados (sin filtro): {len(servicios)}")
+        rows = cursor.fetchall()
+        print(f"📋 Servicios encontrados: {len(rows)}")
         
         resultado = []
-        for s in servicios:
+        for row in rows:
             datos = {}
-            if s.get('datos_negocio'):
+            if row[9]:
                 try:
-                    datos = json.loads(s['datos_negocio']) if isinstance(s['datos_negocio'], str) else s['datos_negocio']
+                    datos = json.loads(row[9]) if isinstance(row[9], str) else row[9]
                 except:
                     pass
             
-            # Filtrar por ubicación si el usuario tiene ubicación
+            # Filtrar por ubicación
             if provincia and municipio:
                 prov_servicio = datos.get('provincia', '')
                 mun_servicio = datos.get('municipio', '')
@@ -1781,30 +1783,37 @@ def api_servicios_publicos():
                     continue
             
             resultado.append({
-                'id': s['id'],
-                'nombre': s['nombre'],
-                'categoria': s.get('categoria'),
-                'precio': float(s['precio']),
-                'duracion': s.get('duracion', 60),
-                'descripcion': s.get('descripcion', ''),
-                'negocio_id': s['negocio_id'],
-                'negocio_username': s.get('negocio_username'),
-                'negocio_nombre': s.get('negocio_nombre') or datos.get('nombre_negocio', s.get('negocio_username')),
+                'id': row[0],
+                'nombre': row[1],
+                'categoria': row[2],
+                'precio': float(row[3]),
+                'duracion': row[4] or 60,
+                'descripcion': row[5] or '',
+                'negocio_id': row[6],
+                'negocio_username': row[7],
+                'negocio_nombre': row[8] or datos.get('nombre_negocio', row[7]),
                 'telefono': datos.get('telefono', ''),
                 'direccion': datos.get('direccion', ''),
                 'provincia': datos.get('provincia', ''),
                 'municipio': datos.get('municipio', ''),
-                'latitud': s.get('latitud'),
-                'longitud': s.get('longitud'),
+                'latitud': row[10],
+                'longitud': row[11],
                 'tipo': 'servicio'
             })
         
-        print(f"📋 Servicios filtrados por ubicación: {len(resultado)}")
+        print(f"✅ Servicios filtrados por ubicación: {len(resultado)}")
+        print("=" * 50)
+        
+        conn.close()
         return jsonify(resultado)
         
     except Exception as e:
-        print(f"❌ Error en api_servicios_publicos: {e}")
+        print(f"❌ ERROR en api_servicios_publicos: {e}")
         traceback.print_exc()
+        try:
+            conn.close()
+        except:
+            pass
         return jsonify({'error': str(e)}), 500
 
 # ============================================
