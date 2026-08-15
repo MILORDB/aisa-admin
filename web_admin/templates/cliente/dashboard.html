@@ -75,7 +75,7 @@
         .container { padding: 16px; max-width: 1200px; margin: 0 auto; }
         
         /* ============================================
-           TARJETA DE UBICACIÓN
+           TARJETA DE UBICACIÓN (SOLO INFORMATIVA)
            ============================================ */
         .ubicacion-card {
             background: rgba(108, 60, 224, 0.08);
@@ -98,40 +98,10 @@
         }
         .ubicacion-card .info .icon { font-size: 18px; }
         .ubicacion-card .info .lugar { color: #6c3ce0; font-weight: 600; }
-        .ubicacion-card .btn-ubicacion {
-            padding: 4px 14px;
-            border: 1px solid #6c3ce0;
-            border-radius: 6px;
-            background: transparent;
-            color: #6c3ce0;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.3s;
-        }
-        .ubicacion-card .btn-ubicacion:hover {
-            background: #6c3ce0;
-            color: #fff;
-        }
         
         /* ============================================
            SECCIONES
            ============================================ */
-        .section-title {
-            font-size: 16px;
-            font-weight: 700;
-            margin: 16px 0 10px 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .section-title .badge {
-            font-size: 10px;
-            background: rgba(108,60,224,0.2);
-            color: #6c3ce0;
-            padding: 1px 10px;
-            border-radius: 12px;
-            font-weight: 400;
-        }
         .section-divider {
             height: 1px;
             background: linear-gradient(to right, transparent, #2a2a3e, transparent);
@@ -250,25 +220,6 @@
             background: rgba(255,152,0,0.15);
             color: #ff9800;
         }
-        
-        /* ============================================
-           ESTADÍSTICAS
-           ============================================ */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 10px;
-            margin: 4px 0 12px 0;
-        }
-        .stat-item {
-            background: #1a1a2e;
-            border: 1px solid #2a2a3e;
-            border-radius: 8px;
-            padding: 12px;
-            text-align: center;
-        }
-        .stat-item .number { font-size: 20px; font-weight: 700; color: #6c3ce0; }
-        .stat-item .label { font-size: 10px; color: #888; margin-top: 2px; }
         
         .empty-state {
             text-align: center;
@@ -512,37 +463,6 @@
         }
         
         /* ============================================
-           DIAGNÓSTICO
-           ============================================ */
-        .diagnostico-box {
-            margin-top: 20px;
-            padding: 12px;
-            background: #1a1a2e;
-            border-radius: 8px;
-            border: 1px solid #2a2a3e;
-        }
-        .diagnostico-box summary {
-            cursor: pointer;
-            color: #6c3ce0;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .diagnostico-box summary:hover {
-            color: #8a5ce0;
-        }
-        .diagnostico-box .contenido {
-            margin-top: 8px;
-            font-size: 11px;
-            color: #888;
-            max-height: 250px;
-            overflow-y: auto;
-        }
-        .diagnostico-box .contenido .ok { color: #6bff6b; }
-        .diagnostico-box .contenido .error { color: #ff6b6b; }
-        .diagnostico-box .contenido .info { color: #64b5f6; }
-        .diagnostico-box .contenido .warning { color: #ffbb33; }
-        
-        /* ============================================
            RESPONSIVE
            ============================================ */
         @media (max-width: 768px) {
@@ -564,9 +484,6 @@
             .producto-card .nombre { font-size: 11px; }
             .producto-card .precio { font-size: 14px; }
             .producto-card .stock { font-size: 10px; }
-            .stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
-            .stat-item { padding: 8px; }
-            .stat-item .number { font-size: 16px; }
             .modal-content { max-width: 100%; margin: 0; border-radius: 12px; }
             .modal-body { padding: 4px 14px 14px 14px; }
             .modal-body .modal-foto { max-height: 180px; }
@@ -575,11 +492,6 @@
             .modal-body .modal-actions .btn { font-size: 12px; padding: 8px 12px; min-width: 80px; }
             .modal-mapa-container #modalMapa { height: 160px; }
             .ubicacion-card { flex-direction: column; align-items: flex-start; }
-            .ubicacion-card .btn-ubicacion { width: 100%; text-align: center; }
-            .section-title { font-size: 14px; }
-            .section-title .badge { font-size: 9px; padding: 1px 8px; }
-            .diagnostico-box { padding: 8px; }
-            .diagnostico-box .contenido { font-size: 10px; max-height: 200px; }
         }
         
         @media (max-width: 400px) {
@@ -588,10 +500,6 @@
             .producto-card .nombre { font-size: 10px; }
             .producto-card .precio { font-size: 12px; }
             .producto-card .negocio-nombre { font-size: 8px; }
-            .stats-grid { grid-template-columns: 1fr 1fr; gap: 4px; }
-            .stat-item { padding: 6px; }
-            .stat-item .number { font-size: 14px; }
-            .stat-item .label { font-size: 8px; }
             .modal-body .modal-foto { max-height: 140px; }
             .modal-body .modal-nombre { font-size: 16px; }
             .modal-body .modal-precio { font-size: 18px; }
@@ -615,43 +523,16 @@
 
     <div class="container">
 
-        <!-- TARJETA DE UBICACIÓN -->
+        <!-- TARJETA DE UBICACIÓN (SOLO INFORMATIVA) -->
         <div class="ubicacion-card" id="ubicacionCard">
             <div class="info">
                 <span class="icon">📍</span>
                 <span>Tu ubicación: </span>
                 <span class="lugar" id="ubicacionTexto">Cargando ubicación...</span>
             </div>
-            <button class="btn-ubicacion" onclick="window.location.href='/perfil'">
-                ✏️ Actualizar ubicación
-            </button>
         </div>
 
-        <!-- ESTADÍSTICAS RÁPIDAS -->
-        <div class="stats-grid">
-            <div class="stat-item">
-                <span class="number" id="totalProductos">0</span>
-                <span class="label">📦 Productos</span>
-            </div>
-            <div class="stat-item">
-                <span class="number" id="negociosActivos">0</span>
-                <span class="label">🏢 Negocios</span>
-            </div>
-            <div class="stat-item">
-                <span class="number" id="productosDestacados">0</span>
-                <span class="label">⭐ Destacados</span>
-            </div>
-            <div class="stat-item">
-                <span class="number" id="totalServicios">0</span>
-                <span class="label">📋 Servicios</span>
-            </div>
-        </div>
-
-        <!-- SECCIÓN 1: CATÁLOGO ALEATORIO (Productos y servicios) -->
-        <div class="section-title">
-            🎲 Catálogo aleatorio
-            <span class="badge">de negocios cercanos</span>
-        </div>
+        <!-- SECCIÓN 1: CATÁLOGO ALEATORIO -->
         <div id="catalogoContainer">
             <div class="empty-state">
                 <span class="icon">🔄</span>
@@ -661,28 +542,12 @@
 
         <div class="section-divider"></div>
 
-        <!-- SECCIÓN 2: PRODUCTOS DE TIENDAS (Destacados y publicados) -->
-        <div class="section-title">
-            🏪 Productos en tiendas
-            <span class="badge">publicados por negocios</span>
-        </div>
+        <!-- SECCIÓN 2: PRODUCTOS DE TIENDAS -->
         <div id="tiendaContainer">
             <div class="empty-state">
                 <span class="icon">🔄</span>
                 Cargando productos de tiendas...
             </div>
-        </div>
-
-        <!-- ============================================
-        DIAGNÓSTICO (solo para depuración)
-        ============================================ -->
-        <div class="diagnostico-box">
-            <details>
-                <summary>🔧 Diagnóstico del sistema</summary>
-                <div class="contenido" id="diagnosticoInfo">
-                    <div class="info">⏳ Cargando diagnóstico...</div>
-                </div>
-            </details>
         </div>
 
     </div>
@@ -796,14 +661,6 @@
                 catalogoProductos = todos.slice(0, 30);
                 
                 renderCatalogo(catalogoProductos);
-                
-                // Actualizar estadísticas
-                const negociosUnicos = new Set(todos.map(p => p.negocio_id));
-                document.getElementById('negociosActivos').textContent = negociosUnicos.size || 0;
-                document.getElementById('totalProductos').textContent = productos.length || 0;
-                document.getElementById('totalServicios').textContent = servicios.length || 0;
-                const destacados = todos.filter(p => p.destacado).length;
-                document.getElementById('productosDestacados').textContent = destacados || 0;
                 
             } catch (error) {
                 console.error('Error cargando catálogo:', error);
@@ -1187,86 +1044,6 @@
         }
 
         // ============================================
-        // DIAGNÓSTICO
-        // ============================================
-        
-        async function cargarDiagnostico() {
-            try {
-                const container = document.getElementById('diagnosticoInfo');
-                
-                // Productos
-                const prodRes = await fetch('/api/diagnostico/productos');
-                let prodData = {};
-                if (prodRes.ok) {
-                    prodData = await prodRes.json();
-                } else {
-                    prodData = { error: `HTTP ${prodRes.status}` };
-                }
-                
-                // Servicios
-                const servRes = await fetch('/api/diagnostico/servicios');
-                let servData = {};
-                if (servRes.ok) {
-                    servData = await servRes.json();
-                } else {
-                    servData = { error: `HTTP ${servRes.status}` };
-                }
-                
-                let html = '<div style="color:#fff;">';
-                
-                // Productos
-                html += `<div>📦 <strong>Productos</strong></div>`;
-                if (prodData.error) {
-                    html += `<div class="error">❌ Error: ${prodData.error}</div>`;
-                } else {
-                    html += `<div>Total productos: <span class="ok">${prodData.total_productos || 0}</span></div>`;
-                    html += `<div>Con stock: <span class="${prodData.productos_con_stock > 0 ? 'ok' : 'error'}">${prodData.productos_con_stock || 0}</span></div>`;
-                    html += `<div>En tienda: <span class="${prodData.productos_en_tienda > 0 ? 'ok' : 'error'}">${prodData.productos_en_tienda || 0}</span></div>`;
-                    html += `<div>Negocios activos: <span class="${prodData.negocios_activos > 0 ? 'ok' : 'error'}">${prodData.negocios_activos || 0}</span></div>`;
-                    
-                    if (prodData.ejemplos && prodData.ejemplos.length > 0) {
-                        html += '<div style="font-size:10px;color:#666;margin:4px 0;">Ejemplos:</div>';
-                        prodData.ejemplos.forEach(p => {
-                            html += `<div style="font-size:10px;color:#aaa;padding:2px 8px;">- ${p.nombre} (stock: ${p.stock}) - ${p.username || 'sin usuario'}</div>`;
-                        });
-                    } else {
-                        html += '<div class="error" style="font-size:10px;margin:4px 0;">⚠️ No hay productos disponibles</div>';
-                    }
-                }
-                
-                // Servicios
-                html += `<div style="margin-top:8px;">📋 <strong>Servicios</strong></div>`;
-                if (servData.error) {
-                    html += `<div class="error">❌ Error: ${servData.error}</div>`;
-                } else {
-                    html += `<div>Servicios activos: <span class="${servData.servicios_activos > 0 ? 'ok' : 'error'}">${servData.servicios_activos || 0}</span></div>`;
-                    html += `<div>Negocios activos: <span class="${servData.negocios_activos > 0 ? 'ok' : 'error'}">${servData.negocios_activos || 0}</span></div>`;
-                    
-                    if (servData.ejemplos && servData.ejemplos.length > 0) {
-                        html += '<div style="font-size:10px;color:#666;margin:4px 0;">Ejemplos:</div>';
-                        servData.ejemplos.forEach(s => {
-                            html += `<div style="font-size:10px;color:#aaa;padding:2px 8px;">- ${s.nombre} ($${s.precio}) - ${s.username || 'sin usuario'}</div>`;
-                        });
-                    } else {
-                        html += '<div class="error" style="font-size:10px;margin:4px 0;">⚠️ No hay servicios disponibles</div>';
-                    }
-                }
-                
-                // Ubicación del usuario
-                html += `<div style="margin-top:8px;">📍 <strong>Tu ubicación</strong></div>`;
-                html += `<div>Provincia: <span class="${ubicacionUsuario.provincia ? 'ok' : 'warning'}">${ubicacionUsuario.provincia || 'No configurada'}</span></div>`;
-                html += `<div>Municipio: <span class="${ubicacionUsuario.municipio ? 'ok' : 'warning'}">${ubicacionUsuario.municipio || 'No configurado'}</span></div>`;
-                
-                html += '</div>';
-                container.innerHTML = html;
-                
-            } catch (error) {
-                console.error('Error en diagnóstico:', error);
-                document.getElementById('diagnosticoInfo').innerHTML = `<div class="error">❌ Error al cargar diagnóstico: ${error.message}</div>`;
-            }
-        }
-
-        // ============================================
         // INICIO
         // ============================================
         
@@ -1275,9 +1052,6 @@
             await obtenerUbicacionUsuario();
             await cargarCatalogo();
             await cargarTienda();
-            
-            // Cargar diagnóstico después de un momento
-            setTimeout(cargarDiagnostico, 2000);
             
             // Actualizar cada 30 segundos
             setInterval(() => {
