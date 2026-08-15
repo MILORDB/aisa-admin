@@ -2,7 +2,7 @@
 
 import os
 import psycopg2
-from psycopg2.extras import RealDictCursor  # <-- Asegúrate que esto esté
+from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
 import bcrypt
 import json
@@ -145,6 +145,7 @@ def init_db():
         comision REAL DEFAULT 0,
         stock INTEGER DEFAULT 0,
         stock_minimo INTEGER DEFAULT 3,
+        descripcion TEXT,
         foto_url TEXT,
         foto_public_id TEXT,
         created_at TEXT NOT NULL,
@@ -1643,7 +1644,7 @@ def obtener_estadisticas_trabajador(trabajador_id):
         return {'ventas': 0, 'ingresos': 0, 'servicios': 0, 'clientes': 0}
 
 # ============================================
-# FUNCIONES PARA VENTAS (CORREGIDO - CON DESCUENTO DE STOCK)
+# FUNCIONES PARA VENTAS
 # ============================================
 
 def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, cantidad, precio, total,
@@ -1652,28 +1653,6 @@ def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, canti
                 transferencia_banco=None, transferencia_fecha=None):
     """
     Crea una nueva venta y descuenta el stock del producto
-    
-    Args:
-        negocio_id (int): ID del negocio
-        trabajador_id (int): ID del trabajador (opcional)
-        cliente (str): Nombre del cliente
-        producto (str): Nombre del producto
-        producto_id (int): ID del producto
-        cantidad (int): Cantidad vendida
-        precio (float): Precio unitario
-        total (float): Total de la venta
-        estado (str): Estado de la venta
-        empresa (str): Empresa (opcional)
-        tipo (str): Tipo de venta
-        factura_url (str): URL de la factura
-        factura (str): Número de factura
-        transferencia_id (str): ID de transferencia
-        transferencia_cedula (str): Cédula de transferencia
-        transferencia_banco (str): Banco de transferencia
-        transferencia_fecha (str): Fecha de transferencia
-    
-    Returns:
-        int: ID de la venta creada o None si hay error
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -2039,6 +2018,62 @@ def toggle_servicio(servicio_id, activo):
                    (activo, datetime.now().isoformat(), servicio_id))
     conn.commit()
     conn.close()
+
+def actualizar_servicio(servicio_id, nombre, categoria, precio, duracion, activo, descripcion=''):
+    """
+    Actualiza un servicio existente en la base de datos
+    
+    Args:
+        servicio_id (int): ID del servicio a actualizar
+        nombre (str): Nuevo nombre del servicio
+        categoria (str): Nueva categoría
+        precio (float): Nuevo precio
+        duracion (int): Nueva duración en minutos
+        activo (int): 1 para activo, 0 para inactivo
+        descripcion (str): Nueva descripción (opcional)
+    
+    Returns:
+        bool: True si se actualizó correctamente, False en caso contrario
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            UPDATE servicios 
+            SET nombre = %s, 
+                categoria = %s, 
+                precio = %s, 
+                duracion = %s, 
+                activo = %s, 
+                descripcion = %s, 
+                updated_at = %s 
+            WHERE id = %s
+        ''', (
+            nombre, 
+            categoria, 
+            float(precio), 
+            int(duracion), 
+            int(activo), 
+            descripcion, 
+            datetime.now().isoformat(), 
+            servicio_id
+        ))
+        
+        if cursor.rowcount > 0:
+            conn.commit()
+            conn.close()
+            print(f"✅ Servicio {servicio_id} actualizado: {nombre}")
+            return True
+        else:
+            conn.close()
+            print(f"⚠️ Servicio {servicio_id} no encontrado")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error al actualizar servicio {servicio_id}: {e}")
+        conn.rollback()
+        conn.close()
+        return False
 
 def eliminar_servicio(servicio_id):
     conn = get_db()
