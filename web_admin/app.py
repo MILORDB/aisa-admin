@@ -383,6 +383,61 @@ def fix_db():
         '''
 
 # ============================================
+# CONFIGURACIÓN DE CACHÉ (ANTI-CACHÉ)
+# ============================================
+@app.after_request
+def add_header(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    return response
+
+# ============================================
+# DECORADORES
+# ============================================
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('token')
+        if not token:
+            return redirect(url_for('login'))
+        try:
+            usuario = obtener_usuario_sesion(token)
+            if not usuario:
+                return redirect(url_for('login'))
+            return f(*args, **kwargs)
+        except Exception as e:
+            print(f"❌ Error en login_required: {e}")
+            return redirect(url_for('login'))
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        token = request.cookies.get('token')
+        if not token:
+            print("❌ No hay token en admin_required")
+            return jsonify({'error': 'No autorizado'}), 401
+        try:
+            usuario = obtener_usuario_sesion(token)
+            if not usuario:
+                print(f"❌ Usuario no encontrado para token")
+                return jsonify({'error': 'No autorizado'}), 401
+            
+            print(f"🔍 admin_required - Usuario: {usuario.get('username')}, Rol: {usuario.get('rol')}")
+            
+            if usuario.get('rol') != 'admin':
+                print(f"❌ Usuario {usuario.get('username')} no es admin (rol: {usuario.get('rol')})")
+                return jsonify({'error': 'Acceso denegado'}), 403
+            
+            return f(*args, **kwargs)
+        except Exception as e:
+            print(f"❌ Error en admin_required: {e}")
+            traceback.print_exc()
+            return jsonify({'error': 'Error de autenticación'}), 401
+    return decorated_function
+
+# ============================================
 # API - AGREGAR COLUMNA DESCRIPCION A PRODUCTOS
 # ============================================
 
@@ -466,61 +521,6 @@ def agregar_columna_descripcion_servicios():
         print(f"❌ Error agregando columna: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
-# ============================================
-# CONFIGURACIÓN DE CACHÉ (ANTI-CACHÉ)
-# ============================================
-@app.after_request
-def add_header(response):
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '-1'
-    return response
-
-# ============================================
-# DECORADORES
-# ============================================
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.cookies.get('token')
-        if not token:
-            return redirect(url_for('login'))
-        try:
-            usuario = obtener_usuario_sesion(token)
-            if not usuario:
-                return redirect(url_for('login'))
-            return f(*args, **kwargs)
-        except Exception as e:
-            print(f"❌ Error en login_required: {e}")
-            return redirect(url_for('login'))
-    return decorated_function
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        token = request.cookies.get('token')
-        if not token:
-            print("❌ No hay token en admin_required")
-            return jsonify({'error': 'No autorizado'}), 401
-        try:
-            usuario = obtener_usuario_sesion(token)
-            if not usuario:
-                print(f"❌ Usuario no encontrado para token")
-                return jsonify({'error': 'No autorizado'}), 401
-            
-            print(f"🔍 admin_required - Usuario: {usuario.get('username')}, Rol: {usuario.get('rol')}")
-            
-            if usuario.get('rol') != 'admin':
-                print(f"❌ Usuario {usuario.get('username')} no es admin (rol: {usuario.get('rol')})")
-                return jsonify({'error': 'Acceso denegado'}), 403
-            
-            return f(*args, **kwargs)
-        except Exception as e:
-            print(f"❌ Error en admin_required: {e}")
-            traceback.print_exc()
-            return jsonify({'error': 'Error de autenticación'}), 401
-    return decorated_function
 
 # ============================================
 # RUTAS PRINCIPALES
