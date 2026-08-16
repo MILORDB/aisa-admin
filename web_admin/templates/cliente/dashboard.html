@@ -72,7 +72,7 @@
             background: rgba(255,255,255,0.25);
         }
         
-        .container { padding: 16px; max-width: 1200px; margin: 0 auto; }
+        .container { padding: 16px; max-width: 1400px; margin: 0 auto; }
         
         /* ============================================
            TARJETA DE UBICACIÓN (OCULTA)
@@ -98,11 +98,12 @@
             border-radius: 10px;
             margin-bottom: 4px;
             position: relative;
+            width: 100%;
         }
         
         .catalogo-rotatorio .track {
             display: flex;
-            animation: scrollCatalogo 30s linear infinite;
+            animation: scrollCatalogo 25s linear infinite;
             width: max-content;
         }
         
@@ -131,7 +132,6 @@
             border-color: #6c3ce0;
             transform: scale(1.05);
             box-shadow: 0 4px 20px rgba(108, 60, 224, 0.2);
-            animation-play-state: paused;
         }
         .catalogo-rotatorio .producto-card .foto {
             width: 100%;
@@ -215,11 +215,11 @@
         }
         
         /* ============================================
-           TIENDA (CATÁLOGO EN GRID)
+           TIENDA (CATÁLOGO EN GRID - 5 COLUMNAS)
            ============================================ */
         #tiendaContainer .productos-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: 14px;
         }
         
@@ -564,6 +564,12 @@
         /* ============================================
            RESPONSIVE
            ============================================ */
+        @media (max-width: 1200px) {
+            #tiendaContainer .productos-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+        
         @media (max-width: 992px) {
             #tiendaContainer .productos-grid {
                 grid-template-columns: repeat(3, 1fr);
@@ -705,7 +711,7 @@
 
         <div class="section-divider"></div>
 
-        <!-- SECCIÓN 2: TIENDA (CATÁLOGO EN GRID) -->
+        <!-- SECCIÓN 2: TIENDA (CATÁLOGO EN GRID 5 COLUMNAS) -->
         <div id="tiendaContainer">
             <div class="empty-state">
                 <span class="icon">🔄</span>
@@ -826,7 +832,7 @@
         }
 
         // ============================================
-        // RENDER CATÁLOGO ROTATORIO (SCROLL INFINITO)
+        // RENDER CATÁLOGO ROTATORIO (SCROLL INFINITO SIN ESPACIOS)
         // ============================================
         
         function renderCatalogoRotatorio(productos) {
@@ -845,8 +851,9 @@
             // Generar HTML para cada producto
             let html = '';
             
-            // Duplicar productos para efecto infinito (2 veces)
-            const productosDuplicados = [...productos, ...productos];
+            // Duplicar productos 3 veces para efecto infinito perfecto
+            // (3 veces asegura que nunca se vea el final)
+            const productosDuplicados = [...productos, ...productos, ...productos];
             
             productosDuplicados.forEach(p => {
                 const esServicio = p.tipo === 'servicio';
@@ -883,13 +890,15 @@
             track.innerHTML = html;
             
             // Ajustar velocidad según cantidad de productos
+            // Mientras más productos, más lento (para que se vean bien)
             const totalItems = productos.length;
-            const speed = Math.max(20, Math.min(60, totalItems * 2));
+            // Velocidad base: 20s para 10 items, ajustar proporcionalmente
+            const speed = Math.max(15, Math.min(50, totalItems * 2));
             track.style.animationDuration = `${speed}s`;
         }
 
         // ============================================
-        // CARGAR TIENDA (CATÁLOGO EN GRID)
+        // CARGAR TIENDA (CATÁLOGO EN GRID 5 COLUMNAS)
         // ============================================
         
         async function cargarTienda() {
@@ -918,7 +927,7 @@
         }
 
         // ============================================
-        // RENDER TIENDA (CATÁLOGO EN GRID)
+        // RENDER TIENDA (CATÁLOGO EN GRID 5 COLUMNAS)
         // ============================================
         
         function renderTiendaGrid(productos) {
