@@ -79,26 +79,7 @@
            ============================================ */
         .ubicacion-card {
             display: none;
-            background: rgba(108, 60, 224, 0.08);
-            border: 1px solid rgba(108, 60, 224, 0.2);
-            border-radius: 10px;
-            padding: 12px 16px;
-            margin-bottom: 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
         }
-        .ubicacion-card .info {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: #aaa;
-        }
-        .ubicacion-card .info .icon { font-size: 18px; }
-        .ubicacion-card .info .lugar { color: #6c3ce0; font-weight: 600; }
         
         /* ============================================
            SECCIONES
@@ -110,119 +91,245 @@
         }
         
         /* ============================================
-           PRODUCTOS GRID - SCROLL HORIZONTAL
+           CATÁLOGO ROTATORIO (CARRUSEL AUTOMÁTICO)
            ============================================ */
-        .productos-scroll {
-            display: flex;
-            gap: 14px;
-            overflow-x: auto;
-            padding: 4px 2px 12px 2px;
-            -webkit-overflow-scrolling: touch;
-            scroll-snap-type: x mandatory;
-        }
-        .productos-scroll::-webkit-scrollbar {
-            height: 4px;
-        }
-        .productos-scroll::-webkit-scrollbar-track {
-            background: #1a1a2e;
-            border-radius: 4px;
-        }
-        .productos-scroll::-webkit-scrollbar-thumb {
-            background: #6c3ce0;
-            border-radius: 4px;
+        .catalogo-rotatorio {
+            position: relative;
+            overflow: hidden;
+            border-radius: 10px;
+            margin-bottom: 4px;
         }
         
-        .producto-card {
-            min-width: 180px;
-            max-width: 200px;
+        .catalogo-rotatorio .slides {
+            display: flex;
+            transition: transform 0.6s ease-in-out;
+            will-change: transform;
+        }
+        
+        .catalogo-rotatorio .slide {
+            min-width: 100%;
+            display: flex;
+            gap: 10px;
+            padding: 4px 2px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .catalogo-rotatorio .producto-card {
+            width: calc(20% - 10px);
+            min-width: 90px;
+            max-width: 120px;
             background: #1a1a2e;
             border: 1px solid #2a2a3e;
-            border-radius: 12px;
-            padding: 12px;
+            border-radius: 8px;
+            padding: 6px;
             cursor: pointer;
             transition: all 0.3s;
-            scroll-snap-align: start;
             flex-shrink: 0;
         }
-        .producto-card:hover {
+        .catalogo-rotatorio .producto-card:hover {
             border-color: #6c3ce0;
-            transform: translateY(-3px);
-            box-shadow: 0 6px 20px rgba(108, 60, 224, 0.15);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(108, 60, 224, 0.12);
         }
-        .producto-card .foto {
+        .catalogo-rotatorio .producto-card .foto {
             width: 100%;
-            height: 140px;
-            border-radius: 8px;
-            margin-bottom: 8px;
+            height: 70px;
+            border-radius: 6px;
+            margin-bottom: 4px;
             background: #0f0f1a;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 48px;
+            font-size: 28px;
             color: #444;
-            border: 2px dashed #2a2a3e;
+            border: 1.5px dashed #2a2a3e;
         }
-        .producto-card .nombre {
-            font-size: 14px;
+        .catalogo-rotatorio .producto-card .nombre {
+            font-size: 10px;
             font-weight: 600;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .producto-card .categoria {
-            font-size: 10px;
+        .catalogo-rotatorio .producto-card .categoria {
+            font-size: 8px;
+            color: #888;
+            margin-top: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .catalogo-rotatorio .producto-card .precio {
+            font-size: 12px;
+            color: #6c3ce0;
+            font-weight: 700;
+            margin-top: 1px;
+        }
+        .catalogo-rotatorio .producto-card .stock {
+            font-size: 8px;
             color: #888;
             margin-top: 1px;
         }
-        .producto-card .precio {
-            font-size: 17px;
-            color: #6c3ce0;
-            font-weight: 700;
-            margin-top: 2px;
-        }
-        .producto-card .stock {
-            font-size: 11px;
-            color: #888;
-            margin-top: 2px;
-        }
-        .producto-card .stock.bajo { color: #ff6b6b; }
-        .producto-card .negocio-nombre {
-            font-size: 10px;
+        .catalogo-rotatorio .producto-card .stock.bajo { color: #ff6b6b; }
+        .catalogo-rotatorio .producto-card .negocio-nombre {
+            font-size: 7px;
             color: #666;
-            margin-top: 4px;
+            margin-top: 2px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .producto-card .destacado-badge {
+        .catalogo-rotatorio .producto-card .destacado-badge {
             display: inline-block;
-            font-size: 9px;
+            font-size: 7px;
             background: #ff9800;
             color: #000;
-            padding: 1px 8px;
-            border-radius: 10px;
+            padding: 0px 6px;
+            border-radius: 8px;
             font-weight: 600;
-            margin-top: 2px;
+            margin-top: 1px;
         }
-        .producto-card .ubicacion-tag {
-            font-size: 9px;
+        .catalogo-rotatorio .producto-card .ubicacion-tag {
+            font-size: 7px;
+            color: #6c3ce0;
+            background: rgba(108,60,224,0.1);
+            padding: 0px 6px;
+            border-radius: 8px;
+            display: inline-block;
+            margin-top: 1px;
+        }
+        .catalogo-rotatorio .producto-card .tipo-badge {
+            display: inline-block;
+            font-size: 6px;
+            padding: 0px 4px;
+            border-radius: 6px;
+            background: rgba(108,60,224,0.15);
+            color: #6c3ce0;
+            margin-top: 1px;
+        }
+        .catalogo-rotatorio .producto-card .tipo-badge.servicio {
+            background: rgba(255,152,0,0.15);
+            color: #ff9800;
+        }
+        
+        /* Indicadores del carrusel */
+        .catalogo-rotatorio .indicadores {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .catalogo-rotatorio .indicadores .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #2a2a3e;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .catalogo-rotatorio .indicadores .dot.active {
+            background: #6c3ce0;
+        }
+        
+        /* ============================================
+           TIENDA (LISTA VERTICAL)
+           ============================================ */
+        #tiendaContainer .productos-lista {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        #tiendaContainer .producto-card-lista {
+            display: flex;
+            background: #1a1a2e;
+            border: 1px solid #2a2a3e;
+            border-radius: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            align-items: center;
+            gap: 14px;
+        }
+        #tiendaContainer .producto-card-lista:hover {
+            border-color: #6c3ce0;
+            background: rgba(108,60,224,0.05);
+        }
+        #tiendaContainer .producto-card-lista .foto {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            background: #0f0f1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: #444;
+            border: 1.5px dashed #2a2a3e;
+            flex-shrink: 0;
+        }
+        #tiendaContainer .producto-card-lista .info {
+            flex: 1;
+            min-width: 0;
+        }
+        #tiendaContainer .producto-card-lista .info .nombre {
+            font-size: 14px;
+            font-weight: 600;
+        }
+        #tiendaContainer .producto-card-lista .info .categoria {
+            font-size: 11px;
+            color: #888;
+        }
+        #tiendaContainer .producto-card-lista .info .negocio-nombre {
+            font-size: 11px;
+            color: #666;
+        }
+        #tiendaContainer .producto-card-lista .info .ubicacion-tag {
+            font-size: 10px;
             color: #6c3ce0;
             background: rgba(108,60,224,0.1);
             padding: 1px 8px;
-            border-radius: 10px;
+            border-radius: 8px;
             display: inline-block;
             margin-top: 2px;
         }
-        .producto-card .tipo-badge {
+        #tiendaContainer .producto-card-lista .precio {
+            font-size: 18px;
+            color: #6c3ce0;
+            font-weight: 700;
+            text-align: right;
+            flex-shrink: 0;
+            min-width: 80px;
+        }
+        #tiendaContainer .producto-card-lista .stock {
+            font-size: 12px;
+            color: #888;
+            text-align: right;
+            flex-shrink: 0;
+            min-width: 100px;
+        }
+        #tiendaContainer .producto-card-lista .stock.bajo { color: #ff6b6b; }
+        #tiendaContainer .producto-card-lista .destacado-badge {
             display: inline-block;
-            font-size: 8px;
-            padding: 1px 6px;
+            font-size: 10px;
+            background: #ff9800;
+            color: #000;
+            padding: 1px 10px;
+            border-radius: 10px;
+            font-weight: 600;
+            margin-left: 6px;
+        }
+        #tiendaContainer .producto-card-lista .tipo-badge {
+            display: inline-block;
+            font-size: 9px;
+            padding: 1px 8px;
             border-radius: 8px;
             background: rgba(108,60,224,0.15);
             color: #6c3ce0;
-            margin-top: 2px;
+            margin-left: 6px;
         }
-        .producto-card .tipo-badge.servicio {
+        #tiendaContainer .producto-card-lista .tipo-badge.servicio {
             background: rgba(255,152,0,0.15);
             color: #ff9800;
         }
@@ -479,10 +586,31 @@
            ============================================ */
         @media (max-width: 768px) {
             .container { padding: 12px; }
-            .producto-card { min-width: 150px; max-width: 170px; padding: 10px; }
-            .producto-card .foto { height: 110px; font-size: 36px; }
-            .producto-card .nombre { font-size: 12px; }
-            .producto-card .precio { font-size: 15px; }
+            
+            .catalogo-rotatorio .producto-card {
+                min-width: 75px;
+                max-width: 85px;
+                padding: 4px;
+            }
+            .catalogo-rotatorio .producto-card .foto {
+                height: 55px;
+                font-size: 22px;
+            }
+            .catalogo-rotatorio .producto-card .nombre { font-size: 8px; }
+            .catalogo-rotatorio .producto-card .precio { font-size: 10px; }
+            
+            #tiendaContainer .producto-card-lista {
+                padding: 8px 12px;
+                gap: 10px;
+            }
+            #tiendaContainer .producto-card-lista .foto {
+                width: 50px;
+                height: 50px;
+                font-size: 22px;
+            }
+            #tiendaContainer .producto-card-lista .info .nombre { font-size: 13px; }
+            #tiendaContainer .producto-card-lista .precio { font-size: 16px; min-width: 70px; }
+            #tiendaContainer .producto-card-lista .stock { font-size: 11px; min-width: 80px; }
         }
         
         @media (max-width: 600px) {
@@ -491,11 +619,37 @@
             .header .user { width: 100%; justify-content: flex-end; }
             .header .user .user-name { max-width: 60px; font-size: 12px; }
             .header .user a { font-size: 11px; padding: 3px 10px; }
-            .producto-card { min-width: 130px; max-width: 150px; padding: 8px; }
-            .producto-card .foto { height: 90px; font-size: 30px; }
-            .producto-card .nombre { font-size: 11px; }
-            .producto-card .precio { font-size: 14px; }
-            .producto-card .stock { font-size: 10px; }
+            
+            .catalogo-rotatorio .producto-card {
+                min-width: 65px;
+                max-width: 75px;
+                padding: 4px;
+            }
+            .catalogo-rotatorio .producto-card .foto {
+                height: 45px;
+                font-size: 18px;
+            }
+            .catalogo-rotatorio .producto-card .nombre { font-size: 7px; }
+            .catalogo-rotatorio .producto-card .precio { font-size: 9px; }
+            .catalogo-rotatorio .producto-card .categoria { font-size: 6px; }
+            .catalogo-rotatorio .producto-card .stock { font-size: 6px; }
+            .catalogo-rotatorio .producto-card .negocio-nombre { font-size: 6px; }
+            
+            #tiendaContainer .producto-card-lista {
+                padding: 6px 10px;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            #tiendaContainer .producto-card-lista .foto {
+                width: 40px;
+                height: 40px;
+                font-size: 18px;
+            }
+            #tiendaContainer .producto-card-lista .info .nombre { font-size: 12px; }
+            #tiendaContainer .producto-card-lista .info .categoria { font-size: 10px; }
+            #tiendaContainer .producto-card-lista .precio { font-size: 14px; min-width: 60px; }
+            #tiendaContainer .producto-card-lista .stock { font-size: 10px; min-width: 70px; }
+            
             .modal-content { max-width: 100%; margin: 0; border-radius: 12px; }
             .modal-body { padding: 4px 14px 14px 14px; }
             .modal-body .modal-foto { max-height: 180px; min-height: 120px; font-size: 48px; }
@@ -506,11 +660,22 @@
         }
         
         @media (max-width: 400px) {
-            .producto-card { min-width: 110px; max-width: 130px; padding: 6px; }
-            .producto-card .foto { height: 70px; font-size: 24px; }
-            .producto-card .nombre { font-size: 10px; }
-            .producto-card .precio { font-size: 12px; }
-            .producto-card .negocio-nombre { font-size: 8px; }
+            .catalogo-rotatorio .producto-card {
+                min-width: 55px;
+                max-width: 65px;
+                padding: 3px;
+            }
+            .catalogo-rotatorio .producto-card .foto {
+                height: 38px;
+                font-size: 14px;
+            }
+            .catalogo-rotatorio .producto-card .nombre { font-size: 6px; }
+            .catalogo-rotatorio .producto-card .precio { font-size: 8px; }
+            
+            #tiendaContainer .producto-card-lista .info .nombre { font-size: 11px; }
+            #tiendaContainer .producto-card-lista .precio { font-size: 13px; min-width: 50px; }
+            #tiendaContainer .producto-card-lista .stock { font-size: 9px; min-width: 60px; }
+            
             .modal-body .modal-foto { max-height: 140px; min-height: 100px; font-size: 36px; }
             .modal-body .modal-nombre { font-size: 16px; }
             .modal-body .modal-precio { font-size: 18px; }
@@ -534,26 +699,19 @@
 
     <div class="container">
 
-        <!-- TARJETA DE UBICACIÓN (OCULTA) -->
-        <div class="ubicacion-card" id="ubicacionCard" style="display:none;">
-            <div class="info">
-                <span class="icon">📍</span>
-                <span>Tu ubicación: </span>
-                <span class="lugar" id="ubicacionTexto">Cargando ubicación...</span>
+        <!-- SECCIÓN 1: CATÁLOGO ROTATORIO -->
+        <div class="catalogo-rotatorio" id="catalogoRotatorio">
+            <div class="slides" id="slidesCatalogo">
+                <!-- Las slides se generan dinámicamente -->
             </div>
-        </div>
-
-        <!-- SECCIÓN 1: CATÁLOGO ALEATORIO -->
-        <div id="catalogoContainer">
-            <div class="empty-state">
-                <span class="icon">🔄</span>
-                Cargando catálogo...
+            <div class="indicadores" id="indicadoresCatalogo">
+                <!-- Indicadores generados dinámicamente -->
             </div>
         </div>
 
         <div class="section-divider"></div>
 
-        <!-- SECCIÓN 2: PRODUCTOS DE TIENDAS -->
+        <!-- SECCIÓN 2: PRODUCTOS DE TIENDAS (LISTA VERTICAL) -->
         <div id="tiendaContainer">
             <div class="empty-state">
                 <span class="icon">🔄</span>
@@ -589,6 +747,9 @@
         let marcadorModal = null;
         let marcadorUsuario = null;
         let mapaInicializado = false;
+        let intervaloRotacion = null;
+        let slideActual = 0;
+        let itemsPorSlide = 5;
 
         // ============================================
         // FUNCIÓN PARA ESCAPAR JSON PARA ONCLICK
@@ -598,7 +759,7 @@
         }
 
         // ============================================
-        // OBTENER UBICACIÓN DEL USUARIO (solo para filtrar productos)
+        // OBTENER UBICACIÓN DEL USUARIO
         // ============================================
         
         async function obtenerUbicacionUsuario() {
@@ -620,12 +781,12 @@
         }
 
         // ============================================
-        // CARGAR CATÁLOGO ALEATORIO
+        // CARGAR CATÁLOGO ROTATORIO
         // ============================================
         
         async function cargarCatalogo() {
-            const container = document.getElementById('catalogoContainer');
-            container.innerHTML = '<div class="empty-state"><span class="icon">🔄</span>Cargando catálogo...</div>';
+            const container = document.getElementById('slidesCatalogo');
+            container.innerHTML = '';
             
             try {
                 // Obtener productos de la tienda pública
@@ -657,10 +818,9 @@
                     [todos[i], todos[j]] = [todos[j], todos[i]];
                 }
                 
-                // Limitar a 30 items
-                catalogoProductos = todos.slice(0, 30);
+                catalogoProductos = todos;
                 
-                renderCatalogo(catalogoProductos);
+                renderCatalogoRotatorio(catalogoProductos);
                 
             } catch (error) {
                 console.error('Error cargando catálogo:', error);
@@ -674,67 +834,164 @@
         }
 
         // ============================================
-        // RENDER CATÁLOGO
+        // RENDER CATÁLOGO ROTATORIO
         // ============================================
         
-        function renderCatalogo(productos) {
-            const container = document.getElementById('catalogoContainer');
+        function renderCatalogoRotatorio(productos) {
+            const container = document.getElementById('slidesCatalogo');
+            const indicadores = document.getElementById('indicadoresCatalogo');
             
             if (!productos || productos.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
                         <span class="icon">📭</span>
-                        No hay productos o servicios disponibles en tu zona
-                        <div style="font-size:11px;color:#666;margin-top:6px;">
-                            Actualiza tu ubicación en el perfil para ver más resultados
-                        </div>
+                        No hay productos o servicios disponibles
                     </div>
                 `;
+                indicadores.innerHTML = '';
                 return;
             }
             
-            let html = '<div class="productos-scroll">';
+            // Calcular items por slide según el ancho
+            const screenWidth = window.innerWidth;
+            if (screenWidth < 400) itemsPorSlide = 3;
+            else if (screenWidth < 600) itemsPorSlide = 4;
+            else if (screenWidth < 768) itemsPorSlide = 4;
+            else itemsPorSlide = 5;
             
-            productos.forEach(p => {
-                const esServicio = p.tipo === 'servicio';
-                const stockClass = !esServicio && p.stock !== undefined && p.stock < (p.stock_minimo || 3) ? 'bajo' : '';
-                let stockText = '';
-                if (esServicio) {
-                    stockText = '📋 Servicio';
-                } else if (p.stock > 0) {
-                    stockText = `📦 ${p.stock} unidades`;
-                } else {
-                    stockText = '🚫 Agotado';
-                }
-                const tipoIcon = esServicio ? '📋' : '📦';
-                const tipoLabel = esServicio ? 'Servicio' : 'Producto';
-                const tipoBadgeClass = esServicio ? 'servicio' : '';
-                const ubicacionText = p.provincia && p.municipio ? `${p.provincia}, ${p.municipio}` : '';
-                
-                // Escapar el objeto para pasarlo al onclick
-                const pEscapado = escaparJSON(p);
-                
-                html += `
-                    <div class="producto-card" onclick="abrirModalProducto(${pEscapado})">
-                        <div class="foto">📷</div>
-                        <div class="nombre">${tipoIcon} ${p.nombre}</div>
-                        <div class="categoria">${p.categoria || ''}</div>
-                        <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
-                        <div class="stock ${stockClass}">${stockText}</div>
-                        <div class="negocio-nombre">🏢 ${p.negocio_nombre || p.negocio_username || 'Negocio'}</div>
-                        ${ubicacionText ? `<div class="ubicacion-tag">📍 ${ubicacionText}</div>` : ''}
-                        ${p.destacado ? '<div class="destacado-badge">⭐ Destacado</div>' : ''}
-                        <span class="tipo-badge ${tipoBadgeClass}">${tipoLabel}</span>
-                    </div>
-                `;
+            // Crear slides
+            let slides = [];
+            for (let i = 0; i < productos.length; i += itemsPorSlide) {
+                slides.push(productos.slice(i, i + itemsPorSlide));
+            }
+            
+            // Generar HTML de slides
+            let slidesHTML = '';
+            slides.forEach((slide, index) => {
+                let slideHTML = `<div class="slide" data-index="${index}">`;
+                slide.forEach(p => {
+                    const esServicio = p.tipo === 'servicio';
+                    const stockClass = !esServicio && p.stock !== undefined && p.stock < (p.stock_minimo || 3) ? 'bajo' : '';
+                    let stockText = '';
+                    if (esServicio) {
+                        stockText = '📋';
+                    } else if (p.stock > 0) {
+                        stockText = `📦${p.stock}`;
+                    } else {
+                        stockText = '🚫';
+                    }
+                    const tipoIcon = esServicio ? '📋' : '📦';
+                    const tipoLabel = esServicio ? 'Servicio' : 'Producto';
+                    const tipoBadgeClass = esServicio ? 'servicio' : '';
+                    const ubicacionText = p.provincia && p.municipio ? `${p.provincia}` : '';
+                    const pEscapado = escaparJSON(p);
+                    
+                    slideHTML += `
+                        <div class="producto-card" onclick="abrirModalProducto(${pEscapado})">
+                            <div class="foto">📷</div>
+                            <div class="nombre">${tipoIcon} ${p.nombre}</div>
+                            <div class="categoria">${p.categoria || ''}</div>
+                            <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
+                            <div class="stock ${stockClass}">${stockText}</div>
+                            <div class="negocio-nombre">${p.negocio_nombre || p.negocio_username || 'Negocio'}</div>
+                            ${ubicacionText ? `<div class="ubicacion-tag">📍${ubicacionText}</div>` : ''}
+                            ${p.destacado ? '<div class="destacado-badge">⭐</div>' : ''}
+                            <span class="tipo-badge ${tipoBadgeClass}">${tipoLabel}</span>
+                        </div>
+                    `;
+                });
+                slideHTML += '</div>';
+                slidesHTML += slideHTML;
             });
             
-            html += '</div>';
-            container.innerHTML = html;
+            container.innerHTML = slidesHTML;
+            
+            // Generar indicadores
+            let indicadoresHTML = '';
+            slides.forEach((_, index) => {
+                indicadoresHTML += `<span class="dot ${index === 0 ? 'active' : ''}" data-index="${index}"></span>`;
+            });
+            indicadores.innerHTML = indicadoresHTML;
+            
+            // Agregar eventos a los indicadores
+            document.querySelectorAll('.indicadores .dot').forEach(dot => {
+                dot.addEventListener('click', function() {
+                    const index = parseInt(this.dataset.index);
+                    irSlide(index);
+                });
+            });
+            
+            // Iniciar rotación automática
+            iniciarRotacion();
+            
+            // Actualizar en resize
+            window.addEventListener('resize', function() {
+                const newItemsPorSlide = window.innerWidth < 400 ? 3 : 
+                                        window.innerWidth < 600 ? 4 : 
+                                        window.innerWidth < 768 ? 4 : 5;
+                if (newItemsPorSlide !== itemsPorSlide) {
+                    itemsPorSlide = newItemsPorSlide;
+                    renderCatalogoRotatorio(catalogoProductos);
+                }
+            });
         }
 
         // ============================================
-        // CARGAR PRODUCTOS DE TIENDAS
+        // FUNCIONES DE ROTACIÓN
+        // ============================================
+        
+        function irSlide(index) {
+            const slides = document.querySelectorAll('.catalogo-rotatorio .slide');
+            const dots = document.querySelectorAll('.indicadores .dot');
+            
+            if (index < 0) index = slides.length - 1;
+            if (index >= slides.length) index = 0;
+            
+            slideActual = index;
+            
+            // Mover slides
+            const container = document.getElementById('slidesCatalogo');
+            container.style.transform = `translateX(-${index * 100}%)`;
+            
+            // Actualizar indicadores
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === index);
+            });
+        }
+        
+        function slideSiguiente() {
+            const slides = document.querySelectorAll('.catalogo-rotatorio .slide');
+            if (slides.length === 0) return;
+            irSlide(slideActual + 1);
+        }
+        
+        function iniciarRotacion() {
+            if (intervaloRotacion) {
+                clearInterval(intervaloRotacion);
+            }
+            // Cambiar cada 5 segundos
+            intervaloRotacion = setInterval(slideSiguiente, 5000);
+        }
+        
+        function detenerRotacion() {
+            if (intervaloRotacion) {
+                clearInterval(intervaloRotacion);
+                intervaloRotacion = null;
+            }
+        }
+        
+        // Pausar rotación al hacer hover
+        document.getElementById('catalogoRotatorio').addEventListener('mouseenter', detenerRotacion);
+        document.getElementById('catalogoRotatorio').addEventListener('mouseleave', iniciarRotacion);
+        
+        // Pausar en móviles al tocar
+        document.getElementById('catalogoRotatorio').addEventListener('touchstart', detenerRotacion);
+        document.getElementById('catalogoRotatorio').addEventListener('touchend', function() {
+            setTimeout(iniciarRotacion, 3000);
+        });
+
+        // ============================================
+        // CARGAR PRODUCTOS DE TIENDAS (LISTA VERTICAL)
         // ============================================
         
         async function cargarTienda() {
@@ -749,7 +1006,7 @@
                 tiendaProductos = await response.json();
                 console.log('🏪 Productos de tienda cargados:', tiendaProductos.length);
                 
-                renderTienda(tiendaProductos);
+                renderTiendaLista(tiendaProductos);
                 
             } catch (error) {
                 console.error('Error cargando tienda:', error);
@@ -763,10 +1020,10 @@
         }
 
         // ============================================
-        // RENDER TIENDA
+        // RENDER TIENDA (LISTA VERTICAL)
         // ============================================
         
-        function renderTienda(productos) {
+        function renderTiendaLista(productos) {
             const container = document.getElementById('tiendaContainer');
             
             if (!productos || productos.length === 0) {
@@ -782,25 +1039,33 @@
                 return;
             }
             
-            let html = '<div class="productos-scroll">';
+            let html = '<div class="productos-lista">';
             
             productos.forEach(p => {
                 const stockClass = p.stock < (p.stock_minimo || 3) ? 'bajo' : '';
                 const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
                 const ubicacionText = p.provincia && p.municipio ? `${p.provincia}, ${p.municipio}` : '';
+                const esServicio = p.tipo === 'servicio';
+                const tipoLabel = esServicio ? 'Servicio' : 'Producto';
+                const tipoBadgeClass = esServicio ? 'servicio' : '';
                 
                 const pEscapado = escaparJSON(p);
                 
                 html += `
-                    <div class="producto-card" onclick="abrirModalProducto(${pEscapado})">
+                    <div class="producto-card-lista" onclick="abrirModalProducto(${pEscapado})">
                         <div class="foto">📷</div>
-                        <div class="nombre">📦 ${p.nombre}</div>
-                        <div class="categoria">${p.categoria || ''}</div>
+                        <div class="info">
+                            <div class="nombre">
+                                ${p.nombre}
+                                ${p.destacado ? '<span class="destacado-badge">⭐ Destacado</span>' : ''}
+                                <span class="tipo-badge ${tipoBadgeClass}">${tipoLabel}</span>
+                            </div>
+                            <div class="categoria">${p.categoria || 'Sin categoría'}</div>
+                            <div class="negocio-nombre">🏢 ${p.negocio_nombre || p.negocio_username || 'Negocio'}</div>
+                            ${ubicacionText ? `<div class="ubicacion-tag">📍 ${ubicacionText}</div>` : ''}
+                        </div>
                         <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
                         <div class="stock ${stockClass}">${stockText}</div>
-                        <div class="negocio-nombre">🏢 ${p.negocio_nombre || p.negocio_username || 'Negocio'}</div>
-                        ${ubicacionText ? `<div class="ubicacion-tag">📍 ${ubicacionText}</div>` : ''}
-                        ${p.destacado ? '<div class="destacado-badge">⭐ Destacado</div>' : ''}
                     </div>
                 `;
             });
@@ -1047,9 +1312,8 @@
             await cargarCatalogo();
             await cargarTienda();
             
-            // Actualizar cada 30 segundos
+            // Actualizar tienda cada 30 segundos
             setInterval(() => {
-                cargarCatalogo();
                 cargarTienda();
             }, 30000);
         }
