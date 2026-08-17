@@ -645,7 +645,10 @@
         async function cargarServicios() {
             try {
                 const response = await fetch('/api/servicios');
-                if (!response.ok) throw new Error('Error al cargar servicios');
+                if (!response.ok) {
+                    console.error('❌ Error en /api/servicios:', response.status);
+                    throw new Error('Error al cargar servicios');
+                }
                 servicios = await response.json();
                 console.log('📋 Servicios cargados:', servicios.length);
                 return true;
@@ -654,7 +657,6 @@
                 return false;
             }
         }
-
         // ============================================
         // CARGAR EMPRESAS CON CONTRATOS
         // ============================================
