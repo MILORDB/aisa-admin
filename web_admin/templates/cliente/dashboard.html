@@ -103,7 +103,7 @@
         
         .catalogo-rotatorio .track {
             display: flex;
-            animation: scrollCatalogo 25s linear infinite;
+            animation: scrollCatalogo 20s linear infinite;
             width: max-content;
         }
         
@@ -702,7 +702,7 @@
 
     <div class="container">
 
-        <!-- SECCIÓN 1: CATÁLOGO ROTATORIO FLUIDO (SCROLL INFINITO) -->
+        <!-- SECCIÓN 1: CATÁLOGO ROTATORIO FLUIDO (SCROLL INFINITO - 10 PRODUCTOS) -->
         <div class="catalogo-rotatorio" id="catalogoRotatorio">
             <div class="track" id="trackCatalogo">
                 <!-- Los productos se generan dinámicamente -->
@@ -748,6 +748,8 @@
         let marcadorUsuario = null;
         let mapaInicializado = false;
         let animationFrame = null;
+        let tiendaActualizada = 0;
+        const TIENDA_INTERVALO = 3600000; // 1 hora en milisegundos
 
         // ============================================
         // FUNCIÓN PARA ESCAPAR JSON PARA ONCLICK
@@ -779,7 +781,23 @@
         }
 
         // ============================================
-        // CARGAR CATÁLOGO ROTATORIO
+        // SELECCIONAR 10 PRODUCTOS ALEATORIOS
+        // ============================================
+        function seleccionarProductosAleatorios(productos, cantidad = 10) {
+            if (!productos || productos.length === 0) return [];
+            if (productos.length <= cantidad) return productos;
+            
+            // Mezclar y tomar los primeros 'cantidad'
+            const shuffled = [...productos];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled.slice(0, cantidad);
+        }
+
+        // ============================================
+        // CARGAR CATÁLOGO ROTATORIO (10 PRODUCTOS ALEATORIOS)
         // ============================================
         
         async function cargarCatalogo() {
@@ -792,7 +810,7 @@
                 let productos = [];
                 if (prodResponse.ok) {
                     productos = await prodResponse.json();
-                    console.log('📦 Productos cargados:', productos.length);
+                    console.log('📦 Productos cargados (total):', productos.length);
                 } else {
                     console.error('❌ Error en /api/tienda/public:', prodResponse.status);
                 }
@@ -802,7 +820,7 @@
                 let servicios = [];
                 if (servResponse.ok) {
                     servicios = await servResponse.json();
-                    console.log('📋 Servicios cargados:', servicios.length);
+                    console.log('📋 Servicios cargados (total):', servicios.length);
                 } else {
                     console.error('❌ Error en /api/servicios/publicos:', servResponse.status);
                 }
@@ -810,13 +828,9 @@
                 // Combinar productos y servicios
                 let todos = [...productos, ...servicios];
                 
-                // Mezclar aleatoriamente (Fisher-Yates)
-                for (let i = todos.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [todos[i], todos[j]] = [todos[j], todos[i]];
-                }
-                
-                catalogoProductos = todos;
+                // Seleccionar SOLO 10 productos aleatorios
+                catalogoProductos = seleccionarProductosAleatorios(todos, 10);
+                console.log('🎲 Productos seleccionados para el carrusel:', catalogoProductos.length);
                 
                 renderCatalogoRotatorio(catalogoProductos);
                 
@@ -852,7 +866,6 @@
             let html = '';
             
             // Duplicar productos 3 veces para efecto infinito perfecto
-            // (3 veces asegura que nunca se vea el final)
             const productosDuplicados = [...productos, ...productos, ...productos];
             
             productosDuplicados.forEach(p => {
@@ -889,19 +902,24 @@
             
             track.innerHTML = html;
             
-            // Ajustar velocidad según cantidad de productos
-            // Mientras más productos, más lento (para que se vean bien)
-            const totalItems = productos.length;
-            // Velocidad base: 20s para 10 items, ajustar proporcionalmente
-            const speed = Math.max(15, Math.min(50, totalItems * 2));
-            track.style.animationDuration = `${speed}s`;
+            // Velocidad fija para 10 productos
+            track.style.animationDuration = '20s';
         }
 
         // ============================================
-        // CARGAR TIENDA (CATÁLOGO EN GRID 5 COLUMNAS)
+        // CARGAR TIENDA (SOLO SI HA PASADO 1 HORA)
         // ============================================
         
-        async function cargarTienda() {
+        async function cargarTienda(forzar = false) {
+            const ahora = Date.now();
+            
+            // Si no ha pasado 1 hora y no es forzado, no hacer nada
+            if (!forzar && (ahora - tiendaActualizada) < TIENDA_INTERVALO) {
+                console.log('⏳ La tienda se actualizará en:', 
+                    Math.round((TIENDA_INTERVALO - (ahora - tiendaActualizada)) / 60000), 'minutos');
+                return;
+            }
+            
             const container = document.getElementById('tiendaContainer');
             container.innerHTML = '<div class="empty-state"><span class="icon">🔄</span>Cargando productos de tiendas...</div>';
             
@@ -914,6 +932,10 @@
                 console.log('🏪 Productos de tienda cargados:', tiendaProductos.length);
                 
                 renderTiendaGrid(tiendaProductos);
+                
+                // Actualizar timestamp
+                tiendaActualizada = ahora;
+                console.log('✅ Tienda actualizada a las:', new Date(ahora).toLocaleString());
                 
             } catch (error) {
                 console.error('Error cargando tienda:', error);
@@ -1213,13 +1235,20 @@
         async function iniciar() {
             console.log('🚀 Iniciando vista de cliente...');
             await obtenerUbicacionUsuario();
-            await cargarCatalogo();
-            await cargarTienda();
             
-            // Actualizar tienda cada 30 segundos
+            // Cargar catálogo (siempre se carga)
+            await cargarCatalogo();
+            
+            // Cargar tienda (primera carga)
+            await cargarTienda(true);
+            
+            // Actualizar tienda cada hora (3600000 ms = 1 hora)
             setInterval(() => {
-                cargarTienda();
-            }, 30000);
+                cargarTienda(false);
+            }, TIENDA_INTERVALO);
+            
+            // Mostrar próxima actualización en consola
+            console.log('⏳ La tienda se actualizará automáticamente cada 1 hora');
         }
         
         document.addEventListener('DOMContentLoaded', iniciar);
