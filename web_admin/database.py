@@ -132,14 +132,15 @@ def init_db():
     ''')
     
     # ============================================
-    # TABLA PRODUCTOS
+    # TABLA PRODUCTOS (con descripcion, categoria_id, subcategoria_id)
     # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS productos (
         id SERIAL PRIMARY KEY,
         negocio_id INTEGER NOT NULL,
         nombre TEXT NOT NULL,
-        categoria TEXT,
+        categoria_id INTEGER,
+        subcategoria_id INTEGER,
         precio REAL NOT NULL,
         costo REAL DEFAULT 0,
         comision REAL DEFAULT 0,
@@ -150,7 +151,9 @@ def init_db():
         foto_public_id TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT,
-        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE
+        FOREIGN KEY (negocio_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (categoria_id) REFERENCES categorias(id) ON DELETE SET NULL,
+        FOREIGN KEY (subcategoria_id) REFERENCES subcategorias(id) ON DELETE SET NULL
     )
     ''')
     
@@ -201,7 +204,7 @@ def init_db():
     ''')
     
     # ============================================
-    # TABLA SERVICIOS
+    # TABLA SERVICIOS (con descripcion)
     # ============================================
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS servicios (
@@ -430,6 +433,35 @@ def init_db():
     ''')
     
     # ============================================
+    # TABLA CATEGORIAS
+    # ============================================
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS categorias (
+        id SERIAL PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        icono TEXT,
+        activo INTEGER DEFAULT 1,
+        orden INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+    
+    # ============================================
+    # TABLA SUBCATEGORIAS
+    # ============================================
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS subcategorias (
+        id SERIAL PRIMARY KEY,
+        categoria_id INTEGER NOT NULL,
+        nombre TEXT NOT NULL,
+        activo INTEGER DEFAULT 1,
+        orden INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (categoria_id) REFERENCES categorias(id) ON DELETE CASCADE
+    )
+    ''')
+    
+    # ============================================
     # INSERTAR MÓDULOS
     # ============================================
     cursor.execute("SELECT COUNT(*) FROM modulos")
@@ -478,6 +510,115 @@ def init_db():
             VALUES (%s, %s, 1)
             ''', (admin_id, mod[0]))
         print("✅ Usuario admin creado (admin/admin123)")
+    
+    # ============================================
+    # INSERTAR CATEGORÍAS Y SUBCATEGORÍAS POR DEFECTO
+    # ============================================
+    cursor.execute("SELECT COUNT(*) FROM categorias")
+    if cursor.fetchone()[0] == 0:
+        # Insertar categorías
+        categorias = [
+            ('Electrónica', '📱', 1),
+            ('Ropa y Moda', '👕', 2),
+            ('Hogar', '🏠', 3),
+            ('Alimentos', '🍕', 4),
+            ('Automotriz', '🚗', 5),
+            ('Belleza', '💄', 6),
+            ('Deportes', '🏋️', 7),
+            ('Educación', '📚', 8),
+            ('Salud', '🏥', 9),
+            ('Servicios', '🔧', 10),
+        ]
+        for cat in categorias:
+            cursor.execute(
+                'INSERT INTO categorias (nombre, icono, orden) VALUES (%s, %s, %s)',
+                cat
+            )
+        print("✅ Categorías insertadas")
+        
+        # Insertar subcategorías
+        subcategorias = [
+            # Electrónica (categoria_id = 1)
+            (1, 'Teléfonos', 1),
+            (1, 'Laptops', 2),
+            (1, 'Tablets', 3),
+            (1, 'Accesorios', 4),
+            (1, 'Audio', 5),
+            (1, 'Televisores', 6),
+            (1, 'Cámaras', 7),
+            (1, 'Videojuegos', 8),
+            # Ropa y Moda (categoria_id = 2)
+            (2, 'Ropa de Hombre', 1),
+            (2, 'Ropa de Mujer', 2),
+            (2, 'Ropa de Niños', 3),
+            (2, 'Zapatos', 4),
+            (2, 'Accesorios', 5),
+            (2, 'Bolsos', 6),
+            (2, 'Relojes', 7),
+            # Hogar (categoria_id = 3)
+            (3, 'Muebles', 1),
+            (3, 'Electrodomésticos', 2),
+            (3, 'Decoración', 3),
+            (3, 'Cocina', 4),
+            (3, 'Jardín', 5),
+            (3, 'Iluminación', 6),
+            # Alimentos (categoria_id = 4)
+            (4, 'Lácteos', 1),
+            (4, 'Carnes', 2),
+            (4, 'Verduras', 3),
+            (4, 'Frutas', 4),
+            (4, 'Panes', 5),
+            (4, 'Bebidas', 6),
+            (4, 'Snacks', 7),
+            (4, 'Comida Preparada', 8),
+            # Automotriz (categoria_id = 5)
+            (5, 'Repuestos', 1),
+            (5, 'Accesorios', 2),
+            (5, 'Llantas', 3),
+            (5, 'Servicios', 4),
+            (5, 'Herramientas', 5),
+            (5, 'Lubricantes', 6),
+            # Belleza (categoria_id = 6)
+            (6, 'Maquillaje', 1),
+            (6, 'Cuidado Facial', 2),
+            (6, 'Cuidado Capilar', 3),
+            (6, 'Perfumes', 4),
+            (6, 'Tratamientos', 5),
+            (6, 'Uñas', 6),
+            # Deportes (categoria_id = 7)
+            (7, 'Fútbol', 1),
+            (7, 'Baloncesto', 2),
+            (7, 'Gimnasio', 3),
+            (7, 'Natación', 4),
+            (7, 'Ciclismo', 5),
+            (7, 'Tenis', 6),
+            (7, 'Running', 7),
+            # Educación (categoria_id = 8)
+            (8, 'Libros', 1),
+            (8, 'Cursos', 2),
+            (8, 'Material Escolar', 3),
+            (8, 'Software', 4),
+            (8, 'Idiomas', 5),
+            # Salud (categoria_id = 9)
+            (9, 'Medicamentos', 1),
+            (9, 'Vitaminas', 2),
+            (9, 'Equipos Médicos', 3),
+            (9, 'Cuidado Personal', 4),
+            (9, 'Terapias', 5),
+            # Servicios (categoria_id = 10)
+            (10, 'Limpieza', 1),
+            (10, 'Mantenimiento', 2),
+            (10, 'Construcción', 3),
+            (10, 'Jardineria', 4),
+            (10, 'Transporte', 5),
+            (10, 'Fotografía', 6),
+        ]
+        for sub in subcategorias:
+            cursor.execute(
+                'INSERT INTO subcategorias (categoria_id, nombre, orden) VALUES (%s, %s, %s)',
+                sub
+            )
+        print("✅ Subcategorías insertadas")
     
     conn.commit()
     conn.close()
@@ -878,6 +1019,123 @@ def obtener_negocios_con_ubicacion(negocio_id=None):
     return resultado
 
 # ============================================
+# FUNCIONES DE CATEGORÍAS Y SUBCATEGORÍAS
+# ============================================
+
+def obtener_categorias():
+    """Obtiene todas las categorías principales"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('SELECT * FROM categorias WHERE activo = 1 ORDER BY orden, nombre')
+    categorias = cursor.fetchall()
+    conn.close()
+    return categorias
+
+def obtener_subcategorias(categoria_id=None):
+    """Obtiene subcategorías de una categoría específica"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    if categoria_id:
+        cursor.execute('SELECT * FROM subcategorias WHERE categoria_id = %s AND activo = 1 ORDER BY orden, nombre', (categoria_id,))
+    else:
+        cursor.execute('SELECT * FROM subcategorias WHERE activo = 1 ORDER BY categoria_id, orden, nombre')
+    subcategorias = cursor.fetchall()
+    conn.close()
+    return subcategorias
+
+def obtener_categoria_por_id(categoria_id):
+    """Obtiene una categoría por su ID"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('SELECT * FROM categorias WHERE id = %s', (categoria_id,))
+    categoria = cursor.fetchone()
+    conn.close()
+    return categoria
+
+def obtener_subcategoria_por_id(subcategoria_id):
+    """Obtiene una subcategoría por su ID"""
+    conn = get_db()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute('SELECT * FROM subcategorias WHERE id = %s', (subcategoria_id,))
+    subcategoria = cursor.fetchone()
+    conn.close()
+    return subcategoria
+
+def crear_categoria(nombre, icono=None, activo=1, orden=0):
+    """Crea una nueva categoría"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO categorias (nombre, icono, activo, orden)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id
+        ''', (nombre, icono, activo, orden))
+        categoria_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return categoria_id
+    except Exception as e:
+        print(f"❌ Error creando categoría: {e}")
+        conn.rollback()
+        conn.close()
+        return None
+
+def crear_subcategoria(categoria_id, nombre, activo=1, orden=0):
+    """Crea una nueva subcategoría"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            INSERT INTO subcategorias (categoria_id, nombre, activo, orden)
+            VALUES (%s, %s, %s, %s)
+            RETURNING id
+        ''', (categoria_id, nombre, activo, orden))
+        subcategoria_id = cursor.fetchone()[0]
+        conn.commit()
+        conn.close()
+        return subcategoria_id
+    except Exception as e:
+        print(f"❌ Error creando subcategoría: {e}")
+        conn.rollback()
+        conn.close()
+        return None
+
+def actualizar_categoria(categoria_id, nombre, icono=None, activo=1):
+    """Actualiza una categoría"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('''
+            UPDATE categorias 
+            SET nombre = %s, icono = %s, activo = %s
+            WHERE id = %s
+        ''', (nombre, icono, activo, categoria_id))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error actualizando categoría: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+def eliminar_categoria(categoria_id):
+    """Elimina una categoría (y sus subcategorías en cascada)"""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute('DELETE FROM categorias WHERE id = %s', (categoria_id,))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"❌ Error eliminando categoría: {e}")
+        conn.rollback()
+        conn.close()
+        return False
+
+# ============================================
 # FUNCIONES DE MÓDULOS
 # ============================================
 
@@ -1009,28 +1267,33 @@ def obtener_logs(limit=50):
     return logs
 
 # ============================================
-# FUNCIONES PARA PRODUCTOS
+# FUNCIONES PARA PRODUCTOS (CON CATEGORÍAS)
 # ============================================
 
-def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, stock=0, stock_minimo=3, descripcion=''):
+def crear_producto(negocio_id, nombre, categoria_id, subcategoria_id, precio, costo=0, comision=0, stock=0, stock_minimo=3, descripcion=''):
     """Crea un nuevo producto en la base de datos"""
     conn = None
     cursor = None
     try:
+        print(f"📝 Creando producto: {nombre}, categoria_id={categoria_id}, subcategoria_id={subcategoria_id}, precio={precio}")
+        
         conn = get_db()
         cursor = conn.cursor()
         
+        # Verificar que el negocio existe
         cursor.execute('SELECT id FROM usuarios WHERE id = %s AND tipo = %s', (negocio_id, 'negocio'))
         if not cursor.fetchone():
             print(f"❌ Error: El negocio {negocio_id} no existe o no es de tipo negocio")
             return None
         
         created_at = datetime.now().isoformat()
+        
         cursor.execute('''
         INSERT INTO productos (
             negocio_id, 
             nombre, 
-            categoria, 
+            categoria_id,
+            subcategoria_id, 
             precio, 
             costo, 
             comision, 
@@ -1039,12 +1302,13 @@ def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, s
             descripcion,
             created_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         ''', (
             negocio_id, 
             nombre, 
-            categoria, 
+            categoria_id,
+            subcategoria_id,
             float(precio), 
             float(costo), 
             float(comision), 
@@ -1081,7 +1345,17 @@ def crear_producto(negocio_id, nombre, categoria, precio, costo=0, comision=0, s
 def obtener_productos(negocio_id):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT * FROM productos WHERE negocio_id = %s ORDER BY id DESC', (negocio_id,))
+    cursor.execute('''
+        SELECT p.*, 
+               c.nombre as categoria_nombre, 
+               c.icono as categoria_icono,
+               s.nombre as subcategoria_nombre
+        FROM productos p
+        LEFT JOIN categorias c ON p.categoria_id = c.id
+        LEFT JOIN subcategorias s ON p.subcategoria_id = s.id
+        WHERE p.negocio_id = %s 
+        ORDER BY p.id DESC
+    ''', (negocio_id,))
     productos = cursor.fetchall()
     conn.close()
     return productos
@@ -1090,8 +1364,16 @@ def obtener_todos_productos():
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
-    SELECT p.*, u.username as negocio_username
-    FROM productos p JOIN usuarios u ON p.negocio_id = u.id ORDER BY p.id DESC
+        SELECT p.*, 
+               u.username as negocio_username,
+               c.nombre as categoria_nombre, 
+               c.icono as categoria_icono,
+               s.nombre as subcategoria_nombre
+        FROM productos p 
+        JOIN usuarios u ON p.negocio_id = u.id
+        LEFT JOIN categorias c ON p.categoria_id = c.id
+        LEFT JOIN subcategorias s ON p.subcategoria_id = s.id
+        ORDER BY p.id DESC
     ''')
     productos = cursor.fetchall()
     conn.close()
@@ -1100,8 +1382,12 @@ def obtener_todos_productos():
 def obtener_productos_con_stock(negocio_id):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute('SELECT id, nombre, precio, costo, comision, stock FROM productos WHERE negocio_id = %s AND stock > 0 ORDER BY nombre',
-                   (negocio_id,))
+    cursor.execute('''
+        SELECT id, nombre, precio, costo, comision, stock, categoria_id, subcategoria_id 
+        FROM productos 
+        WHERE negocio_id = %s AND stock > 0 
+        ORDER BY nombre
+    ''', (negocio_id,))
     productos = cursor.fetchall()
     conn.close()
     return productos
@@ -1112,12 +1398,15 @@ def obtener_productos_tienda_publica(provincia=None, municipio=None):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     query = '''
-        SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url, 
+        SELECT p.id, p.nombre, p.categoria_id, p.subcategoria_id, p.precio, p.stock, p.foto_url, 
                p.negocio_id, u.username as negocio_username, u.nombre as negocio_nombre,
-               u.datos_negocio, pt.destacado
+               u.datos_negocio, pt.destacado,
+               c.nombre as categoria_nombre, s.nombre as subcategoria_nombre
         FROM productos p 
         JOIN usuarios u ON p.negocio_id = u.id
         LEFT JOIN productos_tienda pt ON p.id = pt.producto_id AND pt.negocio_id = u.id
+        LEFT JOIN categorias c ON p.categoria_id = c.id
+        LEFT JOIN subcategorias s ON p.subcategoria_id = s.id
         WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0
     '''
     
@@ -1149,7 +1438,10 @@ def obtener_productos_tienda_publica(provincia=None, municipio=None):
         resultado.append({
             'id': p['id'],
             'nombre': p['nombre'],
-            'categoria': p.get('categoria'),
+            'categoria_id': p.get('categoria_id'),
+            'categoria_nombre': p.get('categoria_nombre'),
+            'subcategoria_id': p.get('subcategoria_id'),
+            'subcategoria_nombre': p.get('subcategoria_nombre'),
             'precio': float(p['precio']),
             'stock': p['stock'],
             'foto_url': p.get('foto_url'),
@@ -1159,7 +1451,9 @@ def obtener_productos_tienda_publica(provincia=None, municipio=None):
             'destacado': p.get('destacado', 0),
             'provincia': datos.get('provincia', ''),
             'municipio': datos.get('municipio', ''),
-            'direccion': datos.get('direccion', '')
+            'direccion': datos.get('direccion', ''),
+            'telefono': datos.get('telefono', ''),
+            'descripcion': p.get('descripcion', '')
         })
     
     return resultado
@@ -1168,10 +1462,14 @@ def obtener_productos_tienda_negocio(negocio_id):
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
-    SELECT pt.id as tienda_id, p.*, pt.destacado
-    FROM productos_tienda pt
-    JOIN productos p ON pt.producto_id = p.id
-    WHERE pt.negocio_id = %s ORDER BY pt.destacado DESC, p.id DESC
+        SELECT pt.id as tienda_id, p.*, pt.destacado,
+               c.nombre as categoria_nombre, s.nombre as subcategoria_nombre
+        FROM productos_tienda pt
+        JOIN productos p ON pt.producto_id = p.id
+        LEFT JOIN categorias c ON p.categoria_id = c.id
+        LEFT JOIN subcategorias s ON p.subcategoria_id = s.id
+        WHERE pt.negocio_id = %s 
+        ORDER BY pt.destacado DESC, p.id DESC
     ''', (negocio_id,))
     productos = cursor.fetchall()
     conn.close()
@@ -1183,9 +1481,12 @@ def obtener_productos_tienda_por_negocio(negocio_id):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     cursor.execute('''
-        SELECT pt.id as tienda_id, p.*, pt.destacado
+        SELECT pt.id as tienda_id, p.*, pt.destacado,
+               c.nombre as categoria_nombre, s.nombre as subcategoria_nombre
         FROM productos_tienda pt
         JOIN productos p ON pt.producto_id = p.id
+        LEFT JOIN categorias c ON p.categoria_id = c.id
+        LEFT JOIN subcategorias s ON p.subcategoria_id = s.id
         WHERE pt.negocio_id = %s
         ORDER BY pt.destacado DESC, p.nombre ASC
     ''', (negocio_id,))
@@ -1200,7 +1501,8 @@ def obtener_productos_con_stock_negocio(negocio_id):
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     cursor.execute('''
-        SELECT id, nombre, precio, costo, comision, stock, stock_minimo
+        SELECT id, nombre, precio, costo, comision, stock, stock_minimo,
+               categoria_id, subcategoria_id
         FROM productos 
         WHERE negocio_id = %s AND stock > 0
         ORDER BY nombre ASC
@@ -1217,23 +1519,29 @@ def obtener_productos_tienda(negocio_id=None):
     
     if negocio_id:
         cursor.execute('''
-            SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
+            SELECT p.id, p.nombre, p.categoria_id, p.subcategoria_id, p.precio, p.stock, p.foto_url,
                    p.negocio_id, u.username as negocio_username, u.nombre as negocio_nombre,
-                   u.datos_negocio, pt.destacado
+                   u.datos_negocio, pt.destacado,
+                   c.nombre as categoria_nombre, s.nombre as subcategoria_nombre
             FROM productos p 
             JOIN usuarios u ON p.negocio_id = u.id
             LEFT JOIN productos_tienda pt ON p.id = pt.producto_id AND pt.negocio_id = u.id
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+            LEFT JOIN subcategorias s ON p.subcategoria_id = s.id
             WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0 AND u.id = %s
             ORDER BY pt.destacado DESC, p.id DESC
         ''', (negocio_id,))
     else:
         cursor.execute('''
-            SELECT p.id, p.nombre, p.categoria, p.precio, p.stock, p.foto_url,
+            SELECT p.id, p.nombre, p.categoria_id, p.subcategoria_id, p.precio, p.stock, p.foto_url,
                    p.negocio_id, u.username as negocio_username, u.nombre as negocio_nombre,
-                   u.datos_negocio, pt.destacado
+                   u.datos_negocio, pt.destacado,
+                   c.nombre as categoria_nombre, s.nombre as subcategoria_nombre
             FROM productos p 
             JOIN usuarios u ON p.negocio_id = u.id
             LEFT JOIN productos_tienda pt ON p.id = pt.producto_id AND pt.negocio_id = u.id
+            LEFT JOIN categorias c ON p.categoria_id = c.id
+            LEFT JOIN subcategorias s ON p.subcategoria_id = s.id
             WHERE u.tipo = 'negocio' AND u.activo = 1 AND p.stock > 0
             ORDER BY pt.destacado DESC, p.id DESC
         ''')
@@ -1253,7 +1561,10 @@ def obtener_productos_tienda(negocio_id=None):
         resultado.append({
             'id': p['id'],
             'nombre': p['nombre'],
-            'categoria': p.get('categoria'),
+            'categoria_id': p.get('categoria_id'),
+            'categoria_nombre': p.get('categoria_nombre'),
+            'subcategoria_id': p.get('subcategoria_id'),
+            'subcategoria_nombre': p.get('subcategoria_nombre'),
             'precio': float(p['precio']),
             'stock': p['stock'],
             'foto_url': p.get('foto_url'),
@@ -1265,7 +1576,7 @@ def obtener_productos_tienda(negocio_id=None):
             'municipio': datos.get('municipio', ''),
             'direccion': datos.get('direccion', ''),
             'telefono': datos.get('telefono', ''),
-            'descripcion': datos.get('descripcion', '')
+            'descripcion': p.get('descripcion', '')
         })
     
     return resultado
@@ -1294,16 +1605,36 @@ def eliminar_producto_tienda(tienda_id):
     conn.commit()
     conn.close()
 
-def actualizar_producto(producto_id, nombre, categoria, precio, costo, comision, stock, stock_minimo, descripcion=''):
+def actualizar_producto(producto_id, nombre, categoria_id, subcategoria_id, precio, costo, comision, stock, stock_minimo, descripcion=''):
     conn = get_db()
     cursor = conn.cursor()
     try:
         cursor.execute('''
         UPDATE productos 
-        SET nombre = %s, categoria = %s, precio = %s, costo = %s, comision = %s,
-            stock = %s, stock_minimo = %s, descripcion = %s, updated_at = %s 
+        SET nombre = %s, 
+            categoria_id = %s, 
+            subcategoria_id = %s, 
+            precio = %s, 
+            costo = %s, 
+            comision = %s,
+            stock = %s, 
+            stock_minimo = %s, 
+            descripcion = %s, 
+            updated_at = %s 
         WHERE id = %s
-        ''', (nombre, categoria, precio, costo, comision, stock, stock_minimo, descripcion, datetime.now().isoformat(), producto_id))
+        ''', (
+            nombre, 
+            categoria_id, 
+            subcategoria_id, 
+            float(precio), 
+            float(costo), 
+            float(comision), 
+            int(stock), 
+            int(stock_minimo), 
+            descripcion, 
+            datetime.now().isoformat(), 
+            producto_id
+        ))
         conn.commit()
         conn.close()
         return True
@@ -2038,26 +2369,55 @@ def actualizar_servicio(servicio_id, nombre, categoria, precio, duracion, activo
     conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute('''
-            UPDATE servicios 
-            SET nombre = %s, 
-                categoria = %s, 
-                precio = %s, 
-                duracion = %s, 
-                activo = %s, 
-                descripcion = %s, 
-                updated_at = %s 
-            WHERE id = %s
-        ''', (
-            nombre, 
-            categoria, 
-            float(precio), 
-            int(duracion), 
-            int(activo), 
-            descripcion, 
-            datetime.now().isoformat(), 
-            servicio_id
-        ))
+        # Verificar si la columna descripcion existe
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'servicios' AND column_name = 'descripcion'
+        """)
+        tiene_descripcion = cursor.fetchone() is not None
+        
+        if tiene_descripcion:
+            cursor.execute('''
+                UPDATE servicios 
+                SET nombre = %s, 
+                    categoria = %s, 
+                    precio = %s, 
+                    duracion = %s, 
+                    activo = %s, 
+                    descripcion = %s, 
+                    updated_at = %s 
+                WHERE id = %s
+            ''', (
+                nombre, 
+                categoria, 
+                float(precio), 
+                int(duracion), 
+                int(activo), 
+                descripcion, 
+                datetime.now().isoformat(), 
+                servicio_id
+            ))
+        else:
+            cursor.execute('''
+                UPDATE servicios 
+                SET nombre = %s, 
+                    categoria = %s, 
+                    precio = %s, 
+                    duracion = %s, 
+                    activo = %s, 
+                    updated_at = %s 
+                WHERE id = %s
+            ''', (
+                nombre, 
+                categoria, 
+                float(precio), 
+                int(duracion), 
+                int(activo), 
+                datetime.now().isoformat(), 
+                servicio_id
+            ))
+            print("⚠️ La columna 'descripcion' no existe en la tabla servicios, omitiendo...")
         
         if cursor.rowcount > 0:
             conn.commit()
