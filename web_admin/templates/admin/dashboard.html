@@ -61,11 +61,86 @@
         .stat-item .label { font-size: 12px; color: #888; margin-top: 4px; }
         .welcome { font-size: 20px; margin-bottom: 4px; }
         .subtitle { color: #888; font-size: 14px; margin-bottom: 16px; }
+        
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .btn-purple { background: #6c3ce0; }
+        .btn-purple:hover { background: #5a2ec0; }
+        .btn-orange { background: #ff9800; }
+        .btn-orange:hover { background: #e68900; }
+        .btn-blue { background: #2196f3; }
+        .btn-blue:hover { background: #1976d2; }
+        .btn-red { background: #ff5722; }
+        .btn-red:hover { background: #e64a19; }
+        .btn-green { background: #4caf50; }
+        .btn-green:hover { background: #388e3c; }
+        
+        .acciones-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        .acciones-grid .btn {
+            text-align: center;
+            padding: 14px 20px;
+            font-size: 14px;
+        }
+        
+        .db-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .db-status-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            padding: 10px;
+            text-align: center;
+        }
+        .db-status-item .nombre {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .db-status-item .valor {
+            font-size: 20px;
+            font-weight: 700;
+            color: #6c3ce0;
+        }
+        .db-status-item .valor.ok { color: #6bff6b; }
+        .db-status-item .valor.error { color: #ff6b6b; }
+        .db-status-item .valor.warning { color: #ffbb33; }
+        
+        .loading { text-align: center; color: #888; padding: 20px; font-size: 13px; }
+        
         @media (max-width: 600px) {
             .container { padding: 16px; }
             .stats-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .acciones-grid { grid-template-columns: 1fr; }
+            .db-status-grid { grid-template-columns: 1fr 1fr; }
             .header { padding: 10px 16px; flex-wrap: wrap; gap: 8px; }
             .header .nav { width: 100%; display: flex; flex-wrap: wrap; gap: 4px; }
+            .header .nav a { font-size: 11px; padding: 4px 10px; margin-left: 0; }
+        }
+        @media (max-width: 400px) {
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 4px; }
+            .stat-item { padding: 10px; }
+            .stat-item .number { font-size: 20px; }
+            .db-status-grid { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -75,12 +150,14 @@
         <h1>🛡️ AIsa <span style="font-size:14px;font-weight:normal;opacity:0.7;">Panel de Administración</span></h1>
         <div class="nav">
             <a href="/admin/db">🗄️ Gestor BD</a>
+            <a href="/admin/sql">⚡ Gestor SQL</a>
             <a href="/admin/perfil">👤 Perfil</a>
             <a href="/logout">Cerrar sesión</a>
         </div>
     </header>
 
     <div class="container">
+        <!-- Bienvenida -->
         <div class="card">
             <div class="welcome">👋 ¡Bienvenido, {{ usuario.nombre or usuario.username }}!</div>
             <div class="subtitle">Panel de administración del sistema</div>
@@ -110,20 +187,50 @@
                     <span class="number" id="totalContratos">0</span>
                     <span class="label">📄 Contratos</span>
                 </div>
+                <div class="stat-item">
+                    <span class="number" id="totalCategorias">0</span>
+                    <span class="label">📂 Categorías</span>
+                </div>
+                <div class="stat-item">
+                    <span class="number" id="totalSubcategorias">0</span>
+                    <span class="label">📁 Subcategorías</span>
+                </div>
             </div>
         </div>
 
+        <!-- Estado de la Base de Datos -->
+        <div class="card">
+            <h2>📊 Estado de la Base de Datos</h2>
+            <div id="dbStatus" style="margin-top:4px;">
+                <div class="loading">Cargando estado...</div>
+            </div>
+        </div>
+
+        <!-- Acciones Rápidas -->
         <div class="card">
             <h2>🔧 Acciones Rápidas</h2>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-                <a href="/admin/db" class="btn" style="background:#6c3ce0;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;">🗄️ Gestor de Base de Datos</a>
-                <a href="/fix-admin" class="btn" style="background:#ff9800;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;">🔧 Reparar Admin</a>
-                <a href="/fix-nomina-tabla" class="btn" style="background:#2196f3;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;">📊 Reparar Nómina</a>
+            <div class="acciones-grid">
+                <a href="/admin/db" class="btn btn-purple">🗄️ Gestor de Base de Datos</a>
+                <a href="/admin/sql" class="btn btn-red">⚡ Gestor SQL</a>
+                <a href="/fix-db" class="btn btn-orange">🔧 Reparar DB</a>
+                <a href="/fix-admin" class="btn btn-blue">🔧 Reparar Admin</a>
+                <a href="/fix-nomina-tabla" class="btn btn-green">📊 Reparar Nómina</a>
+            </div>
+        </div>
+
+        <!-- Diagnóstico de Categorías -->
+        <div class="card">
+            <h2>📂 Diagnóstico de Categorías</h2>
+            <div id="categoriaStatus">
+                <div class="loading">Cargando...</div>
             </div>
         </div>
     </div>
 
     <script>
+        // ============================================
+        // CARGAR ESTADÍSTICAS
+        // ============================================
         async function cargarEstadisticas() {
             try {
                 const response = await fetch('/api/estadisticas');
@@ -135,11 +242,127 @@
                 document.getElementById('totalServicios').textContent = data.total_servicios || 0;
                 document.getElementById('totalContratos').textContent = data.total_contratos || 0;
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error cargando estadísticas:', error);
             }
         }
+
+        // ============================================
+        // CARGAR ESTADO DE LA BASE DE DATOS
+        // ============================================
+        async function cargarEstadoDB() {
+            const container = document.getElementById('dbStatus');
+            
+            try {
+                const response = await fetch('/api/admin/db-status');
+                const data = await response.json();
+                
+                if (data.success) {
+                    let html = '<div class="db-status-grid">';
+                    
+                    // Tablas
+                    html += `<div class="db-status-item">
+                        <div class="nombre">📋 Tablas</div>
+                        <div class="valor ok">${data.tablas.length}</div>
+                    </div>`;
+                    
+                    // descripcion en productos
+                    html += `<div class="db-status-item">
+                        <div class="nombre">📝 descripcion (productos)</div>
+                        <div class="valor ${data.tiene_descripcion_productos ? 'ok' : 'error'}">${data.tiene_descripcion_productos ? '✅ Sí' : '❌ No'}</div>
+                    </div>`;
+                    
+                    // descripcion en servicios
+                    html += `<div class="db-status-item">
+                        <div class="nombre">📝 descripcion (servicios)</div>
+                        <div class="valor ${data.tiene_descripcion_servicios ? 'ok' : 'error'}">${data.tiene_descripcion_servicios ? '✅ Sí' : '❌ No'}</div>
+                    </div>`;
+                    
+                    // categorias
+                    const categoriasCount = data.info_tablas['categorias'] || 0;
+                    html += `<div class="db-status-item">
+                        <div class="nombre">📂 Categorías</div>
+                        <div class="valor ${categoriasCount > 0 ? 'ok' : 'warning'}">${categoriasCount}</div>
+                    </div>`;
+                    
+                    // subcategorias
+                    const subcategoriasCount = data.info_tablas['subcategorias'] || 0;
+                    html += `<div class="db-status-item">
+                        <div class="nombre">📁 Subcategorías</div>
+                        <div class="valor ${subcategoriasCount > 0 ? 'ok' : 'warning'}">${subcategoriasCount}</div>
+                    </div>`;
+                    
+                    html += '</div>';
+                    container.innerHTML = html;
+                    
+                    // Actualizar estadísticas de categorías
+                    document.getElementById('totalCategorias').textContent = categoriasCount;
+                    document.getElementById('totalSubcategorias').textContent = subcategoriasCount;
+                } else {
+                    container.innerHTML = `<div class="loading" style="color:#ff6b6b;">❌ Error al cargar estado: ${data.error}</div>`;
+                }
+                
+            } catch (error) {
+                container.innerHTML = `<div class="loading" style="color:#ff6b6b;">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        // ============================================
+        // CARGAR DIAGNÓSTICO DE CATEGORÍAS
+        // ============================================
+        async function cargarDiagnosticoCategorias() {
+            const container = document.getElementById('categoriaStatus');
+            
+            try {
+                // Cargar categorías
+                const catResponse = await fetch('/api/categorias');
+                if (!catResponse.ok) {
+                    container.innerHTML = `<div class="loading" style="color:#ff6b6b;">❌ Error cargando categorías</div>`;
+                    return;
+                }
+                const categorias = await catResponse.json();
+                
+                // Cargar subcategorías
+                const subResponse = await fetch('/api/subcategorias');
+                const subcategorias = subResponse.ok ? await subResponse.json() : [];
+                
+                if (categorias.length === 0) {
+                    container.innerHTML = `
+                        <div style="color:#ffbb33;padding:10px;">
+                            ⚠️ No hay categorías registradas. 
+                            <a href="/admin/sql" style="color:#6c3ce0;">Ejecuta SQL para crearlas</a>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = '<div class="db-status-grid">';
+                categorias.forEach(c => {
+                    const count = subcategorias.filter(s => s.categoria_id === c.id).length;
+                    html += `<div class="db-status-item">
+                        <div class="nombre">${c.icono || '📂'} ${c.nombre}</div>
+                        <div class="valor ${count > 0 ? 'ok' : 'warning'}">${count} subcategorías</div>
+                    </div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+                
+            } catch (error) {
+                container.innerHTML = `<div class="loading" style="color:#ff6b6b;">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        // ============================================
+        // INICIO
+        // ============================================
         cargarEstadisticas();
-        setInterval(cargarEstadisticas, 30000);
+        cargarEstadoDB();
+        cargarDiagnosticoCategorias();
+        
+        // Actualizar cada 30 segundos
+        setInterval(() => {
+            cargarEstadisticas();
+            cargarEstadoDB();
+        }, 30000);
     </script>
 </body>
 </html>
