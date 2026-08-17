@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor SQL - AIsa Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f1a;
+            color: #fff;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #6c3ce0, #4a1a9e);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .header h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+        .header .nav a {
+            color: #fff;
+            text-decoration: none;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+            font-size: 13px;
+            transition: background 0.3s;
+            margin-left: 8px;
+        }
+        .header .nav a:hover { background: rgba(255,255,255,0.2); }
+        .container { padding: 24px; max-width: 1400px; margin: 0 auto; }
+        .card {
+            background: #1a1a2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #2a2a3e;
+            margin-bottom: 20px;
+        }
+        .card h2 { font-size: 18px; color: #6c3ce0; margin-bottom: 16px; }
+        .card .subtitle { font-size: 13px; color: #888; margin-bottom: 16px; }
+        
+        .sql-editor {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            background: #0f0f1a;
+            color: #fff;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .sql-editor:focus {
+            border-color: #6c3ce0;
+        }
+        .sql-editor::placeholder {
+            color: #444;
+        }
+        
+        .btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #6c3ce0; color: #fff; }
+        .btn-primary:hover { background: #5a2ec0; }
+        .btn-success { background: #4caf50; color: #fff; }
+        .btn-success:hover { background: #3d8b40; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-danger:hover { background: #c62828; }
+        .btn-warning { background: #ff9800; color: #000; }
+        .btn-warning:hover { background: #e68900; }
+        .btn-sm { padding: 4px 12px; font-size: 11px; }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 12px 0;
+        }
+        
+        .result-container {
+            background: #0f0f1a;
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid #2a2a3e;
+            overflow-x: auto;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+        }
+        .result-container .success { color: #6bff6b; }
+        .result-container .error { color: #ff6b6b; }
+        .result-container .info { color: #64b5f6; }
+        .result-container .warning { color: #ffbb33; }
+        
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .result-table th {
+            text-align: left;
+            padding: 6px 10px;
+            color: #888;
+            border-bottom: 2px solid #2a2a3e;
+            font-weight: 600;
+        }
+        .result-table td {
+            padding: 6px 10px;
+            border-bottom: 1px solid #1a1a2e;
+            color: #ccc;
+        }
+        .result-table tr:hover td {
+            background: rgba(108, 60, 224, 0.05);
+        }
+        
+        .quick-commands {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        .quick-commands .cmd {
+            padding: 4px 12px;
+            border-radius: 4px;
+            background: #2a2a3e;
+            color: #aaa;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: monospace;
+        }
+        .quick-commands .cmd:hover {
+            background: #6c3ce0;
+            color: #fff;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 10px;
+        }
+        .status-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 6px;
+            padding: 10px;
+            text-align: center;
+        }
+        .status-item .nombre {
+            font-size: 11px;
+            color: #888;
+        }
+        .status-item .valor {
+            font-size: 18px;
+            font-weight: 700;
+            color: #6c3ce0;
+        }
+        .status-item .valor.ok { color: #6bff6b; }
+        .status-item .valor.error { color: #ff6b6b; }
+        .status-item .valor.warning { color: #ffbb33; }
+        
+        .mensaje {
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-size: 13px;
+            display: none;
+        }
+        .mensaje.show { display: block; }
+        .mensaje.exito { background: #224422; color: #6bff6b; }
+        .mensaje.error { background: #442222; color: #ff6b6b; }
+        .mensaje.info { background: #1a2a3a; color: #64b5f6; }
+        
+        .loading { text-align: center; color: #888; padding: 20px; }
+        
+        @media (max-width: 600px) {
+            .container { padding: 16px; }
+            .status-grid { grid-template-columns: 1fr 1fr; }
+            .result-container { font-size: 11px; }
+            .result-table { font-size: 10px; }
+            .result-table th, .result-table td { padding: 4px 6px; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1>⚡ Gestor SQL</h1>
+        <div class="nav">
+            <a href="/dashboard">← Volver al Panel</a>
+            <a href="/admin/db">🗄️ Gestor BD</a>
+            <a href="/logout">Cerrar sesión</a>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <!-- Estado de la DB -->
+        <div class="card">
+            <h2>📊 Estado de la Base de Datos</h2>
+            <div id="dbStatus">
+                <div class="loading">Cargando estado...</div>
+            </div>
+        </div>
+
+        <!-- Editor SQL -->
+        <div class="card">
+            <h2>⚡ Ejecutar SQL</h2>
+            <div class="subtitle">⚠️ Solo para administradores avanzados</div>
+            
+            <div id="mensaje" class="mensaje"></div>
+            
+            <div class="quick-commands">
+                <span class="cmd" onclick="insertarSQL('ALTER TABLE productos ADD COLUMN IF NOT EXISTS descripcion TEXT;')">📝 Agregar descripcion a productos</span>
+                <span class="cmd" onclick="insertarSQL('ALTER TABLE servicios ADD COLUMN IF NOT EXISTS descripcion TEXT;')">📝 Agregar descripcion a servicios</span>
+                <span class="cmd" onclick="insertarSQL('CREATE TABLE IF NOT EXISTS categorias (id SERIAL PRIMARY KEY, nombre TEXT NOT NULL, icono TEXT, activo INTEGER DEFAULT 1, orden INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);')">📋 Crear categorias</span>
+                <span class="cmd" onclick="insertarSQL('CREATE TABLE IF NOT EXISTS subcategorias (id SERIAL PRIMARY KEY, categoria_id INTEGER NOT NULL, nombre TEXT NOT NULL, activo INTEGER DEFAULT 1, orden INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (categoria_id) REFERENCES categorias(id) ON DELETE CASCADE);')">📋 Crear subcategorias</span>
+                <span class="cmd" onclick="insertarSQL('SELECT * FROM productos LIMIT 10;')">📦 Ver productos</span>
+                <span class="cmd" onclick="insertarSQL('SELECT * FROM usuarios LIMIT 10;')">👥 Ver usuarios</span>
+                <span class="cmd" onclick="insertarSQL('SELECT * FROM modulos;')">🧩 Ver módulos</span>
+                <span class="cmd" onclick="insertarSQL('SELECT * FROM categorias;')">📂 Ver categorías</span>
+                <span class="cmd" onclick="insertarSQL('SELECT * FROM subcategorias;')">📁 Ver subcategorías</span>
+            </div>
+            
+            <textarea class="sql-editor" id="sqlEditor" placeholder="Escribe tu consulta SQL aquí...">SELECT * FROM productos LIMIT 10;</textarea>
+            
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="ejecutarSQL()">▶️ Ejecutar</button>
+                <button class="btn btn-danger" onclick="limpiarResultado()">🗑️ Limpiar</button>
+                <button class="btn btn-warning" onclick="document.getElementById('sqlEditor').value = 'SELECT * FROM productos LIMIT 10;'">📋 SELECT productos</button>
+                <button class="btn btn-warning" onclick="document.getElementById('sqlEditor').value = 'SELECT * FROM usuarios LIMIT 10;'">📋 SELECT usuarios</button>
+                <button class="btn btn-warning" onclick="document.getElementById('sqlEditor').value = 'SELECT * FROM modulos;'">📋 SELECT modulos</button>
+            </div>
+        </div>
+
+        <!-- Resultado -->
+        <div class="card">
+            <h2>📋 Resultado</h2>
+            <div id="resultContainer" class="result-container">
+                <span class="info">💡 Ejecuta una consulta para ver los resultados aquí</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ============================================
+        // FUNCIONES
+        // ============================================
+        
+        function insertarSQL(sql) {
+            document.getElementById('sqlEditor').value = sql;
+            document.getElementById('sqlEditor').focus();
+        }
+        
+        function mostrarMensaje(texto, tipo) {
+            const el = document.getElementById('mensaje');
+            el.textContent = texto;
+            el.className = `mensaje ${tipo} show`;
+            setTimeout(() => {
+                el.className = 'mensaje';
+            }, 5000);
+        }
+        
+        function limpiarResultado() {
+            document.getElementById('resultContainer').innerHTML = '<span class="info">💡 Ejecuta una consulta para ver los resultados aquí</span>';
+        }
+        
+        async function ejecutarSQL() {
+            const query = document.getElementById('sqlEditor').value.trim();
+            if (!query) {
+                mostrarMensaje('❌ Escribe una consulta SQL', 'error');
+                return;
+            }
+            
+            const container = document.getElementById('resultContainer');
+            container.innerHTML = '<div class="loading">⏳ Ejecutando...</div>';
+            
+            try {
+                const response = await fetch('/api/admin/sql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    mostrarMensaje('✅ Consulta ejecutada correctamente', 'exito');
+                    
+                    if (data.type === 'select') {
+                        // Mostrar tabla
+                        let html = `<div class="success">✅ ${data.count} filas encontradas</div><br>`;
+                        
+                        if (data.rows.length > 0) {
+                            html += '<table class="result-table"><thead><tr>';
+                            data.columns.forEach(col => {
+                                html += `<th>${col}</th>`;
+                            });
+                            html += '</tr></thead><tbody>';
+                            
+                            data.rows.forEach(row => {
+                                html += '<tr>';
+                                data.columns.forEach(col => {
+                                    html += `<td>${row[col] !== null ? row[col] : '<span style="color:#666;">NULL</span>'}</td>`;
+                                });
+                                html += '</tr>';
+                            });
+                            html += '</tbody></table>';
+                        } else {
+                            html += '<span class="info">📭 No hay datos</span>';
+                        }
+                        
+                        container.innerHTML = html;
+                    } else {
+                        // INSERT, UPDATE, DELETE, ALTER, etc.
+                        const affected = data.affected_rows !== undefined ? data.affected_rows : 'N/A';
+                        container.innerHTML = `
+                            <div class="success">✅ ${data.message}</div>
+                            <div class="info">📊 Filas afectadas: ${affected}</div>
+                        `;
+                    }
+                } else {
+                    container.innerHTML = `<div class="error">❌ Error: ${data.error}</div>`;
+                    mostrarMensaje(`❌ Error: ${data.error}`, 'error');
+                }
+                
+            } catch (error) {
+                container.innerHTML = `<div class="error">❌ Error de conexión: ${error.message}</div>`;
+                mostrarMensaje(`❌ Error de conexión: ${error.message}`, 'error');
+            }
+        }
+        
+        async function cargarEstadoDB() {
+            const container = document.getElementById('dbStatus');
+            container.innerHTML = '<div class="loading">Cargando estado...</div>';
+            
+            try {
+                const response = await fetch('/api/admin/db-status');
+                const data = await response.json();
+                
+                if (data.success) {
+                    let html = '<div class="status-grid">';
+                    
+                    // Tablas
+                    html += `<div class="status-item">
+                        <div class="nombre">📋 Tablas</div>
+                        <div class="valor ok">${data.tablas.length}</div>
+                    </div>`;
+                    
+                    // Columnas de descripción
+                    html += `<div class="status-item">
+                        <div class="nombre">📝 descripcion en productos</div>
+                        <div class="valor ${data.tiene_descripcion_productos ? 'ok' : 'error'}">${data.tiene_descripcion_productos ? '✅ Sí' : '❌ No'}</div>
+                    </div>`;
+                    
+                    html += `<div class="status-item">
+                        <div class="nombre">📝 descripcion en servicios</div>
+                        <div class="valor ${data.tiene_descripcion_servicios ? 'ok' : 'error'}">${data.tiene_descripcion_servicios ? '✅ Sí' : '❌ No'}</div>
+                    </div>`;
+                    
+                    // Información de tablas principales
+                    const tablas_principales = ['usuarios', 'productos', 'servicios', 'ventas', 'contratos', 'categorias', 'subcategorias'];
+                    tablas_principales.forEach(tabla => {
+                        if (data.info_tablas[tabla] !== undefined) {
+                            html += `<div class="status-item">
+                                <div class="nombre">📊 ${tabla}</div>
+                                <div class="valor">${data.info_tablas[tabla]}</div>
+                            </div>`;
+                        }
+                    });
+                    
+                    html += '</div>';
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = `<div class="error">❌ Error: ${data.error}</div>`;
+                }
+                
+            } catch (error) {
+                container.innerHTML = `<div class="error">❌ Error al cargar estado: ${error.message}</div>`;
+            }
+        }
+        
+        // ============================================
+        // EJECUTAR CON CTRL+ENTER
+        // ============================================
+        document.getElementById('sqlEditor').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                ejecutarSQL();
+            }
+        });
+        
+        // ============================================
+        // INICIO
+        // ============================================
+        cargarEstadoDB();
+        setInterval(cargarEstadoDB, 30000);
+    </script>
+</body>
+</html>
