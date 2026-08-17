@@ -203,7 +203,7 @@
             padding-left: 24px;
         }
 
-        /* ESTADÍSTICAS PARA TRABAJADOR - OCULTAS */
+        /* ESTADÍSTICAS SUPERIORES - OCULTAS PARA TRABAJADOR */
         .stats-resumen {
             display: none;
         }
@@ -237,6 +237,32 @@
 
     <div class="mensaje-error" id="mensajeError"></div>
     <div class="mensaje-exito" id="mensajeExito"></div>
+
+    <!-- ESTADÍSTICAS OCULTAS PARA TRABAJADOR -->
+    <div class="card stats-resumen" id="statsResumen">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(80px, 1fr));gap:6px;">
+            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:6px;padding:6px;text-align:center;">
+                <div style="font-size:16px;font-weight:700;color:#6c3ce0;" id="totalVentas">0</div>
+                <div style="font-size:8px;color:#888;">📊 Total</div>
+            </div>
+            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:6px;padding:6px;text-align:center;">
+                <div style="font-size:16px;font-weight:700;color:#6bff6b;" id="totalPagado">0</div>
+                <div style="font-size:8px;color:#888;">✅ Pagadas</div>
+            </div>
+            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:6px;padding:6px;text-align:center;">
+                <div style="font-size:16px;font-weight:700;color:#ffbb33;" id="totalPendiente">0</div>
+                <div style="font-size:8px;color:#888;">⏳ Pendientes</div>
+            </div>
+            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:6px;padding:6px;text-align:center;">
+                <div style="font-size:16px;font-weight:700;color:#ff6b6b;" id="totalCancelado">0</div>
+                <div style="font-size:8px;color:#888;">❌ Canceladas</div>
+            </div>
+            <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:6px;padding:6px;text-align:center;">
+                <div style="font-size:16px;font-weight:700;color:#ff9800;" id="totalOfertas">0</div>
+                <div style="font-size:8px;color:#888;">📄 Ofertas</div>
+            </div>
+        </div>
+    </div>
 
     <div class="card">
         <div class="search-bar">
@@ -424,6 +450,9 @@
             if (trabajadorId) {
                 const input = document.getElementById('ventaTrabajador');
                 if (input) input.value = trabajadorId;
+                // Ocultar estadísticas para trabajador
+                const stats = document.getElementById('statsResumen');
+                if (stats) stats.style.display = 'none';
             }
             
             // Asignar event listeners
@@ -471,6 +500,7 @@
                 console.log('📊 Ventas cargadas:', ventas.length);
                 
                 renderVentas();
+                actualizarResumenVentas();
             } catch (error) {
                 console.error('Error cargando ventas:', error);
                 if (container) {
@@ -554,6 +584,27 @@
             
             html += `</tbody></table>`;
             container.innerHTML = html;
+        }
+
+        // ============================================
+        // ACTUALIZAR RESUMEN DE VENTAS
+        // ============================================
+        function actualizarResumenVentas() {
+            // Solo actualizar si el elemento existe y no está oculto
+            const totalEl = document.getElementById('totalVentas');
+            if (!totalEl) return;
+            
+            const total = ventas.length;
+            const pagado = ventas.filter(v => v.estado === 'pagado' || v.estado === 'transferencia').length;
+            const pendiente = ventas.filter(v => v.estado === 'pendiente').length;
+            const cancelado = ventas.filter(v => v.estado === 'cancelado').length;
+            const oferta = ventas.filter(v => v.estado === 'oferta').length;
+            
+            document.getElementById('totalVentas').textContent = total;
+            document.getElementById('totalPagado').textContent = pagado;
+            document.getElementById('totalPendiente').textContent = pendiente;
+            document.getElementById('totalCancelado').textContent = cancelado;
+            document.getElementById('totalOfertas').textContent = oferta;
         }
 
         // ============================================
