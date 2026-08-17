@@ -60,10 +60,12 @@
             padding: 6px 10px; border: 1px solid #2a2a3e; border-radius: 6px;
             background: #0f0f1a; color: #fff; font-size: 12px;
             flex: 1; min-width: 100px;
+            font-family: inherit;
         }
         .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
             border-color: #6c3ce0; outline: none;
         }
+        .form-row select option { background: #1a1a2e; }
         .search-bar {
             display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
         }
@@ -98,10 +100,14 @@
             display: inline-block; background: rgba(108,60,224,0.2);
             color: #6c3ce0; padding: 1px 8px; border-radius: 10px; font-size: 10px;
         }
+        .subcategoria-tag {
+            display: inline-block; background: rgba(33,150,243,0.15);
+            color: #64b5f6; padding: 1px 8px; border-radius: 10px; font-size: 9px;
+        }
         .acciones-cell { display: flex; gap: 4px; flex-wrap: wrap; }
         
         .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -4px; }
-        .table-wrapper table { min-width: 500px; }
+        .table-wrapper table { min-width: 600px; }
 
         @media (max-width: 600px) {
             body { padding: 8px; }
@@ -151,32 +157,28 @@
         <div id="formServicio" style="display:none;border-top:1px solid #2a2a3e;padding-top:12px;margin-top:8px;">
             <h3 style="font-size:14px;margin-bottom:8px;" id="formTitle">📋 Nuevo Servicio</h3>
             <div class="form-row">
-                <input type="text" id="serNombre" placeholder="Nombre">
-                <select id="serCategoria">
-                    <option value="">-- Categoría --</option>
-                    <option value="electronica">💻 Electrónica</option>
-                    <option value="ropa">👕 Ropa</option>
-                    <option value="hogar">🏠 Hogar</option>
-                    <option value="belleza">💄 Belleza</option>
-                    <option value="deporte">🏋️ Deporte</option>
-                    <option value="educacion">📚 Educación</option>
-                    <option value="salud">🏥 Salud</option>
-                    <option value="otros">📦 Otros</option>
+                <input type="text" id="serNombre" placeholder="Nombre" required>
+            </div>
+            <div class="form-row">
+                <select id="serCategoria" required>
+                    <option value="">-- Seleccionar categoría --</option>
+                </select>
+                <select id="serSubcategoria">
+                    <option value="">-- Seleccionar subcategoría --</option>
                 </select>
             </div>
             <div class="form-row">
-                <input type="number" id="serPrecio" placeholder="Precio" step="0.01">
-                <input type="number" id="serDuracion" placeholder="Duración (min)">
+                <input type="number" id="serPrecio" placeholder="Precio" step="0.01" required>
+                <input type="number" id="serDuracion" placeholder="Duración (min)" value="60">
                 <select id="serEstado">
                     <option value="1">Activo</option>
                     <option value="0">Inactivo</option>
                 </select>
             </div>
-            <div class="form-row">
-                <textarea id="serDescripcion" placeholder="Descripción" rows="2"></textarea>
+            <div class="form-row descripcion-field">
+                <textarea id="serDescripcion" placeholder="Descripción del servicio (opcional)" rows="2"></textarea>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <!-- ELIMINÉ onclick="guardarServicio()" para evitar duplicados -->
                 <button class="btn btn-success" id="btnGuardar">💾 Guardar</button>
                 <button class="btn btn-danger" id="btnCancelar">✕ Cancelar</button>
             </div>
@@ -192,9 +194,17 @@
     </div>
 
     <script>
+        // ============================================
+        // VARIABLES GLOBALES
+        // ============================================
         let servicios = [];
         let editandoId = null;
+        let categorias = [];
+        let subcategorias = [];
 
+        // ============================================
+        // MOSTRAR MENSAJES
+        // ============================================
         function mostrarMensaje(texto, tipo) {
             const errorEl = document.getElementById('mensajeError');
             const exitoEl = document.getElementById('mensajeExito');
@@ -213,6 +223,68 @@
             }, 4000);
         }
 
+        // ============================================
+        // CARGAR CATEGORÍAS
+        // ============================================
+        async function cargarCategorias() {
+            try {
+                const response = await fetch('/api/categorias');
+                if (!response.ok) throw new Error('Error al cargar categorías');
+                categorias = await response.json();
+                console.log('📂 Categorías cargadas:', categorias.length);
+                
+                const select = document.getElementById('serCategoria');
+                select.innerHTML = '<option value="">-- Seleccionar categoría --</option>';
+                categorias.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = `${c.icono || '📂'} ${c.nombre}`;
+                    select.appendChild(opt);
+                });
+            } catch (error) {
+                console.error('Error cargando categorías:', error);
+            }
+        }
+
+        // ============================================
+        // CARGAR SUBCATEGORÍAS POR CATEGORÍA
+        // ============================================
+        async function cargarSubcategorias(categoriaId, seleccionarId = null) {
+            const select = document.getElementById('serSubcategoria');
+            select.innerHTML = '<option value="">-- Seleccionar subcategoría --</option>';
+            
+            if (!categoriaId) return;
+            
+            try {
+                const response = await fetch(`/api/subcategorias?categoria_id=${categoriaId}`);
+                if (!response.ok) throw new Error('Error al cargar subcategorías');
+                subcategorias = await response.json();
+                console.log('📁 Subcategorías cargadas:', subcategorias.length);
+                
+                subcategorias.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = s.nombre;
+                    if (seleccionarId && s.id === seleccionarId) {
+                        opt.selected = true;
+                    }
+                    select.appendChild(opt);
+                });
+            } catch (error) {
+                console.error('Error cargando subcategorías:', error);
+            }
+        }
+
+        // ============================================
+        // EVENTO DE CAMBIO DE CATEGORÍA
+        // ============================================
+        document.getElementById('serCategoria').addEventListener('change', function() {
+            cargarSubcategorias(this.value);
+        });
+
+        // ============================================
+        // CARGAR SERVICIOS
+        // ============================================
         async function cargarServicios() {
             const container = document.getElementById('serviciosContainer');
             container.innerHTML = '<div class="loading">Cargando...</div>';
@@ -221,6 +293,7 @@
                 const response = await fetch('/api/servicios');
                 if (!response.ok) throw new Error('Error');
                 servicios = await response.json();
+                console.log('📋 Servicios cargados:', servicios.length);
                 renderServicios();
                 actualizarEstadisticas();
             } catch (error) {
@@ -229,13 +302,18 @@
             }
         }
 
+        // ============================================
+        // RENDER SERVICIOS
+        // ============================================
         function renderServicios(filtro = '') {
             const container = document.getElementById('serviciosContainer');
             const filtroLower = filtro.toLowerCase();
             
             const filtrados = servicios.filter(s => 
                 s.nombre.toLowerCase().includes(filtroLower) ||
-                (s.categoria && s.categoria.toLowerCase().includes(filtroLower))
+                (s.categoria && s.categoria.toLowerCase().includes(filtroLower)) ||
+                (s.categoria_nombre && s.categoria_nombre.toLowerCase().includes(filtroLower)) ||
+                (s.subcategoria_nombre && s.subcategoria_nombre.toLowerCase().includes(filtroLower))
             );
 
             if (filtrados.length === 0) {
@@ -247,6 +325,7 @@
                 <thead><tr>
                     <th>Servicio</th>
                     <th>Categoría</th>
+                    <th>Subcategoría</th>
                     <th>Precio</th>
                     <th>Duración</th>
                     <th>Estado</th>
@@ -254,10 +333,14 @@
                 </tr></thead><tbody>`;
 
             filtrados.forEach(s => {
+                const categoriaDisplay = s.categoria_nombre || s.categoria || '-';
+                const subcategoriaDisplay = s.subcategoria_nombre || '-';
+                
                 html += `
                     <tr>
                         <td><strong>${s.nombre}</strong></td>
-                        <td><span class="categoria-tag">${s.categoria || '-'}</span></td>
+                        <td><span class="categoria-tag">${categoriaDisplay}</span></td>
+                        <td>${subcategoriaDisplay !== '-' ? `<span class="subcategoria-tag">${subcategoriaDisplay}</span>` : '-'}</td>
                         <td>$${parseFloat(s.precio).toFixed(2)}</td>
                         <td>${s.duracion} min</td>
                         <td><span class="badge ${s.activo ? 'activo' : 'inactivo'}">${s.activo ? '🟢 Activo' : '🔴 Inactivo'}</span></td>
@@ -275,6 +358,9 @@
             container.innerHTML = html;
         }
 
+        // ============================================
+        // ACTUALIZAR ESTADÍSTICAS
+        // ============================================
         function actualizarEstadisticas() {
             const total = servicios.length;
             const activos = servicios.filter(s => s.activo === 1).length;
@@ -285,10 +371,16 @@
             document.getElementById('serviciosInactivos').textContent = inactivos;
         }
 
+        // ============================================
+        // FILTRAR SERVICIOS
+        // ============================================
         function filtrarServicios() {
             renderServicios(document.getElementById('searchInput').value);
         }
 
+        // ============================================
+        // FORMULARIO
+        // ============================================
         function mostrarFormulario() {
             document.getElementById('formServicio').style.display = 'block';
             document.getElementById('serNombre').focus();
@@ -297,11 +389,28 @@
             document.getElementById('btnGuardar').textContent = '💾 Guardar';
             document.getElementById('btnGuardar').className = 'btn btn-success';
             document.getElementById('serNombre').value = '';
-            document.getElementById('serCategoria').value = '';
             document.getElementById('serPrecio').value = '';
-            document.getElementById('serDuracion').value = '';
+            document.getElementById('serDuracion').value = '60';
             document.getElementById('serDescripcion').value = '';
             document.getElementById('serEstado').value = '1';
+            
+            // Cargar categorías si no están cargadas
+            if (categorias.length === 0) {
+                cargarCategorias();
+            } else {
+                // Resetear selects
+                const selectCat = document.getElementById('serCategoria');
+                selectCat.innerHTML = '<option value="">-- Seleccionar categoría --</option>';
+                categorias.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = `${c.icono || '📂'} ${c.nombre}`;
+                    selectCat.appendChild(opt);
+                });
+                document.getElementById('serSubcategoria').innerHTML = '<option value="">-- Seleccionar subcategoría --</option>';
+            }
+            
+            document.getElementById('formServicio').scrollIntoView({ behavior: 'smooth' });
         }
 
         function cancelarFormulario() {
@@ -315,11 +424,30 @@
             
             document.getElementById('formServicio').style.display = 'block';
             document.getElementById('serNombre').value = s.nombre;
-            document.getElementById('serCategoria').value = s.categoria || '';
             document.getElementById('serPrecio').value = s.precio;
             document.getElementById('serDuracion').value = s.duracion || 60;
             document.getElementById('serDescripcion').value = s.descripcion || '';
             document.getElementById('serEstado').value = s.activo ? '1' : '0';
+            
+            // Cargar categorías
+            const selectCat = document.getElementById('serCategoria');
+            selectCat.innerHTML = '<option value="">-- Seleccionar categoría --</option>';
+            categorias.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = `${c.icono || '📂'} ${c.nombre}`;
+                if (s.categoria_id && c.id === s.categoria_id) {
+                    opt.selected = true;
+                }
+                selectCat.appendChild(opt);
+            });
+            
+            // Cargar subcategorías
+            if (s.categoria_id) {
+                cargarSubcategorias(s.categoria_id, s.subcategoria_id);
+            } else {
+                document.getElementById('serSubcategoria').innerHTML = '<option value="">-- Seleccionar subcategoría --</option>';
+            }
             
             editandoId = id;
             document.getElementById('formTitle').textContent = '✏️ Editar Servicio';
@@ -330,27 +458,34 @@
         }
 
         // ============================================
-        // GUARDAR SERVICIO (CORREGIDO - SIN onclick en HTML)
+        // GUARDAR SERVICIO
         // ============================================
         async function guardarServicio() {
             const nombre = document.getElementById('serNombre').value.trim();
-            const categoria = document.getElementById('serCategoria').value;
+            const categoria_id = document.getElementById('serCategoria').value;
+            const subcategoria_id = document.getElementById('serSubcategoria').value || null;
             const precio = parseFloat(document.getElementById('serPrecio').value);
             const duracion = parseInt(document.getElementById('serDuracion').value) || 60;
             const activo = parseInt(document.getElementById('serEstado').value) === 1;
             const descripcion = document.getElementById('serDescripcion').value.trim();
 
-            if (!nombre || !categoria || isNaN(precio)) {
+            if (!nombre || !categoria_id || isNaN(precio) || precio <= 0) {
                 mostrarMensaje('Nombre, categoría y precio son obligatorios', 'error');
                 return;
             }
 
-            const data = { nombre, categoria, precio, duracion, activo, descripcion };
+            const data = { 
+                nombre, 
+                categoria_id: parseInt(categoria_id),
+                subcategoria_id: subcategoria_id ? parseInt(subcategoria_id) : null,
+                precio, 
+                duracion, 
+                activo, 
+                descripcion 
+            };
             
             const btn = document.getElementById('btnGuardar');
             const textoOriginal = btn.textContent;
-            
-            // Deshabilitar el botón para evitar doble clic
             btn.disabled = true;
             btn.textContent = '⏳ Guardando...';
 
@@ -385,6 +520,9 @@
             }
         }
 
+        // ============================================
+        // TOGGLE SERVICIO
+        // ============================================
         async function toggleServicio(id, activo) {
             try {
                 const response = await fetch(`/api/servicio/${id}/toggle`, {
@@ -404,6 +542,9 @@
             }
         }
 
+        // ============================================
+        // ELIMINAR SERVICIO
+        // ============================================
         async function eliminarServicio(id) {
             if (!confirm('¿Eliminar este servicio?')) return;
             try {
@@ -424,14 +565,15 @@
         }
 
         // ============================================
-        // EVENT LISTENERS (SOLO AQUÍ, NO onclick en HTML)
+        // EVENT LISTENERS
         // ============================================
         document.addEventListener('DOMContentLoaded', function() {
             // Asignar event listeners
             document.getElementById('btnGuardar').addEventListener('click', guardarServicio);
             document.getElementById('btnCancelar').addEventListener('click', cancelarFormulario);
             
-            // Cargar servicios iniciales
+            // Cargar categorías al inicio
+            cargarCategorias();
             cargarServicios();
             
             // Actualizar cada 30 segundos
