@@ -219,6 +219,14 @@
             border-radius: 10px;
             font-size: 10px;
         }
+        .subcategoria-tag {
+            display: inline-block;
+            background: rgba(33, 150, 243, 0.15);
+            color: #64b5f6;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 9px;
+        }
         .acciones-cell {
             display: flex;
             gap: 4px;
@@ -230,7 +238,7 @@
             margin: 0 -4px;
         }
         .table-wrapper table {
-            min-width: 800px;
+            min-width: 900px;
         }
         .ganancia-indicador {
             font-size: 9px;
@@ -354,16 +362,13 @@
             <h3 style="font-size:14px;margin-bottom:8px;" id="formTitle">📦 Nuevo Producto</h3>
             <div class="form-row">
                 <input type="text" id="prodNombre" placeholder="Nombre" required>
-                <select id="prodCategoria">
+            </div>
+            <div class="form-row">
+                <select id="prodCategoria" required>
                     <option value="">-- Seleccionar categoría --</option>
-                    <option value="electronica">Electrónica</option>
-                    <option value="ropa">Ropa</option>
-                    <option value="hogar">Hogar</option>
-                    <option value="belleza">Belleza</option>
-                    <option value="deporte">Deporte</option>
-                    <option value="alimentos">Alimentos</option>
-                    <option value="automotriz">Automotriz</option>
-                    <option value="otros">Otros</option>
+                </select>
+                <select id="prodSubcategoria">
+                    <option value="">-- Seleccionar subcategoría --</option>
                 </select>
             </div>
             <div class="form-row">
@@ -418,6 +423,8 @@
         // ============================================
         let productos = [];
         let editandoId = null;
+        let categorias = [];
+        let subcategorias = [];
 
         // ============================================
         // MOSTRAR MENSAJES
@@ -440,6 +447,65 @@
                 exitoEl.classList.remove('show');
             }, 4000);
         }
+
+        // ============================================
+        // CARGAR CATEGORÍAS
+        // ============================================
+        async function cargarCategorias() {
+            try {
+                const response = await fetch('/api/categorias');
+                if (!response.ok) throw new Error('Error al cargar categorías');
+                categorias = await response.json();
+                console.log('📂 Categorías cargadas:', categorias.length);
+                
+                const select = document.getElementById('prodCategoria');
+                select.innerHTML = '<option value="">-- Seleccionar categoría --</option>';
+                categorias.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = `${c.icono || '📂'} ${c.nombre}`;
+                    select.appendChild(opt);
+                });
+            } catch (error) {
+                console.error('Error cargando categorías:', error);
+            }
+        }
+
+        // ============================================
+        // CARGAR SUBCATEGORÍAS POR CATEGORÍA
+        // ============================================
+        async function cargarSubcategorias(categoriaId, seleccionarId = null) {
+            const select = document.getElementById('prodSubcategoria');
+            select.innerHTML = '<option value="">-- Seleccionar subcategoría --</option>';
+            
+            if (!categoriaId) return;
+            
+            try {
+                const response = await fetch(`/api/subcategorias?categoria_id=${categoriaId}`);
+                if (!response.ok) throw new Error('Error al cargar subcategorías');
+                subcategorias = await response.json();
+                console.log('📁 Subcategorías cargadas:', subcategorias.length);
+                
+                subcategorias.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.id;
+                    opt.textContent = s.nombre;
+                    if (seleccionarId && s.id === seleccionarId) {
+                        opt.selected = true;
+                    }
+                    select.appendChild(opt);
+                });
+            } catch (error) {
+                console.error('Error cargando subcategorías:', error);
+            }
+        }
+
+        // ============================================
+        // EVENTO DE CAMBIO DE CATEGORÍA
+        // ============================================
+        document.getElementById('prodCategoria').addEventListener('change', function() {
+            cargarSubcategorias(this.value);
+        });
 
         // ============================================
         // PREVISUALIZAR FOTO
@@ -517,7 +583,8 @@
             
             const filtrados = productos.filter(p => 
                 p.nombre.toLowerCase().includes(filtroLower) ||
-                (p.categoria && p.categoria.toLowerCase().includes(filtroLower)) ||
+                (p.categoria_nombre && p.categoria_nombre.toLowerCase().includes(filtroLower)) ||
+                (p.subcategoria_nombre && p.subcategoria_nombre.toLowerCase().includes(filtroLower)) ||
                 (p.descripcion && p.descripcion.toLowerCase().includes(filtroLower))
             );
 
@@ -531,6 +598,7 @@
                     <th>Foto</th>
                     <th>Producto</th>
                     <th>Categoría</th>
+                    <th>Subcategoría</th>
                     <th>Descripción</th>
                     <th>Precio</th>
                     <th>Costo</th>
@@ -547,7 +615,8 @@
                 else if (p.stock <= (p.stock_minimo || 3)) { estado = '⚠️ Bajo'; clase = 'bajo'; }
                 else { estado = '✅ Normal'; clase = 'alto'; }
                 
-                const categoriaDisplay = p.categoria || '-';
+                const categoriaDisplay = p.categoria_nombre || p.categoria || '-';
+                const subcategoriaDisplay = p.subcategoria_nombre || '-';
                 const costo = p.costo || 0;
                 const ganancia = p.precio - costo;
                 const porcentaje = costo > 0 ? (ganancia / costo) * 100 : 0;
@@ -571,6 +640,7 @@
                         <td>${fotoHtml}</td>
                         <td><strong>${p.nombre}</strong></td>
                         <td><span class="categoria-tag">${categoriaDisplay}</span></td>
+                        <td>${subcategoriaDisplay !== '-' ? `<span class="subcategoria-tag">${subcategoriaDisplay}</span>` : '-'}</td>
                         <td><div class="descripcion-cell" title="${descripcion}">${descripcion || '-'}</div></td>
                         <td>$${parseFloat(p.precio).toFixed(2)}</td>
                         <td>$${costo.toFixed(2)}</td>
@@ -634,6 +704,7 @@
             document.getElementById('btnGuardar').className = 'btn btn-success';
             document.getElementById('prodNombre').value = '';
             document.getElementById('prodCategoria').value = '';
+            document.getElementById('prodSubcategoria').value = '';
             document.getElementById('prodPrecio').value = '';
             document.getElementById('prodCosto').value = '';
             document.getElementById('prodComision').value = '';
@@ -644,6 +715,23 @@
             document.getElementById('fotoPreview').classList.remove('show');
             document.getElementById('fotoPreview').src = '';
             document.getElementById('prodFoto').value = '';
+            
+            // Cargar categorías si no están cargadas
+            if (categorias.length === 0) {
+                cargarCategorias();
+            } else {
+                // Resetear selects
+                const selectCat = document.getElementById('prodCategoria');
+                selectCat.innerHTML = '<option value="">-- Seleccionar categoría --</option>';
+                categorias.forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = `${c.icono || '📂'} ${c.nombre}`;
+                    selectCat.appendChild(opt);
+                });
+                document.getElementById('prodSubcategoria').innerHTML = '<option value="">-- Seleccionar subcategoría --</option>';
+            }
+            
             document.getElementById('formProducto').scrollIntoView({ behavior: 'smooth' });
         }
 
@@ -658,13 +746,32 @@
             
             document.getElementById('formProducto').style.display = 'block';
             document.getElementById('prodNombre').value = p.nombre;
-            document.getElementById('prodCategoria').value = p.categoria || '';
             document.getElementById('prodPrecio').value = p.precio;
             document.getElementById('prodCosto').value = p.costo || 0;
             document.getElementById('prodComision').value = p.comision || 0;
             document.getElementById('prodStock').value = p.stock;
             document.getElementById('prodMinimo').value = p.stock_minimo || 3;
             document.getElementById('prodDescripcion').value = p.descripcion || '';
+            
+            // Cargar categorías
+            const selectCat = document.getElementById('prodCategoria');
+            selectCat.innerHTML = '<option value="">-- Seleccionar categoría --</option>';
+            categorias.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = `${c.icono || '📂'} ${c.nombre}`;
+                if (p.categoria_id && c.id === p.categoria_id) {
+                    opt.selected = true;
+                }
+                selectCat.appendChild(opt);
+            });
+            
+            // Cargar subcategorías
+            if (p.categoria_id) {
+                cargarSubcategorias(p.categoria_id, p.subcategoria_id);
+            } else {
+                document.getElementById('prodSubcategoria').innerHTML = '<option value="">-- Seleccionar subcategoría --</option>';
+            }
             
             if (p.foto_url) {
                 const preview = document.getElementById('fotoPreview');
@@ -686,7 +793,8 @@
         // ============================================
         async function guardarProducto() {
             const nombre = document.getElementById('prodNombre').value.trim();
-            const categoria = document.getElementById('prodCategoria').value;
+            const categoria_id = document.getElementById('prodCategoria').value;
+            const subcategoria_id = document.getElementById('prodSubcategoria').value || null;
             const precio = parseFloat(document.getElementById('prodPrecio').value);
             const costo = parseFloat(document.getElementById('prodCosto').value) || 0;
             const comision = parseFloat(document.getElementById('prodComision').value) || 0;
@@ -694,14 +802,15 @@
             const stock_minimo = parseInt(document.getElementById('prodMinimo').value) || 3;
             const descripcion = document.getElementById('prodDescripcion').value.trim();
 
-            if (!nombre || !categoria || isNaN(precio) || precio <= 0) {
+            if (!nombre || !categoria_id || isNaN(precio) || precio <= 0) {
                 mostrarMensaje('Nombre, categoría y precio son obligatorios', 'error');
                 return;
             }
 
             const data = { 
                 nombre, 
-                categoria, 
+                categoria_id: parseInt(categoria_id),
+                subcategoria_id: subcategoria_id ? parseInt(subcategoria_id) : null,
                 precio, 
                 costo, 
                 comision, 
@@ -828,6 +937,8 @@
             if (precioInput) precioInput.addEventListener('input', calcularGanancia);
             if (costoInput) costoInput.addEventListener('input', calcularGanancia);
             
+            // Cargar categorías al inicio
+            cargarCategorias();
             cargarProductos();
             setInterval(cargarProductos, 30000);
         });
