@@ -70,7 +70,7 @@ try:
         crear_venta, obtener_ventas, obtener_todas_ventas, obtener_estadisticas_ventas,
         eliminar_venta_con_reintegro,
         actualizar_estado_venta,
-        crear_servicio, obtener_servicios, obtener_todos_servicios, toggle_servicio, eliminar_servicio,
+        crear_servicio, obtener_servicios, obtener_todos_servicios,toggle_servicio, eliminar_servicio, actualizar_servicio,
         obtener_estadisticas_trabajador,
         crear_trabajador_negocio, toggle_trabajador_negocio, actualizar_trabajador_negocio,
         obtener_trabajadores_pendientes, aprobar_trabajador, rechazar_trabajador,
@@ -2214,15 +2214,17 @@ def api_crear_servicio():
         return jsonify({'success': False, 'error': 'Datos inválidos'}), 400
     
     nombre = data.get('nombre')
-    categoria = data.get('categoria')
+    categoria_id = data.get('categoria_id')
+    subcategoria_id = data.get('subcategoria_id')
     precio = data.get('precio')
     duracion = data.get('duracion', 60)
     activo = data.get('activo', True)
     descripcion = data.get('descripcion', '')
     
-    print(f"📝 Creando servicio: {nombre}, {categoria}, {precio}")
+    print(f"📝 Creando servicio: {nombre}, categoria_id={categoria_id}, subcategoria_id={subcategoria_id}, precio={precio}")
     
-    if not nombre or not categoria or precio is None:
+    # Validar campos obligatorios
+    if not nombre or not categoria_id or precio is None:
         return jsonify({'success': False, 'error': 'Nombre, categoría y precio son obligatorios'}), 400
     
     try:
@@ -2239,7 +2241,8 @@ def api_crear_servicio():
             negocio_id, 
             trabajador_id, 
             nombre, 
-            categoria, 
+            categoria_id, 
+            subcategoria_id,
             float(precio), 
             int(duracion), 
             1 if activo else 0, 
