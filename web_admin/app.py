@@ -914,10 +914,13 @@ def api_perfil():
     })
 
 @app.route('/api/perfil/password', methods=['POST'])
-@admin_required
+@login_required  # <-- CAMBIADO DE admin_required a login_required
 def api_perfil_password():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
     
     data = request.get_json()
     current_password = data.get('current_password')
