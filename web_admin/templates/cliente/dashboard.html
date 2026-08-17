@@ -91,6 +91,54 @@
         }
         
         /* ============================================
+           FILTRO DE CATEGORÍAS
+           ============================================ */
+        .filtro-categorias {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 8px 2px 12px 2px;
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x mandatory;
+            margin-bottom: 12px;
+        }
+        .filtro-categorias::-webkit-scrollbar {
+            height: 3px;
+        }
+        .filtro-categorias::-webkit-scrollbar-track {
+            background: #1a1a2e;
+            border-radius: 4px;
+        }
+        .filtro-categorias::-webkit-scrollbar-thumb {
+            background: #6c3ce0;
+            border-radius: 4px;
+        }
+        
+        .filtro-categoria-item {
+            padding: 6px 16px;
+            border-radius: 20px;
+            background: #1a1a2e;
+            border: 1px solid #2a2a3e;
+            color: #888;
+            cursor: pointer;
+            white-space: nowrap;
+            font-size: 12px;
+            transition: all 0.3s;
+            scroll-snap-align: start;
+            flex-shrink: 0;
+        }
+        .filtro-categoria-item:hover {
+            border-color: #6c3ce0;
+            color: #fff;
+        }
+        .filtro-categoria-item.active {
+            background: #6c3ce0;
+            border-color: #6c3ce0;
+            color: #fff;
+        }
+        .filtro-categoria-item .icono { margin-right: 4px; }
+        
+        /* ============================================
            CATÁLOGO ROTATORIO FLUIDO (SCROLL INFINITO)
            ============================================ */
         .catalogo-rotatorio {
@@ -156,6 +204,14 @@
         .catalogo-rotatorio .producto-card .categoria {
             font-size: 9px;
             color: #888;
+            margin-top: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .catalogo-rotatorio .producto-card .subcategoria {
+            font-size: 8px;
+            color: #666;
             margin-top: 1px;
             white-space: nowrap;
             overflow: hidden;
@@ -259,6 +315,11 @@
         #tiendaContainer .producto-card-grid .categoria {
             font-size: 10px;
             color: #888;
+            margin-top: 1px;
+        }
+        #tiendaContainer .producto-card-grid .subcategoria {
+            font-size: 9px;
+            color: #666;
             margin-top: 1px;
         }
         #tiendaContainer .producto-card-grid .precio {
@@ -423,6 +484,11 @@
         .modal-body .modal-categoria {
             font-size: 12px;
             color: #888;
+            margin-bottom: 4px;
+        }
+        .modal-body .modal-subcategoria {
+            font-size: 11px;
+            color: #666;
             margin-bottom: 4px;
         }
         .modal-body .modal-precio {
@@ -601,6 +667,8 @@
             }
             #tiendaContainer .producto-card-grid .nombre { font-size: 12px; }
             #tiendaContainer .producto-card-grid .precio { font-size: 15px; }
+            
+            .filtro-categoria-item { font-size: 11px; padding: 4px 12px; }
         }
         
         @media (max-width: 600px) {
@@ -641,6 +709,8 @@
             #tiendaContainer .producto-card-grid .precio { font-size: 13px; }
             #tiendaContainer .producto-card-grid .stock { font-size: 10px; }
             
+            .filtro-categoria-item { font-size: 10px; padding: 3px 10px; }
+            
             .modal-content { max-width: 100%; margin: 0; border-radius: 12px; }
             .modal-body { padding: 4px 14px 14px 14px; }
             .modal-body .modal-foto { max-height: 180px; min-height: 120px; font-size: 48px; }
@@ -679,6 +749,8 @@
             #tiendaContainer .producto-card-grid .precio { font-size: 12px; }
             #tiendaContainer .producto-card-grid .negocio-nombre { font-size: 8px; }
             
+            .filtro-categoria-item { font-size: 9px; padding: 2px 8px; }
+            
             .modal-body .modal-foto { max-height: 140px; min-height: 100px; font-size: 36px; }
             .modal-body .modal-nombre { font-size: 16px; }
             .modal-body .modal-precio { font-size: 18px; }
@@ -701,6 +773,14 @@
     </header>
 
     <div class="container">
+
+        <!-- FILTRO DE CATEGORÍAS -->
+        <div class="filtro-categorias" id="filtroCategorias">
+            <div class="filtro-categoria-item active" data-categoria="todos" onclick="filtrarPorCategoria('todos')">
+                📋 Todos
+            </div>
+            <!-- Las categorías se cargan dinámicamente -->
+        </div>
 
         <!-- SECCIÓN 1: CATÁLOGO ROTATORIO FLUIDO (SCROLL INFINITO - 10 PRODUCTOS) -->
         <div class="catalogo-rotatorio" id="catalogoRotatorio">
@@ -747,6 +827,8 @@
         let marcadorModal = null;
         let marcadorUsuario = null;
         let mapaInicializado = false;
+        let categoriaSeleccionada = 'todos';
+        let categorias = [];
         let animationFrame = null;
         let tiendaActualizada = 0;
         const TIENDA_INTERVALO = 3600000; // 1 hora en milisegundos
@@ -778,6 +860,56 @@
             } catch (error) {
                 console.error('Error al obtener ubicación:', error);
             }
+        }
+
+        // ============================================
+        // CARGAR CATEGORÍAS PARA EL FILTRO
+        // ============================================
+        async function cargarCategoriasFiltro() {
+            try {
+                const response = await fetch('/api/categorias');
+                if (!response.ok) throw new Error('Error al cargar categorías');
+                categorias = await response.json();
+                console.log('📂 Categorías para filtro:', categorias.length);
+                
+                const container = document.getElementById('filtroCategorias');
+                // Mantener el botón "Todos"
+                container.innerHTML = `
+                    <div class="filtro-categoria-item active" data-categoria="todos" onclick="filtrarPorCategoria('todos')">
+                        📋 Todos
+                    </div>
+                `;
+                
+                categorias.forEach(c => {
+                    const div = document.createElement('div');
+                    div.className = 'filtro-categoria-item';
+                    div.dataset.categoria = c.id;
+                    div.innerHTML = `${c.icono || '📂'} ${c.nombre}`;
+                    div.onclick = () => filtrarPorCategoria(c.id);
+                    container.appendChild(div);
+                });
+                
+            } catch (error) {
+                console.error('Error cargando categorías para filtro:', error);
+            }
+        }
+
+        // ============================================
+        // FILTRAR POR CATEGORÍA
+        // ============================================
+        function filtrarPorCategoria(categoriaId) {
+            categoriaSeleccionada = categoriaId;
+            
+            // Actualizar UI del filtro
+            document.querySelectorAll('.filtro-categoria-item').forEach(el => {
+                el.classList.toggle('active', el.dataset.categoria == categoriaId);
+            });
+            
+            // Renderizar tienda con filtro
+            renderTiendaGrid(tiendaProductos);
+            
+            // Actualizar carrusel con filtro
+            renderCatalogoRotatorio(catalogoProductos);
         }
 
         // ============================================
@@ -827,12 +959,13 @@
                 
                 // Combinar productos y servicios
                 let todos = [...productos, ...servicios];
+                catalogoProductos = todos;
                 
                 // Seleccionar SOLO 10 productos aleatorios
-                catalogoProductos = seleccionarProductosAleatorios(todos, 10);
-                console.log('🎲 Productos seleccionados para el carrusel:', catalogoProductos.length);
+                const seleccionados = seleccionarProductosAleatorios(todos, 10);
+                console.log('🎲 Productos seleccionados para el carrusel:', seleccionados.length);
                 
-                renderCatalogoRotatorio(catalogoProductos);
+                renderCatalogoRotatorio(seleccionados);
                 
             } catch (error) {
                 console.error('Error cargando catálogo:', error);
@@ -852,11 +985,17 @@
         function renderCatalogoRotatorio(productos) {
             const track = document.getElementById('trackCatalogo');
             
-            if (!productos || productos.length === 0) {
+            // Filtrar por categoría si está seleccionada
+            let productosFiltrados = productos;
+            if (categoriaSeleccionada !== 'todos') {
+                productosFiltrados = productos.filter(p => p.categoria_id == categoriaSeleccionada);
+            }
+            
+            if (!productosFiltrados || productosFiltrados.length === 0) {
                 track.innerHTML = `
                     <div class="empty-state">
                         <span class="icon">📭</span>
-                        No hay productos o servicios disponibles
+                        No hay productos en esta categoría
                     </div>
                 `;
                 return;
@@ -866,7 +1005,7 @@
             let html = '';
             
             // Duplicar productos 3 veces para efecto infinito perfecto
-            const productosDuplicados = [...productos, ...productos, ...productos];
+            const productosDuplicados = [...productosFiltrados, ...productosFiltrados, ...productosFiltrados];
             
             productosDuplicados.forEach(p => {
                 const esServicio = p.tipo === 'servicio';
@@ -883,13 +1022,16 @@
                 const tipoLabel = esServicio ? 'Servicio' : 'Producto';
                 const tipoBadgeClass = esServicio ? 'servicio' : '';
                 const ubicacionText = p.provincia && p.municipio ? `${p.provincia}` : '';
+                const categoriaDisplay = p.categoria_nombre || p.categoria || '';
+                const subcategoriaDisplay = p.subcategoria_nombre || '';
                 const pEscapado = escaparJSON(p);
                 
                 html += `
                     <div class="producto-card" onclick="abrirModalProducto(${pEscapado})">
                         <div class="foto">📷</div>
                         <div class="nombre">${tipoIcon} ${p.nombre}</div>
-                        <div class="categoria">${p.categoria || ''}</div>
+                        <div class="categoria">${categoriaDisplay}</div>
+                        ${subcategoriaDisplay ? `<div class="subcategoria">📁 ${subcategoriaDisplay}</div>` : ''}
                         <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
                         <div class="stock ${stockClass}">${stockText}</div>
                         <div class="negocio-nombre">${p.negocio_nombre || p.negocio_username || 'Negocio'}</div>
@@ -949,19 +1091,25 @@
         }
 
         // ============================================
-        // RENDER TIENDA (CATÁLOGO EN GRID 5 COLUMNAS)
+        // RENDER TIENDA (CATÁLOGO EN GRID 5 COLUMNAS CON CATEGORÍAS)
         // ============================================
         
         function renderTiendaGrid(productos) {
             const container = document.getElementById('tiendaContainer');
             
-            if (!productos || productos.length === 0) {
+            // Filtrar por categoría si está seleccionada
+            let productosFiltrados = productos;
+            if (categoriaSeleccionada !== 'todos') {
+                productosFiltrados = productos.filter(p => p.categoria_id == categoriaSeleccionada);
+            }
+            
+            if (!productosFiltrados || productosFiltrados.length === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
                         <span class="icon">🏪</span>
-                        No hay productos publicados en tiendas cercanas
+                        No hay productos en esta categoría
                         <div style="font-size:11px;color:#666;margin-top:6px;">
-                            Los negocios pueden publicar sus productos en la sección "Tienda"
+                            Selecciona otra categoría o espera nuevos productos
                         </div>
                     </div>
                 `;
@@ -970,13 +1118,15 @@
             
             let html = '<div class="productos-grid">';
             
-            productos.forEach(p => {
+            productosFiltrados.forEach(p => {
                 const stockClass = p.stock < (p.stock_minimo || 3) ? 'bajo' : '';
                 const stockText = p.stock > 0 ? `📦 ${p.stock} unidades` : '🚫 Agotado';
                 const ubicacionText = p.provincia && p.municipio ? `${p.provincia}, ${p.municipio}` : '';
                 const esServicio = p.tipo === 'servicio';
                 const tipoLabel = esServicio ? 'Servicio' : 'Producto';
                 const tipoBadgeClass = esServicio ? 'servicio' : '';
+                const categoriaDisplay = p.categoria_nombre || p.categoria || '';
+                const subcategoriaDisplay = p.subcategoria_nombre || '';
                 
                 const pEscapado = escaparJSON(p);
                 
@@ -987,11 +1137,13 @@
                             ${p.nombre}
                             ${p.destacado ? '<span class="destacado-badge">⭐ Destacado</span>' : ''}
                         </div>
-                        <div class="categoria">${p.categoria || 'Sin categoría'} • <span class="tipo-badge ${tipoBadgeClass}">${tipoLabel}</span></div>
+                        <div class="categoria">${categoriaDisplay}</div>
+                        ${subcategoriaDisplay ? `<div class="subcategoria">📁 ${subcategoriaDisplay}</div>` : ''}
                         <div class="precio">$${parseFloat(p.precio).toFixed(2)}</div>
                         <div class="stock ${stockClass}">${stockText}</div>
                         <div class="negocio-nombre">🏢 ${p.negocio_nombre || p.negocio_username || 'Negocio'}</div>
                         ${ubicacionText ? `<div class="ubicacion-tag">📍 ${ubicacionText}</div>` : ''}
+                        <span class="tipo-badge ${tipoBadgeClass}">${tipoLabel}</span>
                     </div>
                 `;
             });
@@ -1033,12 +1185,15 @@
             const telefono = producto.telefono || 'No disponible';
             const tieneUbicacion = producto.latitud && producto.longitud;
             const tieneTelefono = telefono !== 'No disponible' && telefono !== '';
+            const categoriaDisplay = producto.categoria_nombre || producto.categoria || '';
+            const subcategoriaDisplay = producto.subcategoria_nombre || '';
             
             // Construir HTML del modal
             body.innerHTML = `
                 <div class="modal-foto">📷</div>
                 <div class="modal-nombre">${tipoIcon} ${producto.nombre}</div>
-                <div class="modal-categoria">${producto.categoria || 'Sin categoría'} • ${tipoLabel}</div>
+                <div class="modal-categoria">${categoriaDisplay}</div>
+                ${subcategoriaDisplay ? `<div class="modal-subcategoria">📁 ${subcategoriaDisplay}</div>` : ''}
                 <div class="modal-precio">$${parseFloat(producto.precio).toFixed(2)}</div>
                 <span class="modal-stock ${stockClase}">${stockTexto}</span>
                 
@@ -1235,19 +1390,15 @@
         async function iniciar() {
             console.log('🚀 Iniciando vista de cliente...');
             await obtenerUbicacionUsuario();
-            
-            // Cargar catálogo (siempre se carga)
+            await cargarCategoriasFiltro();
             await cargarCatalogo();
-            
-            // Cargar tienda (primera carga)
             await cargarTienda(true);
             
-            // Actualizar tienda cada hora (3600000 ms = 1 hora)
+            // Actualizar tienda cada hora
             setInterval(() => {
                 cargarTienda(false);
             }, TIENDA_INTERVALO);
             
-            // Mostrar próxima actualización en consola
             console.log('⏳ La tienda se actualizará automáticamente cada 1 hora');
         }
         
