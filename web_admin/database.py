@@ -2310,10 +2310,12 @@ def crear_servicio(negocio_id, trabajador_id, nombre, categoria_id, subcategoria
             conn.close()
 
 def obtener_servicios(negocio_id, trabajador_id=None):
+    """Obtiene servicios de un negocio. Si trabajador_id es None, devuelve todos."""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     try:
         if trabajador_id:
+            # Si se especifica trabajador, filtrar por él
             cursor.execute('''
                 SELECT s.*, 
                        c.nombre as categoria_nombre, 
@@ -2326,6 +2328,7 @@ def obtener_servicios(negocio_id, trabajador_id=None):
                 ORDER BY s.id DESC
             ''', (negocio_id, trabajador_id))
         else:
+            # Si no se especifica trabajador, devolver todos los servicios activos del negocio
             cursor.execute('''
                 SELECT s.*, 
                        c.nombre as categoria_nombre, 
@@ -2334,7 +2337,7 @@ def obtener_servicios(negocio_id, trabajador_id=None):
                 FROM servicios s
                 LEFT JOIN categorias c ON s.categoria_id = c.id
                 LEFT JOIN subcategorias sc ON s.subcategoria_id = sc.id
-                WHERE s.negocio_id = %s
+                WHERE s.negocio_id = %s AND s.activo = 1
                 ORDER BY s.id DESC
             ''', (negocio_id,))
         servicios = cursor.fetchall()
@@ -2346,6 +2349,7 @@ def obtener_servicios(negocio_id, trabajador_id=None):
         return []
 
 def obtener_todos_servicios():
+    """Obtiene todos los servicios del sistema (solo para admin)"""
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
