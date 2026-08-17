@@ -2243,7 +2243,7 @@ def eliminar_venta_con_reintegro(venta_id, negocio_id):
 # FUNCIONES PARA SERVICIOS
 # ============================================
 
-def crear_servicio(negocio_id, trabajador_id, nombre, categoria, precio, duracion, activo=1, descripcion=''):
+def crear_servicio(negocio_id, trabajador_id, nombre, categoria_id, subcategoria_id, precio, duracion, activo=1, descripcion=''):
     """Crea un nuevo servicio en la base de datos"""
     conn = None
     cursor = None
@@ -2262,20 +2262,22 @@ def crear_servicio(negocio_id, trabajador_id, nombre, categoria, precio, duracio
             negocio_id, 
             trabajador_id, 
             nombre, 
-            categoria, 
+            categoria_id,
+            subcategoria_id, 
             precio, 
             duracion, 
             activo, 
             descripcion, 
             created_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         ''', (
             negocio_id, 
             trabajador_id, 
             nombre, 
-            categoria, 
+            categoria_id,
+            subcategoria_id,
             float(precio), 
             int(duracion), 
             int(activo), 
@@ -2313,15 +2315,27 @@ def obtener_servicios(negocio_id, trabajador_id=None):
     try:
         if trabajador_id:
             cursor.execute('''
-                SELECT * FROM servicios 
-                WHERE negocio_id = %s AND trabajador_id = %s AND activo = 1
-                ORDER BY id DESC
+                SELECT s.*, 
+                       c.nombre as categoria_nombre, 
+                       c.icono as categoria_icono,
+                       sc.nombre as subcategoria_nombre
+                FROM servicios s
+                LEFT JOIN categorias c ON s.categoria_id = c.id
+                LEFT JOIN subcategorias sc ON s.subcategoria_id = sc.id
+                WHERE s.negocio_id = %s AND s.trabajador_id = %s
+                ORDER BY s.id DESC
             ''', (negocio_id, trabajador_id))
         else:
             cursor.execute('''
-                SELECT * FROM servicios 
-                WHERE negocio_id = %s
-                ORDER BY id DESC
+                SELECT s.*, 
+                       c.nombre as categoria_nombre, 
+                       c.icono as categoria_icono,
+                       sc.nombre as subcategoria_nombre
+                FROM servicios s
+                LEFT JOIN categorias c ON s.categoria_id = c.id
+                LEFT JOIN subcategorias sc ON s.subcategoria_id = sc.id
+                WHERE s.negocio_id = %s
+                ORDER BY s.id DESC
             ''', (negocio_id,))
         servicios = cursor.fetchall()
         conn.close()
@@ -2335,8 +2349,16 @@ def obtener_todos_servicios():
     conn = get_db()
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute('''
-    SELECT s.*, u.username as negocio_username
-    FROM servicios s JOIN usuarios u ON s.negocio_id = u.id ORDER BY s.id DESC
+        SELECT s.*, 
+               u.username as negocio_username,
+               c.nombre as categoria_nombre, 
+               c.icono as categoria_icono,
+               sc.nombre as subcategoria_nombre
+        FROM servicios s 
+        JOIN usuarios u ON s.negocio_id = u.id
+        LEFT JOIN categorias c ON s.categoria_id = c.id
+        LEFT JOIN subcategorias sc ON s.subcategoria_id = sc.id
+        ORDER BY s.id DESC
     ''')
     servicios = cursor.fetchall()
     conn.close()
@@ -2350,74 +2372,35 @@ def toggle_servicio(servicio_id, activo):
     conn.commit()
     conn.close()
 
-def actualizar_servicio(servicio_id, nombre, categoria, precio, duracion, activo, descripcion=''):
+def actualizar_servicio(servicio_id, nombre, categoria_id, subcategoria_id, precio, duracion, activo, descripcion=''):
     """
     Actualiza un servicio existente en la base de datos
-    
-    Args:
-        servicio_id (int): ID del servicio a actualizar
-        nombre (str): Nuevo nombre del servicio
-        categoria (str): Nueva categoría
-        precio (float): Nuevo precio
-        duracion (int): Nueva duración en minutos
-        activo (int): 1 para activo, 0 para inactivo
-        descripcion (str): Nueva descripción (opcional)
-    
-    Returns:
-        bool: True si se actualizó correctamente, False en caso contrario
     """
     conn = get_db()
     cursor = conn.cursor()
     try:
-        # Verificar si la columna descripcion existe
-        cursor.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name = 'servicios' AND column_name = 'descripcion'
-        """)
-        tiene_descripcion = cursor.fetchone() is not None
-        
-        if tiene_descripcion:
-            cursor.execute('''
-                UPDATE servicios 
-                SET nombre = %s, 
-                    categoria = %s, 
-                    precio = %s, 
-                    duracion = %s, 
-                    activo = %s, 
-                    descripcion = %s, 
-                    updated_at = %s 
-                WHERE id = %s
-            ''', (
-                nombre, 
-                categoria, 
-                float(precio), 
-                int(duracion), 
-                int(activo), 
-                descripcion, 
-                datetime.now().isoformat(), 
-                servicio_id
-            ))
-        else:
-            cursor.execute('''
-                UPDATE servicios 
-                SET nombre = %s, 
-                    categoria = %s, 
-                    precio = %s, 
-                    duracion = %s, 
-                    activo = %s, 
-                    updated_at = %s 
-                WHERE id = %s
-            ''', (
-                nombre, 
-                categoria, 
-                float(precio), 
-                int(duracion), 
-                int(activo), 
-                datetime.now().isoformat(), 
-                servicio_id
-            ))
-            print("⚠️ La columna 'descripcion' no existe en la tabla servicios, omitiendo...")
+        cursor.execute('''
+            UPDATE servicios 
+            SET nombre = %s, 
+                categoria_id = %s, 
+                subcategoria_id = %s,
+                precio = %s, 
+                duracion = %s, 
+                activo = %s, 
+                descripcion = %s, 
+                updated_at = %s 
+            WHERE id = %s
+        ''', (
+            nombre, 
+            categoria_id,
+            subcategoria_id,
+            float(precio), 
+            int(duracion), 
+            int(activo), 
+            descripcion, 
+            datetime.now().isoformat(), 
+            servicio_id
+        ))
         
         if cursor.rowcount > 0:
             conn.commit()
