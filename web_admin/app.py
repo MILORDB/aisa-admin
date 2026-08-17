@@ -2186,9 +2186,11 @@ def api_obtener_servicios():
             negocio_id = obtener_negocio_de_trabajador(usuario['id'])
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-            servicios = obtener_servicios(negocio_id, usuario['id'])
-        else:
-            servicios = obtener_servicios(negocio_id)
+        
+        # Obtener todos los servicios del negocio (sin filtrar por trabajador)
+        servicios = obtener_servicios(negocio_id, None)
+        
+        print(f"📋 Servicios encontrados para negocio {negocio_id}: {len(servicios)}")
         
         return jsonify([dict(s) for s in servicios])
     except Exception as e:
