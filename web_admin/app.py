@@ -121,7 +121,9 @@ try:
         generar_notificacion_stock_actualizado,
         obtener_producto_por_id, obtener_preferencias_notificaciones,
         actualizar_preferencias_notificaciones,
-        actualizar_servicio
+        actualizar_servicio,
+        obtener_categorias, obtener_subcategorias,
+        obtener_categoria_por_id, obtener_subcategoria_por_id
     )
     print("✅ Database importada correctamente")
 except ImportError as e:
@@ -523,7 +525,7 @@ def agregar_columna_descripcion_servicios():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - ADMIN SQL (NUEVO)
+# API - ADMIN SQL
 # ============================================
 
 @app.route('/api/admin/sql', methods=['POST'])
@@ -598,7 +600,7 @@ def api_admin_sql():
 
 
 # ============================================
-# API - DIAGNÓSTICO DE BASE DE DATOS (NUEVO)
+# API - DIAGNÓSTICO DE BASE DE DATOS
 # ============================================
 
 @app.route('/api/admin/db-status', methods=['GET'])
@@ -660,7 +662,7 @@ def api_admin_db_status():
 
 
 # ============================================
-# API - CATEGORÍAS Y SUBCATEGORÍAS (NUEVO)
+# API - CATEGORÍAS Y SUBCATEGORÍAS
 # ============================================
 
 @app.route('/api/categorias', methods=['GET'])
@@ -668,11 +670,7 @@ def api_admin_db_status():
 def api_obtener_categorias():
     """Obtiene todas las categorías principales"""
     try:
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute('SELECT * FROM categorias WHERE activo = 1 ORDER BY orden, nombre')
-        categorias = cursor.fetchall()
-        conn.close()
+        categorias = obtener_categorias()
         return jsonify([dict(c) for c in categorias])
     except Exception as e:
         print(f"❌ Error en api_obtener_categorias: {e}")
@@ -683,15 +681,11 @@ def api_obtener_categorias():
 def api_obtener_subcategorias():
     """Obtiene subcategorías (filtradas por categoría si se especifica)"""
     try:
-        conn = get_db()
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
         categoria_id = request.args.get('categoria_id')
         if categoria_id:
-            cursor.execute('SELECT * FROM subcategorias WHERE categoria_id = %s AND activo = 1 ORDER BY orden, nombre', (int(categoria_id),))
+            subcategorias = obtener_subcategorias(int(categoria_id))
         else:
-            cursor.execute('SELECT * FROM subcategorias WHERE activo = 1 ORDER BY categoria_id, orden, nombre')
-        subcategorias = cursor.fetchall()
-        conn.close()
+            subcategorias = obtener_subcategorias()
         return jsonify([dict(s) for s in subcategorias])
     except Exception as e:
         print(f"❌ Error en api_obtener_subcategorias: {e}")
@@ -1677,7 +1671,18 @@ def api_actualizar_producto(producto_id):
         producto_anterior = obtener_producto_por_id(producto_id)
         stock_anterior = producto_anterior.get('stock', 0) if producto_anterior else 0
         
-        exito = actualizar_producto(producto_id, nombre, categoria_id, subcategoria_id, float(precio), float(costo), float(comision), int(stock), int(stock_minimo), descripcion)
+        exito = actualizar_producto(
+            producto_id, 
+            nombre, 
+            categoria_id,
+            subcategoria_id,
+            float(precio), 
+            float(costo), 
+            float(comision), 
+            int(stock), 
+            int(stock_minimo),
+            descripcion
+        )
         
         if exito:
             registrar_log(usuario['id'], 'producto_actualizado', f'Producto ID: {producto_id}')
@@ -1906,7 +1911,7 @@ def api_eliminar_producto_tienda(tienda_id):
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - TIENDA PÚBLICA (PARA CLIENTE) - VERSIÓN SIMPLE
+# API - TIENDA PÚBLICA (PARA CLIENTE)
 # ============================================
 
 @app.route('/api/tienda/public', methods=['GET'])
