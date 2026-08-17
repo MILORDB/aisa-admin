@@ -523,6 +523,181 @@ def agregar_columna_descripcion_servicios():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
+# API - ADMIN SQL (NUEVO)
+# ============================================
+
+@app.route('/api/admin/sql', methods=['POST'])
+@admin_required
+def api_admin_sql():
+    """Ejecuta comandos SQL directamente (solo admin)"""
+    try:
+        data = request.get_json()
+        query = data.get('query', '').strip()
+        
+        if not query:
+            return jsonify({'error': 'La consulta SQL está vacía'}), 400
+        
+        # Verificar que solo sean comandos DDL o DML permitidos
+        query_lower = query.lower()
+        comandos_permitidos = ['create table', 'alter table', 'drop table', 'insert into', 'update', 'delete from', 'select']
+        permitido = any(query_lower.startswith(cmd) for cmd in comandos_permitidos)
+        
+        if not permitido:
+            return jsonify({'error': 'Comando SQL no permitido'}), 403
+        
+        # Lista de comandos peligrosos
+        comandos_peligrosos = ['drop database', 'truncate', 'drop table usuarios', 'drop table sesiones']
+        for peligroso in comandos_peligrosos:
+            if peligroso in query_lower:
+                return jsonify({'error': f'Comando peligroso no permitido: {peligroso}'}), 403
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Ejecutar la consulta
+        cursor.execute(query)
+        
+        # Si es SELECT, devolver resultados
+        if query_lower.startswith('select'):
+            column_names = [desc[0] for desc in cursor.description] if cursor.description else []
+            rows = cursor.fetchall()
+            
+            # Convertir a diccionarios
+            result = []
+            for row in rows:
+                if column_names:
+                    result.append(dict(zip(column_names, row)))
+                else:
+                    result.append(row)
+            
+            conn.commit()
+            conn.close()
+            return jsonify({
+                'success': True,
+                'type': 'select',
+                'columns': column_names,
+                'rows': result,
+                'count': len(result)
+            })
+        else:
+            # Para INSERT, UPDATE, DELETE, ALTER, CREATE, DROP
+            rowcount = cursor.rowcount
+            conn.commit()
+            conn.close()
+            return jsonify({
+                'success': True,
+                'type': 'command',
+                'message': f'Comando ejecutado correctamente',
+                'affected_rows': rowcount
+            })
+        
+    except Exception as e:
+        print(f"❌ Error ejecutando SQL: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
+# API - DIAGNÓSTICO DE BASE DE DATOS (NUEVO)
+# ============================================
+
+@app.route('/api/admin/db-status', methods=['GET'])
+@admin_required
+def api_admin_db_status():
+    """Obtiene el estado de la base de datos"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Obtener todas las tablas
+        cursor.execute("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+            ORDER BY table_name
+        """)
+        tablas = [row[0] for row in cursor.fetchall()]
+        
+        # Obtener conteo de registros por tabla
+        info_tablas = {}
+        for tabla in tablas:
+            try:
+                cursor.execute(f"SELECT COUNT(*) FROM {tabla}")
+                count = cursor.fetchone()[0]
+                info_tablas[tabla] = count
+            except:
+                info_tablas[tabla] = 'Error'
+        
+        # Verificar si existe la columna descripcion en productos
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'productos' AND column_name = 'descripcion'
+        """)
+        tiene_descripcion_productos = cursor.fetchone() is not None
+        
+        # Verificar si existe la columna descripcion en servicios
+        cursor.execute("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'servicios' AND column_name = 'descripcion'
+        """)
+        tiene_descripcion_servicios = cursor.fetchone() is not None
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'tablas': tablas,
+            'info_tablas': info_tablas,
+            'tiene_descripcion_productos': tiene_descripcion_productos,
+            'tiene_descripcion_servicios': tiene_descripcion_servicios
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en db-status: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
+# API - CATEGORÍAS Y SUBCATEGORÍAS (NUEVO)
+# ============================================
+
+@app.route('/api/categorias', methods=['GET'])
+@login_required
+def api_obtener_categorias():
+    """Obtiene todas las categorías principales"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('SELECT * FROM categorias WHERE activo = 1 ORDER BY orden, nombre')
+        categorias = cursor.fetchall()
+        conn.close()
+        return jsonify([dict(c) for c in categorias])
+    except Exception as e:
+        print(f"❌ Error en api_obtener_categorias: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/subcategorias', methods=['GET'])
+@login_required
+def api_obtener_subcategorias():
+    """Obtiene subcategorías (filtradas por categoría si se especifica)"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        categoria_id = request.args.get('categoria_id')
+        if categoria_id:
+            cursor.execute('SELECT * FROM subcategorias WHERE categoria_id = %s AND activo = 1 ORDER BY orden, nombre', (int(categoria_id),))
+        else:
+            cursor.execute('SELECT * FROM subcategorias WHERE activo = 1 ORDER BY categoria_id, orden, nombre')
+        subcategorias = cursor.fetchall()
+        conn.close()
+        return jsonify([dict(s) for s in subcategorias])
+    except Exception as e:
+        print(f"❌ Error en api_obtener_subcategorias: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
 # RUTAS PRINCIPALES
 # ============================================
 
@@ -665,6 +840,14 @@ def dashboard():
     except Exception as e:
         print(f"❌ Error en dashboard: {e}")
         return render_template('login.html')
+
+@app.route('/admin/sql')
+@admin_required
+def admin_sql():
+    """Panel de administración SQL"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    return render_template('admin/sql_manager.html', usuario=usuario)
 
 @app.route('/perfil')
 @login_required
@@ -896,6 +1079,43 @@ def api_obtener_ubicacion_usuario():
         'tiene_ubicacion': bool(datos.get('provincia') and datos.get('municipio'))
     })
 
+@app.route('/api/usuario/cambiar-password', methods=['POST'])
+@login_required
+def api_cambiar_password_usuario():
+    """Endpoint para que cualquier usuario cambie su propia contraseña"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    data = request.get_json()
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    
+    if not current_password or not new_password:
+        return jsonify({'error': 'La contraseña actual y la nueva son requeridas'}), 400
+    
+    if len(new_password) < 6:
+        return jsonify({'error': 'La nueva contraseña debe tener al menos 6 caracteres'}), 400
+    
+    # Verificar contraseña actual
+    if not verify_password(current_password, usuario.get('password_hash')):
+        return jsonify({'error': 'Contraseña actual incorrecta'}), 401
+    
+    # Hashear nueva contraseña
+    new_hash = hash_password(new_password)
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE usuarios SET password_hash = %s WHERE id = %s', (new_hash, usuario['id']))
+    conn.commit()
+    conn.close()
+    
+    registrar_log(usuario['id'], 'cambio_password', 'Contraseña actualizada')
+    
+    return jsonify({'success': True, 'message': 'Contraseña actualizada correctamente'})
+
 @app.route('/api/perfil')
 @admin_required
 def api_perfil():
@@ -914,7 +1134,7 @@ def api_perfil():
     })
 
 @app.route('/api/perfil/password', methods=['POST'])
-@login_required  # <-- CAMBIADO DE admin_required a login_required
+@login_required
 def api_perfil_password():
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
@@ -1344,7 +1564,7 @@ def verificar_usuario(username):
     return jsonify({'exists': False, 'message': 'Usuario no encontrado'})
 
 # ============================================
-# API - PRODUCTOS (SIN DESCRIPCION POR AHORA)
+# API - PRODUCTOS
 # ============================================
 
 @app.route('/api/productos', methods=['GET'])
@@ -1388,21 +1608,34 @@ def api_crear_producto():
         return jsonify({'success': False, 'error': 'Datos inválidos'}), 400
     
     nombre = data.get('nombre')
-    categoria = data.get('categoria')
+    categoria_id = data.get('categoria_id')
+    subcategoria_id = data.get('subcategoria_id')
     precio = data.get('precio')
     costo = data.get('costo', 0)
     comision = data.get('comision', 0)
     stock = data.get('stock', 0)
     stock_minimo = data.get('stock_minimo', 3)
+    descripcion = data.get('descripcion', '')
     
-    print(f"📝 Creando producto: {nombre}, {categoria}, {precio}")
+    print(f"📝 Creando producto: {nombre}, categoria_id={categoria_id}, subcategoria_id={subcategoria_id}, precio={precio}")
     
-    if not nombre or not categoria or precio is None:
+    if not nombre or not categoria_id or precio is None:
         return jsonify({'success': False, 'error': 'Nombre, categoría y precio son obligatorios'}), 400
     
     try:
         negocio_id = usuario.get('id')
-        producto_id = crear_producto(negocio_id, nombre, categoria, float(precio), float(costo), float(comision), int(stock), int(stock_minimo))
+        producto_id = crear_producto(
+            negocio_id, 
+            nombre, 
+            categoria_id,
+            subcategoria_id,
+            float(precio), 
+            float(costo), 
+            float(comision), 
+            int(stock), 
+            int(stock_minimo),
+            descripcion
+        )
         
         if producto_id:
             registrar_log(usuario['id'], 'producto_creado', f'Producto: {nombre}')
@@ -1428,21 +1661,23 @@ def api_actualizar_producto(producto_id):
     
     data = request.get_json()
     nombre = data.get('nombre')
-    categoria = data.get('categoria')
+    categoria_id = data.get('categoria_id')
+    subcategoria_id = data.get('subcategoria_id')
     precio = data.get('precio')
     costo = data.get('costo', 0)
     comision = data.get('comision', 0)
     stock = data.get('stock', 0)
     stock_minimo = data.get('stock_minimo', 3)
+    descripcion = data.get('descripcion', '')
     
-    if not nombre or not categoria or precio is None:
+    if not nombre or not categoria_id or precio is None:
         return jsonify({'error': 'Nombre, categoría y precio son obligatorios'}), 400
     
     try:
         producto_anterior = obtener_producto_por_id(producto_id)
         stock_anterior = producto_anterior.get('stock', 0) if producto_anterior else 0
         
-        exito = actualizar_producto(producto_id, nombre, categoria, float(precio), float(costo), float(comision), int(stock), int(stock_minimo))
+        exito = actualizar_producto(producto_id, nombre, categoria_id, subcategoria_id, float(precio), float(costo), float(comision), int(stock), int(stock_minimo), descripcion)
         
         if exito:
             registrar_log(usuario['id'], 'producto_actualizado', f'Producto ID: {producto_id}')
@@ -1708,7 +1943,7 @@ def api_tienda_publica():
         
         print(f"📊 PASO 2: Obteniendo productos con IDs: {ids_str}")
         query = f"""
-            SELECT id, nombre, categoria, precio, stock, foto_url, stock_minimo, negocio_id
+            SELECT id, nombre, categoria_id, subcategoria_id, precio, stock, foto_url, stock_minimo, negocio_id
             FROM productos
             WHERE id IN ({ids_str}) AND stock > 0
         """
@@ -1726,7 +1961,7 @@ def api_tienda_publica():
         
         # PASO 3: Obtener datos de negocios uno por uno
         print("📊 PASO 3: Obteniendo datos de negocios...")
-        negocio_ids = list(set([row[7] for row in productos_rows]))
+        negocio_ids = list(set([row[8] for row in productos_rows]))
         negocios = {}
         
         for neg_id in negocio_ids:
@@ -1755,12 +1990,24 @@ def api_tienda_publica():
         
         print(f"   → Negocios cargados: {len(negocios)}")
         
-        # PASO 4: Construir resultado
-        print("📊 PASO 4: Construyendo resultado...")
+        # PASO 4: Obtener categorías y subcategorías
+        print("📊 PASO 4: Obteniendo categorías...")
+        categorias = {}
+        cursor.execute("SELECT id, nombre, icono FROM categorias")
+        for row in cursor.fetchall():
+            categorias[row[0]] = {'nombre': row[1], 'icono': row[2]}
+        
+        subcategorias = {}
+        cursor.execute("SELECT id, categoria_id, nombre FROM subcategorias")
+        for row in cursor.fetchall():
+            subcategorias[row[0]] = {'categoria_id': row[1], 'nombre': row[2]}
+        
+        # PASO 5: Construir resultado
+        print("📊 PASO 5: Construyendo resultado...")
         resultado = []
         
         for p in productos_rows:
-            negocio = negocios.get(p[7], {})
+            negocio = negocios.get(p[8], {})
             
             # Obtener ubicación del usuario para filtrar
             datos_usuario = obtener_datos_negocio(usuario['id'])
@@ -1774,16 +2021,27 @@ def api_tienda_publica():
                 if prov_negocio != provincia or mun_negocio != municipio:
                     continue
             
+            # Obtener nombres de categorías
+            cat_id = p[2]
+            subcat_id = p[3]
+            categoria_nombre = categorias.get(cat_id, {}).get('nombre', '') if cat_id else ''
+            categoria_icono = categorias.get(cat_id, {}).get('icono', '') if cat_id else ''
+            subcategoria_nombre = subcategorias.get(subcat_id, {}).get('nombre', '') if subcat_id else ''
+            
             resultado.append({
                 'id': p[0],
                 'nombre': p[1],
-                'categoria': p[2],
-                'precio': float(p[3]),
-                'stock': p[4],
-                'stock_minimo': p[6] or 3,
-                'foto_url': p[5],
+                'categoria_id': cat_id,
+                'categoria_nombre': categoria_nombre,
+                'categoria_icono': categoria_icono,
+                'subcategoria_id': subcat_id,
+                'subcategoria_nombre': subcategoria_nombre,
+                'precio': float(p[4]),
+                'stock': p[5],
+                'stock_minimo': p[7] or 3,
+                'foto_url': p[6],
                 'descripcion': '',
-                'negocio_id': p[7],
+                'negocio_id': p[8],
                 'negocio_username': negocio.get('username', ''),
                 'negocio_nombre': negocio.get('nombre', ''),
                 'telefono': negocio.get('telefono', ''),
