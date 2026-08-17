@@ -162,27 +162,11 @@
         .campo-transferencia .form-row { margin-bottom: 4px; }
         .campo-transferencia .form-row input { padding: 4px 8px; font-size: 11px; }
         
-        .stats-resumen {
-            display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px;
-        }
-        .stats-resumen .stat-box {
-            background: #0f0f1a; border: 1px solid #2a2a3e; border-radius: 6px; padding: 6px; text-align: center;
-        }
-        .stats-resumen .stat-box .number { font-size: 16px; font-weight: 700; }
-        .stats-resumen .stat-box .label { font-size: 8px; color: #888; }
-        .stats-resumen .stat-box .number.total { color: #6c3ce0; }
-        .stats-resumen .stat-box .number.pagado { color: #6bff6b; }
-        .stats-resumen .stat-box .number.pendiente { color: #ffbb33; }
-        .stats-resumen .stat-box .number.cancelado { color: #ff6b6b; }
-        .stats-resumen .stat-box .number.oferta { color: #ff9800; }
-        
         .acciones-cell { display: flex; gap: 4px; flex-wrap: wrap; }
         .estado-select {
             background: #1a1a2e; color: #fff; border: 1px solid #2a2a3e;
             border-radius: 4px; padding: 1px 4px; font-size: 10px;
         }
-        .contrato-link { color: #6c3ce0; text-decoration: none; font-size: 11px; cursor: pointer; }
-        .contrato-link:hover { text-decoration: underline; }
         .badge-numero { font-size: 10px; color: #6c3ce0; font-weight: 600; }
         .badge-oferta { font-size: 10px; color: #ff9800; font-weight: 600; background: rgba(255,152,0,0.1); padding: 1px 6px; border-radius: 4px; }
         
@@ -219,6 +203,11 @@
             padding-left: 24px;
         }
 
+        /* ESTADÍSTICAS PARA TRABAJADOR - OCULTAS */
+        .stats-resumen {
+            display: none;
+        }
+
         @media (max-width: 600px) {
             body { padding: 8px; }
             .card { padding: 10px; }
@@ -230,7 +219,6 @@
             .item-line { flex-wrap: wrap; }
             .item-line select { flex: 1 1 100%; }
             .factura-preview { font-size: 10px; }
-            .stats-resumen { grid-template-columns: 1fr 1fr; }
             .tabla { font-size: 11px; }
             .tabla th, .tabla td { padding: 4px 6px; }
             .oferta-section { padding: 6px 8px; }
@@ -238,7 +226,6 @@
         @media (max-width: 400px) {
             .tabla { font-size: 10px; }
             .tabla th, .tabla td { padding: 3px 4px; }
-            .stats-resumen { grid-template-columns: 1fr 1fr; }
         }
     </style>
 </head>
@@ -250,17 +237,6 @@
 
     <div class="mensaje-error" id="mensajeError"></div>
     <div class="mensaje-exito" id="mensajeExito"></div>
-
-    <!-- Resumen -->
-    <div class="card">
-        <div class="stats-resumen" id="statsResumen">
-            <div class="stat-box"><div class="number total" id="totalVentas">0</div><div class="label">📊 Total</div></div>
-            <div class="stat-box"><div class="number pagado" id="totalPagado">0</div><div class="label">✅ Pagadas</div></div>
-            <div class="stat-box"><div class="number pendiente" id="totalPendiente">0</div><div class="label">⏳ Pendientes</div></div>
-            <div class="stat-box"><div class="number cancelado" id="totalCancelado">0</div><div class="label">❌ Canceladas</div></div>
-            <div class="stat-box"><div class="number oferta" id="totalOfertas">0</div><div class="label">📄 Ofertas</div></div>
-        </div>
-    </div>
 
     <div class="card">
         <div class="search-bar">
@@ -495,7 +471,6 @@
                 console.log('📊 Ventas cargadas:', ventas.length);
                 
                 renderVentas();
-                actualizarResumenVentas();
             } catch (error) {
                 console.error('Error cargando ventas:', error);
                 if (container) {
@@ -582,29 +557,6 @@
         }
 
         // ============================================
-        // ACTUALIZAR RESUMEN DE VENTAS
-        // ============================================
-        function actualizarResumenVentas() {
-            const total = ventas.length;
-            const pagado = ventas.filter(v => v.estado === 'pagado' || v.estado === 'transferencia').length;
-            const pendiente = ventas.filter(v => v.estado === 'pendiente').length;
-            const cancelado = ventas.filter(v => v.estado === 'cancelado').length;
-            const oferta = ventas.filter(v => v.estado === 'oferta').length;
-            
-            const elTotal = document.getElementById('totalVentas');
-            const elPagado = document.getElementById('totalPagado');
-            const elPendiente = document.getElementById('totalPendiente');
-            const elCancelado = document.getElementById('totalCancelado');
-            const elOfertas = document.getElementById('totalOfertas');
-            
-            if (elTotal) elTotal.textContent = total;
-            if (elPagado) elPagado.textContent = pagado;
-            if (elPendiente) elPendiente.textContent = pendiente;
-            if (elCancelado) elCancelado.textContent = cancelado;
-            if (elOfertas) elOfertas.textContent = oferta;
-        }
-
-        // ============================================
         // FILTRAR VENTAS
         // ============================================
         function filtrarVentas() {
@@ -645,10 +597,7 @@
         async function cargarServicios() {
             try {
                 const response = await fetch('/api/servicios');
-                if (!response.ok) {
-                    console.error('❌ Error en /api/servicios:', response.status);
-                    throw new Error('Error al cargar servicios');
-                }
+                if (!response.ok) throw new Error('Error al cargar servicios');
                 servicios = await response.json();
                 console.log('📋 Servicios cargados:', servicios.length);
                 return true;
@@ -657,6 +606,7 @@
                 return false;
             }
         }
+
         // ============================================
         // CARGAR EMPRESAS CON CONTRATOS
         // ============================================
@@ -740,7 +690,6 @@
                     facturaInfo.style.color = '#6c3ce0';
                 }
                 
-                // ✅ Generar número de factura
                 generarNumeroFactura();
                 
                 const info = document.getElementById('infoContrato');
@@ -767,7 +716,7 @@
         }
 
         // ============================================
-        // GENERAR NÚMERO DE FACTURA (CORREGIDO)
+        // GENERAR NÚMERO DE FACTURA
         // ============================================
         function generarNumeroFactura() {
             if (esOferta) {
@@ -788,9 +737,7 @@
             const facturaNum = document.getElementById('facturaNumero');
             const facturaInfo = document.getElementById('facturaInfo');
             
-            // ✅ Solo generar factura si hay empresa seleccionada
             if (empresa && input && facturaNum) {
-                // Generar número localmente
                 ultimoNumeroFactura++;
                 const año = new Date().getFullYear();
                 const facturaGenerada = `FAC-${año}-${String(ultimoNumeroFactura).padStart(4,'0')}`;
@@ -1226,142 +1173,142 @@
             if (modal) modal.classList.remove('show'); 
         }
 
-// ============================================
-// GUARDAR VENTA (CORREGIDO)
-// ============================================
-async function guardarVenta() {
-    const esOfertaCheck = document.getElementById('esOferta');
-    const selectEmpresa = document.getElementById('ventaEmpresa');
-    const estadoSelect = document.getElementById('ventaEstado');
-    const facturaInput = document.getElementById('ventaFactura');
-    
-    const esOfertaVal = esOfertaCheck ? esOfertaCheck.checked : false;
-    const empresa = selectEmpresa ? selectEmpresa.value.trim() : null;
-    const estado = esOfertaVal ? 'oferta' : (estadoSelect ? estadoSelect.value : 'pagado');
-    const factura = (empresa && !esOfertaVal) ? (facturaInput ? facturaInput.value.trim() : null) : null;
-    
-    // ✅ Recolectar productos en formato array
-    let productos = [];
-    let cliente = esOfertaVal ? '📄 OFERTA' : (empresa || 'Cliente sin empresa');
-    let total = 0;
-    
-    // Productos
-    document.querySelectorAll('#productosContainer .item-line').forEach(line => {
-        const select = line.querySelector('.select-producto');
-        const cantInput = line.querySelector('.input-cantidad');
-        if (select && select.value) {
-            const selected = select.options[select.selectedIndex];
-            const cantidad = parseInt(cantInput ? cantInput.value : 1) || 1;
-            const precio = parseFloat(selected.dataset.precio) || 0;
-            productos.push({
-                id: parseInt(select.value),
-                nombre: selected.text,
-                cantidad: cantidad,
-                precio: precio,
-                subtotal: precio * cantidad
+        // ============================================
+        // GUARDAR VENTA
+        // ============================================
+        async function guardarVenta() {
+            const esOfertaCheck = document.getElementById('esOferta');
+            const selectEmpresa = document.getElementById('ventaEmpresa');
+            const estadoSelect = document.getElementById('ventaEstado');
+            const facturaInput = document.getElementById('ventaFactura');
+            
+            const esOfertaVal = esOfertaCheck ? esOfertaCheck.checked : false;
+            const empresa = selectEmpresa ? selectEmpresa.value.trim() : null;
+            const estado = esOfertaVal ? 'oferta' : (estadoSelect ? estadoSelect.value : 'pagado');
+            const factura = (empresa && !esOfertaVal) ? (facturaInput ? facturaInput.value.trim() : null) : null;
+            
+            // Recolectar productos en formato array
+            let productosList = [];
+            let cliente = esOfertaVal ? '📄 OFERTA' : (empresa || 'Cliente sin empresa');
+            let total = 0;
+            
+            // Productos
+            document.querySelectorAll('#productosContainer .item-line').forEach(line => {
+                const select = line.querySelector('.select-producto');
+                const cantInput = line.querySelector('.input-cantidad');
+                if (select && select.value) {
+                    const selected = select.options[select.selectedIndex];
+                    const cantidad = parseInt(cantInput ? cantInput.value : 1) || 1;
+                    const precio = parseFloat(selected.dataset.precio) || 0;
+                    productosList.push({
+                        id: parseInt(select.value),
+                        nombre: selected.text,
+                        cantidad: cantidad,
+                        precio: precio,
+                        subtotal: precio * cantidad
+                    });
+                    total += precio * cantidad;
+                }
             });
-            total += precio * cantidad;
-        }
-    });
-    
-    // Servicios
-    document.querySelectorAll('#serviciosContainer .item-line').forEach(line => {
-        const select = line.querySelector('.select-servicio');
-        if (select && select.value) {
-            const selected = select.options[select.selectedIndex];
-            const precio = parseFloat(selected.dataset.precio) || 0;
-            productos.push({
-                id: parseInt(select.value),
-                nombre: selected.text,
-                cantidad: 1,
-                precio: precio,
-                subtotal: precio,
-                tipo: 'servicio'
+            
+            // Servicios
+            document.querySelectorAll('#serviciosContainer .item-line').forEach(line => {
+                const select = line.querySelector('.select-servicio');
+                if (select && select.value) {
+                    const selected = select.options[select.selectedIndex];
+                    const precio = parseFloat(selected.dataset.precio) || 0;
+                    productosList.push({
+                        id: parseInt(select.value),
+                        nombre: selected.text,
+                        cantidad: 1,
+                        precio: precio,
+                        subtotal: precio,
+                        tipo: 'servicio'
+                    });
+                    total += precio;
+                }
             });
-            total += precio;
+            
+            // Validar
+            if (productosList.length === 0) { 
+                mostrarMensaje('Agrega al menos un producto o servicio', 'error'); 
+                return; 
+            }
+            
+            const nombres = productosList.map(i => `${i.cantidad}x ${i.nombre}`).join(', ');
+            const primerItem = productosList[0];
+            
+            // Transferencia
+            let transId = null, transCedula = null, transBanco = null, transFecha = null;
+            if (!esOfertaVal && estado === 'transferencia') {
+                transId = document.getElementById('transferenciaId')?.value.trim() || null;
+                transCedula = document.getElementById('transferenciaCedula')?.value.trim() || null;
+                transBanco = document.getElementById('transferenciaBanco')?.value.trim() || null;
+                transFecha = document.getElementById('transferenciaFecha')?.value || null;
+            }
+            
+            // Datos para el backend
+            const data = {
+                cliente: cliente,
+                producto: nombres,
+                producto_id: primerItem.id || null,
+                cantidad: productosList.reduce((s, i) => s + i.cantidad, 0),
+                precio: parseFloat(total),
+                total: parseFloat(total),
+                empresa: empresa,
+                factura: factura,
+                tipo: productosList.length === 1 && productosList[0].tipo === 'servicio' ? 'servicio' : 'producto',
+                trabajador_id: trabajadorId || null,
+                estado: estado,
+                transferencia_id: transId,
+                transferencia_cedula: transCedula,
+                transferencia_banco: transBanco,
+                transferencia_fecha: transFecha,
+                productos: productosList,
+                es_oferta: esOfertaVal
+            };
+            
+            console.log('📤 Datos enviados:', JSON.stringify(data, null, 2));
+            
+            const btn = document.getElementById('btnGuardarVenta');
+            const textoOriginal = btn ? btn.textContent : '💾 Guardar';
+            if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
+            
+            try {
+                const response = await fetch('/api/ventas', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(data) 
+                });
+                
+                const responseText = await response.text();
+                console.log('📥 Respuesta:', responseText);
+                
+                let result;
+                try { result = JSON.parse(responseText); } catch (e) {
+                    console.error('Error parseando JSON:', e);
+                    mostrarMensaje('Error del servidor', 'error');
+                    if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
+                    return;
+                }
+                
+                if (result.success) {
+                    const mensajeFactura = result.numero_factura ? `\n📄 Factura: ${result.numero_factura}` : '';
+                    mostrarMensaje(`✅ ${esOfertaVal ? 'Oferta' : 'Venta'} registrada${mensajeFactura}`, 'exito');
+                    cerrarModal(); 
+                    cargarVentas(); 
+                    cargarProductos();
+                } else {
+                    mostrarMensaje(result.error || 'Error al guardar', 'error');
+                }
+            } catch (error) { 
+                console.error('Error:', error);
+                mostrarMensaje('Error de conexión: ' + error.message, 'error'); 
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
+            }
         }
-    });
-    
-    // ✅ Validar
-    if (productos.length === 0) { 
-        mostrarMensaje('Agrega al menos un producto o servicio', 'error'); 
-        return; 
-    }
-    
-    const nombres = productos.map(i => `${i.cantidad}x ${i.nombre}`).join(', ');
-    const primerItem = productos[0];
-    
-    // Transferencia
-    let transId = null, transCedula = null, transBanco = null, transFecha = null;
-    if (!esOfertaVal && estado === 'transferencia') {
-        transId = document.getElementById('transferenciaId')?.value.trim() || null;
-        transCedula = document.getElementById('transferenciaCedula')?.value.trim() || null;
-        transBanco = document.getElementById('transferenciaBanco')?.value.trim() || null;
-        transFecha = document.getElementById('transferenciaFecha')?.value || null;
-    }
-    
-    // ✅ Datos para el backend
-    const data = {
-        cliente: cliente,
-        producto: nombres,
-        producto_id: primerItem.id || null,
-        cantidad: productos.reduce((s, i) => s + i.cantidad, 0),
-        precio: parseFloat(total),
-        total: parseFloat(total),
-        empresa: empresa,
-        factura: factura,
-        tipo: productos.length === 1 && productos[0].tipo === 'servicio' ? 'servicio' : 'producto',
-        trabajador_id: trabajadorId || null,
-        estado: estado,
-        transferencia_id: transId,
-        transferencia_cedula: transCedula,
-        transferencia_banco: transBanco,
-        transferencia_fecha: transFecha,
-        productos: productos,
-        es_oferta: esOfertaVal
-    };
-    
-    console.log('📤 Datos enviados:', JSON.stringify(data, null, 2));
-    
-    const btn = document.getElementById('btnGuardarVenta');
-    const textoOriginal = btn ? btn.textContent : '💾 Guardar';
-    if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando...'; }
-    
-    try {
-        const response = await fetch('/api/ventas', { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify(data) 
-        });
-        
-        const responseText = await response.text();
-        console.log('📥 Respuesta:', responseText);
-        
-        let result;
-        try { result = JSON.parse(responseText); } catch (e) {
-            console.error('Error parseando JSON:', e);
-            mostrarMensaje('Error del servidor', 'error');
-            if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
-            return;
-        }
-        
-        if (result.success) {
-            const mensajeFactura = result.numero_factura ? `\n📄 Factura: ${result.numero_factura}` : '';
-            mostrarMensaje(`✅ ${esOfertaVal ? 'Oferta' : 'Venta'} registrada${mensajeFactura}`, 'exito');
-            cerrarModal(); 
-            cargarVentas(); 
-            cargarProductos();
-        } else {
-            mostrarMensaje(result.error || 'Error al guardar', 'error');
-        }
-    } catch (error) { 
-        console.error('Error:', error);
-        mostrarMensaje('Error de conexión: ' + error.message, 'error'); 
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = textoOriginal; }
-    }
-}
 
         // ============================================
         // CAMBIAR ESTADO DE VENTA
