@@ -1984,18 +1984,27 @@ def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, canti
                 transferencia_banco=None, transferencia_fecha=None):
     """
     Crea una nueva venta y descuenta el stock del producto
+    También registra comisiones para el trabajador si las tiene configuradas
     """
     conn = get_db()
     cursor = conn.cursor()
     try:
         fecha = datetime.now().isoformat()
+        fecha_date = datetime.now().date()
         
-        # Si es una oferta, no descontar stock
+        # Si es una oferta, no descontar stock ni registrar comisiones
         es_oferta = estado == 'oferta'
+        
+        # Obtener comisión del producto si existe
+        comision_producto = 0
+        if producto_id and not es_oferta:
+            cursor.execute('SELECT comision, negocio_id FROM productos WHERE id = %s', (producto_id,))
+            result = cursor.fetchone()
+            if result:
+                comision_producto = result[0] or 0
         
         # Si hay producto_id y NO es oferta, descontar stock
         if producto_id and not es_oferta:
-            # Verificar stock disponible
             cursor.execute('SELECT stock FROM productos WHERE id = %s AND negocio_id = %s', (producto_id, negocio_id))
             result = cursor.fetchone()
             if not result:
@@ -2009,7 +2018,6 @@ def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, canti
                 print(f"❌ Stock insuficiente: {stock_actual} < {cantidad}")
                 return None
             
-            # Descontar stock
             cursor.execute('''
                 UPDATE productos 
                 SET stock = stock - %s, updated_at = %s 
@@ -2038,6 +2046,42 @@ def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, canti
               transferencia_banco, transferencia_fecha, fecha, fecha))
         
         venta_id = cursor.fetchone()[0]
+        
+        # ============================================
+        # REGISTRAR COMISIÓN SI HAY TRABAJADOR Y NO ES OFERTA
+        # ============================================
+        if trabajador_id and not es_oferta and estado != 'cancelado':
+            # Calcular comisión (10% del total o la comisión específica del producto)
+            monto_comision = comision_producto if comision_producto > 0 else total * 0.10
+            
+            # Si hay producto_id, usar la comisión del producto, sino usar 10%
+            if comision_producto > 0:
+                monto_comision = comision_producto * cantidad
+            else:
+                monto_comision = total * 0.10
+            
+            # Limitar comisión a un máximo razonable
+            if monto_comision > total:
+                monto_comision = total * 0.10
+            
+            cursor.execute('''
+                INSERT INTO comisiones_trabajador (
+                    negocio_id, trabajador_id, venta_id, producto_id, 
+                    monto, fecha, created_at
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ''', (
+                negocio_id, 
+                trabajador_id, 
+                venta_id, 
+                producto_id,
+                monto_comision, 
+                fecha_date,
+                datetime.now()
+            ))
+            
+            print(f"✅ Comisión registrada: ${monto_comision:.2f} para trabajador {trabajador_id}")
+        
         conn.commit()
         conn.close()
         
