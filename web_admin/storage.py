@@ -107,8 +107,8 @@ class StorageManager:
                     q=query,
                     spaces='drive',
                     fields='files(id, name)',
-                    supportsAllDrives=True,  # ⭐ SOPORTE PARA SHARED DRIVE
-                    includeItemsFromAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True
                 ).execute()
 
                 folders = results.get('files', [])
@@ -123,7 +123,7 @@ class StorageManager:
                     folder = self.drive_service.files().create(
                         body=file_metadata,
                         fields='id',
-                        supportsAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
+                        supportsAllDrives=True
                     ).execute()
                     current_parent = folder.get('id')
                     print(f"✅ Carpeta creada: {part} (ID: {current_parent})")
@@ -139,14 +139,32 @@ class StorageManager:
             traceback.print_exc()
             return None
 
-         def subir_foto_producto(self, negocio_id, producto_id, archivo_foto, nombre_foto):
-                # ... (código de logs y verificación de use_local) ...
+    def subir_foto_producto(self, negocio_id, producto_id, archivo_foto, nombre_foto):
+        """
+        Sube una foto de producto a Google Drive (Shared Drive)
 
-                if self.use_local or not self.drive_service:
-                    print("📁 Usando almacenamiento LOCAL (fallback)")
-                    return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
+        Args:
+            negocio_id (int): ID del negocio
+            producto_id (int): ID del producto
+            archivo_foto: Archivo de imagen (objeto FileStorage)
+            nombre_foto (str): Nombre del archivo
 
-                try:
+        Returns:
+            bool: True si se subió correctamente
+        """
+        print("=" * 60)
+        print("📤 INICIANDO SUBIDA DE FOTO A SHARED DRIVE")
+        print(f"   Negocio ID: {negocio_id}")
+        print(f"   Producto ID: {producto_id}")
+        print(f"   Nombre: {nombre_foto}")
+        print(f"   Base Folder ID: {self.base_folder_id}")
+        print("=" * 60)
+
+        if self.use_local or not self.drive_service:
+            print("📁 Usando almacenamiento LOCAL (fallback)")
+            return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
+
+        try:
             # ============================================
             # PASO 0: VERIFICAR ACCESO A LA CARPETA BASE
             # ============================================
@@ -159,13 +177,12 @@ class StorageManager:
                     fields='files(id, name)',
                     supportsAllDrives=True,
                     includeItemsFromAllDrives=True,
-                    pageSize=1  # Solo necesitamos 1 para verificar
+                    pageSize=1
                 ).execute()
                 print("✅ Acceso a la carpeta base verificado.")
             except Exception as e:
                 print(f"❌ ERROR DE ACCESO A LA CARPETA BASE: {e}")
                 print("⚠️ La cuenta de servicio podría no tener permisos de escritura.")
-                # Si no podemos acceder, intentamos el fallback a local
                 return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
 
             # ============================================
@@ -174,7 +191,7 @@ class StorageManager:
             folder_path = f"negocio_{negocio_id}/productos/producto_{producto_id}"
             print(f"📁 Creando estructura de carpetas: {folder_path}")
 
-            folder_id = self._get_or_create_folder(folder_path, self.base_folder_id) # Pasamos explícitamente el ID base
+            folder_id = self._get_or_create_folder(folder_path, self.base_folder_id)
 
             if not folder_id:
                 print("❌ No se pudo crear carpeta en Google Drive, usando local")
@@ -183,39 +200,63 @@ class StorageManager:
             print(f"✅ Carpeta destino ID: {folder_id}")
 
             # ============================================
-            # PASO 2: Guardar archivo temporalmente (sin cambios)
+            # PASO 2: Guardar archivo temporalmente
             # ============================================
-            # ... (código existente para guardar el archivo temporal) ...
+            temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/temp')
+            os.makedirs(temp_dir, exist_ok=True)
+            temp_path = os.path.join(temp_dir, nombre_foto)
+
+            print(f"📁 Guardando archivo temporal en: {temp_path}")
+            archivo_foto.save(temp_path)
+
+            if not os.path.exists(temp_path):
+                print(f"❌ Error: No se pudo guardar el archivo temporal")
+                return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
+
+            file_size = os.path.getsize(temp_path)
+            print(f"📊 Tamaño del archivo: {file_size} bytes")
 
             # ============================================
             # PASO 3: Subir a Google Drive (Shared Drive)
             # ============================================
-            # ... (código existente para preparar la subida) ...
+            mime_type = 'image/jpeg'
+            if nombre_foto.lower().endswith('.png'):
+                mime_type = 'image/png'
+            elif nombre_foto.lower().endswith('.gif'):
+                mime_type = 'image/gif'
+            elif nombre_foto.lower().endswith('.webp'):
+                mime_type = 'image/webp'
 
-            # Asegurarse de que el file_metadata tenga los parents correctos
+            print(f"📤 Subiendo archivo a Google Drive...")
+            print(f"   MIME Type: {mime_type}")
+
             file_metadata = {
                 'name': nombre_foto,
-                'parents': [folder_id] # <--- Este es el ID de la carpeta hija
+                'parents': [folder_id]
             }
 
-            # ... (resto del código de subida) ...
+            media = MediaFileUpload(temp_path, mimetype=mime_type, resumable=True)
 
-        except Exception as e:
-            print(f"❌ Error subiendo a Google Drive: {e}")
-            import traceback
-            traceback.print_exc()
-            return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
+            try:
+                file = self.drive_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, webViewLink, webContentLink',
+                    supportsAllDrives=True
+                ).execute()
 
-    def _get_or_create_folder(self, path, parent_id=None):
-        # ... (código existente) ...
+                file_id = file.get('id')
+                print(f"✅ Archivo subido a Google Drive (ID: {file_id})")
 
-        # Añadir más logs para depuración
-        print(f"🔍 Buscando/Creando carpeta en: {path} con padre {parent_id}")
-
-        # Asegurarse de que parent_id sea siempre el ID de la carpeta base si no se proporciona
-        if not parent_id:
-            parent_id = self.base_folder_id
-            print(f"   Usando carpeta base por defecto: {parent_id}")
+            except HttpError as e:
+                print(f"❌ Error HTTP en Google Drive: {e}")
+                print(f"   Respuesta: {e.content}")
+                return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
+            except Exception as e:
+                print(f"❌ Error en subida a Google Drive: {e}")
+                import traceback
+                traceback.print_exc()
+                return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
 
             # ============================================
             # PASO 4: Eliminar archivo temporal
@@ -258,7 +299,7 @@ class StorageManager:
                 file = self.drive_service.files().get(
                     fileId=file_id,
                     fields='webViewLink, webContentLink',
-                    supportsAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
+                    supportsAllDrives=True
                 ).execute()
                 return file.get('webViewLink') or file.get('webContentLink')
             else:
@@ -273,8 +314,8 @@ class StorageManager:
                     q=f"name='{nombre_foto}' and '{folder_id}' in parents and trashed=false",
                     spaces='drive',
                     fields='files(id, webViewLink, webContentLink)',
-                    supportsAllDrives=True,  # ⭐ SOPORTE PARA SHARED DRIVE
-                    includeItemsFromAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True
                 ).execute()
 
                 files = results.get('files', [])
@@ -314,8 +355,8 @@ class StorageManager:
                 q=f"name='{nombre_foto}' and '{folder_id}' in parents and trashed=false",
                 spaces='drive',
                 fields='files(id)',
-                supportsAllDrives=True,  # ⭐ SOPORTE PARA SHARED DRIVE
-                includeItemsFromAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True
             ).execute()
 
             files = results.get('files', [])
@@ -391,7 +432,7 @@ class StorageManager:
                 body=file_metadata,
                 media_body=media,
                 fields='id',
-                supportsAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
+                supportsAllDrives=True
             ).execute()
 
             if os.path.exists(temp_path):
@@ -449,7 +490,7 @@ class StorageManager:
             if file_id:
                 self.drive_service.files().delete(
                     fileId=file_id,
-                    supportsAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
+                    supportsAllDrives=True
                 ).execute()
                 print(f"✅ Foto eliminada de Google Drive: {nombre_foto}")
                 return True
@@ -463,8 +504,8 @@ class StorageManager:
                         q=f"name='{nombre_foto}' and '{folder_id}' in parents and trashed=false",
                         spaces='drive',
                         fields='files(id)',
-                        supportsAllDrives=True,  # ⭐ SOPORTE PARA SHARED DRIVE
-                        includeItemsFromAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
+                        supportsAllDrives=True,
+                        includeItemsFromAllDrives=True
                     ).execute()
 
                     files = results.get('files', [])
@@ -472,7 +513,7 @@ class StorageManager:
                     if files:
                         self.drive_service.files().delete(
                             fileId=files[0]['id'],
-                            supportsAllDrives=True  # ⭐ SOPORTE PARA SHARED DRIVE
+                            supportsAllDrives=True
                         ).execute()
                         print(f"✅ Foto eliminada de Google Drive: {nombre_foto}")
                         return True
