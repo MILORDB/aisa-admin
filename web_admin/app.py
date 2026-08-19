@@ -2044,7 +2044,6 @@ def api_eliminar_producto(producto_id):
 @app.route('/api/producto/<int:producto_id>/foto', methods=['POST'])
 @login_required
 def api_subir_foto_producto(producto_id):
-    """Sube una foto para un producto a Google Drive"""
     token = request.cookies.get('token')
     usuario = obtener_usuario_sesion(token)
     
@@ -2073,18 +2072,18 @@ def api_subir_foto_producto(producto_id):
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
         
-        exito = storage.subir_foto_producto(negocio_id, producto_id, foto, nombre_foto)
+        # Llamar al método que ahora devuelve (exito, url, file_id)
+        exito, foto_url, file_id = storage.subir_foto_producto(negocio_id, producto_id, foto, nombre_foto)
         
-        if exito:
-            if not storage.use_local:
-                file_id = storage.obtener_file_id(negocio_id, producto_id, nombre_foto)
-                foto_url = storage.obtener_url_foto(negocio_id, producto_id, nombre_foto, file_id)
-                actualizar_foto_producto(producto_id, foto_url, file_id)
-            else:
-                foto_url = storage.obtener_url_foto(negocio_id, producto_id, nombre_foto)
-                actualizar_foto_producto(producto_id, foto_url)
+        if exito and foto_url:
+            # Actualizar la base de datos con la URL
+            actualizar_foto_producto(producto_id, foto_url, file_id)
             
-            return jsonify({'success': True, 'url': foto_url})
+            return jsonify({
+                'success': True, 
+                'url': foto_url,
+                'file_id': file_id
+            })
         else:
             return jsonify({'error': 'Error al subir la foto'}), 500
             
