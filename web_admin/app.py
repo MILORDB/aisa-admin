@@ -123,7 +123,8 @@ try:
         actualizar_preferencias_notificaciones,
         actualizar_servicio,
         obtener_categorias, obtener_subcategorias,
-        obtener_categoria_por_id, obtener_subcategoria_por_id
+        obtener_categoria_por_id, obtener_subcategoria_por_id,
+        regenerar_comisiones_trabajador
     )
     print("✅ Database importada correctamente")
 except ImportError as e:
@@ -672,6 +673,57 @@ def api_admin_db_status():
 
 
 # ============================================
+# API - DIAGNÓSTICO DE COMISIONES (NUEVO)
+# ============================================
+
+@app.route('/api/diagnostico/comisiones', methods=['GET'])
+@admin_required
+def api_diagnostico_comisiones():
+    """Diagnóstico para verificar comisiones registradas"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        # Total de comisiones registradas
+        cursor.execute('SELECT COUNT(*) as total FROM comisiones_trabajador')
+        total = cursor.fetchone()
+        
+        # Comisiones por trabajador
+        cursor.execute('''
+            SELECT trabajador_id, u.nombre, COUNT(*) as cantidad, COALESCE(SUM(monto), 0) as total_monto
+            FROM comisiones_trabajador c
+            JOIN usuarios u ON c.trabajador_id = u.id
+            GROUP BY trabajador_id, u.nombre
+            ORDER BY total_monto DESC
+        ''')
+        por_trabajador = cursor.fetchall()
+        
+        # Últimas 5 comisiones registradas
+        cursor.execute('''
+            SELECT c.*, u.nombre as trabajador_nombre, v.cliente, v.total as venta_total
+            FROM comisiones_trabajador c
+            JOIN usuarios u ON c.trabajador_id = u.id
+            JOIN ventas v ON c.venta_id = v.id
+            ORDER BY c.created_at DESC
+            LIMIT 5
+        ''')
+        ultimas = cursor.fetchall()
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'total_comisiones': total['total'] if total else 0,
+            'por_trabajador': [dict(t) for t in por_trabajador],
+            'ultimas': [dict(u) for u in ultimas]
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en diagnostico comisiones: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
 # API - CATEGORÍAS Y SUBCATEGORÍAS
 # ============================================
 
@@ -702,7 +754,7 @@ def api_obtener_subcategorias():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# API - OBTENER COMISIONES POR TRABAJADOR (NUEVO)
+# API - OBTENER COMISIONES POR TRABAJADOR
 # ============================================
 
 @app.route('/api/nomina/comisiones', methods=['GET'])
@@ -780,7 +832,7 @@ def api_obtener_comisiones_trabajador():
 
 
 # ============================================
-# API - DETALLE DE NÓMINA CON COMISIONES (NUEVO)
+# API - DETALLE DE NÓMINA CON COMISIONES
 # ============================================
 
 @app.route('/api/nomina/detalle', methods=['GET'])
@@ -874,6 +926,82 @@ def api_detalle_nomina():
         
     except Exception as e:
         print(f"❌ Error en api_detalle_nomina: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
+# API - REGENERAR COMISIONES (NUEVO)
+# ============================================
+
+@app.route('/api/nomina/regenerar-comisiones', methods=['POST'])
+@admin_required
+def api_regenerar_comisiones():
+    """Regenera comisiones para un trabajador basado en sus ventas"""
+    data = request.get_json()
+    trabajador_id = data.get('trabajador_id')
+    mes = data.get('mes', datetime.now().month)
+    ano = data.get('ano', datetime.now().year)
+    
+    if not trabajador_id:
+        return jsonify({'error': 'trabajador_id es requerido'}), 400
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Verificar que el trabajador existe
+        cursor.execute('SELECT id FROM usuarios WHERE id = %s AND rol = %s', (trabajador_id, 'trabajador'))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({'error': 'Trabajador no encontrado'}), 404
+        
+        # Eliminar comisiones existentes para este mes
+        cursor.execute('''
+            DELETE FROM comisiones_trabajador 
+            WHERE trabajador_id = %s 
+            AND EXTRACT(MONTH FROM fecha) = %s 
+            AND EXTRACT(YEAR FROM fecha) = %s
+        ''', (trabajador_id, mes, ano))
+        
+        # Regenerar comisiones desde ventas (10% del total)
+        cursor.execute('''
+            INSERT INTO comisiones_trabajador (negocio_id, trabajador_id, venta_id, producto_id, monto, fecha, created_at)
+            SELECT 
+                negocio_id, 
+                trabajador_id, 
+                id as venta_id, 
+                producto_id, 
+                total * 0.10 as monto, 
+                fecha::date, 
+                CURRENT_TIMESTAMP
+            FROM ventas
+            WHERE trabajador_id = %s 
+            AND estado = 'pagado'
+            AND EXTRACT(MONTH FROM fecha) = %s 
+            AND EXTRACT(YEAR FROM fecha) = %s
+        ''', (trabajador_id, mes, ano))
+        
+        # Contar cuántas comisiones se regeneraron
+        cursor.execute('''
+            SELECT COUNT(*) FROM comisiones_trabajador 
+            WHERE trabajador_id = %s 
+            AND EXTRACT(MONTH FROM fecha) = %s 
+            AND EXTRACT(YEAR FROM fecha) = %s
+        ''', (trabajador_id, mes, ano))
+        count = cursor.fetchone()[0]
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Se regeneraron {count} comisiones para el trabajador',
+            'cantidad': count
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en regenerar comisiones: {e}")
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
