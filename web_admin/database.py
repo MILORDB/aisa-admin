@@ -1654,6 +1654,7 @@ def actualizar_foto_producto(producto_id, foto_url, foto_public_id=None):
     ''', (foto_url, foto_public_id, datetime.now().isoformat(), producto_id))
     conn.commit()
     conn.close()
+    print(f"✅ Foto actualizada en BD: producto {producto_id} -> {foto_url}")
 
 def eliminar_foto_producto(producto_id):
     conn = get_db()
