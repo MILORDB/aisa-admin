@@ -117,6 +117,15 @@
         }
         .trabajador-card .estado.activo { background: #224422; color: #6bff6b; }
         .trabajador-card .estado.inactivo { background: #442222; color: #ff6b6b; }
+        .trabajador-card .comision-tag {
+            font-size: 10px;
+            color: #ff9800;
+            background: rgba(255,152,0,0.1);
+            padding: 1px 8px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-top: 2px;
+        }
         
         .empty { text-align: center; color: #888; padding: 30px; font-size: 13px; }
         .loading { text-align: center; color: #888; padding: 20px; font-size: 13px; }
@@ -203,6 +212,7 @@
             border: 1px solid transparent;
             user-select: none;
             min-height: 30px;
+            position: relative;
         }
         .calendario-grid .dia:hover {
             border-color: #6c3ce0;
@@ -254,6 +264,13 @@
         .calendario-grid .dia .numero-dia {
             font-weight: 600;
         }
+        .calendario-grid .dia .comision-indicator {
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            font-size: 7px;
+            color: #ff9800;
+        }
         .calendario-leyenda {
             display: flex;
             gap: 12px;
@@ -277,9 +294,10 @@
         .calendario-leyenda .color.ausente { background: #3a1a1a; border: 1px solid #f44336; }
         .calendario-leyenda .color.extra { background: #1a2a3a; border: 1px solid #2196f3; }
         .calendario-leyenda .color.vacio { background: #1a1a2e; border: 1px solid #2a2a3e; }
+        .calendario-leyenda .color.comision { background: rgba(255,152,0,0.3); border: 1px solid #ff9800; }
         
         /* ============================================
-           RESUMEN DE NÓMINA
+           RESUMEN DE NÓMINA CON COMISIONES
            ============================================ */
         .resumen-nomina {
             display: grid;
@@ -301,7 +319,7 @@
         }
         .resumen-nomina .item .numero.total { color: #6c3ce0; }
         .resumen-nomina .item .numero.salario { color: #6bff6b; }
-        .resumen-nomina .item .numero.comisiones { color: #2196f3; }
+        .resumen-nomina .item .numero.comisiones { color: #ff9800; }
         .resumen-nomina .item .label {
             font-size: 9px;
             color: #888;
@@ -322,7 +340,7 @@
         }
         
         /* ============================================
-           MODAL DE DETALLE
+           MODAL DE DETALLE CON COMISIONES
            ============================================ */
         .modal-overlay {
             display: none;
@@ -342,7 +360,7 @@
             background: #1a1a2e;
             padding: 20px;
             border-radius: 10px;
-            max-width: 500px;
+            max-width: 550px;
             width: 100%;
             border: 1px solid #2a2a3e;
             max-height: 90vh;
@@ -360,12 +378,12 @@
         .modal-content .detalle-item .label { color: #888; font-size: 12px; }
         .modal-content .detalle-item .value { font-weight: 600; font-size: 13px; }
         .modal-content .detalle-item .value.total { color: #6c3ce0; font-size: 16px; }
-        .modal-content .detalle-item .value.comision { color: #2196f3; }
+        .modal-content .detalle-item .value.comision { color: #ff9800; }
         .modal-content .form-actions { display: flex; gap: 8px; margin-top: 14px; border-top: 1px solid #2a2a3e; padding-top: 12px; }
         .modal-content .form-actions .btn { flex: 1; }
         
         .comisiones-list {
-            max-height: 120px;
+            max-height: 150px;
             overflow-y: auto;
             margin-top: 8px;
         }
@@ -377,7 +395,14 @@
             font-size: 11px;
         }
         .comisiones-list .comision-item .producto { color: #aaa; }
-        .comisiones-list .comision-item .monto { color: #2196f3; font-weight: 600; }
+        .comisiones-list .comision-item .monto { color: #ff9800; font-weight: 600; }
+        .comisiones-list .comision-item .fecha { color: #666; font-size: 10px; }
+        .comisiones-list .empty-comisiones {
+            color: #888;
+            font-size: 11px;
+            text-align: center;
+            padding: 8px;
+        }
         
         .seleccionado-info {
             background: rgba(108,60,224,0.05);
@@ -394,6 +419,7 @@
         .seleccionado-info .info { font-size: 12px; }
         .seleccionado-info .info .nombre { color: #6c3ce0; font-weight: 600; }
         .seleccionado-info .info .salario { color: #6bff6b; }
+        .seleccionado-info .info .comisiones { color: #ff9800; }
         
         @media (max-width: 600px) {
             body { padding: 8px; }
@@ -414,7 +440,7 @@
 <body>
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:6px;">
-        <h1 style="font-size:18px;display:flex;align-items:center;gap:8px;">📊 Nómina <span style="font-size:12px;font-weight:normal;opacity:0.7;">Gestión de salarios</span></h1>
+        <h1 style="font-size:18px;display:flex;align-items:center;gap:8px;">📊 Nómina <span style="font-size:12px;font-weight:normal;opacity:0.7;">Gestión de salarios y comisiones</span></h1>
     </div>
 
     <div class="mensaje-error" id="mensajeError"></div>
@@ -458,7 +484,7 @@
     ============================================ -->
     <div class="card">
         <h2>👥 Trabajadores</h2>
-        <div class="subtitle">Selecciona un trabajador para gestionar su asistencia</div>
+        <div class="subtitle">Selecciona un trabajador para gestionar su asistencia y ver sus comisiones</div>
         <div id="trabajadoresContainer">
             <div class="loading">Cargando trabajadores...</div>
         </div>
@@ -473,7 +499,9 @@
                 <div class="info">
                     👤 <span class="nombre" id="trabajadorNombre">-</span>
                     <span style="color:#888;margin:0 8px;">|</span>
-                    💰 Salario mensual: <span class="salario" id="trabajadorSalario">$0</span>
+                    💰 Salario: <span class="salario" id="trabajadorSalario">$0</span>
+                    <span style="color:#888;margin:0 8px;">|</span>
+                    💵 Comisiones: <span class="comisiones" id="trabajadorComisiones">$0</span>
                 </div>
                 <div>
                     <span style="font-size:11px;color:#888;" id="trabajadorCargo">-</span>
@@ -498,11 +526,12 @@
                     <span class="item"><span class="color ausente"></span> Ausente</span>
                     <span class="item"><span class="color extra"></span> Extra</span>
                     <span class="item"><span class="color vacio"></span> Sin marcar</span>
+                    <span class="item"><span class="color comision"></span> Con comisión</span>
                 </div>
             </div>
         </div>
 
-        <!-- Resumen de nómina -->
+        <!-- Resumen de nómina con comisiones -->
         <div class="card">
             <h2>💰 Resumen de Nómina</h2>
             <div class="subtitle" id="resumenSubtitulo">Cargando...</div>
@@ -532,6 +561,10 @@
                     <span class="numero" id="resumenDiasExtras" style="color:#2196f3;">0</span>
                     <span class="label">⭐ Días extras</span>
                 </div>
+                <div class="item">
+                    <span class="numero" id="resumenVentas" style="color:#6c3ce0;">0</span>
+                    <span class="label">💰 Ventas realizadas</span>
+                </div>
             </div>
 
             <div class="acciones-nomina">
@@ -540,10 +573,19 @@
                 <button class="btn btn-warning" onclick="generarReporteNomina()">📄 Reporte</button>
             </div>
         </div>
+
+        <!-- Comisiones del trabajador -->
+        <div class="card">
+            <h2>💵 Comisiones del Mes</h2>
+            <div class="subtitle" id="comisionesSubtitulo">Cargando comisiones...</div>
+            <div id="comisionesList">
+                <div class="loading">Cargando comisiones...</div>
+            </div>
+        </div>
     </div>
 
     <!-- ============================================
-    MODAL DETALLE DE NÓMINA
+    MODAL DETALLE DE NÓMINA CON COMISIONES
     ============================================ -->
     <div class="modal-overlay" id="modalDetalle">
         <div class="modal-content">
@@ -579,7 +621,7 @@
                     <span class="label">📈 Salario Devengado</span>
                     <span class="value" id="detSalarioDevengado">$0</span>
                 </div>
-                <div class="detalle-item">
+                <div class="detalle-item" style="border-bottom: 1px solid #ff9800;">
                     <span class="label">💵 Comisiones</span>
                     <span class="value comision" id="detComisiones">$0</span>
                 </div>
@@ -587,17 +629,22 @@
                     <span class="label" style="font-weight:700;">💰 TOTAL</span>
                     <span class="value total" id="detTotal">$0</span>
                 </div>
+                <div class="detalle-item">
+                    <span class="label">📊 Ventas realizadas</span>
+                    <span class="value" id="detVentas">0</span>
+                </div>
             </div>
 
             <div style="margin-top:12px;">
-                <h4 style="font-size:12px;color:#2196f3;margin-bottom:6px;">📋 Comisiones del Mes</h4>
+                <h4 style="font-size:12px;color:#ff9800;margin-bottom:6px;">📋 Detalle de Comisiones</h4>
                 <div class="comisiones-list" id="detComisionesList">
-                    <div style="color:#888;font-size:11px;text-align:center;padding:8px;">No hay comisiones registradas</div>
+                    <div class="empty-comisiones">No hay comisiones registradas</div>
                 </div>
             </div>
 
             <div class="form-actions">
                 <button class="btn btn-primary" onclick="cerrarModal()">✕ Cerrar</button>
+                <button class="btn btn-warning" onclick="generarReporteNomina()">📄 Reporte</button>
             </div>
         </div>
     </div>
@@ -609,6 +656,7 @@
         let trabajadores = [];
         let trabajadorSeleccionado = null;
         let asistencias = {};
+        let comisiones = [];
         let mesActual = new Date().getMonth() + 1;
         let anoActual = new Date().getFullYear();
         let mesCalendario = mesActual;
@@ -682,7 +730,6 @@
                 
                 renderTrabajadores();
                 
-                // Si hay trabajadores y no hay selección, seleccionar el primero
                 if (!trabajadorSeleccionado) {
                     const activos = trabajadores.filter(t => t.activo === 1);
                     if (activos.length > 0) {
@@ -692,7 +739,6 @@
                     }
                 }
                 
-                // Verificar que el trabajador seleccionado aún existe
                 const existe = trabajadores.some(t => t.id === trabajadorSeleccionado.id);
                 if (!existe) {
                     trabajadorSeleccionado = trabajadores[0];
@@ -736,11 +782,18 @@
                 const card = document.createElement('div');
                 card.className = `trabajador-card ${seleccionado}`;
                 card.dataset.id = t.id;
+                
+                let comisionHtml = '';
+                if (t.comisiones_total && t.comisiones_total > 0) {
+                    comisionHtml = `<div class="comision-tag">💵 $${t.comisiones_total.toFixed(2)}</div>`;
+                }
+                
                 card.innerHTML = `
                     <span class="avatar">${iniciales}</span>
                     <div class="nombre">${nombreCompleto}</div>
                     <div class="cargo">${t.cargo || 'Trabajador'}</div>
                     <div class="salario">💰 $${(t.salario || 0).toFixed(2)}</div>
+                    ${comisionHtml}
                     <span class="estado ${estadoClass}">${estadoText}</span>
                 `;
                 card.addEventListener('click', () => seleccionarTrabajador(t.id));
@@ -759,23 +812,20 @@
             
             trabajadorSeleccionado = trabajador;
             
-            // Actualizar cards
             document.querySelectorAll('.trabajador-card').forEach(card => {
                 card.classList.toggle('seleccionado', parseInt(card.dataset.id) === id);
             });
             
-            // Mostrar container de nómina
             document.getElementById('nominaContainer').style.display = 'block';
             
-            // Actualizar info del trabajador
             const nombreCompleto = trabajador.apellidos ? `${trabajador.nombre} ${trabajador.apellidos}` : trabajador.nombre;
             document.getElementById('trabajadorNombre').textContent = nombreCompleto;
             document.getElementById('trabajadorSalario').textContent = `$${(trabajador.salario || 0).toFixed(2)}`;
             document.getElementById('trabajadorCargo').textContent = trabajador.cargo || 'Trabajador';
             
-            // Cargar calendario y nómina
             cargarCalendario();
             cargarResumenNomina();
+            cargarComisionesTrabajador();
         }
 
         // ============================================
@@ -805,7 +855,6 @@
             
             grid.innerHTML = '';
             
-            // Días de la semana
             const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
             diasSemana.forEach(d => {
                 const div = document.createElement('div');
@@ -814,50 +863,43 @@
                 grid.appendChild(div);
             });
             
-            // Obtener días del mes
             const primerDia = new Date(anoCalendario, mesCalendario - 1, 1);
             const ultimoDia = new Date(anoCalendario, mesCalendario, 0);
             const diasMes = ultimoDia.getDate();
-            const diaInicioSemana = primerDia.getDay(); // 0=Dom, 1=Lun...
-            
-            // Ajustar para que la semana empiece en lunes
+            const diaInicioSemana = primerDia.getDay();
             let offset = diaInicioSemana === 0 ? 6 : diaInicioSemana - 1;
             
-            // Días vacíos al inicio
             for (let i = 0; i < offset; i++) {
                 const div = document.createElement('div');
                 div.className = 'dia vacio';
                 grid.appendChild(div);
             }
             
-            // Obtener asistencias del trabajador para este mes
+            // Obtener asistencias y comisiones
             const fechaKey = `${anoCalendario}-${String(mesCalendario).padStart(2, '0')}`;
             const asistenciasMes = asistencias[fechaKey] || {};
-            
-            // Obtener comisiones del trabajador
-            const comisiones = await obtenerComisionesTrabajador();
-            const diasConComisiones = new Set();
-            if (comisiones && comisiones.length > 0) {
-                comisiones.forEach(c => {
-                    if (c.fecha) {
-                        const fecha = c.fecha.split('T')[0];
-                        const partes = fecha.split('-');
-                        const d = parseInt(partes[2]);
-                        const m = parseInt(partes[1]);
-                        const a = parseInt(partes[0]);
-                        if (a === anoCalendario && m === mesCalendario) {
-                            diasConComisiones.add(d);
-                        }
-                    }
-                });
-            }
             
             const hoy = new Date();
             const hoyDia = hoy.getDate();
             const hoyMes = hoy.getMonth() + 1;
             const hoyAno = hoy.getFullYear();
             
-            // Días del mes
+            // Obtener comisiones del trabajador para este mes
+            const comisionesData = await obtenerComisionesTrabajador();
+            const diasConComisiones = new Set();
+            comisionesData.forEach(c => {
+                if (c.fecha) {
+                    const fecha = c.fecha.split('T')[0];
+                    const partes = fecha.split('-');
+                    const d = parseInt(partes[2]);
+                    const m = parseInt(partes[1]);
+                    const a = parseInt(partes[0]);
+                    if (a === anoCalendario && m === mesCalendario) {
+                        diasConComisiones.add(d);
+                    }
+                }
+            });
+            
             for (let d = 1; d <= diasMes; d++) {
                 const div = document.createElement('div');
                 div.className = 'dia';
@@ -866,7 +908,6 @@
                 const fechaStr = `${anoCalendario}-${String(mesCalendario).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                 const estado = asistenciasMes[d] || 'sin_marcar';
                 
-                // Determinar si es futuro
                 const esFuturo = (anoCalendario > hoyAno) || 
                                  (anoCalendario === hoyAno && mesCalendario > hoyMes) ||
                                  (anoCalendario === hoyAno && mesCalendario === hoyMes && d > hoyDia);
@@ -883,7 +924,6 @@
                     div.classList.add('extra');
                 }
                 
-                // Mostrar indicador de comisión
                 let badge = '';
                 if (diasConComisiones.has(d) && !esFuturo) {
                     badge = ' 💵';
@@ -891,7 +931,6 @@
                 
                 div.innerHTML = `<span class="numero-dia">${d}</span>${badge}`;
                 
-                // Evento click para marcar/desmarcar
                 if (!esFuturo) {
                     div.addEventListener('click', () => toggleAsistencia(d));
                 }
@@ -899,7 +938,6 @@
                 grid.appendChild(div);
             }
             
-            // Actualizar resumen de nómina
             cargarResumenNomina();
         }
 
@@ -926,10 +964,7 @@
             }
             
             asistencias[fechaKey][dia] = nuevoEstado;
-            
-            // Guardar en el servidor
             guardarAsistencia(dia, nuevoEstado);
-            
             cargarCalendario();
         }
 
@@ -981,7 +1016,82 @@
         }
 
         // ============================================
-        // CARGAR RESUMEN DE NÓMINA
+        // CARGAR COMISIONES DEL TRABAJADOR
+        // ============================================
+        async function cargarComisionesTrabajador() {
+            const container = document.getElementById('comisionesList');
+            const subtitle = document.getElementById('comisionesSubtitulo');
+            
+            if (!trabajadorSeleccionado) {
+                container.innerHTML = '<div class="empty">Selecciona un trabajador</div>';
+                return;
+            }
+            
+            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+            subtitle.textContent = `${trabajadorSeleccionado.nombre} - ${meses[mesCalendario - 1]} ${anoCalendario}`;
+            
+            container.innerHTML = '<div class="loading">Cargando comisiones...</div>';
+            
+            try {
+                const comisionesData = await obtenerComisionesTrabajador();
+                comisiones = comisionesData;
+                
+                if (comisiones.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty" style="padding:15px;">
+                            💵 No hay comisiones registradas para este trabajador en este mes
+                            <div style="font-size:11px;color:#666;margin-top:4px;">
+                                Las comisiones se generan automáticamente al registrar ventas
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let totalComisiones = 0;
+                let html = '<div style="margin-top:4px;">';
+                
+                comisiones.forEach(c => {
+                    totalComisiones += parseFloat(c.monto || 0);
+                    const fecha = c.fecha ? new Date(c.fecha).toLocaleDateString('es-ES') : '-';
+                    const producto = c.producto_nombre || 'Producto';
+                    const cliente = c.cliente || 'Cliente';
+                    
+                    html += `
+                        <div class="comision-item">
+                            <span>
+                                <span class="producto">${producto}</span>
+                                <span style="color:#666;font-size:10px;"> - ${cliente}</span>
+                            </span>
+                            <span>
+                                <span class="monto">$${parseFloat(c.monto || 0).toFixed(2)}</span>
+                                <span class="fecha">${fecha}</span>
+                            </span>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                    <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:2px solid #ff9800;margin-top:4px;">
+                        <span style="font-weight:600;color:#ff9800;">💵 Total Comisiones</span>
+                        <span style="font-weight:700;color:#ff9800;font-size:16px;">$${totalComisiones.toFixed(2)}</span>
+                    </div>
+                `;
+                
+                html += '</div>';
+                container.innerHTML = html;
+                
+                document.getElementById('trabajadorComisiones').textContent = `$${totalComisiones.toFixed(2)}`;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                container.innerHTML = '<div class="empty">❌ Error al cargar comisiones</div>';
+            }
+        }
+
+        // ============================================
+        // CARGAR RESUMEN DE NÓMINA CON COMISIONES
         // ============================================
         async function cargarResumenNomina() {
             if (!trabajadorSeleccionado) return;
@@ -1013,9 +1123,7 @@
                 } else if (estado === 'ausente') diasAusencia++;
             }
             
-            // Si no hay asistencias registradas, usar días laborables aproximados
             if (diasTrabajados === 0 && diasAusencia === 0 && diasExtras === 0) {
-                // Calcular días laborables (lunes a viernes)
                 for (let d = 1; d <= diasMes; d++) {
                     const esFuturo = (anoCalendario > hoyAno) || 
                                      (anoCalendario === hoyAno && mesCalendario > hoyMes) ||
@@ -1034,21 +1142,19 @@
             document.getElementById('resumenDiasAusencia').textContent = diasAusencia;
             document.getElementById('resumenDiasExtras').textContent = diasExtras;
             
-            // Calcular salario
             const salarioBase = trabajadorSeleccionado.salario || 0;
             const diasDelMes = new Date(anoCalendario, mesCalendario, 0).getDate();
             const salarioDiario = diasDelMes > 0 ? salarioBase / diasDelMes : 0;
             const salarioDevengado = salarioDiario * diasTrabajados;
             
-            // Obtener comisiones
-            const comisiones = await obtenerComisionesTrabajador();
-            const totalComisiones = comisiones.reduce((sum, c) => sum + parseFloat(c.monto || 0), 0);
-            
+            const comisionesData = await obtenerComisionesTrabajador();
+            const totalComisiones = comisionesData.reduce((sum, c) => sum + parseFloat(c.monto || 0), 0);
             const total = salarioDevengado + totalComisiones;
             
             document.getElementById('resumenSalarioDevengado').textContent = `$${salarioDevengado.toFixed(2)}`;
             document.getElementById('resumenComisiones').textContent = `$${totalComisiones.toFixed(2)}`;
             document.getElementById('resumenTotal').textContent = `$${total.toFixed(2)}`;
+            document.getElementById('resumenVentas').textContent = comisionesData.length || 0;
             
             const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
                           'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -1087,7 +1193,6 @@
                 }
             }
             
-            // Si no hay asistencias, usar días laborables
             if (diasTrabajados === 0) {
                 for (let d = 1; d <= diasMes; d++) {
                     const esFuturo = (anoCalendario > hoyAno) || 
@@ -1111,7 +1216,6 @@
             const mesNombre = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
                               'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][mesCalendario - 1];
             
-            // Guardar nómina en el servidor
             guardarNomina(trabajadorSeleccionado.id, diasTrabajados);
             
             mostrarMensaje(`✅ Nómina calculada para ${trabajadorSeleccionado.nombre} - ${mesNombre} ${anoCalendario}`, 'exito');
@@ -1144,7 +1248,7 @@
         }
 
         // ============================================
-        // VER DETALLE DE NÓMINA
+        // VER DETALLE DE NÓMINA CON COMISIONES
         // ============================================
         async function verDetalleNomina() {
             if (!trabajadorSeleccionado) {
@@ -1181,22 +1285,29 @@
                 document.getElementById('detSalarioDevengado').textContent = `$${d.salario_devengado.toFixed(2)}`;
                 document.getElementById('detComisiones').textContent = `$${(d.comisiones || 0).toFixed(2)}`;
                 document.getElementById('detTotal').textContent = `$${d.total.toFixed(2)}`;
+                document.getElementById('detVentas').textContent = d.comisiones_list ? d.comisiones_list.length : 0;
                 
-                // Comisiones list
                 const listContainer = document.getElementById('detComisionesList');
                 if (d.comisiones_list && d.comisiones_list.length > 0) {
                     let html = '';
                     d.comisiones_list.forEach(c => {
+                        const fecha = c.fecha ? new Date(c.fecha).toLocaleDateString('es-ES') : '-';
                         html += `
                             <div class="comision-item">
-                                <span class="producto">${c.producto_nombre || 'Producto'} - ${c.cliente || 'Cliente'}</span>
-                                <span class="monto">$${parseFloat(c.monto).toFixed(2)}</span>
+                                <span>
+                                    <span class="producto">${c.producto_nombre || 'Producto'}</span>
+                                    <span style="color:#666;font-size:10px;"> - ${c.cliente || 'Cliente'}</span>
+                                </span>
+                                <span>
+                                    <span class="monto">$${parseFloat(c.monto).toFixed(2)}</span>
+                                    <span class="fecha">${fecha}</span>
+                                </span>
                             </div>
                         `;
                     });
                     listContainer.innerHTML = html;
                 } else {
-                    listContainer.innerHTML = '<div style="color:#888;font-size:11px;text-align:center;padding:8px;">No hay comisiones registradas</div>';
+                    listContainer.innerHTML = '<div class="empty-comisiones">No hay comisiones registradas</div>';
                 }
                 
                 document.getElementById('modalDetalle').classList.add('show');
@@ -1276,9 +1387,9 @@
         initSelectores();
         cargarTrabajadores();
 
-        // Actualizar cada 60 segundos
         setInterval(() => {
             cargarResumenNomina();
+            cargarComisionesTrabajador();
         }, 60000);
     </script>
 </body>
