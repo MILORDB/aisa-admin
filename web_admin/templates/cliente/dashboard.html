@@ -384,7 +384,7 @@
         .empty-state .icon { font-size: 40px; margin-bottom: 10px; display: block; }
         
         /* ============================================
-           MODAL DE PRODUCTO (NUEVA DISPOSICIÓN)
+           MODAL DE PRODUCTO - EFECTO CRISTAL NEVADO
            ============================================ */
         .modal-overlay {
             display: none;
@@ -393,52 +393,54 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.85);
+            background: rgba(15, 15, 26, 0.75);
+            backdrop-filter: blur(12px) saturate(1.2);
+            -webkit-backdrop-filter: blur(12px) saturate(1.2);
             z-index: 2000;
             align-items: center;
             justify-content: center;
             padding: 16px;
-            backdrop-filter: blur(4px);
             animation: fadeIn 0.3s ease;
         }
         .modal-overlay.show { display: flex; }
         
         @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
         
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; transform: translateY(30px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
         
         .modal-content {
-            background: #1a1a2e;
+            background: rgba(26, 26, 46, 0.85);
+            backdrop-filter: blur(16px) saturate(1.3);
+            -webkit-backdrop-filter: blur(16px) saturate(1.3);
             border-radius: 16px;
             max-width: 900px;
             width: 100%;
             max-height: 95vh;
             overflow-y: auto;
-            border: 1px solid #2a2a3e;
+            border: 1px solid rgba(255, 255, 255, 0.08);
             position: relative;
-            animation: slideUp 0.3s ease;
-            display: flex;
-            flex-direction: column;
+            animation: slideUp 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05);
         }
         .modal-content::-webkit-scrollbar {
             width: 4px;
         }
         .modal-content::-webkit-scrollbar-track {
-            background: #0f0f1a;
+            background: rgba(255,255,255,0.02);
             border-radius: 4px;
         }
         .modal-content::-webkit-scrollbar-thumb {
-            background: #2a2a3e;
+            background: rgba(108, 60, 224, 0.4);
             border-radius: 4px;
         }
         .modal-content::-webkit-scrollbar-thumb:hover {
-            background: #6c3ce0;
+            background: rgba(108, 60, 224, 0.6);
         }
         
         .modal-close {
@@ -448,22 +450,20 @@
             float: right;
             background: rgba(255,255,255,0.05);
             border: none;
-            color: #888;
+            color: rgba(255,255,255,0.5);
             font-size: 24px;
             padding: 8px 16px;
             cursor: pointer;
             border-radius: 0 16px 0 12px;
-            transition: background 0.3s;
+            transition: background 0.3s, color 0.3s;
             z-index: 10;
+            backdrop-filter: blur(4px);
         }
         .modal-close:hover {
             background: rgba(255,255,255,0.1);
             color: #fff;
         }
         
-        /* ============================================
-           MODAL - CUERPO PRINCIPAL (2 COLUMNAS)
-           ============================================ */
         .modal-body {
             padding: 16px 20px 20px 20px;
             flex: 1;
@@ -487,13 +487,13 @@
             min-height: 250px;
             max-height: 350px;
             border-radius: 10px;
-            background: #0f0f1a;
+            background: rgba(15, 15, 26, 0.5);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 64px;
-            color: #444;
-            border: 2px dashed #2a2a3e;
+            color: rgba(255,255,255,0.15);
+            border: 2px dashed rgba(255,255,255,0.06);
             object-fit: contain;
         }
         
@@ -501,7 +501,7 @@
         .modal-col-info {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
         .modal-col-info .modal-nombre {
             font-size: 24px;
@@ -510,17 +510,18 @@
         }
         .modal-col-info .modal-categoria {
             font-size: 13px;
-            color: #888;
+            color: rgba(255,255,255,0.5);
         }
         .modal-col-info .modal-subcategoria {
             font-size: 12px;
-            color: #666;
+            color: rgba(255,255,255,0.3);
         }
         .modal-col-info .modal-precio {
             font-size: 28px;
             color: #6c3ce0;
             font-weight: 700;
             margin: 4px 0;
+            text-shadow: 0 0 30px rgba(108, 60, 224, 0.2);
         }
         .modal-col-info .modal-stock {
             display: inline-block;
@@ -533,22 +534,26 @@
         .modal-col-info .modal-stock.disponible {
             background: rgba(76,175,80,0.15);
             color: #6bff6b;
+            border: 1px solid rgba(76,175,80,0.15);
         }
         .modal-col-info .modal-stock.bajo {
             background: rgba(255,152,0,0.15);
             color: #ffbb33;
+            border: 1px solid rgba(255,152,0,0.15);
         }
         .modal-col-info .modal-stock.agotado {
             background: rgba(244,67,54,0.15);
             color: #ff6b6b;
+            border: 1px solid rgba(244,67,54,0.15);
         }
         .modal-col-info .modal-stock.servicio {
             background: rgba(33,150,243,0.15);
             color: #64b5f6;
+            border: 1px solid rgba(33,150,243,0.15);
         }
         .modal-col-info .modal-descripcion {
             font-size: 13px;
-            color: #aaa;
+            color: rgba(255,255,255,0.6);
             line-height: 1.6;
             margin: 4px 0;
         }
@@ -559,14 +564,15 @@
         
         .modal-col-info .modal-negocio {
             background: rgba(108,60,224,0.05);
-            border: 1px solid #2a2a3e;
+            border: 1px solid rgba(108,60,224,0.1);
             border-radius: 8px;
             padding: 10px 14px;
             margin: 4px 0;
+            backdrop-filter: blur(4px);
         }
         .modal-col-info .modal-negocio .label {
             font-size: 10px;
-            color: #666;
+            color: rgba(255,255,255,0.3);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -577,7 +583,7 @@
         }
         .modal-col-info .modal-negocio .direccion {
             font-size: 12px;
-            color: #888;
+            color: rgba(255,255,255,0.4);
             margin-top: 2px;
         }
         
@@ -586,7 +592,7 @@
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
-            margin-top: 8px;
+            margin-top: 6px;
         }
         .modal-actions .btn {
             flex: 1;
@@ -599,30 +605,33 @@
             transition: all 0.3s;
             text-align: center;
             min-width: 120px;
+            backdrop-filter: blur(4px);
         }
         .modal-actions .btn-telefono {
-            background: #4caf50;
-            color: #fff;
+            background: rgba(76,175,80,0.15);
+            color: #6bff6b;
+            border: 1px solid rgba(76,175,80,0.15);
         }
         .modal-actions .btn-telefono:hover {
-            background: #3d8b40;
+            background: rgba(76,175,80,0.25);
             transform: scale(1.02);
         }
         .modal-actions .btn-telefono:disabled {
-            opacity: 0.4;
+            opacity: 0.3;
             cursor: not-allowed;
             transform: none;
         }
         .modal-actions .btn-mapa {
-            background: #2196f3;
-            color: #fff;
+            background: rgba(33,150,243,0.15);
+            color: #64b5f6;
+            border: 1px solid rgba(33,150,243,0.15);
         }
         .modal-actions .btn-mapa:hover {
-            background: #1976d2;
+            background: rgba(33,150,243,0.25);
             transform: scale(1.02);
         }
         .modal-actions .btn-mapa:disabled {
-            opacity: 0.4;
+            opacity: 0.3;
             cursor: not-allowed;
             transform: none;
         }
@@ -632,7 +641,7 @@
             margin-top: 10px;
             border-radius: 10px;
             overflow: hidden;
-            border: 1px solid #2a2a3e;
+            border: 1px solid rgba(255,255,255,0.05);
             display: none;
             width: 100%;
         }
@@ -642,14 +651,14 @@
         .modal-mapa-container #modalMapa {
             width: 100%;
             height: 200px;
-            background: #0f0f1a;
+            background: rgba(15, 15, 26, 0.5);
         }
         
         /* ============================================
            MODAL - PRODUCTOS RELACIONADOS
            ============================================ */
         .modal-relacionados {
-            border-top: 1px solid #2a2a3e;
+            border-top: 1px solid rgba(255,255,255,0.05);
             padding-top: 14px;
             margin-top: 4px;
         }
@@ -664,7 +673,7 @@
         }
         .modal-relacionados .titulo .badge {
             font-size: 10px;
-            color: #888;
+            color: rgba(255,255,255,0.3);
             font-weight: 400;
         }
         .modal-relacionados .relacionados-scroll {
@@ -679,19 +688,19 @@
             height: 3px;
         }
         .modal-relacionados .relacionados-scroll::-webkit-scrollbar-track {
-            background: #1a1a2e;
+            background: rgba(255,255,255,0.02);
             border-radius: 4px;
         }
         .modal-relacionados .relacionados-scroll::-webkit-scrollbar-thumb {
-            background: #6c3ce0;
+            background: rgba(108, 60, 224, 0.3);
             border-radius: 4px;
         }
         
         .modal-relacionados .relacionado-item {
             min-width: 120px;
             max-width: 140px;
-            background: #0f0f1a;
-            border: 1px solid #2a2a3e;
+            background: rgba(15, 15, 26, 0.5);
+            border: 1px solid rgba(255,255,255,0.05);
             border-radius: 8px;
             padding: 8px;
             cursor: pointer;
@@ -699,22 +708,24 @@
             scroll-snap-align: start;
             flex-shrink: 0;
             text-align: center;
+            backdrop-filter: blur(4px);
         }
         .modal-relacionados .relacionado-item:hover {
-            border-color: #6c3ce0;
+            border-color: rgba(108, 60, 224, 0.3);
             transform: translateY(-2px);
+            background: rgba(108, 60, 224, 0.05);
         }
         .modal-relacionados .relacionado-item .foto-mini {
             width: 100%;
             height: 70px;
             border-radius: 6px;
-            background: #1a1a2e;
+            background: rgba(15, 15, 26, 0.5);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 28px;
-            color: #444;
-            border: 1px dashed #2a2a3e;
+            color: rgba(255,255,255,0.1);
+            border: 1px dashed rgba(255,255,255,0.05);
             margin-bottom: 4px;
         }
         .modal-relacionados .relacionado-item .nombre-mini {
@@ -723,6 +734,7 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            color: rgba(255,255,255,0.8);
         }
         .modal-relacionados .relacionado-item .precio-mini {
             font-size: 12px;
@@ -939,7 +951,7 @@
     </div>
 
     <!-- ============================================
-    MODAL DE PRODUCTO (NUEVA DISPOSICIÓN)
+    MODAL DE PRODUCTO - EFECTO CRISTAL NEVADO
     ============================================ -->
     <div class="modal-overlay" id="modalProducto">
         <div class="modal-content">
@@ -1276,13 +1288,11 @@
         function obtenerProductosRelacionados(productoActual, productos) {
             if (!productos || productos.length === 0) return [];
             
-            // Filtrar por el mismo negocio y excluir el producto actual
             const relacionados = productos.filter(p => 
                 p.negocio_id === productoActual.negocio_id && 
                 p.id !== productoActual.id
             );
             
-            // Limitar a 10 productos
             return relacionados.slice(0, 10);
         }
 
@@ -1296,7 +1306,6 @@
             
             console.log('🔄 Abriendo modal para:', producto.nombre);
             
-            // Determinar estado del stock
             const esServicio = producto.tipo === 'servicio';
             let stockClase = 'disponible';
             let stockTexto = '✅ Disponible';
@@ -1321,17 +1330,16 @@
             const tieneTelefono = telefono !== 'No disponible' && telefono !== '';
             const categoriaDisplay = producto.categoria_nombre || producto.categoria || '';
             const subcategoriaDisplay = producto.subcategoria_nombre || '';
+            const negocioNombre = producto.negocio_nombre || producto.negocio_username || 'Negocio';
             
-            // Obtener productos relacionados del mismo negocio
             const relacionados = obtenerProductosRelacionados(producto, tiendaProductos);
             
-            // Construir HTML del modal con nueva disposición
             let relacionadosHTML = '';
             if (relacionados.length > 0) {
                 relacionadosHTML = `
                     <div class="modal-relacionados">
                         <div class="titulo">
-                            🏪 Otros productos de este negocio
+                            🏪 Otros productos de <span style="color:#fff;">${negocioNombre}</span>
                             <span class="badge">${relacionados.length} disponibles</span>
                         </div>
                         <div class="relacionados-scroll">
@@ -1378,7 +1386,7 @@
                         
                         <div class="modal-negocio">
                             <div class="label">🏢 Negocio</div>
-                            <div class="nombre">${producto.negocio_nombre || producto.negocio_username || 'Negocio'}</div>
+                            <div class="nombre">${negocioNombre}</div>
                             ${producto.direccion ? `<div class="direccion">📍 ${producto.direccion}</div>` : ''}
                             ${producto.provincia && producto.municipio ? 
                                 `<div class="direccion">📍 ${producto.provincia}, ${producto.municipio}</div>` : ''}
