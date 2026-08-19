@@ -139,14 +139,14 @@ class StorageManager:
             traceback.print_exc()
             return None
 
- def subir_foto_producto(self, negocio_id, producto_id, archivo_foto, nombre_foto):
-        # ... (código de logs y verificación de use_local) ...
+         def subir_foto_producto(self, negocio_id, producto_id, archivo_foto, nombre_foto):
+                # ... (código de logs y verificación de use_local) ...
 
-        if self.use_local or not self.drive_service:
-            print("📁 Usando almacenamiento LOCAL (fallback)")
-            return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
+                if self.use_local or not self.drive_service:
+                    print("📁 Usando almacenamiento LOCAL (fallback)")
+                    return self._guardar_local(negocio_id, producto_id, archivo_foto, nombre_foto)
 
-        try:
+                try:
             # ============================================
             # PASO 0: VERIFICAR ACCESO A LA CARPETA BASE
             # ============================================
