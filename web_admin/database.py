@@ -1984,7 +1984,7 @@ def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, canti
                 transferencia_banco=None, transferencia_fecha=None):
     """
     Crea una nueva venta y descuenta el stock del producto
-    También registra comisiones para el trabajador si las tiene configuradas
+    También registra comisiones para el trabajador
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -2052,9 +2052,6 @@ def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, canti
         # ============================================
         if trabajador_id and not es_oferta and estado != 'cancelado':
             # Calcular comisión (10% del total o la comisión específica del producto)
-            monto_comision = comision_producto if comision_producto > 0 else total * 0.10
-            
-            # Si hay producto_id, usar la comisión del producto, sino usar 10%
             if comision_producto > 0:
                 monto_comision = comision_producto * cantidad
             else:
@@ -2063,6 +2060,8 @@ def crear_venta(negocio_id, trabajador_id, cliente, producto, producto_id, canti
             # Limitar comisión a un máximo razonable
             if monto_comision > total:
                 monto_comision = total * 0.10
+            
+            print(f"💰 Registrando comisión: ${monto_comision:.2f} para trabajador {trabajador_id}")
             
             cursor.execute('''
                 INSERT INTO comisiones_trabajador (
