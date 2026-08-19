@@ -203,8 +203,44 @@
             padding-left: 24px;
         }
 
-        /* ESTADÍSTICAS SUPERIORES - OCULTAS PARA TRABAJADOR */
-        .stats-resumen {
+        /* ============================================
+           ESTADÍSTICAS PARA TRABAJADORES
+           ============================================ */
+        .stats-trabajador {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .stats-trabajador .stat-item {
+            background: #0f0f1a;
+            border: 1px solid #2a2a3e;
+            border-radius: 8px;
+            padding: 14px 16px;
+            text-align: center;
+        }
+        .stats-trabajador .stat-item .number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #6c3ce0;
+            display: block;
+        }
+        .stats-trabajador .stat-item .number.comisiones {
+            color: #ff9800;
+        }
+        .stats-trabajador .stat-item .label {
+            font-size: 11px;
+            color: #888;
+            margin-top: 2px;
+        }
+        .stats-trabajador .stat-item .sub-label {
+            font-size: 10px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        /* Estadísticas para negocio (ocultas para trabajador) */
+        .stats-negocio {
             display: none;
         }
 
@@ -222,10 +258,15 @@
             .tabla { font-size: 11px; }
             .tabla th, .tabla td { padding: 4px 6px; }
             .oferta-section { padding: 6px 8px; }
+            .stats-trabajador { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .stats-trabajador .stat-item .number { font-size: 22px; }
         }
         @media (max-width: 400px) {
             .tabla { font-size: 10px; }
             .tabla th, .tabla td { padding: 3px 4px; }
+            .stats-trabajador { grid-template-columns: 1fr 1fr; gap: 4px; }
+            .stats-trabajador .stat-item { padding: 8px 10px; }
+            .stats-trabajador .stat-item .number { font-size: 18px; }
         }
     </style>
 </head>
@@ -238,8 +279,8 @@
     <div class="mensaje-error" id="mensajeError"></div>
     <div class="mensaje-exito" id="mensajeExito"></div>
 
-    <!-- ESTADÍSTICAS OCULTAS PARA TRABAJADOR -->
-    <div class="card stats-resumen" id="statsResumen">
+    <!-- ESTADÍSTICAS PARA NEGOCIO (ocultas para trabajador) -->
+    <div class="card stats-negocio" id="statsNegocio">
         <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(80px, 1fr));gap:6px;">
             <div style="background:#0f0f1a;border:1px solid #2a2a3e;border-radius:6px;padding:6px;text-align:center;">
                 <div style="font-size:16px;font-weight:700;color:#6c3ce0;" id="totalVentas">0</div>
@@ -261,6 +302,25 @@
                 <div style="font-size:16px;font-weight:700;color:#ff9800;" id="totalOfertas">0</div>
                 <div style="font-size:8px;color:#888;">📄 Ofertas</div>
             </div>
+        </div>
+    </div>
+
+    <!-- ESTADÍSTICAS PARA TRABAJADOR (visible solo para trabajadores) -->
+    <div class="card stats-trabajador" id="statsTrabajador" style="display:none;">
+        <div class="stat-item">
+            <span class="number" id="ventasHoy">0</span>
+            <span class="label">💰 Ventas de hoy</span>
+            <div class="sub-label">📅 <span id="fechaHoyTexto">-</span></div>
+        </div>
+        <div class="stat-item">
+            <span class="number comisiones" id="comisionesHoy">$0</span>
+            <span class="label">💵 Comisiones ganadas</span>
+            <div class="sub-label">📊 <span id="totalVentasHoy">0</span> ventas realizadas</div>
+        </div>
+        <div class="stat-item">
+            <span class="number" id="clientesHoy">0</span>
+            <span class="label">👥 Clientes atendidos</span>
+            <div class="sub-label">🔄 <span id="promedioVentaHoy">$0</span> promedio por venta</div>
         </div>
     </div>
 
@@ -447,12 +507,21 @@
             console.log('📊 Iniciando módulo de ventas...');
             console.log('📊 Trabajador ID:', trabajadorId);
             
+            // Mostrar estadísticas según el rol
+            const statsNegocio = document.getElementById('statsNegocio');
+            const statsTrabajador = document.getElementById('statsTrabajador');
+            
             if (trabajadorId) {
+                // Es trabajador - mostrar estadísticas de trabajador
+                if (statsNegocio) statsNegocio.style.display = 'none';
+                if (statsTrabajador) statsTrabajador.style.display = 'grid';
+                
                 const input = document.getElementById('ventaTrabajador');
                 if (input) input.value = trabajadorId;
-                // Ocultar estadísticas para trabajador
-                const stats = document.getElementById('statsResumen');
-                if (stats) stats.style.display = 'none';
+            } else {
+                // Es negocio - mostrar estadísticas de negocio
+                if (statsNegocio) statsNegocio.style.display = 'block';
+                if (statsTrabajador) statsTrabajador.style.display = 'none';
             }
             
             // Asignar event listeners
@@ -467,6 +536,11 @@
                 btnCancelar.removeEventListener('click', cerrarModal);
                 btnCancelar.addEventListener('click', cerrarModal);
             }
+            
+            // Fecha actual para el trabajador
+            const hoy = new Date();
+            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('fechaHoyTexto').textContent = hoy.toLocaleDateString('es-ES', opciones);
             
             cargarVentas();
             cargarProductos();
@@ -501,6 +575,7 @@
                 
                 renderVentas();
                 actualizarResumenVentas();
+                actualizarEstadisticasTrabajador();
             } catch (error) {
                 console.error('Error cargando ventas:', error);
                 if (container) {
@@ -587,10 +662,9 @@
         }
 
         // ============================================
-        // ACTUALIZAR RESUMEN DE VENTAS
+        // ACTUALIZAR RESUMEN DE VENTAS (para negocio)
         // ============================================
         function actualizarResumenVentas() {
-            // Solo actualizar si el elemento existe y no está oculto
             const totalEl = document.getElementById('totalVentas');
             if (!totalEl) return;
             
@@ -605,6 +679,53 @@
             document.getElementById('totalPendiente').textContent = pendiente;
             document.getElementById('totalCancelado').textContent = cancelado;
             document.getElementById('totalOfertas').textContent = oferta;
+        }
+
+        // ============================================
+        // ACTUALIZAR ESTADÍSTICAS PARA TRABAJADOR
+        // ============================================
+        function actualizarEstadisticasTrabajador() {
+            if (!trabajadorId) return;
+            
+            const hoy = new Date().toISOString().split('T')[0];
+            
+            // Filtrar ventas del día de hoy para este trabajador
+            const ventasHoy = ventas.filter(v => 
+                v.trabajador_id == trabajadorId && 
+                v.fecha && 
+                v.fecha.startsWith(hoy) &&
+                v.estado !== 'cancelado' &&
+                v.estado !== 'oferta'
+            );
+            
+            // Filtrar ventas de hoy (incluyendo ofertas para conteo)
+            const ventasHoyTotal = ventas.filter(v => 
+                v.trabajador_id == trabajadorId && 
+                v.fecha && 
+                v.fecha.startsWith(hoy) &&
+                v.estado !== 'cancelado'
+            );
+            
+            // Calcular total de ventas de hoy
+            const totalVentasHoy = ventasHoy.length;
+            const totalIngresosHoy = ventasHoy.reduce((sum, v) => sum + parseFloat(v.total || 0), 0);
+            
+            // Calcular comisiones (simuladas - 10% de cada venta)
+            // En un sistema real, las comisiones vendrían de la base de datos
+            const comisionesHoy = totalIngresosHoy * 0.10;
+            
+            // Clientes únicos atendidos hoy
+            const clientesUnicos = new Set(ventasHoy.map(v => v.cliente)).size;
+            
+            // Promedio por venta
+            const promedioVenta = totalVentasHoy > 0 ? totalIngresosHoy / totalVentasHoy : 0;
+            
+            // Actualizar UI
+            document.getElementById('ventasHoy').textContent = totalVentasHoy;
+            document.getElementById('comisionesHoy').textContent = `$${comisionesHoy.toFixed(2)}`;
+            document.getElementById('clientesHoy').textContent = clientesUnicos;
+            document.getElementById('totalVentasHoy').textContent = totalVentasHoy;
+            document.getElementById('promedioVentaHoy').textContent = `$${promedioVenta.toFixed(2)}`;
         }
 
         // ============================================
