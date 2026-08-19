@@ -70,7 +70,7 @@ try:
         crear_venta, obtener_ventas, obtener_todas_ventas, obtener_estadisticas_ventas,
         eliminar_venta_con_reintegro,
         actualizar_estado_venta,
-        crear_servicio, obtener_servicios, obtener_todos_servicios,toggle_servicio, eliminar_servicio, actualizar_servicio,
+        crear_servicio, obtener_servicios, obtener_todos_servicios, toggle_servicio, eliminar_servicio,
         obtener_estadisticas_trabajador,
         crear_trabajador_negocio, toggle_trabajador_negocio, actualizar_trabajador_negocio,
         obtener_trabajadores_pendientes, aprobar_trabajador, rechazar_trabajador,
@@ -646,6 +646,15 @@ def api_admin_db_status():
         """)
         tiene_descripcion_servicios = cursor.fetchone() is not None
         
+        # Verificar si existe la tabla comisiones_trabajador
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'comisiones_trabajador'
+            )
+        """)
+        existe_comisiones = cursor.fetchone()[0]
+        
         conn.close()
         
         return jsonify({
@@ -653,7 +662,8 @@ def api_admin_db_status():
             'tablas': tablas,
             'info_tablas': info_tablas,
             'tiene_descripcion_productos': tiene_descripcion_productos,
-            'tiene_descripcion_servicios': tiene_descripcion_servicios
+            'tiene_descripcion_servicios': tiene_descripcion_servicios,
+            'existe_comisiones_trabajador': existe_comisiones
         })
         
     except Exception as e:
@@ -689,6 +699,182 @@ def api_obtener_subcategorias():
         return jsonify([dict(s) for s in subcategorias])
     except Exception as e:
         print(f"❌ Error en api_obtener_subcategorias: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# ============================================
+# API - OBTENER COMISIONES POR TRABAJADOR (NUEVO)
+# ============================================
+
+@app.route('/api/nomina/comisiones', methods=['GET'])
+@login_required
+def api_obtener_comisiones_trabajador():
+    """Obtiene las comisiones de un trabajador específico"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    trabajador_id = request.args.get('trabajador_id')
+    mes = request.args.get('mes')
+    ano = request.args.get('ano')
+    
+    if not trabajador_id:
+        return jsonify({'error': 'trabajador_id es requerido'}), 400
+    
+    # Verificar que el usuario tiene acceso a este trabajador
+    if usuario.get('rol') != 'admin':
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT negocio_id FROM trabajadores_negocio 
+            WHERE trabajador_id = %s AND negocio_id = %s
+        ''', (trabajador_id, negocio_id))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({'error': 'No tienes acceso a este trabajador'}), 403
+        conn.close()
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        query = '''
+            SELECT c.*, 
+                   p.nombre as producto_nombre, 
+                   v.cliente, 
+                   v.fecha as venta_fecha,
+                   v.total as venta_total
+            FROM comisiones_trabajador c
+            LEFT JOIN productos p ON c.producto_id = p.id
+            LEFT JOIN ventas v ON c.venta_id = v.id
+            WHERE c.trabajador_id = %s
+        '''
+        params = [trabajador_id]
+        
+        if mes and ano:
+            query += ' AND EXTRACT(MONTH FROM c.fecha) = %s AND EXTRACT(YEAR FROM c.fecha) = %s'
+            params.append(int(mes))
+            params.append(int(ano))
+        
+        query += ' ORDER BY c.fecha DESC'
+        
+        cursor.execute(query, params)
+        comisiones = cursor.fetchall()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'comisiones': [dict(c) for c in comisiones],
+            'total': len(comisiones)
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_obtener_comisiones_trabajador: {e}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================
+# API - DETALLE DE NÓMINA CON COMISIONES (NUEVO)
+# ============================================
+
+@app.route('/api/nomina/detalle', methods=['GET'])
+@login_required
+def api_detalle_nomina():
+    """Obtiene el detalle completo de nómina de un trabajador incluyendo comisiones"""
+    token = request.cookies.get('token')
+    usuario = obtener_usuario_sesion(token)
+    
+    if not usuario:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    trabajador_id = request.args.get('trabajador_id')
+    mes = request.args.get('mes', datetime.now().month, type=int)
+    ano = request.args.get('ano', datetime.now().year, type=int)
+    
+    if not trabajador_id:
+        return jsonify({'error': 'trabajador_id es requerido'}), 400
+    
+    # Verificar acceso
+    if usuario.get('rol') != 'admin':
+        negocio_id = usuario.get('id')
+        if usuario.get('rol') == 'trabajador':
+            negocio_id = obtener_negocio_de_trabajador(usuario['id'])
+        
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT negocio_id FROM trabajadores_negocio 
+            WHERE trabajador_id = %s AND negocio_id = %s
+        ''', (trabajador_id, negocio_id))
+        if not cursor.fetchone():
+            conn.close()
+            return jsonify({'error': 'No tienes acceso a este trabajador'}), 403
+        conn.close()
+    
+    try:
+        # Obtener datos del trabajador
+        trabajador = obtener_trabajador_por_id(trabajador_id)
+        if not trabajador:
+            return jsonify({'error': 'Trabajador no encontrado'}), 404
+        
+        # Obtener comisiones del mes
+        conn = get_db()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('''
+            SELECT c.*, p.nombre as producto_nombre, v.cliente, v.fecha as venta_fecha
+            FROM comisiones_trabajador c
+            LEFT JOIN productos p ON c.producto_id = p.id
+            LEFT JOIN ventas v ON c.venta_id = v.id
+            WHERE c.trabajador_id = %s 
+            AND EXTRACT(MONTH FROM c.fecha) = %s 
+            AND EXTRACT(YEAR FROM c.fecha) = %s
+            ORDER BY c.fecha DESC
+        ''', (trabajador_id, mes, ano))
+        comisiones = cursor.fetchall()
+        conn.close()
+        
+        # Calcular total de comisiones
+        total_comisiones = sum(c.get('monto', 0) for c in comisiones) if comisiones else 0
+        
+        # Datos de nómina
+        salario_base = trabajador.get('salario', 0)
+        dias_mes = monthrange(ano, mes)[1]
+        salario_diario = salario_base / dias_mes if dias_mes > 0 else 0
+        
+        # Obtener días trabajados (simulado)
+        dias_trabajados = 20  # Valor por defecto
+        dias_ausencia = 0
+        dias_extras = 0
+        salario_devengado = salario_diario * dias_trabajados
+        total = salario_devengado + total_comisiones
+        
+        return jsonify({
+            'success': True,
+            'detalle': {
+                'trabajador_id': trabajador_id,
+                'nombre': trabajador.get('nombre'),
+                'salario_base': salario_base,
+                'dias_mes': dias_mes,
+                'dias_trabajados': dias_trabajados,
+                'dias_ausencia': dias_ausencia,
+                'dias_extras': dias_extras,
+                'salario_diario': salario_diario,
+                'salario_devengado': salario_devengado,
+                'comisiones': total_comisiones,
+                'comisiones_list': [dict(c) for c in comisiones],
+                'total': total
+            }
+        })
+        
+    except Exception as e:
+        print(f"❌ Error en api_detalle_nomina: {e}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 # ============================================
@@ -2186,11 +2372,9 @@ def api_obtener_servicios():
             negocio_id = obtener_negocio_de_trabajador(usuario['id'])
             if not negocio_id:
                 return jsonify({'error': 'No estás asignado a ningún negocio'}), 403
-        
-        # Obtener todos los servicios del negocio (sin filtrar por trabajador)
-        servicios = obtener_servicios(negocio_id, None)
-        
-        print(f"📋 Servicios encontrados para negocio {negocio_id}: {len(servicios)}")
+            servicios = obtener_servicios(negocio_id, usuario['id'])
+        else:
+            servicios = obtener_servicios(negocio_id)
         
         return jsonify([dict(s) for s in servicios])
     except Exception as e:
@@ -2225,7 +2409,6 @@ def api_crear_servicio():
     
     print(f"📝 Creando servicio: {nombre}, categoria_id={categoria_id}, subcategoria_id={subcategoria_id}, precio={precio}")
     
-    # Validar campos obligatorios
     if not nombre or not categoria_id or precio is None:
         return jsonify({'success': False, 'error': 'Nombre, categoría y precio son obligatorios'}), 400
     
@@ -2243,7 +2426,7 @@ def api_crear_servicio():
             negocio_id, 
             trabajador_id, 
             nombre, 
-            categoria_id, 
+            categoria_id,
             subcategoria_id,
             float(precio), 
             int(duracion), 
